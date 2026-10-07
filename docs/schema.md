@@ -160,7 +160,7 @@ Alle domeintabellen hebben `tenantId → tenants.id` (niet getekend).
 
 ### Afbeeldingen (lokaal, geen Cloudflare)
 - `ProductImage.storageKey` = origineel, conventie `{tenantId}/products/{productId}/{imageId}.{ext}` (tenant-**id**, niet slug — slugs kunnen wijzigen).
-- Varianten maakt `sharp` **volgens conventie** naast het origineel: `{tenantId}/products/{productId}/{imageId}/{variant}.webp` met variant ∈ `thumb` (320), `card` (640), `large` (1600), `blur` (64, geblurd voor gevoelige items). De set varianten staat in code.
+- Varianten maakt `sharp` **volgens conventie** naast het origineel: `{tenantId}/products/{productId}/{imageId}/{variant}.webp` met variant ∈ `thumb` (320w), `card` (800w), `large` (2000w), `blur` (24w, placeholder; ook als data-URL). De set varianten staat in code.
 - `variants Json?` = manifest na verwerking (`{ name: { key, width, height, bytes } }`); `null` + `processedAt null` = nog niet verwerkt. Zo kan de UI srcset/afmetingen bouwen zonder bestanden te statten, en kan een herverwerking (nieuwe variantset) gedetecteerd worden.
 - `sortOrder 0` = hoofdfoto. `legacyCloudflareId` bewaart de bron voor de ETL-download.
 

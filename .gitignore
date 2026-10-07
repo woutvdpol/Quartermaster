@@ -17,8 +17,8 @@ coverage/
 .turbo/
 
 # Uploads
-uploads/
-public/uploads/
+/uploads/
+/public/uploads/
 
 # OS / IDE
 .DS_Store
