@@ -1,7 +1,7 @@
 # Private local data (dumps, exports)
 .local/
-*.sql
-*.sql.gz
+/*.sql
+/*.sql.gz
 
 # Env
 .env
