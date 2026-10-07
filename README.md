@@ -2,7 +2,7 @@
 
 Multi-tenant webshop platform for militaria dealers. Successor of **Concept500** (Laravel 12 · Backpack · Livewire), rebuilt on **Next.js** and **Prisma**.
 
-> **Status:** phase 0–2 done — admin (catalog, orders, customers, sourcing, CMS, newsletter, settings, shipping, Mollie, users, platform) is functional. Next: phase 3, the storefront. Plans and decisions in [`docs/`](docs).
+> **Status:** phases 0–3 done — admin and storefront (catalog, product pages, cart with 15-minute holds, checkout with Mollie, customer accounts, wishlist, CMS pages, SEO) are functional. Next: phase 4 (migration from Concept500 and go-live) and phase 5 (extras). Plans and decisions in [`docs/`](docs).
 
 ## Goals
 
@@ -69,6 +69,7 @@ npm run db:up        # Postgres 18 on 127.0.0.1:54329
 npm run db:migrate   # prisma migrate dev
 npm run db:seed      # local superadmin + demo tenant (credentials from .env)
 npm run db:seed:demo # optional: products with photos, orders, customers, zones, page views
+# Admin: http://localhost:3000/admin  ·  Demo shop: http://concept.localhost:3000
 npm run dev          # http://localhost:3000
 ```
 
