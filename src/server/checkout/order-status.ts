@@ -27,6 +27,9 @@ export type OrderStatusView = {
   email: string;
   lines: { title: string; quantity: number; unitPrice: number; lineTotal: number; imageUrl: string | null }[];
   subtotal: number;
+  /** Coupon discount (0 without). */
+  discountTotal: number;
+  couponCode: string | null;
   shippingTotal: number;
   total: number;
   shipping: { method: "SHIP" | "PICKUP"; option: string | null; name: string; city: string; country: string } | null;
@@ -71,6 +74,8 @@ export async function getOrderStatusView(tenantId: string, uuid: string): Promis
       currency: true,
       email: true,
       subtotal: true,
+      discountTotal: true,
+      couponCode: true,
       shippingTotal: true,
       total: true,
       shippingMethod: true,
@@ -126,6 +131,8 @@ export async function getOrderStatusView(tenantId: string, uuid: string): Promis
       imageUrl: l.imagePath ? imageUrl(l.imagePath) : null,
     })),
     subtotal: order.subtotal,
+    discountTotal: order.discountTotal,
+    couponCode: order.couponCode,
     shippingTotal: order.shippingTotal,
     total: order.total,
     shipping: ship

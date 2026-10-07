@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { cn } from "@/components/shop/ui/cn";
 import { Badge } from "@/components/shop/ui/Badge";
-import { formatMoney } from "@/components/shop/ui/money";
+import { formatIndicative, formatMoney } from "@/components/shop/ui/money";
+import type { DisplayCurrency } from "@/components/shop/ui/types";
+import { uiCopy } from "@/components/shop/ui/_copy";
 import { ReservationCountdown } from "./ReservationCountdown";
 import { PendingButton } from "./PendingButton";
 import { reReserveAction, removeFromCartAction } from "./actions";
@@ -14,6 +16,12 @@ export type CartLineData = {
   title: string;
   href: string;
   price: number;
+  /** List price (differs from `price` when an agreed offer price applies). */
+  listPrice?: number;
+  /** Bought at an agreed offer price. */
+  offerApplied?: boolean;
+  /** Came from an offer whose agreed price no longer applies (list price is charged). */
+  offerExpired?: boolean;
   currency: string;
   imageUrl: string | null;
   imageAlt: string;
@@ -26,8 +34,20 @@ export type CartLineData = {
 };
 
 /** One cart row (server component; remove / re-add are plain forms → work without JS). */
-export function CartLineItem({ line, compact = false }: { line: CartLineData; compact?: boolean }) {
+export function CartLineItem({
+  line,
+  compact = false,
+  display = null,
+  notice = null,
+}: {
+  line: CartLineData;
+  compact?: boolean;
+  display?: DisplayCurrency | null;
+  /** Extra per-line warning (e.g. "can't be shipped to Germany"). */
+  notice?: string | null;
+}) {
   const dim = line.state === "unavailable" || line.state === "taken";
+  const indicative = display && !dim && display.currency !== line.currency ? formatIndicative(line.price, line.currency, display.currency, display.rate) : null;
   return (
     <li className="flex gap-3 py-4 sm:gap-4">
       <Link
@@ -55,6 +75,19 @@ export function CartLineItem({ line, compact = false }: { line: CartLineData; co
             {formatMoney(line.price, line.currency)}
           </span>
         </div>
+        {indicative ? (
+          <p className="self-end text-xs text-shop-muted tabular-nums" title={uiCopy.price.indicativeTitle}>
+            ≈ {indicative} · {uiCopy.price.indicative}
+          </p>
+        ) : null}
+        {line.offerApplied && line.listPrice !== undefined ? (
+          <p className="flex flex-wrap items-center gap-2 text-xs">
+            <Badge tone="ok">{cartCopy.offerLine.agreed}</Badge>
+            <s className="text-shop-muted">{cartCopy.offerLine.listPrice(formatMoney(line.listPrice, line.currency))}</s>
+          </p>
+        ) : null}
+        {line.offerExpired ? <p className="text-xs text-shop-warn">{cartCopy.offerLine.expired}</p> : null}
+        {notice ? <p className="text-xs text-shop-warn">{notice}</p> : null}
 
         {line.state === "held" && line.expiresAt ? <ReservationCountdown expiresAt={line.expiresAt} className="self-start" /> : null}
         {line.state === "lapsed" ? (

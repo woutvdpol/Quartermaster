@@ -158,6 +158,15 @@ async function OrderContent({ params }: { params: PageProps<"/order/[uuid]">["pa
             <dt className="text-shop-ink-2">{t.subtotal}</dt>
             <dd className="tabular-nums">{fmt(view.subtotal)}</dd>
           </div>
+          {view.discountTotal > 0 ? (
+            <div className="flex justify-between">
+              <dt className="text-shop-ink-2">
+                {cartCopy.coupon.discount}
+                {view.couponCode ? <span className="text-shop-muted"> · {view.couponCode}</span> : null}
+              </dt>
+              <dd className="tabular-nums">−{fmt(view.discountTotal)}</dd>
+            </div>
+          ) : null}
           <div className="flex justify-between">
             <dt className="text-shop-ink-2">
               {t.shipping}

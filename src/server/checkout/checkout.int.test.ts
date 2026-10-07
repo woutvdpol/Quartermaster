@@ -213,6 +213,30 @@ describe("placeOrder", () => {
     expect(await db.order.count()).toBe(1);
   });
 
+  it("compliance NO_SHIPPING: quote leaves only pickup, placing with delivery is refused per item", async () => {
+    const restricted = await makeProduct(tenantId, { title: "Bayonet" });
+    const plain = await makeProduct(tenantId, { title: "Cap" });
+    await db.product.update({ where: { id: restricted.id }, data: { ageRestricted: true } });
+    await db.complianceRule.create({ data: { tenantId, name: "No age items DE", match: "AGE_RESTRICTED", countries: ["DE"], action: "NO_SHIPPING" } });
+    const token = await cartWith(restricted.id, plain.id);
+    const de_ = { ...input().shipping, countryCode: "DE", postalCode: "10115", city: "Berlin" };
+
+    const nlQuote = await quoteCheckout(tenantId, token, { countryCode: "NL" });
+    expect(nlQuote.restrictedItems).toEqual([]);
+    const deQuote = await quoteCheckout(tenantId, token, { countryCode: "DE" });
+    expect(deQuote.restrictedItems).toEqual([{ productId: restricted.id, title: "Bayonet" }]);
+    expect(deQuote.options.every((o) => o.isPickup)).toBe(true);
+    expect(deQuote.unavailableReason).toMatch(/Can't be shipped to Germany.*Bayonet/);
+
+    const refused = await placeOrder(tenantId, token, input({ ageConfirmed: "on", shipping: de_, shippingOptionId: de.id }), null);
+    expect(refused).toMatchObject({ ok: false, code: "COMPLIANCE", blockedProductIds: [restricted.id], errors: { "shipping.countryCode": expect.stringContaining("Bayonet") } });
+    expect(await db.order.count()).toBe(0);
+
+    // Pickup is still allowed; so is delivery to a country without the rule.
+    const viaPickup = await placeOrder(tenantId, token, input({ ageConfirmed: "on", shipping: de_, shippingOptionId: pickup.id }), null);
+    expect(viaPickup.ok).toBe(true);
+  });
+
   it("double submit (same key, concurrent) creates exactly one order", async () => {
     const p = await makeProduct(tenantId);
     const token = await cartWith(p.id);

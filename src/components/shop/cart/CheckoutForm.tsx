@@ -10,6 +10,7 @@ import { formatMoney } from "@/components/shop/ui/money";
 import type { CheckoutQuote, PaymentMethodOption } from "@/server/checkout";
 import { loginHref } from "@/server/customer-auth/redirect";
 import { checkoutQuoteAction, placeOrderAction, type CheckoutFormState } from "@/app/(shop)/checkout/actions";
+import { saveCheckoutContactAction } from "./actions";
 import { CartLineItem, type CartLineData } from "./CartLineItem";
 import { FreeShippingBar } from "./FreeShippingBar";
 import type { CountryOption } from "./CartSummary";
@@ -36,6 +37,8 @@ export type CheckoutFormProps = {
   lines: CartLineData[];
   disclaimer: string;
   loginReturnTo: string;
+  /** Contact remembered on the cart (abandoned-cart reminder). */
+  contact?: { email: string | null; reminderConsent: boolean };
 };
 
 const idOf = (name: string) => `co-${name.replace(/\./g, "-")}`;
@@ -240,6 +243,7 @@ export function CheckoutForm(props: CheckoutFormProps) {
   const [quoting, startQuote] = useTransition();
   const seq = useRef(0);
   const alertRef = useRef<HTMLDivElement>(null);
+  const countryLabel = (code: string) => props.countries.find((c) => c.code === code)?.name ?? code;
   const errors = state.errors;
   const values = state.values;
   const fmt = (n: number) => formatMoney(n, currency);
@@ -299,7 +303,7 @@ export function CheckoutForm(props: CheckoutFormProps) {
                 </Link>
               </p>
             ) : null}
-            {state.code === "UNAVAILABLE" || state.code === "EMPTY" ? (
+            {state.code === "UNAVAILABLE" || state.code === "EMPTY" || state.code === "COUPON" || state.code === "COMPLIANCE" ? (
               <p className="mt-1">
                 <Link className="underline" href="/cart">
                   {t.backToCart}
@@ -324,9 +328,44 @@ export function CheckoutForm(props: CheckoutFormProps) {
             {viewer ? (
               <input type="hidden" name="email" value={viewer.email} />
             ) : (
-              <Text name="email" type="email" label={t.email} required autoComplete="email" inputMode="email" errors={errors} values={values} />
+              <Text
+                name="email"
+                type="email"
+                label={t.email}
+                required
+                autoComplete="email"
+                inputMode="email"
+                errors={errors}
+                values={values}
+                defaultValue={props.contact?.email ?? undefined}
+                onBlur={(e) => {
+                  const v = e.currentTarget.value.trim();
+                  if (v.includes("@")) void saveCheckoutContactAction({ email: v });
+                }}
+              />
             )}
             <Text name="phone" type="tel" label={t.phone} required autoComplete="tel" hint={t.phoneHint} errors={errors} values={values} />
+          </div>
+          <div className="mt-4 flex flex-col gap-1">
+            <div className="flex items-start gap-3 text-sm">
+              <input
+                id="co-reminderConsent"
+                type="checkbox"
+                name="reminderConsent"
+                defaultChecked={props.contact?.reminderConsent ?? false}
+                aria-describedby="co-reminderConsent-hint"
+                onChange={(e) => {
+                  const form = e.currentTarget.form;
+                  const email = form ? new FormData(form).get("email") : null;
+                  void saveCheckoutContactAction({ reminderConsent: e.currentTarget.checked, email: typeof email === "string" && email.includes("@") ? email : undefined });
+                }}
+                className="mt-0.5 size-4 accent-shop-primary"
+              />
+              <label htmlFor="co-reminderConsent">{cartCopy.reminder.consent}</label>
+            </div>
+            <p id="co-reminderConsent-hint" className="pl-7 text-xs text-shop-muted">
+              {cartCopy.reminder.hint}
+            </p>
           </div>
         </Section>
 
@@ -364,6 +403,12 @@ export function CheckoutForm(props: CheckoutFormProps) {
         <Section n={3} title={t.shippingMethod}>
           <fieldset aria-describedby={errors?.shippingOptionId ? "co-shippingOptionId-error" : undefined} aria-busy={quoting || undefined}>
             <legend className="sr-only">{t.shippingMethod}</legend>
+            {quote && quote.restrictedItems.length > 0 && quote.options.length > 0 ? (
+              // Compliance: some items can't be shipped to this country; only pickup remains.
+              <p role="note" className="mb-3 rounded-shop-sm border border-shop-warn/30 bg-shop-warn-soft px-3 py-2 text-sm text-shop-warn">
+                {quote.unavailableReason}
+              </p>
+            ) : null}
             {!quote || quote.options.length === 0 ? (
               <p className={quote?.unavailableReason ? "text-sm text-shop-crit" : "text-sm text-shop-muted"}>{quote?.unavailableReason ?? t.noOptions}</p>
             ) : (
@@ -521,11 +566,19 @@ export function CheckoutForm(props: CheckoutFormProps) {
         </div>
         <ul className="-my-2 divide-y divide-shop-line">
           {props.lines.map((l) => (
-            <CartLineItem key={l.productId} line={l} compact />
+            <CartLineItem
+              key={l.productId}
+              line={l}
+              compact
+              notice={quote?.restrictedItems.some((r) => r.productId === l.productId) ? cartCopy.checkout.notShippable(countryLabel(quote.countryCode)) : null}
+            />
           ))}
         </ul>
         <dl className={cn("flex flex-col gap-2 border-t border-shop-line pt-3 text-sm", quoting && "opacity-60")} aria-live="polite" aria-busy={quoting || undefined}>
           <Row label={t.subtotal} value={quote ? fmt(quote.totals.subtotal) : "—"} />
+          {quote && quote.totals.discount > 0 ? (
+            <Row label={`${cartCopy.coupon.discount}${quote.coupon ? ` · ${quote.coupon.code}` : ""}`} value={`−${fmt(quote.totals.discount)}`} />
+          ) : null}
           <Row label={t.shipping} value={quote && selected ? (quote.totals.shipping === 0 ? cartCopy.cart.free : fmt(quote.totals.shipping)) : "—"} />
           {quote && quote.totals.insurance > 0 ? <Row label={t.insuranceLine} value={fmt(quote.totals.insurance)} /> : null}
           <div className="flex items-baseline justify-between gap-4 border-t border-shop-line pt-3">
@@ -533,6 +586,14 @@ export function CheckoutForm(props: CheckoutFormProps) {
             <dd className="font-shop-heading text-2xl font-semibold tabular-nums">{quote && selected ? fmt(quote.totals.total) : "—"}</dd>
           </div>
         </dl>
+        {quote?.coupon && !quote.coupon.ok ? (
+          <p role="alert" className="rounded-shop-sm bg-shop-crit-soft px-3 py-2 text-sm text-shop-crit">
+            {cartCopy.coupon.notApplied(quote.coupon.code, quote.coupon.message)}{" "}
+            <Link href="/cart" className="underline">
+              {t.backToCart}
+            </Link>
+          </p>
+        ) : null}
         {quote?.freeShipping && !quote.freeShipping.reached ? <FreeShippingBar progress={quote.freeShipping} currency={currency} /> : null}
         {quote && quote.minimumShortfall > 0 ? (
           <p className="rounded-shop-sm bg-shop-warn-soft px-3 py-2 text-sm text-shop-warn">{cartCopy.cart.minimumOrder(fmt(quote.minimumShortfall))}</p>

@@ -128,6 +128,7 @@ async function CheckoutContent() {
         lines={lines}
         disclaimer={ctx.disclaimer}
         loginReturnTo="/checkout"
+        contact={{ email: cart.email, reminderConsent: cart.reminderConsent }}
       />
     </>
   );

@@ -43,7 +43,9 @@ export function CartSummary({
 
   const delivery = quote?.options.find((o) => !o.isPickup) ?? null;
   const pickupOnly = quote && !delivery && quote.options.length > 0;
-  const shipping = delivery?.price ?? null;
+  const freeByCoupon = quote?.coupon?.ok === true && quote.coupon.freeShipping;
+  const shipping = delivery ? (freeByCoupon ? 0 : delivery.price) : null;
+  const discount = quote?.totals.discount ?? 0;
   const fmt = (n: number) => formatMoney(n, currency);
 
   return (
@@ -53,6 +55,15 @@ export function CartSummary({
           <dt className="text-shop-ink-2">{t.subtotal}</dt>
           <dd className="font-semibold tabular-nums">{fmt(quote?.totals.subtotal ?? subtotal)}</dd>
         </div>
+        {discount > 0 ? (
+          <div className="flex justify-between gap-4">
+            <dt className="text-shop-ink-2">
+              {cartCopy.coupon.discount}
+              {quote?.coupon ? <span className="text-shop-muted"> · {quote.coupon.code}</span> : null}
+            </dt>
+            <dd className="font-semibold tabular-nums text-shop-ok">−{fmt(discount)}</dd>
+          </div>
+        ) : null}
         <div className="flex flex-col gap-1.5">
           <dt className="flex items-center justify-between gap-2 text-shop-ink-2">
             <label htmlFor="cart-country">{t.shippingEstimate}</label>
@@ -80,7 +91,7 @@ export function CartSummary({
               ) : delivery ? (
                 <>
                   <span className="text-shop-muted">{delivery.name}</span>
-                  <span className="font-semibold tabular-nums">{delivery.price === 0 ? t.free : fmt(delivery.price)}</span>
+                  <span className="font-semibold tabular-nums">{shipping === 0 ? t.free : fmt(delivery.price)}</span>
                 </>
               ) : pickupOnly ? (
                 <span className="text-shop-muted">
@@ -103,7 +114,7 @@ export function CartSummary({
       {shipping !== null && quote ? (
         <div className="flex items-baseline justify-between gap-4 border-t border-shop-line pt-3">
           <span className="font-medium">{cartCopy.checkout.total}</span>
-          <span className="font-shop-heading text-xl font-semibold tabular-nums">{fmt(quote.totals.subtotal + shipping)}</span>
+          <span className="font-shop-heading text-xl font-semibold tabular-nums">{fmt(quote.totals.subtotal - discount + shipping)}</span>
         </div>
       ) : null}
     </div>

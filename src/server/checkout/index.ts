@@ -10,12 +10,16 @@ import { subscribe } from "@/server/newsletter";
 import { variantKey } from "@/server/media/product-images";
 import { calculateShippingQuote, type QuoteResult, type ShippingOption } from "@/server/shipping/calc";
 import { loadQuoteZones } from "@/server/shipping/quote";
-import { isCountryCode, type CountryCode } from "@/server/shipping/countries";
+import { countryName, isCountryCode, type CountryCode } from "@/server/shipping/countries";
+import { resolveCompliance } from "@/server/compliance";
 import { getCart, lockCart, loadCartLinesTx, summarize, type CartView, type ShopViewer } from "@/server/cart";
 import type { Prisma } from "@/generated/prisma/client";
 import { parseCheckoutInput, type FieldErrors } from "./schema";
 import { computeTotals, deliverableCountries, freeShippingProgress, minimumOrderShortfall, selectOption, type FreeShippingProgress, type Totals } from "./totals";
 import { getPaymentSetup, validatePaymentMethod, type PaymentSetup } from "./payment-methods";
+import { applyCouponToTotals, evaluateCoupon, evaluateCouponForOrderTx, type CouponOutcome, type DiscountedTotals } from "@/server/coupons";
+import { convertOffersTx, lockApplicableOffersTx } from "@/server/offers";
+import { formatMoney } from "@/components/shop/ui/money";
 
 export { getPaymentSetup, methodLabel, isDevSimulationAllowed, type PaymentSetup, type PaymentMethodOption } from "./payment-methods";
 export { startOrderPayment, retryOrderPayment, simulateDevPayment, type StartPaymentResult, type RetryResult } from "./payment";
@@ -121,15 +125,27 @@ export type QuoteOptionView = {
   insurance: { price: number; maxInsuredValue: number | null } | null;
 };
 
+/** Totals incl. the coupon: total = subtotal − discount + shipping (+ insurance). */
+export type CheckoutTotals = DiscountedTotals<Totals>;
+
+/** The cart's coupon as evaluated for this quote (null = no code entered). */
+export type CouponQuote = { code: string; ok: true; discount: number; freeShipping: boolean } | { code: string; ok: false; message: string };
+
+/** A cart item a compliance rule forbids shipping to the quoted country (pickup is still possible). */
+export type RestrictedItem = { productId: string; title: string };
+
 export type CheckoutQuote = {
   countryCode: string;
   deliverable: boolean;
+  /** Items that can't be shipped to `countryCode` (compliance NO_SHIPPING); delivery options are then hidden. */
+  restrictedItems: RestrictedItem[];
   /** Why home delivery isn't possible (also when only pickup remains). */
   unavailableReason: string | null;
   options: QuoteOptionView[];
   selectedOptionId: string | null;
   insurance: boolean;
-  totals: Totals;
+  totals: CheckoutTotals;
+  coupon: CouponQuote | null;
   itemCount: number;
   freeShipping: FreeShippingProgress;
   minimumShortfall: number;
@@ -160,6 +176,22 @@ function reasonText(q: QuoteResult): string | null {
   }
 }
 
+/** "Can't be shipped to Germany: Helmet M35, Dagger." */
+export function restrictedMessage(countryCode: string, items: RestrictedItem[]): string {
+  return `Can't be shipped to ${countryName(countryCode)} (local regulations): ${items.map((i) => i.title).join(", ")}. Remove ${items.length > 1 ? "them" : "it"} from your cart or choose pickup.`;
+}
+
+/** Cart items that compliance rules forbid shipping to `countryCode`. */
+async function restrictedItemsFor(tenantId: string, lines: { productId: string; title: string }[], countryCode: string): Promise<RestrictedItem[]> {
+  if (!lines.length || !isCountryCode(countryCode)) return [];
+  const verdicts = await resolveCompliance(
+    tenantId,
+    lines.map((l) => l.productId),
+    countryCode,
+  );
+  return lines.filter((l) => verdicts[l.productId]?.noShipping).map((l) => ({ productId: l.productId, title: l.title }));
+}
+
 function buildQuote(
   prices: number[],
   weightGrams: number,
@@ -167,6 +199,8 @@ function buildQuote(
   input: { countryCode: string; shippingOptionId?: string | null; insurance?: boolean },
   settings: { freeShippingThresholdCents: number; minimumOrderCents: number },
   currency: string,
+  coupon: CouponOutcome | null = null,
+  restrictedItems: RestrictedItem[] = [],
 ): { quote: CheckoutQuote; option: ShippingOption | null } {
   const subtotal = prices.reduce((s, p) => s + p, 0);
   const result = calculateShippingQuote(zones, {
@@ -175,19 +209,25 @@ function buildQuote(
     subtotal,
     freeShippingThreshold: settings.freeShippingThresholdCents || null,
   });
+  // Compliance: items that may not be shipped there leave only pickup options.
+  const restricted = restrictedItems.length > 0;
+  const allowed = result.deliverable ? result.options.filter((o) => !restricted || o.isPickup) : [];
   // Default to the first (delivery) option; an unknown/stale id never falls back silently at placement.
-  const option = selectOption(result, input.shippingOptionId) ?? (input.shippingOptionId ? null : result.deliverable ? result.options[0] : null);
+  const picked = selectOption(result, input.shippingOptionId);
+  const option = picked ? (allowed.includes(picked) ? picked : null) : input.shippingOptionId ? null : (allowed[0] ?? null);
   const insurance = Boolean(input.insurance && option?.insurance);
   return {
     option,
     quote: {
       countryCode: input.countryCode,
       deliverable: result.deliverable,
-      unavailableReason: reasonText(result),
-      options: result.deliverable ? result.options.map(optionView) : [],
+      restrictedItems,
+      unavailableReason: restricted ? restrictedMessage(input.countryCode, restrictedItems) : reasonText(result),
+      options: allowed.map(optionView),
       selectedOptionId: option?.zoneId ?? null,
       insurance,
-      totals: computeTotals(prices, option, insurance),
+      totals: applyCouponToTotals(computeTotals(prices, option, insurance), coupon),
+      coupon: coupon ? (coupon.ok ? { code: coupon.code, ok: true, discount: coupon.discount, freeShipping: coupon.freeShipping } : { code: coupon.code, ok: false, message: coupon.message }) : null,
       itemCount: prices.length,
       freeShipping: freeShippingProgress(subtotal, settings.freeShippingThresholdCents),
       minimumShortfall: minimumOrderShortfall(subtotal, settings.minimumOrderCents),
@@ -209,6 +249,12 @@ export async function quoteCheckout(
   const [cart, checkout, zones] = await Promise.all([getCart(tenantId, token), getSettings(tenantId, "checkout"), loadQuoteZones(tenantId)]);
   const buyable = (cart?.lines ?? []).filter((l) => l.state === "held" || l.state === "lapsed");
   const currency = cart?.currency ?? (await db.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { currency: true } })).currency;
+  const [coupon, restricted] = await Promise.all([
+    cart?.couponCode && buyable.length
+      ? evaluateCoupon(tenantId, cart.couponCode, { subtotal: cart.couponBase, shippingPrice: 0, email: cart.email }, (n) => formatMoney(n, currency))
+      : null,
+    restrictedItemsFor(tenantId, buyable, data.countryCode),
+  ]);
   return buildQuote(
     buyable.map((l) => l.price),
     buyable.reduce((s, l) => s + l.weightGrams, 0),
@@ -216,6 +262,8 @@ export async function quoteCheckout(
     data,
     checkout,
     currency,
+    coupon,
+    restricted,
   ).quote;
 }
 
@@ -225,10 +273,10 @@ export type PlaceOrderResult =
   | { ok: true; orderId: string; uuid: string; number: number; reused: boolean }
   | {
       ok: false;
-      code: "INVALID" | "EMPTY" | "UNAVAILABLE" | "LOGIN_REQUIRED" | "NOT_CONFIGURED" | "MINIMUM" | "SHIPPING";
+      code: "INVALID" | "EMPTY" | "UNAVAILABLE" | "LOGIN_REQUIRED" | "NOT_CONFIGURED" | "MINIMUM" | "SHIPPING" | "COUPON" | "COMPLIANCE";
       message: string;
       errors?: FieldErrors;
-      /** Product ids that block the order (taken by someone else / no longer for sale). */
+      /** Product ids that block the order (taken by someone else / no longer for sale / not shippable there). */
       blockedProductIds?: string[];
     };
 
@@ -352,10 +400,34 @@ export async function placeOrder(
           });
         }
 
-        // Money: from the locked rows only.
-        const ordered = lines.map((l) => products.get(l.productId)!);
-        const prices = ordered.map((p) => p.price);
+        // Money: from the locked rows only. A line bought through an accepted offer uses the agreed
+        // price while the (locked) offer still applies; otherwise the list price.
+        const offers = await lockApplicableOffersTx(tx, tenantId, lines);
+        const ordered = lines.map((l) => {
+          const p = products.get(l.productId)!;
+          const offer = l.offerId ? offers.get(l.offerId) : undefined;
+          return { ...p, unitPrice: offer ? offer.agreedAmount : p.price, offerId: offer?.id ?? null };
+        });
+        const prices = ordered.map((p) => p.unitPrice);
         const weight = ordered.reduce((s, p) => s + p.weightGrams, 0);
+        const email = viewer ? viewer.email.toLowerCase() : input.email;
+
+        // Coupon: re-evaluated under the coupon row lock (concurrent orders can't exceed maxRedemptions).
+        let couponId: string | null = null;
+        let coupon: CouponOutcome | null = null;
+        if (cart.couponCode) {
+          const couponBase = ordered.filter((p) => !p.offerId).reduce((s, p) => s + p.unitPrice, 0);
+          const evaluated = await evaluateCouponForOrderTx(tx, tenantId, cart.couponCode, { subtotal: couponBase, shippingPrice: 0, email }, (n) => formatMoney(n, tenant.currency));
+          if (!evaluated.outcome.ok) {
+            const msg = `${evaluated.outcome.message} (${evaluated.outcome.code}). Remove the code in your cart to continue.`;
+            refuse({ ok: false, code: "COUPON", message: msg, errors: { couponCode: evaluated.outcome.message } });
+          }
+          couponId = evaluated.couponId;
+          coupon = evaluated.outcome;
+        }
+
+        // Compliance (per shipping country): NO_SHIPPING items only leave pickup.
+        const restricted = await restrictedItemsFor(tenantId, lines, input.shipping.countryCode);
         const { option, quote } = buildQuote(
           prices,
           weight,
@@ -363,7 +435,19 @@ export async function placeOrder(
           { countryCode: input.shipping.countryCode, shippingOptionId: input.shippingOptionId, insurance: input.insurance },
           checkout,
           tenant.currency,
+          coupon,
+          restricted,
         );
+        if (restricted.length && !option?.isPickup) {
+          const msg = restrictedMessage(input.shipping.countryCode, restricted);
+          refuse({
+            ok: false,
+            code: "COMPLIANCE",
+            message: msg,
+            errors: { "shipping.countryCode": msg },
+            blockedProductIds: restricted.map((r) => r.productId),
+          });
+        }
         if (!option) {
           const msg = quote.deliverable ? "Choose one of the shipping options for your country" : (quote.unavailableReason ?? "We don't ship to this country");
           refuse({ ok: false, code: "SHIPPING", message: msg, errors: { shippingOptionId: msg } });
@@ -375,7 +459,6 @@ export async function placeOrder(
         if (totals.total <= 0) refuse({ ok: false, code: "INVALID", message: "Your order total must be more than zero" });
 
         // Customer
-        const email = viewer ? viewer.email.toLowerCase() : input.email;
         const name = `${input.shipping.firstName} ${input.shipping.lastName}`.trim();
         let customer = viewer?.customerId ? await tx.customer.findFirst({ where: { id: viewer.customerId, tenantId } }) : null;
         if (!customer) {
@@ -422,6 +505,9 @@ export async function placeOrder(
             subtotal: totals.subtotal,
             shippingTotal: totals.shippingTotal,
             surchargeTotal: 0,
+            discountTotal: totals.discount,
+            couponCode: coupon?.ok ? coupon.code : null,
+            offerId: ordered.find((p) => p.offerId)?.offerId ?? null,
             total: totals.total,
             paymentStatus: "PENDING",
             paymentMethod: method.method,
@@ -438,9 +524,9 @@ export async function placeOrder(
                 stockCode: p.stockCode,
                 sku: p.sku,
                 imagePath: coverOf.get(p.id) ?? null,
-                unitPrice: p.price,
+                unitPrice: p.unitPrice,
                 quantity: 1,
-                lineTotal: p.price,
+                lineTotal: p.unitPrice,
                 purchasePriceSnapshot: p.purchasePrice,
                 sortOrder: i,
               })),
@@ -459,8 +545,19 @@ export async function placeOrder(
           WHERE "tenantId" = ${tenantId} AND "cartId" = ${cart.id} AND status = 'ACTIVE' AND "productId" = ANY(${productIds}::text[])`;
         if (moved !== productIds.length) throw new Error(`Reservation hand-over mismatch (${moved}/${productIds.length})`);
 
+        const usedOffers = ordered.map((p) => p.offerId).filter((id): id is string => !!id);
+        if (usedOffers.length) await convertOffersTx(tx, tenantId, usedOffers, order.id);
+        if (couponId && coupon?.ok) {
+          await tx.couponRedemption.create({
+            data: { tenantId, couponId, orderId: order.id, email, amount: totals.discount + totals.shippingDiscount },
+          });
+        }
+
         await tx.cartItem.deleteMany({ where: { tenantId, cartId: cart.id } });
-        await tx.cart.update({ where: { id: cart.id }, data: { countryCode: input.shipping.countryCode, customerId: cart.customerId ?? customer.id } });
+        await tx.cart.update({
+          where: { id: cart.id },
+          data: { countryCode: input.shipping.countryCode, customerId: cart.customerId ?? customer.id, couponCode: null },
+        });
         await tx.orderEvent.create({
           data: {
             tenantId,
@@ -475,6 +572,8 @@ export async function placeOrder(
               newsletterOptIn: input.newsletter,
               insurance: totals.insurance > 0,
               guest: !viewer,
+              couponCode: coupon?.ok ? coupon.code : null,
+              offerIds: usedOffers,
             },
           },
         });

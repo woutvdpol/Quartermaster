@@ -9,6 +9,7 @@ import { imageUrl } from "@/server/media/product-images";
 import type { Prisma } from "@/generated/prisma/client";
 import type { ShopViewer } from "./viewer";
 import { lineState, minutesUntil, type CartLineState } from "./state";
+import { offerPriceApplies } from "@/server/offers/rules";
 
 export { lineState, minutesUntil, type CartLineState } from "./state";
 export { getShopViewer, type ShopViewer } from "./viewer";
@@ -39,8 +40,16 @@ export type CartLine = {
   stockCode: number;
   slug: string;
   title: string;
-  /** Minor units, shop currency. Always the live product price. */
+  /** Minor units, shop currency: the agreed offer price when `offerApplied`, else the live list price. */
   price: number;
+  /** Live product (list) price. */
+  listPrice: number;
+  /** Offer behind this line (bought via a personal offer link), or null. */
+  offerId: string | null;
+  /** The agreed offer price is used for this line (offer accepted, link not expired, not used yet). */
+  offerApplied: boolean;
+  /** The line came from an offer whose agreed price no longer applies → list price. */
+  offerExpired: boolean;
   weightGrams: number;
   imageUrl: string | null;
   imageAlt: string | null;
@@ -58,9 +67,16 @@ export type CartView = {
   currency: string;
   countryCode: string | null;
   customerId: string | null;
+  /** Coupon code entered in the cart (validated by the quote / again at placement). */
+  couponCode: string | null;
+  /** Email captured at checkout (abandoned-cart reminder, only with `reminderConsent`). */
+  email: string | null;
+  reminderConsent: boolean;
   lines: CartLine[];
   /** Σ price of lines that can still be bought (held or lapsed-but-free). */
   subtotal: number;
+  /** Part of `subtotal` a coupon applies to (lines at an agreed offer price excluded). */
+  couponBase: number;
   weightGrams: number;
   /** Lines that can still be bought (held or lapsed). */
   buyableCount: number;
@@ -103,6 +119,7 @@ async function loadLines(tenantId: string, cartId: string, client: Tx | typeof d
     orderBy: [{ addedAt: "asc" }, { id: "asc" }],
     select: {
       addedAt: true,
+      offerId: true,
       product: {
         select: {
           id: true,
@@ -127,9 +144,19 @@ async function loadLines(tenantId: string, cartId: string, client: Tx | typeof d
     },
   });
   const now = new Date();
+  const offerIds = [...new Set(items.map((i) => i.offerId).filter((id): id is string => !!id))];
+  const offers = offerIds.length
+    ? await client.offer.findMany({
+        where: { id: { in: offerIds }, tenantId },
+        select: { id: true, tenantId: true, productId: true, status: true, agreedAmount: true, checkoutExpiresAt: true, orderId: true },
+      })
+    : [];
+  const offerById = new Map(offers.map((o) => [o.id, o]));
   return items
     .filter((i) => i.product.tenantId === tenantId)
-    .map(({ addedAt, product: p }) => {
+    .map(({ addedAt, offerId, product: p }) => {
+      const offer = offerId ? offerById.get(offerId) : undefined;
+      const applied = offerPriceApplies(offer, { tenantId, productId: p.id }, now);
       const hold = p.reservations[0] ?? null;
       const state = lineState({ status: p.status, quantity: p.quantity }, hold, cartId, now);
       const img = p.images[0];
@@ -139,7 +166,11 @@ async function loadLines(tenantId: string, cartId: string, client: Tx | typeof d
         stockCode: p.stockCode,
         slug: p.slug,
         title: p.title,
-        price: p.price,
+        price: applied ? offer!.agreedAmount! : p.price,
+        listPrice: p.price,
+        offerId: offerId ?? null,
+        offerApplied: applied,
+        offerExpired: Boolean(offerId) && !applied,
         weightGrams: p.weightGrams,
         imageUrl: img ? imageUrl(img.storageKey, "thumb") : null,
         imageAlt: img?.alt ?? null,
@@ -158,6 +189,7 @@ export function summarize(lines: CartLine[]) {
   const held = lines.filter((l) => l.state === "held" && l.expiresAt);
   return {
     subtotal: buyable.reduce((s, l) => s + l.price, 0),
+    couponBase: buyable.filter((l) => !l.offerApplied).reduce((s, l) => s + l.price, 0),
     weightGrams: buyable.reduce((s, l) => s + l.weightGrams, 0),
     buyableCount: buyable.length,
     earliestExpiry: held.length ? new Date(Math.min(...held.map((l) => l.expiresAt!.getTime()))) : null,
@@ -172,7 +204,17 @@ export async function getCart(tenantId: string, token: string | null | undefined
     loadLines(tenantId, cart.id),
     db.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { currency: true } }),
   ]);
-  return { id: cart.id, currency: tenant.currency, countryCode: cart.countryCode, customerId: cart.customerId, lines, ...summarize(lines) };
+  return {
+    id: cart.id,
+    currency: tenant.currency,
+    countryCode: cart.countryCode,
+    customerId: cart.customerId,
+    couponCode: cart.couponCode,
+    email: cart.email,
+    reminderConsent: cart.reminderConsent,
+    lines,
+    ...summarize(lines),
+  };
 }
 
 /** Number of items in the cart (header badge). 0 when there is no cart. */
@@ -201,6 +243,8 @@ export async function addToCart(
   token: string | null | undefined,
   productId: string,
   viewer: ShopViewer | null = null,
+  /** Internal (offers): the line is bought at this accepted offer's agreed price. Validated by the caller. */
+  opts: { offerId?: string } = {},
 ): Promise<{ token: string | null; result: AddToCartResult }> {
   const pid = productIdSchema.parse(productId);
   const [checkout, legal] = await Promise.all([getSettings(tenantId, "checkout"), getSettings(tenantId, "legal")]);
@@ -229,7 +273,8 @@ export async function addToCart(
     try {
       const reservation = await reserveProduct({ tenantId, productId: pid, cartId: cart.id, minutes: checkout.reservationMinutes }, tx);
       const existing = await tx.cartItem.findUnique({ where: { cartId_productId: { cartId: cart.id, productId: pid } }, select: { id: true } });
-      if (!existing) await tx.cartItem.create({ data: { tenantId, cartId: cart.id, productId: pid, quantity: 1 } });
+      if (!existing) await tx.cartItem.create({ data: { tenantId, cartId: cart.id, productId: pid, quantity: 1, offerId: opts.offerId ?? null } });
+      else if (opts.offerId) await tx.cartItem.update({ where: { id: existing.id }, data: { offerId: opts.offerId } });
       await tx.cart.update({
         where: { id: cart.id },
         data: { expiresAt: cartExpiry(), ...(viewer?.customerId && !cart.customerId ? { customerId: viewer.customerId } : {}) },

@@ -10,6 +10,8 @@ import { CartSummary } from "@/components/shop/cart/CartSummary";
 import { PendingButton } from "@/components/shop/cart/PendingButton";
 import { removeUnavailableAction } from "@/components/shop/cart/actions";
 import { CheckoutButton } from "@/components/shop/cart/CheckoutButton";
+import { CouponForm } from "@/components/shop/cart/CouponForm";
+import { RestoreCartPrompt } from "@/components/shop/cart/RestoreCartPrompt";
 import { toCartLineData } from "@/components/shop/cart/lines";
 import { cartCopy } from "@/components/shop/cart/_copy";
 import { requireShop } from "@/server/storefront/context";
@@ -17,20 +19,32 @@ import { getCart, getShopViewer } from "@/server/cart";
 import { readCartToken } from "@/server/cart/cookie";
 import { getCheckoutContext, quoteCheckout } from "@/server/checkout";
 import { countryName } from "@/server/shipping/countries";
+import { getVisitorDisplayCurrency } from "@/server/rates/display";
+import { RecentlyViewed } from "@/components/shop/recent";
 
 const t = cartCopy.cart;
 
 export const metadata: Metadata = { title: t.metaTitle, robots: { index: false, follow: false } };
 
-export default function CartPage() {
+export default function CartPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   return (
     <Container className="py-8 sm:py-12">
       <h1 className="mb-6 text-3xl sm:text-4xl">{t.title}</h1>
+      <Suspense fallback={null}>
+        <Restore searchParams={searchParams} />
+      </Suspense>
       <Suspense fallback={<CartSkeleton />}>
         <CartContent />
       </Suspense>
     </Container>
   );
+}
+
+/** ?restore=<signed token> from the abandoned-cart mail → explicit "Restore my cart" button. */
+async function Restore({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const token = (await searchParams).restore;
+  if (typeof token !== "string" || token.length > 200) return null;
+  return <RestoreCartPrompt token={token} />;
 }
 
 function CartSkeleton() {
@@ -66,11 +80,18 @@ async function CartContent() {
         >
           {t.emptyText}
         </EmptyState>
+        <RecentlyViewed
+          limit={4}
+          columns={shop.settings.catalog.gridColumns}
+          display={await getVisitorDisplayCurrency(tenantId)}
+          showStockCode={shop.settings.catalog.showStockCode}
+          className="mt-12"
+        />
       </>
     );
   }
 
-  const ctx = await getCheckoutContext(tenantId, token, viewer);
+  const [ctx, display] = await Promise.all([getCheckoutContext(tenantId, token, viewer), getVisitorDisplayCurrency(tenantId)]);
   const country = ctx.defaultCountry;
   const quote = country ? await quoteCheckout(tenantId, token, { countryCode: country }) : null;
   const lines = toCartLineData(cart, { guest: !viewer, blurSensitiveForGuests: shop.settings.legal.blurSensitiveForGuests });
@@ -87,7 +108,7 @@ async function CartContent() {
         <p className="mb-2 text-sm text-shop-muted">{t.uniqueNote}</p>
         <ul className="divide-y divide-shop-line border-y border-shop-line">
           {lines.map((line) => (
-            <CartLineItem key={line.productId} line={line} />
+            <CartLineItem key={line.productId} line={line} display={display} />
           ))}
         </ul>
         {hasUnavailable ? (
@@ -101,11 +122,17 @@ async function CartContent() {
 
       <aside aria-label={cartCopy.checkout.summary} className="flex flex-col gap-5 rounded-shop border border-shop-line bg-shop-surface p-5 shadow-shop lg:sticky lg:top-24">
         <CartSummary
+          key={`${cart.couponCode ?? ""}:${cart.subtotal}`}
           subtotal={cart.subtotal}
           currency={cart.currency}
           countries={ctx.countries.map((c) => ({ code: c, name: countryName(c) })).sort((a, b) => a.name.localeCompare(b.name, "en"))}
           initialCountry={country}
           initialQuote={quote}
+        />
+        <CouponForm
+          code={cart.couponCode}
+          problem={quote?.coupon && !quote.coupon.ok ? quote.coupon.message : null}
+          hasOfferLines={cart.lines.some((l) => l.offerApplied)}
         />
         <CheckoutButton disabled={!canCheckout} />
         <p className="text-xs text-shop-muted">{t.totalNote}</p>

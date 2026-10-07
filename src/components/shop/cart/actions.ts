@@ -18,6 +18,7 @@ import {
 } from "@/server/cart";
 import { db } from "@/server/db";
 import { quoteCheckout, type CheckoutQuote } from "@/server/checkout";
+import { applyCartCoupon, removeCartCoupon, restoreCart, setCartContact } from "@/server/cart/extras";
 
 /*
  * Cart server actions, shared by the product page (AddToCartButton), the header and the cart page.
@@ -128,4 +129,62 @@ export async function cartEstimateAction(countryCode: unknown): Promise<Checkout
   const token = await readCartToken();
   await setCartCountry(tenantId, token, countryCode);
   return quoteCheckout(tenantId, token, { countryCode });
+}
+
+// ─── Coupon, checkout contact, restore (phase 5) ───────────────────────────
+
+const COUPON_RULE = { limit: 20, windowMs: 10 * 60 * 1000 };
+const CONTACT_RULE = { limit: 60, windowMs: 10 * 60 * 1000 };
+
+export type CouponFormState = { ok: boolean; message: string } | null;
+
+/** Apply a discount code to the cart (rate limited: codes must not be brute-forced). */
+export async function applyCouponAction(_prev: CouponFormState, form: FormData): Promise<CouponFormState> {
+  const code = form.get("couponCode");
+  if (typeof code !== "string" || !code.trim()) return { ok: false, message: "Enter a code" };
+  const tenantId = await requireTenantId();
+  const key = `cart.coupon:${tenantId}:${(await clientIp()) ?? "unknown"}`;
+  if (await isLimited(key, COUPON_RULE)) return { ok: false, message: "Too many attempts. Please wait a few minutes." };
+  await hit(key);
+  const res = await applyCartCoupon(tenantId, await readCartToken(), code);
+  revalidatePath("/cart");
+  revalidatePath("/checkout");
+  return res.ok ? { ok: true, message: `Code ${res.outcome.code} applied` } : { ok: false, message: res.message };
+}
+
+export async function removeCouponAction(): Promise<void> {
+  const tenantId = await requireTenantId();
+  await removeCartCoupon(tenantId, await readCartToken());
+  revalidatePath("/cart");
+  revalidatePath("/checkout");
+}
+
+/**
+ * Checkout: remembers the email (on blur) and the "remind me" consent on the cart. A signed-in
+ * customer's account email is used instead of the typed one.
+ */
+export async function saveCheckoutContactAction(input: { email?: unknown; reminderConsent?: unknown }): Promise<void> {
+  const tenantId = await requireTenantId();
+  const key = `cart.contact:${tenantId}:${(await clientIp()) ?? "unknown"}`;
+  if (await isLimited(key, CONTACT_RULE)) return;
+  await hit(key);
+  const viewer = await getShopViewer(tenantId);
+  await setCartContact(tenantId, await readCartToken(), {
+    email: viewer ? viewer.email : typeof input?.email === "string" ? input.email.slice(0, 254) : undefined,
+    reminderConsent: typeof input?.reminderConsent === "boolean" ? input.reminderConsent : undefined,
+  });
+}
+
+/** "Back to your cart" (reminder mail): POST only — mail scanners follow GET links. */
+export async function restoreCartAction(restoreToken: unknown): Promise<{ ok: boolean }> {
+  const tenantId = await requireTenantId();
+  const key = `cart.restore:${tenantId}:${(await clientIp()) ?? "unknown"}`;
+  if (await isLimited(key, COUPON_RULE)) return { ok: false };
+  await hit(key);
+  const restored = await restoreCart(tenantId, restoreToken);
+  if (!restored) return { ok: false };
+  await writeCartToken(restored.token);
+  await extendReservations(tenantId, restored.token);
+  revalidatePath("/cart");
+  return { ok: true };
 }
