@@ -103,7 +103,7 @@ async function CartContent() {
         <CartSummary
           subtotal={cart.subtotal}
           currency={cart.currency}
-          countries={ctx.countries.map((c) => ({ code: c, name: countryName(c) }))}
+          countries={ctx.countries.map((c) => ({ code: c, name: countryName(c) })).sort((a, b) => a.name.localeCompare(b.name, "en"))}
           initialCountry={country}
           initialQuote={quote}
         />

@@ -116,7 +116,7 @@ async function CheckoutContent() {
       ) : null}
       <CheckoutForm
         currency={ctx.currency}
-        countries={ctx.countries.map((c) => ({ code: c, name: countryName(c) }))}
+        countries={ctx.countries.map((c) => ({ code: c, name: countryName(c) })).sort((a, b) => a.name.localeCompare(b.name, "en"))}
         defaultCountry={ctx.defaultCountry}
         initialQuote={quote}
         payment={ctx.payment}

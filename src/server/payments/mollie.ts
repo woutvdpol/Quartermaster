@@ -94,6 +94,9 @@ export async function createMolliePayment(
   if (method && enabled.length && !enabled.includes(method)) throw new ServiceError("INVALID", "This payment method is not available");
   const methodParam = method ?? (enabled.length ? enabled : undefined);
 
+  // Local development: Mollie rejects webhook URLs it cannot reach (localhost). Create the payment
+  // without one; the order page then pulls the status (syncLocalMolliePayment). Never in production.
+  const localWebhook = process.env.NODE_ENV !== "production" && isLocalUrl(webhookUrl);
   const client = mollieClient(creds.apiKey);
   let mp: MolliePayment;
   try {
@@ -102,7 +105,7 @@ export async function createMolliePayment(
       description: `Order ${row.number}`,
       redirectUrl,
       cancelUrl,
-      webhookUrl,
+      webhookUrl: localWebhook ? undefined : webhookUrl,
       locale: locale as never,
       method: methodParam as PaymentMethod | PaymentMethod[] | undefined,
       metadata: { tenantId, orderId: row.id, orderNumber: row.number },
@@ -197,4 +200,33 @@ export async function handleMollieWebhook(tenantId: string, providerPaymentId: s
     if (err instanceof ServiceError && err.code === "INVALID") return { outcome: "ignored", reason: "UNKNOWN_STATUS" };
     throw new MollieWebhookRetryableError("Applying payment status failed", { cause: err });
   }
+}
+
+function isLocalUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  try {
+    const host = new URL(url).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host.endsWith(".localhost");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Development only: without a reachable webhook, pull the latest Mollie status for an order's open
+ * payments and apply it exactly like the webhook would. No-op in production.
+ */
+export async function syncLocalMolliePayment(tenantId: string, orderId: string): Promise<boolean> {
+  if (process.env.NODE_ENV === "production") return false;
+  const open = await db.payment.findMany({
+    where: { tenantId, orderId, provider: "MOLLIE", status: { in: ["OPEN", "PENDING", "AUTHORIZED"] } },
+    select: { providerPaymentId: true },
+  });
+  let changed = false;
+  for (const p of open) {
+    if (!p.providerPaymentId) continue;
+    const outcome = await handleMollieWebhook(tenantId, p.providerPaymentId).catch(() => null);
+    if (outcome && outcome.outcome !== "ignored") changed = true;
+  }
+  return changed;
 }

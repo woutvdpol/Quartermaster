@@ -7,6 +7,8 @@ import { getMollieCredentials } from "@/server/payments/mollie-config";
 import { isDevSimulationAllowed } from "./payment-methods";
 import { RETRY_WINDOW_MS } from "./payment";
 import { orderDisplayState, type OrderDisplayState } from "./status";
+import { syncLocalMolliePayment } from "@/server/payments/mollie";
+import { revalidateCatalog } from "@/server/storefront-catalog/cache";
 
 export { orderDisplayState, type OrderDisplayState } from "./status";
 
@@ -50,6 +52,11 @@ export function maskEmail(email: string): string {
 
 export async function getOrderStatusView(tenantId: string, uuid: string): Promise<OrderStatusView | null> {
   if (!uuidSchema.safeParse(uuid).success) return null;
+  if (process.env.NODE_ENV !== "production") {
+    // Local dev has no reachable Mollie webhook: pull the payment status instead (no-op in production).
+    const pending = await db.order.findFirst({ where: { uuid, tenantId, paymentStatus: "PENDING" }, select: { id: true } });
+    if (pending && (await syncLocalMolliePayment(tenantId, pending.id))) revalidateCatalog(tenantId);
+  }
   const order = await db.order.findFirst({
     where: { uuid, tenantId },
     select: {

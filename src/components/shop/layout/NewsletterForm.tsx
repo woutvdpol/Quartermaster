@@ -36,7 +36,8 @@ export function NewsletterForm({ source = "footer", tone = "light", className }:
       <label htmlFor={`${id}-email`} className="sr-only">
         {t.emailLabel}
       </label>
-      <div className="flex flex-col gap-2 sm:flex-row">
+      {/* The footer column is narrow: stack there; side by side only in wide (block) placements. */}
+      <div className={cn("flex flex-col gap-2", tone !== "dark" && "sm:flex-row")}>
         <input
           id={`${id}-email`}
           name="email"
