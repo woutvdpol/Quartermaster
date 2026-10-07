@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dealer applications</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ECECE5}
+a{color:#7E5416}a:hover{color:#1E2119}
+button{font:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #ECECE5; color: #1E2119; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; display: flex; flex-wrap: wrap">
+  <nav aria-label="Platform" style="flex: 1 1 220px; max-width: 232px; background: #2F3526; color: #D9DCCB; padding: 18px 14px; display: flex; flex-direction: column; gap: 4px; box-sizing: border-box">
+    <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: 0.04em; padding: 4px 10px 16px">QUARTERMASTER</span>
+    <span style="color: #8E937E; font-size: 11px; letter-spacing: 0.12em; padding: 6px 10px 4px">PLATFORM</span>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; border-radius: 4px">Shops</a>
+    <a href="#" aria-current="page" style="color: #FFFFFF; background: #3E4532; padding: 8px 10px; border-radius: 4px; font-weight: 600; display: flex; justify-content: space-between">Applications <span style="background: #9C6B22; color: #FFFFFF; border-radius: 999px; padding: 0 7px; font-size: 12px">3</span></a>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; border-radius: 4px">Users</a>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; border-radius: 4px">Audit log</a>
+  </nav>
+
+  <main style="flex: 999 1 640px; min-width: 0; display: flex; flex-wrap: wrap">
+    <section style="flex: 999 1 460px; min-width: 0; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px">
+      <div style="display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: 10px">
+        <h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 28px">Dealer applications</h1>
+        <div role="tablist" aria-label="Status" style="display: flex; gap: 4px; font-size: 13px">
+          <button type="button" role="tab" aria-selected="true" style="height: 32px; padding: 0 12px; border: 1px solid #1E2119; background: #1E2119; color: #FAFAF6; border-radius: 4px">Pending · 3</button>
+          <button type="button" role="tab" aria-selected="false" style="height: 32px; padding: 0 12px; border: 1px solid #D7D8CC; background: #FAFAF6; border-radius: 4px">Approved</button>
+          <button type="button" role="tab" aria-selected="false" style="height: 32px; padding: 0 12px; border: 1px solid #D7D8CC; background: #FAFAF6; border-radius: 4px">Rejected</button>
+        </div>
+      </div>
+      <div style="overflow-x: auto; background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px">
+          <thead>
+            <tr style="text-align: left; color: #666A5A; font-size: 12px; letter-spacing: 0.06em">
+              <th style="padding: 10px 14px; border-bottom: 1px solid #D7D8CC; font-weight: 600">SHOP</th>
+              <th style="padding: 10px 14px; border-bottom: 1px solid #D7D8CC; font-weight: 600">COUNTRY</th>
+              <th style="padding: 10px 14px; border-bottom: 1px solid #D7D8CC; font-weight: 600">SELLS VIA</th>
+              <th style="padding: 10px 14px; border-bottom: 1px solid #D7D8CC; font-weight: 600">CHECKS</th>
+              <th style="padding: 10px 14px; border-bottom: 1px solid #D7D8CC; font-weight: 600">RECEIVED</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background: #F1E5CC">
+              <td style="padding: 12px 14px; border-bottom: 1px solid #D7D8CC"><strong>[Shop name A]</strong><br><span style="color: #666A5A">[applicant email]</span></td>
+              <td style="padding: 12px 14px; border-bottom: 1px solid #D7D8CC">NL</td>
+              <td style="padding: 12px 14px; border-bottom: 1px solid #D7D8CC">WooCommerce</td>
+              <td style="padding: 12px 14px; border-bottom: 1px solid #D7D8CC"><span style="color: #2F6B3A">✓ KvK</span> · <span style="color: #2F6B3A">✓ email</span></td>
+              <td style="padding: 12px 14px; border-bottom: 1px solid #D7D8CC; font-family: 'IBM Plex Mono', monospace">2 h ago</td>
+            </tr>
+            <tr>
+              <td style="padding: 12px 14px; border-bottom: 1px solid #D7D8CC"><strong>[Shop name B]</strong><br><span style="color: #666A5A">[applicant email]</span></td>
+              <td style="padding: 12px 14px; border-bottom: 1px solid #D7D8CC">BE</td>
+              <td style="padding: 12px 14px; border-bottom: 1px solid #D7D8CC">Shopify</td>
+              <td style="padding: 12px 14px; border-bottom: 1px solid #D7D8CC"><span style="color: #946200">! KvK not checked</span></td>
+              <td style="padding: 12px 14px; border-bottom: 1px solid #D7D8CC; font-family: 'IBM Plex Mono', monospace">1 d ago</td>
+            </tr>
+            <tr>
+              <td style="padding: 12px 14px"><strong>[Shop name C]</strong><br><span style="color: #666A5A">[applicant email]</span></td>
+              <td style="padding: 12px 14px">DE</td>
+              <td style="padding: 12px 14px">Fairs only</td>
+              <td style="padding: 12px 14px"><span style="color: #A2342A">✕ email bounced</span></td>
+              <td style="padding: 12px 14px; font-family: 'IBM Plex Mono', monospace">3 d ago</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <aside aria-label="Application detail" style="flex: 1 1 360px; max-width: 440px; background: #FAFAF6; border-left: 1px solid #D7D8CC; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; box-sizing: border-box">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #7E5416">APPLICATION · PENDING</span>
+        <h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px">[Shop name A]</h2>
+      </div>
+      <dl style="margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; font-size: 13px">
+        <div><dt style="color: #666A5A">Applicant</dt><dd style="margin: 2px 0 0">[name]</dd></div>
+        <div><dt style="color: #666A5A">KvK</dt><dd style="margin: 2px 0 0; font-family: 'IBM Plex Mono', monospace">[number] ✓</dd></div>
+        <div><dt style="color: #666A5A">Sells via</dt><dd style="margin: 2px 0 0">WooCommerce</dd></div>
+        <div><dt style="color: #666A5A">Proposed address</dt><dd style="margin: 2px 0 0; font-family: 'IBM Plex Mono', monospace">shop-a.quartermaster.app</dd></div>
+      </dl>
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <span style="color: #666A5A; font-size: 13px">What they sell</span>
+        <p style="margin: 0; background: #FFFFFF; border: 1px solid #D7D8CC; border-radius: 4px; padding: 10px 12px">[Applicant's description]</p>
+      </div>
+      <label style="display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: #666A5A">Internal note
+        <textarea rows="3" style="border: 1px solid #B7B49F; border-radius: 4px; padding: 8px 10px; font: inherit; color: #1E2119; background: #FFFFFF"></textarea>
+      </label>
+      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #4A4D40">
+        <strong style="color: #1E2119">On approve</strong>
+        <span>• Shop is created on the subdomain above (own domain later)</span>
+        <span>• Owner account gets an invite link (24 h)</span>
+        <span>• The setup wizard opens at first login</span>
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: auto">
+        <button type="button" style="flex: 1; height: 40px; border: 1px solid #A2342A; color: #A2342A; background: #FAFAF6; border-radius: 4px">Reject…</button>
+        <button type="button" style="flex: 2; height: 40px; border: 0; background: #7E5416; color: #FFFFFF; border-radius: 4px; font-weight: 600">Approve &amp; send invite</button>
+      </div>
+    </aside>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":940}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

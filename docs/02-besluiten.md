@@ -114,3 +114,10 @@ Kanttekeningen:
 - Verzendregio "Freeyo" was testdata; geen handmatige landtoewijzing nodig.
 - Toeslag per betaalmethode (legacy PayPal 5%) wordt in de admin instelbaar en door de ETL overgenomen.
 - Hosting/provider nog onbekend; manifests blijven generiek.
+
+## Innovaties ronde 1 — akkoord eigenaar (08-10-2026)
+Volgorde: **themabuilder + startwizard** → **AI-plaatsingsassistent + slim zoeken** → doorlopend: **hele app sneller** (meten vóór/na).
+- **Aanmelden:** handelaren melden zich zelf aan op het platform; SUPERADMIN keurt goed; daarna start de wizard.
+- **Themabuilder:** preset (Gallery/Archive/Field Kit/Vault) + afstemmen (kleuren, lettertypes, hoekafronding, knopvorm, dichtheid, logo). Concept → live preview → publiceren.
+- **Imports in de wizard:** WooCommerce-CSV, Shopify-CSV en Concept500 (onze ETL).
+- **Sneller:** hele app (shop Core Web Vitals, admin-schermen, zoeken), met meetrapport vooraf en achteraf.

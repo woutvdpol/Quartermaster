@@ -20,20 +20,26 @@ enum TenantStatus {
 }
 
 model Tenant {
-  id        String       @id @default(cuid())
-  slug      String       @unique
-  name      String
-  status    TenantStatus @default(ACTIVE)
-  currency  String       @default("EUR") @db.Char(3)
-  timezone  String       @default("Europe/Amsterdam")
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id               String       @id @default(cuid())
+  slug             String       @unique
+  name             String
+  status           TenantStatus @default(ACTIVE)
+  currency         String       @default("EUR") @db.Char(3)
+  timezone         String       @default("Europe/Amsterdam")
+  // Setup wizard (onboarding): per-step progress { [stepKey]: { done: bool, skipped?: bool, at } };
+  // null = shop predates the wizard (treated as set up). setupCompletedAt set on "Go live".
+  setupState       Json?
+  setupCompletedAt DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
-  domains   TenantDomain[]
-  redirects Redirect[]
-  users     User[]
-  settings  Setting[]
-  auditLogs AuditLog[]
+  domains     TenantDomain[]
+  redirects   Redirect[]
+  application DealerApplication?
+  importJobs  ImportJob[]
+  users       User[]
+  settings    Setting[]
+  auditLogs   AuditLog[]
 
   // phase 1 domain
   sequences             TenantSequence[]
@@ -158,6 +164,7 @@ model Session {
 enum AuthTokenType {
   PASSWORD_RESET
   EMAIL_VERIFICATION
+  INVITE // owner invite after a dealer application is approved (set first password)
 }
 
 model AuthToken {
@@ -1544,4 +1551,79 @@ model Redirect {
 
   @@unique([tenantId, fromPath])
   @@map("redirects")
+}
+
+// ─── Dealer onboarding (innovation round 1) ─────────────────────────────────
+
+enum DealerApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// A dealer's request for a shop, submitted on the platform host and reviewed by a SUPERADMIN.
+// Approval creates the Tenant (tenantId set) and invites the applicant as OWNER.
+model DealerApplication {
+  id              String                  @id @default(cuid())
+  status          DealerApplicationStatus @default(PENDING)
+  applicantName   String
+  email           String // lower-case
+  shopName        String
+  country         String                  @db.Char(2)
+  cocNumber       String? // Chamber of Commerce / company registration number
+  currentPlatform String? // "woocommerce" | "shopify" | "concept500" | "none" | free text
+  description     String // what they sell
+  legalConsent    Boolean                 @default(false)
+  emailVerifiedAt DateTime?
+  checks          Json? // automated checks { emailDeliverable, cocFormat, duplicateEmail, … }
+  internalNote    String?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  rejectReason    String?
+  tenantId        String?                 @unique
+  ip              String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([email])
+  @@map("dealer_applications")
+}
+
+enum ImportSource {
+  WOOCOMMERCE
+  SHOPIFY
+}
+
+enum ImportJobStatus {
+  UPLOADED // file parsed, preview available
+  RUNNING // rows being created
+  IMAGES // products created, images downloading in the background
+  DONE
+  FAILED
+  CANCELED
+}
+
+// Product import from another shop system's CSV export (setup wizard + Inventory → Import).
+model ImportJob {
+  id          String          @id @default(cuid())
+  tenantId    String
+  source      ImportSource
+  status      ImportJobStatus @default(UPLOADED)
+  fileName    String
+  fileKey     String // storage key of the uploaded CSV (private)
+  options     Json // { publish: bool, tagsAs: "facets" | "tags", stockMode: "split" | "single", mapping: {...} }
+  summary     Json? // preview/result counts { rows, products, images, categories, warnings[], errors[] }
+  createdById String?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("import_jobs")
 }

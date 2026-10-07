@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Set up your shop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ECECE5}
+a{color:#7E5416}a:hover{color:#1E2119}
+button{font:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #ECECE5; color: #1E2119; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px">
+  <header style="background: #2F3526; color: #D9DCCB">
+    <div style="max-width: 1240px; margin: 0 auto; padding: 14px 32px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px">
+      <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: 0.05em">QUARTERMASTER · SETUP</span>
+      <span style="font-size: 13px">Step 6 of 8 · <a href="#" style="color: #D9DCCB">Save and finish later</a></span>
+    </div>
+  </header>
+
+  <div style="max-width: 1240px; margin: 0 auto; padding: 28px 32px 56px; display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start">
+    <nav aria-label="Setup steps" style="flex: 1 1 240px; max-width: 280px">
+      <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px">
+        <sc-for list="{{steps}}" as="s" hint-placeholder-count="8">
+          <li style="{{s.rowStyle}}">
+            <span style="{{s.markStyle}}">{{s.mark}}</span>
+            <span style="display: flex; flex-direction: column"><span style="{{s.labelStyle}}">{{s.label}}</span><span style="font-size: 12px; color: #666A5A">{{s.hint}}</span></span>
+          </li>
+        </sc-for>
+      </ol>
+    </nav>
+
+    <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 18px">
+      <div>
+        <h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 34px">Bring your products</h1>
+        <p style="margin: 6px 0 0; color: #4A4D40; max-width: 640px">Import your existing catalogue. Nothing is published until you check the preview — imported items start as drafts unless you choose otherwise.</p>
+      </div>
+
+      <div role="radiogroup" aria-label="Import source" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px">
+        <label style="display: flex; flex-direction: column; gap: 6px; padding: 16px; background: #FFFFFF; border: 2px solid #7E5416; border-radius: 6px; cursor: pointer">
+          <span style="display: flex; justify-content: space-between; align-items: center"><strong>WooCommerce</strong><input type="radio" name="source" checked></span>
+          <span style="font-size: 13px; color: #666A5A">Products → Export → CSV. Photos are downloaded from your site.</span>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; padding: 16px; background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; cursor: pointer">
+          <span style="display: flex; justify-content: space-between; align-items: center"><strong>Shopify</strong><input type="radio" name="source"></span>
+          <span style="font-size: 13px; color: #666A5A">Products → Export → CSV for Excel. Photos from Shopify's CDN.</span>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; padding: 16px; background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; cursor: pointer">
+          <span style="display: flex; justify-content: space-between; align-items: center"><strong>Concept500</strong><input type="radio" name="source"></span>
+          <span style="font-size: 13px; color: #666A5A">Full migration incl. orders and customers — done with our team.</span>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; padding: 16px; background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; cursor: pointer">
+          <span style="display: flex; justify-content: space-between; align-items: center"><strong>Start empty</strong><input type="radio" name="source"></span>
+          <span style="font-size: 13px; color: #666A5A">Skip — add products later (or with the AI listing assistant).</span>
+        </label>
+      </div>
+
+      <section aria-label="Import preview" style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; align-items: center">
+          <span><strong>wc-product-export.csv</strong> <span style="color: #666A5A">· [N] rows read</span></span>
+          <a href="#">Choose another file</a>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px">
+          <div style="background: #FFFFFF; border: 1px solid #D7D8CC; border-radius: 4px; padding: 12px"><span style="display: block; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 28px">[N]</span><span style="color: #666A5A; font-size: 12px">products ready</span></div>
+          <div style="background: #FFFFFF; border: 1px solid #D7D8CC; border-radius: 4px; padding: 12px"><span style="display: block; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 28px">[N]</span><span style="color: #666A5A; font-size: 12px">photos to download</span></div>
+          <div style="background: #FFFFFF; border: 1px solid #D7D8CC; border-radius: 4px; padding: 12px"><span style="display: block; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 28px">[N]</span><span style="color: #666A5A; font-size: 12px">categories mapped</span></div>
+          <div style="background: #F5E7C4; border: 1px solid #E5D3A3; border-radius: 4px; padding: 12px"><span style="display: block; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 28px; color: #946200">[N]</span><span style="color: #6E4A00; font-size: 12px">need attention</span></div>
+        </div>
+        <div style="overflow-x: auto">
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px">
+            <thead><tr style="text-align: left; color: #666A5A; font-size: 12px; letter-spacing: 0.06em">
+              <th style="padding: 8px 10px; border-bottom: 1px solid #D7D8CC; font-weight: 600">CSV COLUMN</th>
+              <th style="padding: 8px 10px; border-bottom: 1px solid #D7D8CC; font-weight: 600">BECOMES</th>
+              <th style="padding: 8px 10px; border-bottom: 1px solid #D7D8CC; font-weight: 600">EXAMPLE</th>
+            </tr></thead>
+            <tbody>
+              <tr><td style="padding: 8px 10px; border-bottom: 1px solid #ECECE5; font-family: 'IBM Plex Mono', monospace">Name</td><td style="padding: 8px 10px; border-bottom: 1px solid #ECECE5">Title</td><td style="padding: 8px 10px; border-bottom: 1px solid #ECECE5">[product title]</td></tr>
+              <tr><td style="padding: 8px 10px; border-bottom: 1px solid #ECECE5; font-family: 'IBM Plex Mono', monospace">Regular price</td><td style="padding: 8px 10px; border-bottom: 1px solid #ECECE5">Price</td><td style="padding: 8px 10px; border-bottom: 1px solid #ECECE5">[price]</td></tr>
+              <tr><td style="padding: 8px 10px; border-bottom: 1px solid #ECECE5; font-family: 'IBM Plex Mono', monospace">Categories</td><td style="padding: 8px 10px; border-bottom: 1px solid #ECECE5">Category tree</td><td style="padding: 8px 10px; border-bottom: 1px solid #ECECE5">[Helmets &gt; German]</td></tr>
+              <tr><td style="padding: 8px 10px; border-bottom: 1px solid #ECECE5; font-family: 'IBM Plex Mono', monospace">Tags</td><td style="padding: 8px 10px; border-bottom: 1px solid #ECECE5"><select style="height: 30px; border: 1px solid #B7B49F; border-radius: 4px; font: inherit; background: #FFFFFF"><option>Facets (period / country)</option><option>Plain tags</option></select></td><td style="padding: 8px 10px; border-bottom: 1px solid #ECECE5">[WW2, Germany]</td></tr>
+              <tr><td style="padding: 8px 10px; font-family: 'IBM Plex Mono', monospace">Stock</td><td style="padding: 8px 10px">Unique item (1)</td><td style="padding: 8px 10px; color: #946200">[N] rows have stock &gt; 1 → split or keep 1</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 13px"><input type="checkbox">Publish imported products immediately (otherwise they start as drafts)</label>
+      </section>
+
+      <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px">
+        <button type="button" style="height: 42px; padding: 0 18px; border: 1px solid #D7D8CC; background: #FAFAF6; border-radius: 4px">← Back: Shipping</button>
+        <div style="display: flex; gap: 8px">
+          <button type="button" style="height: 42px; padding: 0 18px; border: 1px solid #D7D8CC; background: #FAFAF6; border-radius: 4px">Skip for now</button>
+          <button type="button" style="height: 42px; padding: 0 18px; border: 0; background: #7E5416; color: #FFFFFF; border-radius: 4px; font-weight: 600">Import [N] products →</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":940}}'>
+class Component extends DCLogic {
+renderVals() {
+const raw = [
+  ['Shop basics', 'Name, subdomain, language', 'done'],
+  ['Business details', 'KvK, VAT, IBAN, address', 'done'],
+  ['Look & feel', 'Theme builder', 'done'],
+  ['Payments', 'Connect Mollie (test first)', 'done'],
+  ['Shipping', 'Zones from a template', 'done'],
+  ['Import products', 'WooCommerce · Shopify · Concept500', 'current'],
+  ['Legal pages', 'Terms, privacy, returns templates', 'todo'],
+  ['Go live', 'Checklist + own domain', 'todo']
+];
+const steps = raw.map((r, i) => {
+  const st = r[2];
+  return {
+    label: r[0], hint: r[1],
+    mark: st === 'done' ? '✓' : String(i + 1),
+    rowStyle: 'display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 6px; ' + (st === 'current' ? 'background: #FAFAF6; border: 1px solid #D7D8CC;' : 'border: 1px solid transparent;'),
+    markStyle: 'flex: 0 0 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 600; ' + (st === 'done' ? 'background: #DCEBD9; color: #2F6B3A;' : st === 'current' ? 'background: #7E5416; color: #FFFFFF;' : 'background: #FFFFFF; color: #666A5A; border: 1px solid #D7D8CC;'),
+    labelStyle: st === 'current' ? 'font-weight: 600' : (st === 'todo' ? 'color: #666A5A' : '')
+  };
+});
+return { steps: steps };
+}
+}
+</script>
+</body>
+</html>

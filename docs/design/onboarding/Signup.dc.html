@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Open your shop — Quartermaster</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ECECE5}
+a{color:#7E5416}a:hover{color:#1E2119}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #ECECE5; color: #1E2119; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 15px; line-height: 1.5">
+  <header style="background: #2F3526; color: #D9DCCB">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 16px 32px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px">
+      <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 24px; letter-spacing: 0.05em">QUARTERMASTER</span>
+      <nav aria-label="Platform" style="display: flex; gap: 22px; font-size: 14px">
+        <a href="#" style="color: #D9DCCB">Features</a><a href="#" style="color: #D9DCCB">Pricing</a><a href="#" style="color: #D9DCCB">Dealer login</a>
+      </nav>
+    </div>
+  </header>
+
+  <div style="max-width: 1200px; margin: 0 auto; padding: 56px 32px 72px; display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 56px; align-items: start">
+    <section style="display: flex; flex-direction: column; gap: 20px">
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #7E5416">FOR MILITARIA DEALERS</span>
+      <h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 60px; line-height: 0.98; letter-spacing: 0.01em">Open your shop.<br>Built for unique items.</h1>
+      <p style="margin: 0; max-width: 470px; color: #4A4D40; font-size: 17px">Every piece listed once, reserved while someone checks out, sold everywhere at the same moment. Certificates with QR code, per-country compliance rules and Mollie payments are built in.</p>
+      <ol style="margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px">
+        <li style="display: flex; gap: 14px"><span style="font-family: 'IBM Plex Mono', monospace; color: #7E5416">01</span><span><strong>Apply</strong> — tell us about your business. Takes 3 minutes.</span></li>
+        <li style="display: flex; gap: 14px"><span style="font-family: 'IBM Plex Mono', monospace; color: #7E5416">02</span><span><strong>We review</strong> — usually within [X] working days. Militaria is sensitive; every dealer is checked.</span></li>
+        <li style="display: flex; gap: 14px"><span style="font-family: 'IBM Plex Mono', monospace; color: #7E5416">03</span><span><strong>Set up in a guided wizard</strong> — theme, payments, shipping, and import from WooCommerce, Shopify or Concept500.</span></li>
+      </ol>
+    </section>
+
+    <form style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 28px; display: flex; flex-direction: column; gap: 16px">
+      <h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 28px">Apply for a shop</h2>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+        <label style="display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 500">Your name<input type="text" style="height: 40px; border: 1px solid #B7B49F; border-radius: 4px; padding: 0 10px; font: inherit; background: #FFFFFF"></label>
+        <label style="display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 500">Email<input type="email" style="height: 40px; border: 1px solid #B7B49F; border-radius: 4px; padding: 0 10px; font: inherit; background: #FFFFFF"></label>
+      </div>
+      <label style="display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 500">Shop name<input type="text" placeholder="e.g. Concept Militaria" style="height: 40px; border: 1px solid #B7B49F; border-radius: 4px; padding: 0 10px; font: inherit; background: #FFFFFF"></label>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+        <label style="display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 500">Country<select style="height: 40px; border: 1px solid #B7B49F; border-radius: 4px; padding: 0 8px; font: inherit; background: #FFFFFF"><option>Netherlands</option></select></label>
+        <label style="display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 500">Chamber of Commerce no.<input type="text" style="height: 40px; border: 1px solid #B7B49F; border-radius: 4px; padding: 0 10px; font: inherit; background: #FFFFFF"></label>
+      </div>
+      <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+        <legend style="font-size: 13px; font-weight: 500; margin-bottom: 6px">Where do you sell now?</legend>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px">
+          <label style="display: flex; align-items: center; gap: 6px; border: 1px solid #D7D8CC; border-radius: 4px; padding: 8px 10px; background: #FFFFFF"><input type="radio" name="src">WooCommerce</label>
+          <label style="display: flex; align-items: center; gap: 6px; border: 1px solid #D7D8CC; border-radius: 4px; padding: 8px 10px; background: #FFFFFF"><input type="radio" name="src">Shopify</label>
+          <label style="display: flex; align-items: center; gap: 6px; border: 1px solid #D7D8CC; border-radius: 4px; padding: 8px 10px; background: #FFFFFF"><input type="radio" name="src">Concept500</label>
+          <label style="display: flex; align-items: center; gap: 6px; border: 1px solid #D7D8CC; border-radius: 4px; padding: 8px 10px; background: #FFFFFF"><input type="radio" name="src">Fairs / marketplaces only</label>
+        </div>
+      </fieldset>
+      <label style="display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 500">What do you sell?<textarea rows="3" placeholder="Periods, countries, types of items, approximate number of pieces" style="border: 1px solid #B7B49F; border-radius: 4px; padding: 8px 10px; font: inherit; background: #FFFFFF; resize: vertical"></textarea></label>
+      <label style="display: flex; gap: 10px; align-items: flex-start; font-size: 13px"><input type="checkbox" style="margin-top: 3px">I only sell legal items and follow the rules of the countries I ship to (deactivated weapons with certificate).</label>
+      <button type="button" style="height: 46px; border: 0; border-radius: 4px; background: #7E5416; color: #FFFFFF; font: inherit; font-weight: 600; cursor: pointer">Send application</button>
+      <span style="font-size: 12px; color: #666A5A">Protected by Turnstile. We email you once your application is reviewed.</span>
+    </form>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":940}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

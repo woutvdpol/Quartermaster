@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Theme builder</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=Hanken+Grotesk:wght@400;500;600;700&amp;family=Instrument+Serif:ital@0;1&amp;family=Newsreader:ital,opsz,wght@0,6..72,400;1,6..72,400&amp;family=Archivo:wght@400;600&amp;family=Big+Shoulders+Display:wght@800&amp;family=Libre+Caslon+Display&amp;family=Work+Sans:wght@400;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ECECE5}
+a{color:#7E5416}a:hover{color:#1E2119}
+button{font:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #ECECE5; color: #1E2119; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; display: flex; flex-wrap: wrap">
+
+  <nav aria-label="Admin" style="flex: 1 1 220px; max-width: 232px; background: #2F3526; color: #D9DCCB; padding: 18px 14px; display: flex; flex-direction: column; gap: 4px; box-sizing: border-box">
+    <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: 0.04em; padding: 4px 10px 16px">QUARTERMASTER</span>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; border-radius: 4px">Dashboard</a>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; border-radius: 4px">Inventory</a>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; border-radius: 4px">Orders</a>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; border-radius: 4px">Customers</a>
+    <span style="color: #8E937E; font-size: 11px; letter-spacing: 0.12em; padding: 14px 10px 4px">WEBSITE</span>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; border-radius: 4px">Pages</a>
+    <a href="#" aria-current="page" style="color: #FFFFFF; background: #3E4532; padding: 8px 10px; border-radius: 4px; font-weight: 600">Theme</a>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; border-radius: 4px">Menus</a>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; border-radius: 4px">Redirects</a>
+  </nav>
+
+  <main style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; justify-content: space-between; padding: 16px 24px; border-bottom: 1px solid #D7D8CC; background: #FAFAF6">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px; letter-spacing: 0.02em">Theme</h1>
+        <span style="color: #666A5A; font-size: 13px">Draft · 3 unpublished changes · the live shop is unchanged until you publish</span>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center">
+        <button type="button" style="height: 36px; padding: 0 14px; border: 1px solid #D7D8CC; background: #FAFAF6; border-radius: 4px">Discard draft</button>
+        <button type="button" style="height: 36px; padding: 0 14px; border: 1px solid #D7D8CC; background: #FAFAF6; border-radius: 4px">Open preview in new tab</button>
+        <button type="button" style="height: 36px; padding: 0 16px; border: 0; background: #7E5416; color: #FFFFFF; border-radius: 4px; font-weight: 600">Publish theme</button>
+      </div>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 0; flex-grow: 1">
+      <section aria-label="Theme settings" style="flex: 1 1 340px; max-width: 380px; padding: 20px 24px; display: flex; flex-direction: column; gap: 22px; border-right: 1px solid #D7D8CC; background: #FAFAF6; box-sizing: border-box">
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #666A5A; font-weight: 600">1 · PRESET</h2>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+            <sc-for list="{{presets}}" as="p" hint-placeholder-count="4">
+              <button type="button" onClick="{{p.pick}}" aria-pressed="{{p.selected}}" style="{{p.cardStyle}}">
+                <span style="{{p.swatchStyle}}">
+                  <span style="{{p.dot1}}"></span><span style="{{p.dot2}}"></span><span style="{{p.dot3}}"></span>
+                </span>
+                <span style="font-weight: 600; font-size: 14px">{{p.name}}</span>
+                <span style="color: #666A5A; font-size: 12px; line-height: 1.35">{{p.blurb}}</span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #666A5A; font-weight: 600">2 · COLOURS</h2>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+            <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #666A5A">Primary
+              <span style="{{t.primarySwatch}}"></span>
+            </label>
+            <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #666A5A">Background tint
+              <span style="{{t.bgSwatch}}"></span>
+            </label>
+            <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #666A5A">Accent
+              <span style="{{t.accentSwatch}}"></span>
+            </label>
+          </div>
+          <span style="font-size: 12px; color: #2F6B3A">✓ All text passes contrast (AA)</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #666A5A; font-weight: 600">3 · TYPE</h2>
+          <label style="display: flex; justify-content: space-between; align-items: center; gap: 8px">Headings
+            <select style="height: 34px; border: 1px solid #D7D8CC; border-radius: 4px; background: #FFFFFF; padding: 0 8px; font: inherit; min-width: 170px"><option>{{t.headName}}</option></select>
+          </label>
+          <label style="display: flex; justify-content: space-between; align-items: center; gap: 8px">Body text
+            <select style="height: 34px; border: 1px solid #D7D8CC; border-radius: 4px; background: #FFFFFF; padding: 0 8px; font: inherit; min-width: 170px"><option>{{t.bodyName}}</option></select>
+          </label>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #666A5A; font-weight: 600">4 · SHAPE &amp; DENSITY</h2>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px">Corners
+            <div role="group" aria-label="Corners" style="display: flex; border: 1px solid #D7D8CC; border-radius: 4px; overflow: hidden">
+              <sc-for list="{{radii}}" as="r" hint-placeholder-count="3"><button type="button" onClick="{{r.pick}}" aria-pressed="{{r.selected}}" style="{{r.style}}">{{r.label}}</button></sc-for>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px">Buttons
+            <div role="group" aria-label="Button shape" style="display: flex; border: 1px solid #D7D8CC; border-radius: 4px; overflow: hidden">
+              <sc-for list="{{shapes}}" as="s" hint-placeholder-count="3"><button type="button" onClick="{{s.pick}}" aria-pressed="{{s.selected}}" style="{{s.style}}">{{s.label}}</button></sc-for>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px">Density
+            <div role="group" aria-label="Density" style="display: flex; border: 1px solid #D7D8CC; border-radius: 4px; overflow: hidden">
+              <sc-for list="{{densities}}" as="d" hint-placeholder-count="3"><button type="button" onClick="{{d.pick}}" aria-pressed="{{d.selected}}" style="{{d.style}}">{{d.label}}</button></sc-for>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #666A5A; font-weight: 600">5 · LOGO</h2>
+          <div style="border: 1px dashed #B7B49F; border-radius: 4px; padding: 16px; text-align: center; color: #666A5A; font-size: 13px">Drop an SVG or PNG · or <a href="#">browse</a></div>
+        </div>
+      </section>
+
+      <section aria-label="Live preview" style="flex: 999 1 520px; min-width: 0; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px">
+          <span style="font-size: 12px; letter-spacing: 0.12em; color: #666A5A; font-weight: 600">LIVE PREVIEW · DRAFT</span>
+          <div role="group" aria-label="Preview page" style="display: flex; gap: 6px">
+            <button type="button" style="height: 30px; padding: 0 10px; border: 1px solid #1E2119; background: #1E2119; color: #FAFAF6; border-radius: 4px; font-size: 12px">Home</button>
+            <button type="button" style="height: 30px; padding: 0 10px; border: 1px solid #D7D8CC; background: #FAFAF6; border-radius: 4px; font-size: 12px">Catalog</button>
+            <button type="button" style="height: 30px; padding: 0 10px; border: 1px solid #D7D8CC; background: #FAFAF6; border-radius: 4px; font-size: 12px">Product</button>
+            <button type="button" style="height: 30px; padding: 0 10px; border: 1px solid #D7D8CC; background: #FAFAF6; border-radius: 4px; font-size: 12px">Desktop / Mobile</button>
+          </div>
+        </div>
+
+        <div style="border: 1px solid #D7D8CC; border-radius: 8px; overflow: hidden; box-shadow: 0 8px 30px rgba(30,33,25,0.12); background: #FFFFFF">
+          <div style="height: 28px; background: #E3E3DA; display: flex; align-items: center; gap: 6px; padding: 0 10px">
+            <span style="width: 9px; height: 9px; border-radius: 50%; background: #C9C7B6"></span><span style="width: 9px; height: 9px; border-radius: 50%; background: #C9C7B6"></span><span style="width: 9px; height: 9px; border-radius: 50%; background: #C9C7B6"></span>
+            <span style="margin-left: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #666A5A">concept-militaria.nl · draft preview</span>
+          </div>
+          <div style="{{t.root}}">
+            <div style="{{t.header}}">
+              <span style="{{t.logo}}">Concept Militaria</span>
+              <span style="{{t.nav}}">Helmets · Uniforms · Insignia · Documents</span>
+              <span style="{{t.cartBtn}}">Cart · 1</span>
+            </div>
+            <div style="{{t.hero}}">
+              <div style="{{t.heroCard}}">
+                <span style="{{t.heroTitle}}">Original militaria, <span style="{{t.heroEm}}">honestly</span> described.</span>
+                <span style="{{t.heroSub}}">WW1 to the Cold War. Every piece checked, measured and photographed.</span>
+                <span style="{{t.primaryBtn}}">Shop new arrivals</span>
+              </div>
+            </div>
+            <div style="{{t.gridWrap}}">
+              <span style="{{t.sectionTitle}}">Just in</span>
+              <div style="{{t.grid}}">
+                <sc-for list="{{products}}" as="pr" hint-placeholder-count="4">
+                  <div style="display: flex; flex-direction: column; gap: 6px">
+                    <div style="{{t.img}}"></div>
+                    <span style="{{t.code}}">No. {{pr.code}}</span>
+                    <span style="{{t.cardTitle}}">{{pr.title}}</span>
+                    <span style="{{t.price}}">{{pr.price}}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":940}}'>
+class Component extends DCLogic {
+constructor(props) { super(props); this.state = { preset: 'gallery', radius: null, shape: null, density: 'comfortable' }; }
+renderVals() {
+const P = {
+  gallery: { name: 'Gallery', blurb: 'Clean, modern, large photos', bg: '#FFFFFF', sunken: '#F3F3F1', ink: '#141414', muted: '#6A6862', line: '#ECECEA', primary: '#1F4D3A', accent: '#7A2420', head: "'Hanken Grotesk', sans-serif", headName: 'Hanken Grotesk', em: "'Instrument Serif', serif", body: "'Hanken Grotesk', sans-serif", bodyName: 'Hanken Grotesk', weight: 600, upper: false, radius: 'soft', shape: 'pill', heroBg: '#D9D6CE', headerBg: '#FFFFFF', headerInk: '#141414' },
+  archive: { name: 'Archive', blurb: 'Auction catalogue, serif, numbered lots', bg: '#F4F0E6', sunken: '#E3DCCB', ink: '#1E1C17', muted: '#5B5547', line: '#D8D0BD', primary: '#1E1C17', accent: '#7A2420', head: "'Newsreader', serif", headName: 'Newsreader', em: "'Newsreader', serif", body: "'IBM Plex Sans', sans-serif", bodyName: 'IBM Plex Sans', weight: 400, upper: false, radius: 'sharp', shape: 'square', heroBg: '#E3DCCB', headerBg: '#F4F0E6', headerInk: '#1E1C17' },
+  fieldkit: { name: 'Field Kit', blurb: 'Utilitarian spec sheet, olive and orange', bg: '#E6E1D2', sunken: '#CFC8B2', ink: '#23281B', muted: '#5E5A4A', line: '#B9B29C', primary: '#A84E14', accent: '#A84E14', head: "'Big Shoulders Display', sans-serif", headName: 'Big Shoulders', em: "'Big Shoulders Display', sans-serif", body: "'Archivo', sans-serif", bodyName: 'Archivo', weight: 800, upper: true, radius: 'sharp', shape: 'square', heroBg: '#2F3524', headerBg: '#2F3524', headerInk: '#E6E1D2' },
+  vault: { name: 'Vault', blurb: 'Dark and premium, brass accents', bg: '#121311', sunken: '#1D1E1A', ink: '#ECE6D8', muted: '#B7B0A0', line: '#2B2C27', primary: '#D2B07A', accent: '#D2B07A', head: "'Libre Caslon Display', serif", headName: 'Libre Caslon Display', em: "'Libre Caslon Display', serif", body: "'Work Sans', sans-serif", bodyName: 'Work Sans', weight: 400, upper: false, radius: 'sharp', shape: 'square', heroBg: '#1D1E1A', headerBg: '#121311', headerInk: '#ECE6D8' }
+};
+const p = P[this.state.preset];
+const radius = this.state.radius || p.radius;
+const shape = this.state.shape || p.shape;
+const R = { sharp: 0, soft: 6, round: 14 }[radius];
+const B = { square: 0, rounded: 8, pill: 999 }[shape];
+const D = { compact: 0.75, comfortable: 1, spacious: 1.3 }[this.state.density];
+const onPrimary = this.state.preset === 'vault' ? '#121311' : '#FFFFFF';
+const seg = (on) => 'height: 30px; padding: 0 10px; border: 0; font-size: 12px; ' + (on ? 'background: #1E2119; color: #FAFAF6;' : 'background: #FFFFFF; color: #1E2119;');
+const presets = Object.keys(P).map((k) => {
+  const x = P[k]; const on = k === this.state.preset;
+  return {
+    name: x.name, blurb: x.blurb, selected: on ? 'true' : 'false',
+    pick: () => this.setState({ preset: k, radius: null, shape: null }),
+    cardStyle: 'text-align: left; display: flex; flex-direction: column; gap: 6px; padding: 10px; background: #FFFFFF; border-radius: 6px; ' + (on ? 'border: 2px solid #7E5416;' : 'border: 1px solid #D7D8CC; margin: 1px;'),
+    swatchStyle: 'display: flex; gap: 0; height: 34px; border-radius: 4px; overflow: hidden; border: 1px solid #D7D8CC',
+    dot1: 'flex: 2; background: ' + x.bg, dot2: 'flex: 1; background: ' + x.primary, dot3: 'flex: 1; background: ' + (x.accent === x.primary ? x.ink : x.accent)
+  };
+});
+const radii = ['sharp', 'soft', 'round'].map((k) => ({ label: k[0].toUpperCase() + k.slice(1), selected: k === radius ? 'true' : 'false', style: seg(k === radius), pick: () => this.setState({ radius: k }) }));
+const shapes = ['square', 'rounded', 'pill'].map((k) => ({ label: k[0].toUpperCase() + k.slice(1), selected: k === shape ? 'true' : 'false', style: seg(k === shape), pick: () => this.setState({ shape: k }) }));
+const densities = ['compact', 'comfortable', 'spacious'].map((k) => ({ label: k[0].toUpperCase() + k.slice(1), selected: k === this.state.density ? 'true' : 'false', style: seg(k === this.state.density), pick: () => this.setState({ density: k }) }));
+const sw = (c) => 'display: block; height: 36px; border-radius: 4px; border: 1px solid #D7D8CC; background: ' + c;
+const pad = (n) => Math.round(n * D) + 'px';
+const t = {
+  primarySwatch: sw(p.primary), bgSwatch: sw(p.sunken), accentSwatch: sw(p.accent), headName: p.headName, bodyName: p.bodyName,
+  root: 'background: ' + p.bg + '; color: ' + p.ink + '; font-family: ' + p.body + '; font-size: 13px',
+  header: 'display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: ' + p.headerBg + '; color: ' + p.headerInk + '; border-bottom: 1px solid ' + p.line,
+  logo: 'font-family: ' + p.head + '; font-weight: ' + p.weight + '; font-size: 18px;' + (p.upper ? ' text-transform: uppercase; letter-spacing: 0.04em;' : ''),
+  nav: 'font-size: 12px; opacity: 0.8; flex-grow: 1',
+  cartBtn: 'background: ' + (this.state.preset === 'gallery' ? p.ink : p.primary) + '; color: ' + (this.state.preset === 'gallery' ? '#FFFFFF' : onPrimary) + '; padding: 7px 14px; border-radius: ' + B + 'px; font-size: 12px; font-weight: 600',
+  hero: 'margin: ' + pad(16) + ' 20px 0; height: 210px; background: ' + p.heroBg + '; border-radius: ' + R + 'px; display: flex; align-items: flex-end; padding: 16px; box-sizing: border-box',
+  heroCard: 'background: ' + p.bg + '; border-radius: ' + R + 'px; padding: ' + pad(16) + ' 18px; max-width: 320px; display: flex; flex-direction: column; gap: 8px',
+  heroTitle: 'font-family: ' + p.head + '; font-weight: ' + p.weight + '; font-size: 24px; line-height: 1.05;' + (p.upper ? ' text-transform: uppercase;' : ''),
+  heroEm: 'font-family: ' + p.em + '; font-style: italic; font-weight: 400',
+  heroSub: 'font-size: 12px; color: ' + p.muted,
+  primaryBtn: 'align-self: flex-start; background: ' + p.primary + '; color: ' + onPrimary + '; padding: 8px 14px; border-radius: ' + B + 'px; font-size: 12px; font-weight: 600',
+  gridWrap: 'padding: ' + pad(20) + ' 20px ' + pad(22) + '; display: flex; flex-direction: column; gap: ' + pad(12),
+  sectionTitle: 'font-family: ' + p.head + '; font-weight: ' + p.weight + '; font-size: 20px;' + (p.upper ? ' text-transform: uppercase;' : ''),
+  grid: 'display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: ' + pad(14),
+  img: 'aspect-ratio: 4 / 5; background: ' + p.sunken + '; border-radius: ' + R + 'px',
+  code: "font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: " + p.accent,
+  cardTitle: 'font-size: 12px; font-weight: 500; line-height: 1.3',
+  price: 'font-size: 12px; font-weight: 700'
+};
+return {
+  presets: presets, radii: radii, shapes: shapes, densities: densities, t: t,
+  products: [
+    { code: '50212', title: 'Iron Cross 2nd class 1914', price: '€145' },
+    { code: '50185', title: 'Waffenrock M10, feldgrau', price: '€1,350' },
+    { code: '50172', title: 'Bundeswehr M56 Stahlhelm', price: '€45' },
+    { code: '50224', title: '1st Airborne Pegasus patch', price: '€125' }
+  ]
+};
+}
+}
+</script>
+</body>
+</html>
