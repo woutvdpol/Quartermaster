@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { accountCopy } from "./_copy";
-import { Alert, Field, inputClass, SubmitButton } from "./form";
+import { checkClasses, Select } from "@/components/shop/ui/Field";
+import { Alert, Field, SubmitButton } from "./form";
 
 export type AddressFormValues = {
   id?: string;
@@ -46,11 +47,14 @@ export function AddressForm({
       {state?.error ? <Alert tone="error">{state.error}</Alert> : null}
 
       <fieldset className="grid gap-2">
-        <legend className="mb-1 text-sm font-medium text-shop-ink-2">{t.type}</legend>
-        <div className="flex flex-wrap gap-4 text-sm">
+        <legend className="mb-1 text-sm font-medium text-shop-ink">{t.type}</legend>
+        <div className="flex flex-wrap gap-2 text-sm">
           {(["SHIPPING", "BILLING"] as const).map((type) => (
-            <label key={type} className="flex items-center gap-2">
-              <input type="radio" name="type" value={type} defaultChecked={(v?.type ?? "SHIPPING") === type} className="accent-[var(--shop-primary)]" />
+            <label
+              key={type}
+              className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-shop-control border border-shop-line bg-shop-surface px-4 has-checked:border-shop-ink has-checked:ring-1 has-checked:ring-shop-ink"
+            >
+              <input type="radio" name="type" value={type} defaultChecked={(v?.type ?? "SHIPPING") === type} className={checkClasses} />
               {type === "SHIPPING" ? t.shipping : t.billing}
             </label>
           ))}
@@ -73,10 +77,10 @@ export function AddressForm({
       </div>
       <Field id="region" label={f.region} autoComplete="address-level1" defaultValue={v?.region ?? ""} error={fe.region} />
       <div className="grid gap-1.5">
-        <label htmlFor="countryCode" className="text-sm font-medium text-shop-ink-2">
+        <label htmlFor="countryCode" className="text-sm font-medium text-shop-ink">
           {f.countryCode}
         </label>
-        <select
+        <Select
           id="countryCode"
           name="countryCode"
           autoComplete="country"
@@ -84,7 +88,6 @@ export function AddressForm({
           defaultValue={v?.countryCode ?? countries.preferred[0]?.[0] ?? ""}
           aria-invalid={fe.countryCode ? true : undefined}
           aria-describedby={fe.countryCode ? "countryCode-error" : undefined}
-          className={inputClass}
         >
           {countries.preferred.length ? (
             <optgroup label={t.shipsTo}>
@@ -102,7 +105,7 @@ export function AddressForm({
             </option>
           ))}
           </optgroup>
-        </select>
+        </Select>
         {fe.countryCode ? (
           <p id="countryCode-error" className="text-sm text-shop-crit">
             {fe.countryCode}
@@ -110,13 +113,13 @@ export function AddressForm({
         ) : null}
       </div>
       <Field id="phone" label={f.phone} type="tel" autoComplete="tel" defaultValue={v?.phone ?? ""} error={fe.phone} />
-      <label className="flex items-center gap-3 text-sm text-shop-ink-2">
-        <input type="checkbox" name="isDefault" defaultChecked={v?.isDefault} className="size-4 accent-[var(--shop-primary)]" />
+      <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-shop-ink-2">
+        <input type="checkbox" name="isDefault" defaultChecked={v?.isDefault} className={checkClasses} />
         {t.isDefault}
       </label>
       <div className="flex flex-wrap items-center gap-4 pt-2">
         <SubmitButton pendingLabel={accountCopy.common.saving}>{t.save}</SubmitButton>
-        <Link href="/account/addresses" className="text-sm text-shop-muted underline-offset-4 hover:underline">
+        <Link href="/account/addresses" className="inline-flex min-h-11 items-center text-sm font-medium text-shop-muted underline-offset-4 hover:text-shop-ink hover:underline">
           {accountCopy.common.cancel}
         </Link>
       </div>

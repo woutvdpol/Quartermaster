@@ -45,7 +45,7 @@ export function CurrencySwitcher({
             router.refresh();
           });
         }}
-        className="cursor-pointer rounded-shop-sm border border-shop-line bg-transparent px-1.5 py-1 text-xs text-shop-ink-2 hover:text-shop-ink"
+        className="h-8 cursor-pointer rounded-shop-control border border-shop-line bg-transparent px-3 text-xs font-medium text-shop-ink-2 transition-colors hover:border-shop-line-strong hover:text-shop-ink"
       >
         <option value="off">{shopCurrency}</option>
         {options.map((c) => (

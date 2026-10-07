@@ -4,16 +4,15 @@ import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/shop/ui/Button";
 import { cn } from "@/components/shop/ui/cn";
+import { inputClasses } from "@/components/shop/ui/Field";
 
 /*
  * Small form kit for the account/auth pages (no generic shop form primitives exist yet in
  * components/shop/ui — candidates to move there).
  */
 
-export const inputClass =
-  "block w-full h-11 rounded-shop-sm border border-shop-line-strong bg-shop-surface px-3 text-shop-ink " +
-  "placeholder:text-shop-muted focus:border-shop-primary focus:outline-none focus-visible:outline-2 " +
-  "focus-visible:outline-offset-1 focus-visible:outline-shop-primary aria-invalid:border-shop-crit";
+/** Pill input from the shared shop form kit (components/shop/ui/Field). */
+export const inputClass = inputClasses;
 
 export function Field({
   id,
@@ -26,7 +25,7 @@ export function Field({
   const describedBy = [error ? `${id}-error` : null, hint ? `${id}-hint` : null].filter(Boolean).join(" ") || undefined;
   return (
     <div className={cn("grid gap-1.5", className)}>
-      <label htmlFor={id} className="text-sm font-medium text-shop-ink-2">
+      <label htmlFor={id} className="text-sm font-medium text-shop-ink">
         {label}
       </label>
       <input
@@ -58,7 +57,7 @@ export function Alert({ tone, children, id }: { tone: "error" | "success" | "inf
     info: "border-shop-line bg-shop-sunken text-shop-ink-2",
   } as const;
   return (
-    <div id={id} role={tone === "error" ? "alert" : "status"} className={cn("rounded-shop-sm border px-4 py-3 text-sm", tones[tone])}>
+    <div id={id} role={tone === "error" ? "alert" : "status"} className={cn("rounded-shop border px-4 py-3 text-sm", tones[tone])}>
       {children}
     </div>
   );
@@ -69,18 +68,20 @@ export function SubmitButton({
   children,
   pendingLabel,
   variant = "primary",
+  size = "md",
   fullWidth,
   className,
 }: {
   children: ReactNode;
   pendingLabel?: ReactNode;
   variant?: "primary" | "outline" | "accent" | "secondary";
+  size?: "sm" | "md" | "lg";
   fullWidth?: boolean;
   className?: string;
 }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant={variant} fullWidth={fullWidth} pending={pending} className={className}>
+    <Button type="submit" variant={variant} size={size} fullWidth={fullWidth} pending={pending} className={className}>
       {pending && pendingLabel ? pendingLabel : children}
     </Button>
   );

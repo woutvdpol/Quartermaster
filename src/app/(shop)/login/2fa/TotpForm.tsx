@@ -22,8 +22,8 @@ export function TotpForm({ next }: { next: string }) {
       ) : (
         <form action={action} className="grid gap-4" noValidate>
           <input type="hidden" name="next" value={next} />
-          <Field id="code" label={t.code} autoComplete="one-time-code" inputMode="text" autoFocus required maxLength={32} />
-          <SubmitButton pendingLabel={t.submitting} fullWidth>
+          <Field id="code" className="[&_input]:font-shop-mono [&_input]:tracking-[0.2em]" label={t.code} autoComplete="one-time-code" inputMode="text" autoFocus required maxLength={32} />
+          <SubmitButton pendingLabel={t.submitting} size="lg" fullWidth>
             {t.submit}
           </SubmitButton>
         </form>

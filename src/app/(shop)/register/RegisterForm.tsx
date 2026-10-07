@@ -4,6 +4,8 @@ import { useActionState } from "react";
 import { accountCopy } from "@/components/shop/account/_copy";
 import { Alert, Field, Honeypot, SubmitButton } from "@/components/shop/account/form";
 import { Turnstile } from "@/components/shop/turnstile";
+import { checkClasses } from "@/components/shop/ui/Field";
+import { cn } from "@/components/shop/ui/cn";
 import { registerAction } from "./actions";
 
 const t = accountCopy.register;
@@ -38,17 +40,17 @@ export function RegisterForm({ next, minPasswordLength }: { next: string; minPas
         hint={t.passwordHint(minPasswordLength)}
         error={fe.password}
       />
-      <label className="flex items-start gap-3 text-sm text-shop-ink-2">
+      <label className="flex cursor-pointer items-start gap-3 py-1 text-sm text-shop-ink-2">
         <input
           type="checkbox"
           name="newsletter"
           defaultChecked={state?.values?.newsletter}
-          className="mt-0.5 size-4 shrink-0 accent-[var(--shop-primary)]"
+          className={cn(checkClasses, "mt-0.5")}
         />
         <span>{t.newsletter}</span>
       </label>
       <Turnstile action="register" resetKey={state} />
-      <SubmitButton pendingLabel={t.submitting} fullWidth>
+      <SubmitButton pendingLabel={t.submitting} size="lg" fullWidth>
         {t.submit}
       </SubmitButton>
       <p className="text-xs text-shop-muted">{t.privacy}</p>

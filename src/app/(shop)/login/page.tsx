@@ -22,7 +22,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
       footer={
         <>
           {t.noAccount}{" "}
-          <Link href="/register" className="font-medium text-shop-primary underline-offset-4 hover:underline">
+          <Link href="/register" className="font-semibold text-shop-ink underline underline-offset-4 hover:text-shop-primary">
             {t.createAccount}
           </Link>
         </>

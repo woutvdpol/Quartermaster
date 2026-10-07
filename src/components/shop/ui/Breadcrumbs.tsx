@@ -23,7 +23,7 @@ export function Breadcrumbs({ items, className, jsonLdBase }: { items: Crumb[]; 
       }
     : null;
   return (
-    <nav aria-label={uiCopy.breadcrumbs.label} className={cn("text-sm text-shop-muted", className)}>
+    <nav aria-label={uiCopy.breadcrumbs.label} className={cn("text-[0.85rem] text-shop-muted", className)}>
       <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
         {all.map((c, i) => {
           const last = i === all.length - 1;
@@ -31,7 +31,7 @@ export function Breadcrumbs({ items, className, jsonLdBase }: { items: Crumb[]; 
             <li key={`${i}-${c.label}`} className="flex min-w-0 items-center gap-1.5">
               {i > 0 ? <span aria-hidden="true" className="text-shop-line-strong">/</span> : null}
               {c.href && !last ? (
-                <Link href={c.href} className="truncate hover:text-shop-ink hover:underline underline-offset-4">
+                <Link href={c.href} className="truncate transition-colors hover:text-shop-ink">
                   {c.label}
                 </Link>
               ) : (

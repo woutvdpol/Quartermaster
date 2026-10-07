@@ -13,13 +13,13 @@ export default function ShopError({ error, reset }: { error: Error & { digest?: 
     console.error(error);
   }, [error]);
   return (
-    <Container size="narrow" className="py-24 text-center sm:py-32">
-      <h1 className="text-3xl text-shop-ink sm:text-4xl">{t.title}</h1>
+    <Container size="narrow" className="py-20 text-center sm:py-28">
+      <h1 className="text-[2rem] tracking-[-0.03em] text-shop-ink sm:text-[3rem]">{t.title}</h1>
       <p className="mx-auto mt-4 max-w-md text-shop-muted">{t.body}</p>
-      {error.digest ? <p className="mt-2 font-mono text-xs text-shop-muted">{error.digest}</p> : null}
-      <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+      {error.digest ? <p className="mt-2 font-shop-mono text-xs text-shop-muted">{error.digest}</p> : null}
+      <div className="mt-8 flex flex-col justify-center gap-2.5 sm:flex-row">
         <Button onClick={() => reset()}>{t.retry}</Button>
-        <ButtonLink href="/" variant="outline">
+        <ButtonLink href="/" variant="secondary">
           {t.home}
         </ButtonLink>
       </div>

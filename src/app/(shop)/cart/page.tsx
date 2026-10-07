@@ -28,8 +28,8 @@ export const metadata: Metadata = { title: t.metaTitle, robots: { index: false, 
 
 export default function CartPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   return (
-    <Container className="py-8 sm:py-12">
-      <h1 className="mb-6 text-3xl sm:text-4xl">{t.title}</h1>
+    <Container className="py-8 sm:py-14">
+      <h1 className="mb-6 text-[2.25rem] tracking-tight sm:mb-10 sm:text-5xl">{t.title}</h1>
       <Suspense fallback={null}>
         <Restore searchParams={searchParams} />
       </Suspense>
@@ -49,13 +49,13 @@ async function Restore({ searchParams }: { searchParams: Promise<Record<string, 
 
 function CartSkeleton() {
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
-      <div className="flex flex-col gap-4">
+    <div className="grid gap-8 lg:grid-cols-[1fr_400px] lg:gap-14">
+      <div className="flex flex-col gap-6">
         {[0, 1].map((i) => (
-          <Skeleton key={i} className="h-24 w-full" />
+          <Skeleton key={i} className="h-32 w-full" />
         ))}
       </div>
-      <Skeleton className="h-64 w-full" />
+      <Skeleton className="h-72 w-full" />
     </div>
   );
 }
@@ -94,33 +94,34 @@ async function CartContent() {
   const [ctx, display] = await Promise.all([getCheckoutContext(tenantId, token, viewer), getVisitorDisplayCurrency(tenantId)]);
   const country = ctx.defaultCountry;
   const quote = country ? await quoteCheckout(tenantId, token, { countryCode: country }) : null;
-  const lines = toCartLineData(cart, { guest: !viewer, blurSensitiveForGuests: shop.settings.legal.blurSensitiveForGuests });
+  const lines = toCartLineData(cart, { guest: !viewer, blurSensitiveForGuests: shop.settings.legal.blurSensitiveForGuests, showStockCode: shop.settings.catalog.showStockCode });
   const hasUnavailable = lines.some((l) => l.state === "unavailable");
   const canCheckout = cart.buyableCount > 0 && (!quote || quote.minimumShortfall === 0);
 
   return (
-    <div className="grid items-start gap-8 lg:grid-cols-[1fr_360px]">
+    <div className="grid items-start gap-8 lg:grid-cols-[1fr_400px] lg:gap-14">
       <SyncHeaderCounts cart={cart.lines.length} />
       <section aria-labelledby="cart-items">
         <h2 id="cart-items" className="sr-only">
           {t.itemCount(cart.lines.length)}
         </h2>
-        <p className="mb-2 text-sm text-shop-muted">{t.uniqueNote}</p>
-        <ul className="divide-y divide-shop-line border-y border-shop-line">
+        <p className="mb-1 text-sm text-shop-muted">{t.uniqueNote}</p>
+        <ul className="divide-y divide-shop-line border-b border-shop-line">
           {lines.map((line) => (
             <CartLineItem key={line.productId} line={line} display={display} />
           ))}
         </ul>
         {hasUnavailable ? (
-          <form action={removeUnavailableAction} className="mt-3">
-            <PendingButton variant="outline" size="sm">
+          <form action={removeUnavailableAction} className="mt-4">
+            <PendingButton variant="outline" size="sm" className="h-11! sm:h-9!">
               {t.removeUnavailable}
             </PendingButton>
           </form>
         ) : null}
       </section>
 
-      <aside aria-label={cartCopy.checkout.summary} className="flex flex-col gap-5 rounded-shop border border-shop-line bg-shop-surface p-5 shadow-shop lg:sticky lg:top-24">
+      <aside aria-label={cartCopy.checkout.summary} className="flex flex-col gap-5 rounded-shop bg-shop-sunken p-5 sm:p-7 lg:sticky lg:top-24">
+        <h2 className="text-xl">{cartCopy.checkout.summary}</h2>
         <CartSummary
           key={`${cart.couponCode ?? ""}:${cart.subtotal}`}
           subtotal={cart.subtotal}
@@ -135,8 +136,8 @@ async function CartContent() {
           hasOfferLines={cart.lines.some((l) => l.offerApplied)}
         />
         <CheckoutButton disabled={!canCheckout} />
-        <p className="text-xs text-shop-muted">{t.totalNote}</p>
-        <ButtonLink href="/shop" variant="link" size="sm" className="self-center">
+        <p className="-mt-1 text-center text-xs text-shop-muted">{t.totalNote}</p>
+        <ButtonLink href="/shop" variant="link" size="sm" className="min-h-11 self-center text-shop-ink! no-underline hover:underline">
           {t.continueShopping}
         </ButtonLink>
       </aside>

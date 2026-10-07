@@ -20,6 +20,8 @@
  * font-shop-heading, font-shop-body, font-shop-accent, font-shop-mono, rounded-shop, rounded-shop-control (buttons,
  * inputs, chips: pill in theme gallery), shadow-shop. Plus `shop-prose` for Markdown.
  */
+/* Same layer order as globals.css (tailwindcss), so `base` below stays under `utilities`. */
+@layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities) source(none);
 
@@ -53,6 +55,11 @@
   --color-shop-warn-soft: var(--shop-warn-soft);
   --color-shop-crit: var(--shop-crit);
   --color-shop-crit-soft: var(--shop-crit-soft);
+
+  /* Overlays (catalog agent): modal backdrop and the photo lightbox ground. */
+  --color-shop-scrim: var(--shop-scrim);
+  --color-shop-lightbox: var(--shop-lightbox);
+  --color-shop-on-lightbox: var(--shop-on-lightbox);
 
   --font-shop-heading: var(--shop-font-heading);
   --font-shop-body: var(--shop-font-body);
@@ -106,6 +113,11 @@
   --shop-crit: #a2342a;
   --shop-crit-soft: #f8e3df;
 
+  /* Overlays: dialog/sheet backdrop, and the full-screen photo lightbox (dark ground, light controls). */
+  --shop-scrim: rgb(20 20 20 / 0.45);
+  --shop-lightbox: color-mix(in oklab, var(--shop-ink) 92%, #000);
+  --shop-on-lightbox: #ffffff;
+
   --shop-radius: 6px;
   --shop-radius-sm: 6px;
   --shop-radius-control: 999px;
@@ -121,12 +133,18 @@
   color-scheme: light;
 }
 
-.shop-root :where(h1, h2, h3, h4) {
-  font-family: var(--shop-font-heading);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
-  text-wrap: balance;
+/*
+ * Heading defaults live in the base layer (below utilities) so utilities on a heading (font-shop-body, tracking-normal,
+ * leading-snug, font-medium … e.g. ProductCard titles) can override them; unlayered they would win.
+ */
+@layer base {
+  .shop-root :where(h1, h2, h3, h4) {
+    font-family: var(--shop-font-heading);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    text-wrap: balance;
+  }
 }
 
 /* Emphasis inside headings switches to the theme's accent serif ("Original militaria, *honestly* described"). */

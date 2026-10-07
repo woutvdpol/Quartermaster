@@ -96,3 +96,9 @@ Kanttekeningen:
 - Refunds tellen niet mee in omzet/marge.
 - Nieuwsbriefbevestiging via pagina met bevestigknop (POST) i.p.v. directe GET-link.
 - Voorraad handmatig naar 0 → status blijft (geen automatische SOLD).
+
+## Shop-design (07-10-2026)
+- Vier richtingen getoond (canvas: https://claude.ai/artifact/XzjShLtkiEinkYQuJGf5F5, bronbestanden in `docs/design/shop-options/`): Archive, Field Kit, Gallery, Vault.
+- **Gekozen: optie 3 "Gallery"** (wit, modern-minimaal, grote foto's, pill-knoppen) **met de itemnummers van optie 1** ("No. 50212" in mono, accentkleur).
+- **Archive, Field Kit en Vault blijven bewaard voor een latere themabuilder.** Daarom: componenten gebruiken alleen tokens (`--shop-*`); een thema-preset (`appearance.theme`, nu alleen `gallery`) overschrijft tokens via `.shop-root[data-shop-theme=…]`. Lettertypes voor de andere presets staan al in de allowlist.
+- Itemnummers standaard zichtbaar (`catalog.showStockCode` = aan).

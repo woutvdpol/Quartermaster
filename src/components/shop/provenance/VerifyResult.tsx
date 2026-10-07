@@ -1,4 +1,5 @@
 import { cn } from "@/components/shop/ui";
+import { uiCopy } from "@/components/shop/ui/_copy";
 import type { VerifyResult as Result } from "@/server/provenance/certificates";
 import { provenanceShopCopy } from "./_copy";
 
@@ -13,10 +14,10 @@ export function VerifyResult({ result, timeZone }: { result: Result; timeZone: s
   if (result.status === "rate_limited" || result.status === "unknown") {
     const s = result.status === "unknown" ? t.unknown : t.rateLimited;
     return (
-      <div role="status" className="rounded-shop border border-shop-warn/30 bg-shop-warn-soft p-4">
+      <div role="status" className="rounded-shop bg-shop-warn-soft p-5 sm:p-6">
         <h2 className="font-shop-body text-lg font-semibold text-shop-warn">{s.title}</h2>
         <p className="mt-1 text-sm text-shop-ink-2">{s.body}</p>
-        {result.status === "unknown" && result.code ? <p className="mt-2 font-mono text-sm text-shop-ink">{result.code}</p> : null}
+        {result.status === "unknown" && result.code ? <p className="mt-3 font-shop-mono text-sm text-shop-ink">{result.code}</p> : null}
       </div>
     );
   }
@@ -26,7 +27,7 @@ export function VerifyResult({ result, timeZone }: { result: Result; timeZone: s
   const s = valid ? t.valid : t.revoked;
   return (
     <article className="overflow-hidden rounded-shop border border-shop-line bg-shop-surface">
-      <div role="status" className={cn("flex items-start gap-3 p-4", valid ? "bg-shop-ok-soft" : "bg-shop-crit-soft")}>
+      <div role="status" className={cn("flex items-start gap-3 px-5 py-4 sm:px-6", valid ? "bg-shop-ok-soft" : "bg-shop-crit-soft")}>
         <span aria-hidden="true" className={cn("mt-0.5 grid size-8 shrink-0 place-items-center rounded-full", valid ? "bg-shop-ok text-shop-bg" : "bg-shop-crit text-shop-bg")}>
           <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             {valid ? <path d="M5 10.5l3.2 3L15 6.5" /> : <path d="M6 6l8 8M14 6l-8 8" />}
@@ -38,18 +39,20 @@ export function VerifyResult({ result, timeZone }: { result: Result; timeZone: s
         </div>
       </div>
 
-      <div className="grid gap-5 p-4 sm:grid-cols-[minmax(0,14rem)_1fr]">
+      <div className="grid gap-6 p-5 sm:grid-cols-[minmax(0,12rem)_1fr] sm:p-6">
         {c.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- stored JPEG served by /uploads
-          <img src={c.photoUrl} alt={t.photoAlt(c.title)} className="w-full rounded-shop-sm border border-shop-line object-contain" loading="lazy" />
+          <img src={c.photoUrl} alt={t.photoAlt(c.title)} className="w-full rounded-shop bg-shop-sunken object-contain" loading="lazy" />
         ) : null}
         <div className={cn("min-w-0", !c.photoUrl && "sm:col-span-2")}>
-          <h3 className="text-xl text-shop-ink">{c.title}</h3>
-          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+          <h3 className="text-xl text-shop-ink sm:text-2xl">{c.title}</h3>
+          <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-6 border-t border-shop-line text-sm *:border-b *:border-shop-line *:py-2.5">
             <dt className="text-shop-muted">{t.code}</dt>
-            <dd className="font-mono text-shop-ink">{c.code}</dd>
+            <dd className="font-shop-mono text-shop-ink">{c.code}</dd>
             <dt className="text-shop-muted">{t.stockCode}</dt>
-            <dd className="font-mono text-shop-ink">#{c.stockCode}</dd>
+            <dd className="font-shop-mono text-shop-accent">
+              {uiCopy.product.stockCode} {c.stockCode}
+            </dd>
             <dt className="text-shop-muted">{t.issuedBy}</dt>
             <dd className="text-shop-ink">{c.shopName}</dd>
             <dt className="text-shop-muted">{t.issuedOn}</dt>
@@ -62,8 +65,8 @@ export function VerifyResult({ result, timeZone }: { result: Result; timeZone: s
             ) : null}
             {c.specifications.map((r, i) => (
               <div key={`${i}-${r.label}`} className="contents">
-                <dt className="text-shop-muted">{r.label}</dt>
-                <dd className="text-shop-ink">{r.value}</dd>
+                <dt className="border-b border-shop-line py-2.5 text-shop-muted">{r.label}</dt>
+                <dd className="border-b border-shop-line py-2.5 text-shop-ink">{r.value}</dd>
               </div>
             ))}
           </dl>

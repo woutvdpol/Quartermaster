@@ -62,7 +62,7 @@ export const catalogCopy = {
   loadMore: "Load more",
   showing: (shown: number, total: number) => `Showing ${shown} of ${total}`,
   product: {
-    stockCode: (n: number) => `#${n}`,
+    stockCode: (n: number) => `No. ${n}`,
     status: { available: "For sale", reserved: "Reserved", sold: "Sold" } as Record<string, string>,
     reservedHint: "Someone has this item in their cart. If they do not check out, it becomes available again.",
     soldHint: "This item has been sold. It stays here as a reference.",

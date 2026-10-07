@@ -35,18 +35,18 @@ async function Addresses() {
     </ButtonLink>
   );
   if (!addresses.length) return <EmptyState title={t.empty} action={add} />;
-  const small = "text-sm font-medium text-shop-primary underline-offset-4 hover:underline";
+  const small = "inline-flex min-h-11 items-center text-sm font-semibold text-shop-ink underline underline-offset-4 hover:text-shop-primary";
   return (
     <div className="grid gap-6">
       <ul className="grid gap-4 sm:grid-cols-2">
         {addresses.map((a) => (
-          <li key={a.id} className="flex flex-col rounded-shop border border-shop-line bg-shop-surface p-5">
+          <li key={a.id} className="flex flex-col rounded-shop border border-shop-line bg-shop-surface p-5 sm:p-6">
             <div className="mb-3 flex flex-wrap gap-2">
-              <Badge tone="neutral">{a.type === "SHIPPING" ? t.shipping : t.billing}</Badge>
+              <Badge tone="neutral" className="bg-shop-sunken shadow-none">{a.type === "SHIPPING" ? t.shipping : t.billing}</Badge>
               {a.isDefault ? <Badge tone="primary">{t.default}</Badge> : null}
             </div>
             <AddressLines a={a} />
-            <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 pt-4">
+            <div className="mt-auto flex flex-wrap items-center gap-x-5 pt-3">
               <Link href={`/account/addresses/${a.id}`} className={small}>
                 {t.edit}
               </Link>
@@ -60,7 +60,7 @@ async function Addresses() {
               ) : null}
               <form action={deleteAddressAction}>
                 <input type="hidden" name="id" value={a.id} />
-                <ConfirmSubmit message={t.removeConfirm} className="text-sm font-medium text-shop-crit underline-offset-4 hover:underline">
+                <ConfirmSubmit message={t.removeConfirm} className="inline-flex min-h-11 items-center text-sm font-semibold text-shop-crit underline-offset-4 hover:underline">
                   {t.remove}
                 </ConfirmSubmit>
               </form>

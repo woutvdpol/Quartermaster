@@ -8,7 +8,6 @@ import { BlockRenderer } from "@/components/shop/blocks/BlockRenderer";
 import { blockContext } from "@/components/shop/blocks/context";
 import { Breadcrumbs } from "@/components/shop/ui/Breadcrumbs";
 import { Container } from "@/components/shop/ui/Container";
-import { cn } from "@/components/shop/ui/cn";
 
 /*
  * Published CMS pages. Canonical public URL is `/{slug}` (contentPageHref; menus link there): a
@@ -17,6 +16,8 @@ import { cn } from "@/components/shop/ui/cn";
  */
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+const titleClass = "text-[2.25rem] leading-[1.05] tracking-[-0.03em] text-shop-ink sm:text-[3rem]";
 
 async function load(slugParam: string) {
   const shop = await getShopContext();
@@ -58,18 +59,25 @@ export default async function CmsPage({ params }: PageProps<"/pages/[slug]">) {
       {heroFirst ? (
         <h1 className="sr-only">{page.title}</h1>
       ) : (
-        <header className={cn("relative isolate overflow-hidden", banner ? "bg-shop-ink text-white" : "border-b border-shop-line")}>
+        <header className="pt-4 sm:pt-6">
           {banner ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element -- stored branding asset */}
-              <img src={banner} alt="" className="absolute inset-0 -z-10 h-full w-full object-cover" />
-              <div aria-hidden="true" className="absolute inset-0 -z-10 bg-black/55" />
-            </>
-          ) : null}
-          <Container size="narrow" className={banner ? "py-20 sm:py-28" : "py-10 sm:py-14"}>
-            <Breadcrumbs items={[{ label: page.title }]} className={cn("mb-4", banner && "text-white/80 [&_a:hover]:text-white [&_span]:text-white/80")} jsonLdBase={shop.origin} />
-            <h1 className="text-4xl sm:text-5xl">{page.title}</h1>
-          </Container>
+            // Banner as a rounded image with the title card overlaid (same frame as the HERO block).
+            <Container>
+              <div className="relative isolate flex min-h-[300px] items-end overflow-hidden rounded-shop bg-shop-sunken sm:min-h-[380px]">
+                {/* eslint-disable-next-line @next/next/no-img-element -- stored branding asset */}
+                <img src={banner} alt="" className="absolute inset-0 -z-10 h-full w-full object-cover" />
+                <div className="m-3 max-w-[560px] rounded-shop bg-shop-surface p-6 sm:m-6 sm:px-8 sm:py-7">
+                  <Breadcrumbs items={[{ label: page.title }]} className="mb-3" jsonLdBase={shop.origin} />
+                  <h1 className={titleClass}>{page.title}</h1>
+                </div>
+              </div>
+            </Container>
+          ) : (
+            <Container size="narrow" className="pt-6 sm:pt-10">
+              <Breadcrumbs items={[{ label: page.title }]} className="mb-4" jsonLdBase={shop.origin} />
+              <h1 className={titleClass}>{page.title}</h1>
+            </Container>
+          )}
         </header>
       )}
       {page.blocks.length ? <BlockRenderer blocks={page.blocks} ctx={ctx} heroIsTitle={false} /> : null}

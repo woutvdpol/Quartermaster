@@ -6,6 +6,7 @@ import { useActionState, useEffect, useRef, useState, useTransition, type ReactN
 import { useFormStatus } from "react-dom";
 import { buttonClasses } from "@/components/shop/ui/Button";
 import { cn } from "@/components/shop/ui/cn";
+import { checkClasses, inputClasses, Select, textareaClasses } from "@/components/shop/ui/Field";
 import { formatMoney } from "@/components/shop/ui/money";
 import type { CheckoutQuote, PaymentMethodOption } from "@/server/checkout";
 import { loginHref } from "@/server/customer-auth/redirect";
@@ -18,10 +19,11 @@ import { cartCopy } from "./_copy";
 
 const t = cartCopy.checkout;
 
-const inputClass =
-  "block h-11 w-full rounded-shop-sm border border-shop-line-strong bg-shop-surface px-3 text-[0.95rem] text-shop-ink " +
-  "placeholder:text-shop-muted/80 focus:border-shop-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-0 " +
-  "focus-visible:outline-shop-primary aria-invalid:border-shop-crit";
+/** Radio card (shipping option, payment method): panel radius, ink border + ring when selected. */
+const radioCardClass =
+  "flex min-h-14 cursor-pointer items-center gap-3 rounded-shop border border-shop-line bg-shop-surface px-4 py-3 transition-colors " +
+  "hover:border-shop-line-strong has-checked:border-shop-ink has-checked:ring-1 has-checked:ring-shop-ink has-focus-visible:outline-2 " +
+  "has-focus-visible:outline-offset-2 has-focus-visible:outline-shop-primary";
 
 export type CheckoutFormProps = {
   currency: string;
@@ -88,7 +90,7 @@ function Text({
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
         defaultValue={getPath(values, name) ?? defaultValue}
-        className={inputClass}
+        className={inputClasses}
         {...input}
       />
       {hint && !error ? (
@@ -127,14 +129,13 @@ function CountrySelect({
         {t.country}
         <span aria-hidden="true" className="text-shop-crit"> *</span>
       </label>
-      <select
+      <Select
         id={id}
         name={name}
         required
-        {...(onChange ? { value, onChange: (e) => onChange(e.target.value) } : { defaultValue })}
+        {...(onChange ? { value, onChange: (e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value) } : { defaultValue })}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
-        className={inputClass}
         autoComplete={name.startsWith("billing") ? "billing country" : "shipping country"}
       >
         <option value="">{t.chooseCountry}</option>
@@ -143,7 +144,7 @@ function CountrySelect({
             {c.name}
           </option>
         ))}
-      </select>
+      </Select>
       {error ? (
         <p id={`${id}-error`} className="text-xs font-medium text-shop-crit">
           {error}
@@ -199,10 +200,10 @@ function AddressFields({
 
 function Section({ title, children, n }: { title: string; children: ReactNode; n: number }) {
   return (
-    <section aria-labelledby={`co-sec-${n}`} className="rounded-shop border border-shop-line bg-shop-surface p-5 sm:p-6">
-      <h2 id={`co-sec-${n}`} className="mb-4 flex items-center gap-3 text-xl">
-        <span aria-hidden="true" className="grid size-7 place-items-center rounded-full bg-shop-primary-soft font-shop-body text-sm font-semibold text-shop-primary">
-          {n}
+    <section aria-labelledby={`co-sec-${n}`} className="border-t border-shop-line pt-7 sm:pt-9">
+      <h2 id={`co-sec-${n}`} className="mb-5 flex items-baseline gap-3 text-2xl sm:mb-6">
+        <span aria-hidden="true" className="font-shop-mono text-sm font-normal tracking-normal text-shop-muted">
+          {String(n).padStart(2, "0")}
         </span>
         {title}
       </h2>
@@ -278,19 +279,19 @@ export function CheckoutForm(props: CheckoutFormProps) {
   const submitLabel = payment.configured ? t.placeOrder : t.placeOrderDev;
 
   return (
-    <form action={formAction} id="checkout-form" className="grid items-start gap-6 lg:grid-cols-[1fr_380px]" noValidate>
+    <form action={formAction} id="checkout-form" className="grid items-start gap-10 lg:grid-cols-[1fr_400px] lg:gap-14" noValidate>
       <input type="hidden" name="idempotencyKey" value={props.idempotencyKey} />
 
-      <div className="flex flex-col gap-6">
+      <div className="flex min-w-0 flex-col gap-9">
         {state.status === "placed" && state.redirectTo ? (
-          <p role="status" className="rounded-shop-sm border border-shop-ok/30 bg-shop-ok-soft px-4 py-3 text-sm text-shop-ok">
+          <p role="status" className="rounded-shop border border-shop-ok/30 bg-shop-ok-soft px-4 py-3 text-sm text-shop-ok">
             <Link href={state.redirectTo} className="font-medium underline">
               {t.viewOrder}
             </Link>
           </p>
         ) : null}
         {state.status === "error" && state.message ? (
-          <div ref={alertRef} tabIndex={-1} role="alert" className="rounded-shop-sm border border-shop-crit/30 bg-shop-crit-soft px-4 py-3 text-sm text-shop-crit">
+          <div ref={alertRef} tabIndex={-1} role="alert" className="rounded-shop border border-shop-crit/30 bg-shop-crit-soft px-4 py-3 text-sm text-shop-crit">
             <p className="font-medium">{state.message}</p>
             {state.code === "LOGIN_REQUIRED" ? (
               <p className="mt-1">
@@ -347,7 +348,7 @@ export function CheckoutForm(props: CheckoutFormProps) {
             <Text name="phone" type="tel" label={t.phone} required autoComplete="tel" hint={t.phoneHint} errors={errors} values={values} />
           </div>
           <div className="mt-4 flex flex-col gap-1">
-            <div className="flex items-start gap-3 text-sm">
+            <div className="flex items-start gap-3 py-1 text-sm">
               <input
                 id="co-reminderConsent"
                 type="checkbox"
@@ -359,7 +360,7 @@ export function CheckoutForm(props: CheckoutFormProps) {
                   const email = form ? new FormData(form).get("email") : null;
                   void saveCheckoutContactAction({ reminderConsent: e.currentTarget.checked, email: typeof email === "string" && email.includes("@") ? email : undefined });
                 }}
-                className="mt-0.5 size-4 accent-shop-primary"
+                className={cn(checkClasses, "mt-0.5")}
               />
               <label htmlFor="co-reminderConsent">{cartCopy.reminder.consent}</label>
             </div>
@@ -382,19 +383,19 @@ export function CheckoutForm(props: CheckoutFormProps) {
             }}
             defaults={names}
           />
-          <label className="mt-5 flex items-start gap-3 text-sm">
+          <label className="mt-5 flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
             <input
               type="checkbox"
               name="billingSameAsShipping"
               checked={billingSame}
               onChange={(e) => setBillingSame(e.target.checked)}
-              className="mt-0.5 size-4 accent-shop-primary"
+              className={cn(checkClasses, "mt-0.5")}
             />
             <span>{t.billingSame}</span>
           </label>
           {!billingSame ? (
-            <fieldset className="mt-5 border-t border-shop-line pt-5">
-              <legend className="mb-4 font-shop-heading text-lg">{t.billingAddress}</legend>
+            <fieldset className="mt-6 border-t border-shop-line pt-6">
+              <legend className="mb-5 font-shop-heading text-lg font-semibold">{t.billingAddress}</legend>
               <AddressFields prefix="billing" errors={errors} values={values} countries={countries} defaults={names} />
             </fieldset>
           ) : null}
@@ -405,7 +406,7 @@ export function CheckoutForm(props: CheckoutFormProps) {
             <legend className="sr-only">{t.shippingMethod}</legend>
             {quote && quote.restrictedItems.length > 0 && quote.options.length > 0 ? (
               // Compliance: some items can't be shipped to this country; only pickup remains.
-              <p role="note" className="mb-3 rounded-shop-sm border border-shop-warn/30 bg-shop-warn-soft px-3 py-2 text-sm text-shop-warn">
+              <p role="note" className="mb-3 rounded-shop border border-shop-warn/30 bg-shop-warn-soft px-3 py-2 text-sm text-shop-warn">
                 {quote.unavailableReason}
               </p>
             ) : null}
@@ -414,13 +415,7 @@ export function CheckoutForm(props: CheckoutFormProps) {
             ) : (
               <div className={cn("flex flex-col gap-2", quoting && "opacity-60")}>
                 {quote.options.map((o) => (
-                  <label
-                    key={o.id}
-                    className={cn(
-                      "flex cursor-pointer items-center justify-between gap-3 rounded-shop-sm border px-4 py-3",
-                      optionId === o.id ? "border-shop-primary bg-shop-primary-soft" : "border-shop-line-strong bg-shop-surface",
-                    )}
-                  >
+                  <label key={o.id} className={cn(radioCardClass, "justify-between")}>
                     <span className="flex items-center gap-3">
                       <input
                         type="radio"
@@ -431,14 +426,14 @@ export function CheckoutForm(props: CheckoutFormProps) {
                           setOptionId(o.id);
                           requote({ optionId: o.id });
                         }}
-                        className="size-4 accent-shop-primary"
+                        className={checkClasses}
                       />
-                      <span>
+                      <span className="font-medium">
                         {o.name}
-                        {o.isPickup ? <span className="ml-2 text-xs text-shop-muted">({t.pickup})</span> : null}
+                        {o.isPickup ? <span className="ml-2 text-xs font-normal text-shop-muted">({t.pickup})</span> : null}
                       </span>
                     </span>
-                    <span className="font-semibold tabular-nums">
+                    <span className="shrink-0 font-semibold tabular-nums">
                       {o.freeShipping ? (
                         <>
                           <s className="mr-2 font-normal text-shop-muted">{fmt(o.basePrice)}</s>
@@ -455,7 +450,7 @@ export function CheckoutForm(props: CheckoutFormProps) {
               </div>
             )}
             {selected?.insurance ? (
-              <label className="mt-4 flex items-start gap-3 text-sm">
+              <label className="mt-4 flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
                 <input
                   type="checkbox"
                   name="insurance"
@@ -464,7 +459,7 @@ export function CheckoutForm(props: CheckoutFormProps) {
                     setInsurance(e.target.checked);
                     requote({ insurance: e.target.checked });
                   }}
-                  className="mt-0.5 size-4 accent-shop-primary"
+                  className={cn(checkClasses, "mt-0.5")}
                 />
                 <span>
                   {t.insurance(fmt(selected.insurance.price))}
@@ -482,7 +477,7 @@ export function CheckoutForm(props: CheckoutFormProps) {
 
         <Section n={4} title={t.payment}>
           {!payment.configured ? (
-            <p className={cn("rounded-shop-sm px-3 py-2 text-sm", payment.devSimulation ? "bg-shop-warn-soft text-shop-warn" : "bg-shop-crit-soft text-shop-crit")}>
+            <p className={cn("rounded-shop px-4 py-2.5 text-sm", payment.devSimulation ? "bg-shop-warn-soft text-shop-warn" : "bg-shop-crit-soft text-shop-crit")}>
               {payment.devSimulation ? t.paymentsNotConfiguredDev : t.paymentsNotConfigured}
             </p>
           ) : payment.methods.length === 0 ? (
@@ -495,13 +490,13 @@ export function CheckoutForm(props: CheckoutFormProps) {
               <legend className="sr-only">{t.payment}</legend>
               <div className="grid gap-2 sm:grid-cols-2">
                 {payment.methods.map((m) => (
-                  <label key={m.id} className="flex cursor-pointer items-center gap-3 rounded-shop-sm border border-shop-line-strong bg-shop-surface px-4 py-3 has-checked:border-shop-primary has-checked:bg-shop-primary-soft">
+                  <label key={m.id} className={radioCardClass}>
                     <input
                       type="radio"
                       name="paymentMethod"
                       value={m.id}
                       defaultChecked={(getPath(values, "paymentMethod") ?? payment.methods[0]?.id) === m.id}
-                      className="size-4 accent-shop-primary"
+                      className={checkClasses}
                     />
                     <span className="font-medium">{m.label}</span>
                   </label>
@@ -529,7 +524,7 @@ export function CheckoutForm(props: CheckoutFormProps) {
                 rows={3}
                 maxLength={1000}
                 defaultValue={getPath(values, "customerNote")}
-                className="w-full rounded-shop-sm border border-shop-line-strong bg-shop-surface px-3 py-2 text-[0.95rem] focus:border-shop-primary focus:outline-none"
+                className={textareaClasses}
               />
             </div>
             {props.ageConfirmation.required ? (
@@ -557,14 +552,14 @@ export function CheckoutForm(props: CheckoutFormProps) {
         </Section>
       </div>
 
-      <aside aria-label={t.summary} className="flex flex-col gap-4 rounded-shop border border-shop-line bg-shop-surface p-5 shadow-shop lg:sticky lg:top-24">
+      <aside aria-label={t.summary} className="flex flex-col gap-5 rounded-shop bg-shop-sunken p-5 sm:p-7 lg:sticky lg:top-24">
         <div className="flex items-center justify-between">
           <h2 className="text-xl">{t.summary}</h2>
-          <Link href="/cart" className="text-sm text-shop-primary underline underline-offset-2">
+          <Link href="/cart" className="inline-flex min-h-11 items-center text-sm font-semibold text-shop-ink underline underline-offset-4 hover:text-shop-primary">
             {t.edit}
           </Link>
         </div>
-        <ul className="-my-2 divide-y divide-shop-line">
+        <ul className="-my-3 divide-y divide-shop-line">
           {props.lines.map((l) => (
             <CartLineItem
               key={l.productId}
@@ -574,20 +569,20 @@ export function CheckoutForm(props: CheckoutFormProps) {
             />
           ))}
         </ul>
-        <dl className={cn("flex flex-col gap-2 border-t border-shop-line pt-3 text-sm", quoting && "opacity-60")} aria-live="polite" aria-busy={quoting || undefined}>
+        <dl className={cn("flex flex-col gap-3 border-t border-shop-line pt-4 text-[0.95rem]", quoting && "opacity-60")} aria-live="polite" aria-busy={quoting || undefined}>
           <Row label={t.subtotal} value={quote ? fmt(quote.totals.subtotal) : "—"} />
           {quote && quote.totals.discount > 0 ? (
             <Row label={`${cartCopy.coupon.discount}${quote.coupon ? ` · ${quote.coupon.code}` : ""}`} value={`−${fmt(quote.totals.discount)}`} />
           ) : null}
           <Row label={t.shipping} value={quote && selected ? (quote.totals.shipping === 0 ? cartCopy.cart.free : fmt(quote.totals.shipping)) : "—"} />
           {quote && quote.totals.insurance > 0 ? <Row label={t.insuranceLine} value={fmt(quote.totals.insurance)} /> : null}
-          <div className="flex items-baseline justify-between gap-4 border-t border-shop-line pt-3">
-            <dt className="font-medium">{t.total}</dt>
-            <dd className="font-shop-heading text-2xl font-semibold tabular-nums">{quote && selected ? fmt(quote.totals.total) : "—"}</dd>
+          <div className="flex items-baseline justify-between gap-4 border-t border-shop-line-strong/40 pt-4">
+            <dt className="font-semibold">{t.total}</dt>
+            <dd className="font-shop-heading text-2xl font-semibold tracking-tight tabular-nums">{quote && selected ? fmt(quote.totals.total) : "—"}</dd>
           </div>
         </dl>
         {quote?.coupon && !quote.coupon.ok ? (
-          <p role="alert" className="rounded-shop-sm bg-shop-crit-soft px-3 py-2 text-sm text-shop-crit">
+          <p role="alert" className="rounded-shop bg-shop-crit-soft px-4 py-2.5 text-sm text-shop-crit">
             {cartCopy.coupon.notApplied(quote.coupon.code, quote.coupon.message)}{" "}
             <Link href="/cart" className="underline">
               {t.backToCart}
@@ -596,7 +591,7 @@ export function CheckoutForm(props: CheckoutFormProps) {
         ) : null}
         {quote?.freeShipping && !quote.freeShipping.reached ? <FreeShippingBar progress={quote.freeShipping} currency={currency} /> : null}
         {quote && quote.minimumShortfall > 0 ? (
-          <p className="rounded-shop-sm bg-shop-warn-soft px-3 py-2 text-sm text-shop-warn">{cartCopy.cart.minimumOrder(fmt(quote.minimumShortfall))}</p>
+          <p className="rounded-shop bg-shop-warn-soft px-4 py-2.5 text-sm text-shop-warn">{cartCopy.cart.minimumOrder(fmt(quote.minimumShortfall))}</p>
         ) : null}
         <SubmitButton disabled={!canPlace || quoting} label={submitLabel} />
         <p className="text-center text-xs text-shop-muted">
@@ -611,7 +606,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-4">
       <dt className="text-shop-ink-2">{label}</dt>
-      <dd className="tabular-nums">{value}</dd>
+      <dd className="font-medium tabular-nums">{value}</dd>
     </div>
   );
 }
@@ -634,7 +629,7 @@ function Check({
   const id = idOf(name);
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-start gap-3 text-sm">
+      <div className="flex items-start gap-3 py-1 text-sm">
         <input
           id={id}
           type="checkbox"
@@ -643,7 +638,7 @@ function Check({
           defaultChecked={defaultChecked}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
-          className="mt-0.5 size-4 accent-shop-primary"
+          className={cn(checkClasses, "mt-0.5")}
         />
         <label htmlFor={id}>{children}</label>
       </div>

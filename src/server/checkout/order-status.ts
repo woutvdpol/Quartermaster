@@ -25,7 +25,7 @@ export type OrderStatusView = {
   state: OrderDisplayState;
   currency: string;
   email: string;
-  lines: { title: string; quantity: number; unitPrice: number; lineTotal: number; imageUrl: string | null }[];
+  lines: { title: string; stockCode: number | null; quantity: number; unitPrice: number; lineTotal: number; imageUrl: string | null }[];
   subtotal: number;
   /** Coupon discount (0 without). */
   discountTotal: number;
@@ -80,7 +80,7 @@ export async function getOrderStatusView(tenantId: string, uuid: string): Promis
       total: true,
       shippingMethod: true,
       shippingZoneName: true,
-      lines: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: { productId: true, title: true, quantity: true, unitPrice: true, lineTotal: true, imagePath: true } },
+      lines: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: { productId: true, title: true, stockCode: true, quantity: true, unitPrice: true, lineTotal: true, imagePath: true } },
       addresses: { where: { type: "SHIPPING" }, select: { firstName: true, lastName: true, city: true, countryCode: true } },
       payments: { where: { provider: "MOLLIE" }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1, select: { status: true, checkoutUrl: true, expiresAt: true } },
     },
@@ -125,6 +125,7 @@ export async function getOrderStatusView(tenantId: string, uuid: string): Promis
     email: maskEmail(order.email),
     lines: order.lines.map((l) => ({
       title: l.title,
+      stockCode: l.stockCode,
       quantity: l.quantity,
       unitPrice: l.unitPrice,
       lineTotal: l.lineTotal,

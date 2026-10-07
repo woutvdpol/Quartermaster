@@ -13,6 +13,8 @@ const t = cartCopy.cart;
 
 export type CartLineData = {
   productId: string;
+  /** Shop stock number ("No. 50212"); null when the shop hides stock numbers. */
+  stockCode: number | null;
   title: string;
   href: string;
   price: number;
@@ -49,10 +51,14 @@ export function CartLineItem({
   const dim = line.state === "unavailable" || line.state === "taken";
   const indicative = display && !dim && display.currency !== line.currency ? formatIndicative(line.price, line.currency, display.currency, display.rate) : null;
   return (
-    <li className="flex gap-3 py-4 sm:gap-4">
+    <li className={cn("flex gap-4 sm:gap-5", compact ? "py-3" : "py-5 sm:py-6")}>
       <Link
         href={line.href}
-        className={cn("relative block shrink-0 overflow-hidden rounded-shop-sm bg-shop-sunken", compact ? "size-16" : "size-20 sm:size-24", dim && "opacity-60")}
+        className={cn(
+          "relative block shrink-0 overflow-hidden rounded-shop bg-shop-sunken",
+          compact ? "size-16" : "aspect-[4/5] w-20 sm:w-28",
+          dim && "opacity-60 grayscale-[40%]",
+        )}
         tabIndex={-1}
         aria-hidden="true"
       >
@@ -67,11 +73,19 @@ export function CartLineItem({
         ) : null}
       </Link>
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        {line.stockCode !== null ? (
+          <p className="font-shop-mono text-xs text-shop-accent">
+            {uiCopy.product.stockCode} {line.stockCode}
+          </p>
+        ) : null}
         <div className="flex items-start justify-between gap-3">
-          <Link href={line.href} className={cn("font-medium text-shop-ink hover:underline", dim && "text-shop-muted")}>
+          <Link
+            href={line.href}
+            className={cn("leading-snug font-medium text-shop-ink underline-offset-4 hover:underline", compact ? "text-sm" : "sm:text-[1.05rem]", dim && "text-shop-muted")}
+          >
             {line.title}
           </Link>
-          <span className={cn("shrink-0 font-semibold tabular-nums", dim ? "text-shop-muted line-through" : "text-shop-ink")}>
+          <span className={cn("shrink-0 font-bold tabular-nums", compact && "text-sm", dim ? "font-medium text-shop-muted line-through" : "text-shop-ink")}>
             {formatMoney(line.price, line.currency)}
           </span>
         </div>
@@ -83,22 +97,22 @@ export function CartLineItem({
         {line.offerApplied && line.listPrice !== undefined ? (
           <p className="flex flex-wrap items-center gap-2 text-xs">
             <Badge tone="ok">{cartCopy.offerLine.agreed}</Badge>
-            <s className="text-shop-muted">{cartCopy.offerLine.listPrice(formatMoney(line.listPrice, line.currency))}</s>
+            <s className="text-shop-muted tabular-nums">{cartCopy.offerLine.listPrice(formatMoney(line.listPrice, line.currency))}</s>
           </p>
         ) : null}
         {line.offerExpired ? <p className="text-xs text-shop-warn">{cartCopy.offerLine.expired}</p> : null}
         {notice ? <p className="text-xs text-shop-warn">{notice}</p> : null}
 
-        {line.state === "held" && line.expiresAt ? <ReservationCountdown expiresAt={line.expiresAt} className="self-start" /> : null}
+        {line.state === "held" && line.expiresAt ? <ReservationCountdown expiresAt={line.expiresAt} className="mt-1 self-start" /> : null}
         {line.state === "lapsed" ? (
-          <div className="flex flex-wrap items-center gap-2 text-sm">
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
             <Badge tone="warn">{t.lapsed}</Badge>
             <span className="text-shop-muted">{t.lapsedHint}</span>
             {/* compact = inside the checkout form (no nested forms); placing the order re-reserves it */}
             {!compact ? (
               <form action={reReserveAction}>
                 <input type="hidden" name="productId" value={line.productId} />
-                <PendingButton variant="outline" size="sm">
+                <PendingButton variant="outline" size="sm" className="h-11! sm:h-9!">
                   {t.reAdd}
                 </PendingButton>
               </form>
@@ -114,9 +128,18 @@ export function CartLineItem({
         {line.state === "unavailable" ? <Badge tone="sold" className="self-start">{t.unavailable}</Badge> : null}
 
         {!compact ? (
-          <form action={removeFromCartAction} className="mt-auto">
+          <form action={removeFromCartAction} className="mt-auto pt-1">
             <input type="hidden" name="productId" value={line.productId} />
-            <PendingButton variant="link" size="sm" aria-label={t.removeLabel(line.title)} pendingLabel={t.removing} className="text-shop-muted! text-sm">
+            <PendingButton
+              variant="ghost"
+              size="sm"
+              aria-label={t.removeLabel(line.title)}
+              pendingLabel={t.removing}
+              className="-ml-3 h-11! gap-1.5 px-3! font-medium text-shop-muted hover:text-shop-ink"
+            >
+              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" className="shrink-0">
+                <path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
               {t.remove}
             </PendingButton>
           </form>

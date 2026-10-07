@@ -39,14 +39,14 @@ export function DeleteAccount({ action, email }: { action: Action; email: string
     <div className="grid gap-4">
       <p className="text-sm text-shop-ink-2">{t.deleteIntro}</p>
       <div>
-        <Button variant="outline" className="border-shop-crit/40 text-shop-crit" onClick={() => dialog.current?.showModal()}>
+        <Button variant="outline" className="border-shop-crit/40 text-shop-crit hover:border-shop-crit" onClick={() => dialog.current?.showModal()}>
           {t.deleteButton}
         </Button>
       </div>
       <dialog
         ref={dialog}
         aria-labelledby="delete-title"
-        className="m-auto w-[calc(100%-2rem)] max-w-md rounded-shop border border-shop-line bg-shop-surface p-6 text-shop-ink shadow-shop-pop backdrop:bg-black/50"
+        className="m-auto w-[calc(100%-2rem)] max-w-md rounded-shop border border-shop-line bg-shop-surface p-6 text-shop-ink shadow-shop-pop backdrop:bg-shop-ink/50 sm:p-8"
       >
         <form action={formAction} className="grid gap-4">
           <h2 id="delete-title" className="text-xl">

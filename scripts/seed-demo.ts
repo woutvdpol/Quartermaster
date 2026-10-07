@@ -4,6 +4,10 @@
 //   npm run db:seed            # base seed first (tenants, superadmin, owner, settings, system pages)
 //   npm run db:seed:demo       # this script
 //   npm run db:seed:demo -- --reset   # delete previously seeded demo rows, then seed again
+//   npm run db:seed:demo -- --images-only   # regenerate the photos of existing demo products in place
+//   npm run db:seed:demo -- --home-only     # re-apply the demo home page composition (idempotent)
+//   npm run db:seed:demo -- --content-only  # shop details (empty fields only), legal/service pages, header/footer menus
+//   npm run db:seed:demo -- --refresh       # all three of the above; nothing else is touched
 //
 // Rules:
 //  - Refuses to run with NODE_ENV=production.
@@ -26,10 +30,10 @@ import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import sharp from "sharp";
+import { heroArtJpeg, productArtJpeg, provenanceArtJpeg, type Shape } from "./demo-art";
 import type { ServiceContext } from "../src/server/context";
 import type { Prisma } from "../src/generated/prisma/client";
-import type { ProductStatus } from "../src/generated/prisma/enums";
+import type { ContentBlockType, ProductStatus } from "../src/generated/prisma/enums";
 import type { Specification } from "../src/server/catalog/products";
 
 // Service bug workaround: `audit()` (src/server/audit.ts) calls `headers().catch(...)`, but outside a
@@ -57,6 +61,11 @@ let createProduct!: typeof import("../src/server/catalog/products").createProduc
 let setStatus!: typeof import("../src/server/catalog/products").setStatus;
 let addProductImages!: typeof import("../src/server/media/product-images").addProductImages;
 let deleteProductMedia!: typeof import("../src/server/media/product-images").deleteProductMedia;
+let deleteProductImage!: typeof import("../src/server/media/product-images").deleteProductImage;
+let variantKey!: typeof import("../src/server/media/product-images").variantKey;
+let processImage!: typeof import("../src/server/media/images").processImage;
+let VARIANT_NAMES!: typeof import("../src/server/media/images").VARIANT_NAMES;
+let getStorage!: typeof import("../src/server/media/storage").getStorage;
 let allocatePurchaseRecordCost!: typeof import("../src/server/purchasing").allocatePurchaseRecordCost;
 let createPurchaseRecord!: typeof import("../src/server/purchasing").createPurchaseRecord;
 let createSupplier!: typeof import("../src/server/purchasing").createSupplier;
@@ -73,10 +82,15 @@ let setFulfillmentStatus!: typeof import("../src/server/orders/commands").setFul
 let nextSequenceValue!: typeof import("../src/server/sequence").nextSequenceValue;
 let reserveProduct!: typeof import("../src/server/stock/reservations").reserveProduct;
 let addBlock!: typeof import("../src/server/content/pages").addBlock;
+let moveBlock!: typeof import("../src/server/content/pages").moveBlock;
+let createPage!: typeof import("../src/server/content/pages").createPage;
+let createMenuItem!: typeof import("../src/server/content/menus").createMenuItem;
+let removeBlock!: typeof import("../src/server/content/pages").removeBlock;
 let ensureSystemPages!: typeof import("../src/server/content/pages").ensureSystemPages;
 let updateBlock!: typeof import("../src/server/content/pages").updateBlock;
 let updatePage!: typeof import("../src/server/content/pages").updatePage;
 let updateSettings!: typeof import("../src/server/settings").updateSettings;
+let getSettings!: typeof import("../src/server/settings").getSettings;
 let createCampaign!: typeof import("../src/server/newsletter/campaigns").createCampaign;
 let stopBoss!: typeof import("../src/server/jobs/boss").stopBoss;
 
@@ -85,7 +99,9 @@ async function loadServices() {
   ({ createCategory } = await import("../src/server/catalog/categories"));
   ({ createTag } = await import("../src/server/catalog/tags"));
   ({ createProduct, setStatus } = await import("../src/server/catalog/products"));
-  ({ addProductImages, deleteProductMedia } = await import("../src/server/media/product-images"));
+  ({ addProductImages, deleteProductImage, deleteProductMedia, variantKey } = await import("../src/server/media/product-images"));
+  ({ processImage, VARIANT_NAMES } = await import("../src/server/media/images"));
+  ({ getStorage } = await import("../src/server/media/storage"));
   ({ allocatePurchaseRecordCost, createPurchaseRecord, createSupplier, setPurchasePrices } = await import("../src/server/purchasing"));
   ({ createZone } = await import("../src/server/shipping/zones"));
   ({ quoteShipping } = await import("../src/server/shipping/quote"));
@@ -95,8 +111,9 @@ async function loadServices() {
   ));
   ({ nextSequenceValue } = await import("../src/server/sequence"));
   ({ reserveProduct } = await import("../src/server/stock/reservations"));
-  ({ addBlock, ensureSystemPages, updateBlock, updatePage } = await import("../src/server/content/pages"));
-  ({ updateSettings } = await import("../src/server/settings"));
+  ({ addBlock, createPage, ensureSystemPages, moveBlock, removeBlock, updateBlock, updatePage } = await import("../src/server/content/pages"));
+  ({ createMenuItem } = await import("../src/server/content/menus"));
+  ({ getSettings, updateSettings } = await import("../src/server/settings"));
   ({ createCampaign } = await import("../src/server/newsletter/campaigns"));
   ({ stopBoss } = await import("../src/server/jobs/boss"));
 }
@@ -143,7 +160,6 @@ const progress = (msg: string) => {
 // ─── Data definitions ───────────────────────────────────────────────────────
 
 type CatDef = { key: string; title: string; description?: string; children?: CatDef[] };
-type Shape = "helmet" | "cap" | "tunic" | "coat" | "bag" | "canteen" | "optics" | "badge" | "buckle" | "patch" | "document" | "photo" | "blade";
 type ItemDef = {
   title: string;
   cat: string;
@@ -178,6 +194,8 @@ type TenantSpec = {
   cartReservations: number;
   newsletter: boolean;
   homePage: boolean;
+  /** Fictional shop details + legal/service pages + menus ("full" adds shipping/returns pages and a Shop footer column). */
+  shopInfo: { email: string; phone: string; line1: string; postalCode: string; city: string; full: boolean };
   pageViewDays: number;
   visitorsPerDay: number;
 };
@@ -452,6 +470,7 @@ const CONCEPT: TenantSpec = {
   cartReservations: 4,
   newsletter: true,
   homePage: true,
+  shopInfo: { email: "info@concept-militaria.example", phone: "+31 6 12345678", line1: "Demostraat 1", postalCode: "1234 AB", city: "Voorbeeldstad", full: true },
   pageViewDays: 60,
   visitorsPerDay: 38,
 };
@@ -502,6 +521,7 @@ const VELDPOST: TenantSpec = {
   cartReservations: 1,
   newsletter: false,
   homePage: false,
+  shopInfo: { email: "post@veldpost-antiek.example", phone: "+31 6 87654321", line1: "Proefweg 12", postalCode: "5678 CD", city: "Voorbeelddorp", full: false },
   pageViewDays: 30,
   visitorsPerDay: 9,
 };
@@ -532,60 +552,20 @@ async function actorsFor(tenantId: string): Promise<{ owner: Actor; superadmin: 
   return { owner: { id: ow.id, role: ow.role, tenantId: ow.tenantId, email: ow.email }, superadmin, ownerIsSuperadmin: false };
 }
 
-// ─── Placeholder images ─────────────────────────────────────────────────────
+// ─── Images ─────────────────────────────────────────────────────────────────
+// Studio-style product artwork lives in ./demo-art (light backdrop, no text, 4:5).
 
-const PALETTES = [
-  { bg1: "#5B5F3A", bg2: "#3E4128", fg: "#2B2D1C", ink: "#E9E0C6", accent: "#C2954A" }, // olive
-  { bg1: "#B8A97A", bg2: "#8F8257", fg: "#5E5537", ink: "#2E2A1C", accent: "#7E5416" }, // khaki
-  { bg1: "#6E7363", bg2: "#4C5044", fg: "#33362D", ink: "#ECE6D3", accent: "#D19C48" }, // field grey
-  { bg1: "#7A6247", bg2: "#54412D", fg: "#3A2C1E", ink: "#F1E5CC", accent: "#D9A85A" }, // leather
-  { bg1: "#D9CDB0", bg2: "#BFB08C", fg: "#8C7D5A", ink: "#3A3324", accent: "#9C6B22" }, // paper
-];
-
-const SHAPES: Record<Shape, string> = {
-  helmet: `<path d="M210 360 Q215 165 400 150 Q585 165 590 360 L640 385 Q400 425 160 385 Z"/><path d="M250 330 Q400 350 550 330" fill="none" stroke-width="6" class="ln"/>`,
-  cap: `<path d="M235 320 Q255 205 400 195 Q545 205 565 320 Z"/><ellipse cx="400" cy="330" rx="200" ry="34"/><path d="M300 345 Q400 410 520 350 Z"/>`,
-  tunic: `<path d="M310 140 L365 125 L400 175 L435 125 L490 140 L610 230 L570 290 L525 255 L525 470 L275 470 L275 255 L230 290 L190 230 Z"/>`,
-  coat: `<path d="M315 120 L370 105 L400 150 L430 105 L485 120 L600 210 L565 265 L530 235 L560 490 L240 490 L270 235 L235 265 L200 210 Z"/>`,
-  bag: `<rect x="250" y="180" width="300" height="260" rx="38"/><path d="M250 230 Q400 300 550 230 L550 200 Q400 150 250 200 Z" class="ln2"/><rect x="380" y="270" width="40" height="40" rx="6" class="ln2"/>`,
-  canteen: `<ellipse cx="400" cy="320" rx="135" ry="160"/><rect x="370" y="130" width="60" height="45" rx="8"/><rect x="290" y="300" width="220" height="20" class="ln2"/>`,
-  optics: `<rect x="255" y="190" width="120" height="230" rx="30"/><rect x="425" y="190" width="120" height="230" rx="30"/><rect x="360" y="250" width="80" height="50"/><circle cx="315" cy="410" r="52"/><circle cx="485" cy="410" r="52"/>`,
-  badge: `<ellipse cx="400" cy="300" rx="130" ry="160" fill="none" stroke-width="26" class="st"/><path d="M400 200 L428 270 L500 272 L442 315 L465 385 L400 343 L335 385 L358 315 L300 272 L372 270 Z"/>`,
-  buckle: `<rect x="250" y="190" width="300" height="220" rx="26"/><circle cx="400" cy="300" r="70" class="ln2"/><rect x="200" y="270" width="50" height="60"/>`,
-  patch: `<path d="M290 170 L510 170 L510 330 Q510 420 400 460 Q290 420 290 330 Z"/><path d="M340 250 L400 210 L460 250 L430 330 L370 330 Z" class="ln2"/>`,
-  document: `<rect x="270" y="130" width="260" height="340" rx="6"/><g class="ln2"><rect x="305" y="180" width="190" height="12"/><rect x="305" y="215" width="160" height="12"/><rect x="305" y="250" width="180" height="12"/><rect x="305" y="285" width="120" height="12"/><circle cx="460" cy="400" r="34"/></g>`,
-  photo: `<rect x="220" y="160" width="360" height="280" rx="4"/><rect x="245" y="185" width="310" height="200" class="ln2"/><path d="M245 385 L330 300 L390 350 L450 280 L555 385 Z"/>`,
-  blade: `<path d="M150 285 L540 270 L590 300 L540 330 L150 315 Z"/><rect x="540" y="255" width="20" height="90"/><rect x="560" y="280" width="120" height="40" rx="10"/>`,
-};
-const VIEWS = ["FRONT", "SIDE", "DETAIL", "MARKING"];
-
-function xml(s: string) {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
-function svgFor(opts: { title: string; stockCode: number; shape: Shape; view: number; palette: number }) {
-  const p = PALETTES[opts.palette % PALETTES.length];
-  const title = opts.title.length > 44 ? `${opts.title.slice(0, 43)}…` : opts.title;
-  const rotate = [0, -8, 6, -3][opts.view % 4];
-  const scale = [1, 0.9, 1.25, 1.1][opts.view % 4];
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
-  <defs>
-    <radialGradient id="g" cx="50%" cy="42%" r="70%"><stop offset="0" stop-color="${p.bg1}"/><stop offset="1" stop-color="${p.bg2}"/></radialGradient>
-    <style>.ln,.st{stroke:${p.accent}} .ln2{fill:${p.accent};opacity:.55} text{font-family:Helvetica,Arial,sans-serif}</style>
-  </defs>
-  <rect width="800" height="600" fill="url(#g)"/>
-  <g opacity=".08" fill="${p.ink}">${Array.from({ length: 12 }, (_, i) => `<rect x="0" y="${i * 50}" width="800" height="1"/>`).join("")}</g>
-  <g fill="${p.fg}" transform="translate(400 300) rotate(${rotate}) scale(${scale}) translate(-400 -300)">${SHAPES[opts.shape]}</g>
-  <text x="32" y="48" font-size="18" letter-spacing="3" fill="${p.ink}" opacity=".7">DEMO · ${VIEWS[opts.view % 4]}</text>
-  <rect x="0" y="508" width="800" height="92" fill="#1E1C14" opacity=".72"/>
-  <text x="32" y="550" font-size="26" font-weight="700" fill="#F4ECD8">${xml(title)}</text>
-  <text x="32" y="582" font-size="18" fill="#D9A85A" letter-spacing="2">#${opts.stockCode}</text>
-</svg>`;
-}
-
-async function placeholderJpeg(opts: Parameters<typeof svgFor>[0]): Promise<Uint8Array> {
-  const buf = await sharp(Buffer.from(svgFor(opts))).jpeg({ quality: 82 }).toBuffer();
-  return new Uint8Array(buf);
+/** Rendered artwork for one demo product: `count` different shots (front, other side, detail, wide). */
+async function productImageFiles(spec: TenantSpec, item: ItemDef, stockCode: number, seed: number, count: number) {
+  const files = [];
+  for (let v = 0; v < count; v++) {
+    files.push({
+      name: `${stockCode}-${v + 1}.jpg`,
+      type: "image/jpeg",
+      bytes: await productArtJpeg({ title: item.title, shape: spec.shapes[item.cat] ?? "bag", seed, view: v }),
+    });
+  }
+  return files;
 }
 
 // ─── Descriptions & specs ───────────────────────────────────────────────────
@@ -816,16 +796,8 @@ async function seedTenant(spec: TenantSpec): Promise<Summary | null> {
     if (skipPhotos) draftsWithoutPhoto++;
     else {
       const count = int(1, 4);
-      const palette = int(0, PALETTES.length - 1);
-      const files = [];
-      for (let v = 0; v < count; v++) {
-        files.push({
-          name: `${p.stockCode}-${v + 1}.jpg`,
-          type: "image/jpeg",
-          bytes: await placeholderJpeg({ title: item.title, stockCode: p.stockCode, shape: spec.shapes[item.cat] ?? "bag", view: v, palette: palette + (v === 3 ? 1 : 0) }),
-        });
-      }
-      await addProductImages(ctx, p.id, files);
+      int(0, 4); // keeps the PRNG sequence (and so the rest of the demo data) identical to earlier seeds
+      await addProductImages(ctx, p.id, await productImageFiles(spec, item, p.stockCode, p.stockCode, count));
       imageCount += count;
     }
     const cover = await db.productImage.findFirst({ where: { productId: p.id }, orderBy: { sortOrder: "asc" }, select: { storageKey: true, variants: true } });
@@ -908,7 +880,8 @@ async function seedTenant(spec: TenantSpec): Promise<Summary | null> {
   // 10. Content: system pages, home page
   await ensureSystemPages(tenantId);
   let homePublished = "no";
-  if (spec.homePage) homePublished = await seedHomePage(ctx, spec);
+  if (spec.homePage) homePublished = await seedHomePage(ctx);
+  const content = await seedShopContent(ctx, spec, superadmin);
 
   // 11. Newsletter
   let subscribers = 0;
@@ -936,6 +909,7 @@ async function seedTenant(spec: TenantSpec): Promise<Summary | null> {
     "revenue (paid subtotal)": euro(orderSummary.revenue),
     cartReservations: reservations,
     homePublished,
+    content,
     subscribers,
     campaigns,
     pageViews,
@@ -1297,32 +1271,287 @@ async function backdateOrder(
 
 // ─── Content ────────────────────────────────────────────────────────────────
 
-async function seedHomePage(ctx: ServiceContext, spec: TenantSpec): Promise<string> {
+/**
+ * Stores a generated content image (original + the product image variants, by the same key convention)
+ * under `{tenantId}/content/home/{name}-{hash}.jpg`. The hash makes the key change when the artwork does.
+ */
+async function storeContentImage(tenantId: string, name: string, bytes: Uint8Array): Promise<string> {
+  const key = `${tenantId}/content/home/${name}-${createHash("sha256").update(bytes).digest("hex").slice(0, 12)}.jpg`;
+  const storage = getStorage();
+  if (await storage.head(key)) return key;
+  const processed = await processImage(bytes);
+  for (const v of VARIANT_NAMES) await storage.put(variantKey(key, v), processed.variants[v].data, processed.variants[v].mimeType);
+  await storage.put(key, processed.original.data, processed.mimeType);
+  return key;
+}
+
+/**
+ * Home page composition (matches the "Gallery" design): hero, categories, new items, provenance story,
+ * newsletter. Idempotent: existing blocks are reused per type and updated, missing ones added, other
+ * blocks on the home page removed, then everything is put in this order and the page published.
+ */
+async function seedHomePage(ctx: ServiceContext): Promise<string> {
   const home = await db.contentPage.findFirst({ where: { tenantId: ctx.tenantId, systemKey: "HOME" }, include: { blocks: { orderBy: { sortOrder: "asc" } } } });
   if (!home) return "missing";
-  if (home.publishedAt) return "already published";
-  const hero = home.blocks.find((b) => b.type === "HERO");
-  if (hero) {
-    await updateBlock(ctx, hero.id, {
+  const heroKey = await storeContentImage(ctx.tenantId, "hero", await heroArtJpeg());
+  const storyKey = await storeContentImage(ctx.tenantId, "certificate", await provenanceArtJpeg());
+  const newsletter = (await getSettings(ctx.tenantId, "platform")).newsletterEnabled;
+  const target: { type: ContentBlockType; data: Record<string, unknown> }[] = [
+    {
+      type: "HERO",
       data: {
-        title: "Original militaria, honestly described",
-        subtitle: "Helmets, uniforms, insignia and documents from WW1 to the Cold War — every item checked, measured and photographed.",
-        imageKey: null,
-        cta: { label: "Browse the shop", href: "/shop" },
+        title: "Original militaria, *honestly* described.",
+        subtitle: "WW1 to the Cold War. Every piece checked, measured and photographed.",
+        imageKey: heroKey,
+        cta: { label: "Shop new arrivals", href: "/shop" },
       },
+    },
+    { type: "CATEGORIES", data: { title: "", categoryIds: [] } },
+    { type: "NEW_ITEMS", data: { title: "Just in", count: 8, cta: { label: "See all", href: "/shop" } } },
+    {
+      type: "TEXT_IMAGE",
+      data: {
+        title: "Every piece comes with a story *you can check.*",
+        markdown:
+          "Our certificates of authenticity carry a QR code. Scan it, or enter the certificate number on the [verify page](/verify), to see the original photos, measurements and provenance we recorded for that piece, on our own site.",
+        imageKey: storyKey,
+        imagePosition: "left",
+        cta: { label: "Verify a certificate", href: "/verify" },
+      },
+    },
+    ...(newsletter ? [{ type: "NEWSLETTER_SIGNUP" as const, data: { title: "First pick, every Thursday.", text: "New items reach subscribers the evening before they go live." } }] : []),
+  ];
+
+  await syncBlocks(ctx, home.id, home.blocks, target);
+  if (!home.publishedAt) await updatePage(ctx, home.id, { published: true });
+  return home.publishedAt ? "updated" : "yes";
+}
+
+type BlockDef = { type: ContentBlockType; data: Record<string, unknown> };
+
+/** Makes a page's blocks exactly `target` (reusing existing blocks per type, in order). Idempotent. */
+async function syncBlocks(ctx: ServiceContext, pageId: string, existing: { id: string; type: ContentBlockType }[], target: BlockDef[]) {
+  const unused = [...existing];
+  const ids: string[] = [];
+  for (const t of target) {
+    const i = unused.findIndex((b) => b.type === t.type);
+    if (i >= 0) {
+      const [block] = unused.splice(i, 1);
+      await updateBlock(ctx, block.id, { data: t.data, isVisible: true });
+      ids.push(block.id);
+    } else {
+      ids.push((await addBlock(ctx, pageId, { type: t.type, data: t.data })).id);
+    }
+  }
+  for (const b of unused) await removeBlock(ctx, b.id);
+  for (const [index, id] of ids.entries()) await moveBlock(ctx, id, index);
+}
+
+// ─── Shop details, legal/service pages, menus ───────────────────────────────
+
+const text = (title: string, markdown: string): BlockDef => ({ type: "TEXT", data: { title, markdown, cta: null } });
+const DEMO_NOTE = "*Demo shop: this is example content with fictional details.*";
+
+function shopPages(spec: TenantSpec, shopName: string): { key?: "TERMS" | "PRIVACY" | "CONTACT" | "ABOUT"; slug: string; title: string; blocks: BlockDef[] }[] {
+  const i = spec.shopInfo;
+  const pages: { key?: "TERMS" | "PRIVACY" | "CONTACT" | "ABOUT"; slug: string; title: string; blocks: BlockDef[] }[] = [
+    {
+      key: "TERMS",
+      slug: "terms",
+      title: "Terms and conditions",
+      blocks: [
+        text(
+          "",
+          [
+            DEMO_NOTE,
+            "## 1. General",
+            `These terms apply to every offer and order at ${shopName}. By placing an order you accept them.`,
+            "## 2. Items and descriptions",
+            "We sell original, used items. Every piece is described and photographed as accurately as we can, including wear and damage. Measurements are approximate.",
+            "## 3. Prices and payment",
+            "Prices are in euros. An item is reserved for you once the order is placed and is shipped after payment has been received.",
+            "## 4. Shipping",
+            "Shipping costs depend on weight and destination and are shown at checkout. Items travel insured where the carrier allows it.",
+            "## 5. Returns",
+            "You may return an item within 14 days of receipt in the condition you received it. See our returns page for how it works.",
+            "## 6. Authenticity",
+            "If an item turns out not to be original as described, we refund the purchase price and shipping costs, without time limit.",
+          ].join("\n\n"),
+        ),
+      ],
+    },
+    {
+      key: "PRIVACY",
+      slug: "privacy",
+      title: "Privacy policy",
+      blocks: [
+        text(
+          "",
+          [
+            DEMO_NOTE,
+            "## What we collect",
+            "Your name, address, email address, phone number and order history: only what we need to deliver your orders and answer your questions.",
+            "## Why",
+            "To process and ship orders, to send order updates and, only if you subscribed, our newsletter.",
+            "## Who else sees it",
+            "Our payment provider and the carrier that delivers your parcel receive what they need for that. We never sell your data.",
+            "## How long",
+            "Order data is kept for seven years, as tax law requires. Newsletter subscriptions end the moment you unsubscribe.",
+            "## Your rights",
+            `You can ask to see, correct or delete your data at any time: email [${i.email}](mailto:${i.email}).`,
+          ].join("\n\n"),
+        ),
+      ],
+    },
+    {
+      key: "CONTACT",
+      slug: "contact",
+      title: "Contact",
+      blocks: [
+        text(
+          "Get in touch",
+          [
+            "Questions about an item, an order or shipping? We usually reply within one working day.",
+            `**Email:** [${i.email}](mailto:${i.email})  \n**Phone:** ${i.phone}  \n**Address:** ${i.line1}, ${i.postalCode} ${i.city}, the Netherlands`,
+            "Visits by appointment only.",
+            DEMO_NOTE,
+          ].join("\n\n"),
+        ),
+      ],
+    },
+    {
+      key: "ABOUT",
+      slug: "about",
+      title: "About us",
+      blocks: [
+        text(
+          `About ${shopName}`,
+          spec.shopInfo.full
+            ? "We deal in original militaria from WW1 to the Cold War: helmets, uniforms, equipment, insignia, documents and edged weapons.\n\nEvery item is checked for originality, measured and photographed from all sides before it is listed. If we are not sure about something, we say so in the description.\n\nItems with a certificate of authenticity can be verified on our [verify page](/verify)."
+            : "We collect and sell field post, postcards, medals and headgear from the Low Countries, 1914–1945.\n\nEvery item is described honestly and photographed in detail.",
+        ),
+        ...(spec.shopInfo.full ? [{ type: "QUOTE" as const, data: { quote: "Every item has a story. We make sure it is told correctly.", author: "" } }] : []),
+      ],
+    },
+  ];
+  if (spec.shopInfo.full) {
+    pages.push(
+      {
+        slug: "shipping",
+        title: "Shipping & zones",
+        blocks: [
+          text(
+            "",
+            [
+              "We pack every item with care, double-boxed where needed, and ship within two working days of payment.",
+              "## Zones",
+              spec.zones.map((z) => `- **${z.name}**: ${z.isPickup ? "pick up your order by appointment, free of charge." : `${z.countries.length > 5 ? "most EU countries" : z.countries.join(", ")}, from ${euro(Math.min(...z.rates.map((r) => r.price)))}.`}`).join("\n"),
+              "Shipping costs are calculated from weight and destination and shown at checkout before you pay. Outside these zones? Contact us for a quote.",
+              "## Restricted items",
+              "Edged weapons are sold to adults (18+) only and are not shipped to every country.",
+            ].join("\n\n"),
+          ),
+        ],
+      },
+      {
+        slug: "returns",
+        title: "Returns",
+        blocks: [
+          text(
+            "",
+            [
+              "Not what you expected? You may return an item within 14 days of receipt.",
+              `1. Email us at [${i.email}](mailto:${i.email}) with your order number.\n2. Pack the item as well as we did and send it back insured.\n3. We refund the purchase price within 14 days of receiving it.`,
+              "Return shipping is at your expense, unless the item was not as described.",
+            ].join("\n\n"),
+          ),
+        ],
+      },
+    );
+  }
+  return pages;
+}
+
+/**
+ * Fictional shop details (only fields that are still empty), published legal/service pages and
+ * header/footer menus. Idempotent: pages are found by system key or slug and their blocks synced;
+ * menu items are only added when missing (matched by label).
+ */
+async function seedShopContent(ctx: ServiceContext, spec: TenantSpec, superadmin: Actor): Promise<string> {
+  const tenantId = ctx.tenantId;
+  const info = spec.shopInfo;
+
+  // 1. General settings: fill empty fields only.
+  const general = await getSettings(tenantId, "general");
+  const patch: Record<string, unknown> = {};
+  if (!general.contactEmail) patch.contactEmail = info.email;
+  if (!general.phone) patch.phone = info.phone;
+  if (!general.address.line1 && !general.address.city) patch.address = { line1: info.line1, line2: "", postalCode: info.postalCode, city: info.city, country: "NL" };
+  if (!general.cocNumber) patch.cocNumber = "DEMO-00000000";
+  if (!general.vatNumber) patch.vatNumber = "NL000000000B00";
+  if (!general.iban) patch.iban = "NL00DEMO0000000000";
+  if (Object.keys(patch).length) await updateSettings(tenantId, "general", patch as never, superadmin);
+
+  // 2. Pages.
+  await ensureSystemPages(tenantId);
+  const shopName = general.shopName || spec.slug;
+  const pageIds = new Map<string, string>();
+  for (const def of shopPages(spec, shopName)) {
+    let page = await db.contentPage.findFirst({
+      where: { tenantId, ...(def.key ? { systemKey: def.key } : { slug: def.slug }) },
+      include: { blocks: { orderBy: { sortOrder: "asc" } } },
     });
+    if (!page) {
+      const created = await createPage(ctx, { title: def.title, slug: def.slug });
+      page = { ...created, blocks: [] };
+    }
+    if (page.title !== def.title) await updatePage(ctx, page.id, { title: def.title });
+    await syncBlocks(ctx, page.id, page.blocks, def.blocks);
+    if (!page.publishedAt) await updatePage(ctx, page.id, { published: true });
+    pageIds.set(def.slug, page.id);
   }
-  const newItems = home.blocks.find((b) => b.type === "NEW_ITEMS");
-  if (newItems) await updateBlock(ctx, newItems.id, { data: { title: "New arrivals", count: 8, cta: { label: "View all", href: "/shop" } } });
-  await addBlock(ctx, home.id, {
-    type: "TESTIMONIAL",
-    data: { quote: "The M34 helmet arrived double-boxed and exactly as described. Third purchase, won't be the last.", author: "Pieter, Amersfoort", link: null },
-  });
-  if (spec.newsletter) {
-    await addBlock(ctx, home.id, { type: "NEWSLETTER_SIGNUP", data: { title: "Never miss a new arrival", text: "One e-mail when new items are listed. No spam, unsubscribe any time." } });
+
+  // 3. Menus.
+  const items = await db.menuItem.findMany({ where: { tenantId }, select: { id: true, location: true, parentId: true, label: true } });
+  const ensureItem = async (location: "HEADER" | "FOOTER", parentId: string | null, label: string, target: Parameters<typeof createMenuItem>[1]["target"]) => {
+    const found = items.find((m) => m.location === location && m.parentId === parentId && m.label === label);
+    if (found) return found.id;
+    const created = await createMenuItem(ctx, { location, parentId, label, target });
+    items.push({ id: created.id, location, parentId, label });
+    return created.id;
+  };
+  const page = (slug: string) => ({ kind: "page" as const, pageId: pageIds.get(slug)! });
+  const publicArchive = (await getSettings(tenantId, "catalog")).publicArchive;
+  if (info.full) {
+    const shopCol = await ensureItem("FOOTER", null, "Shop", null);
+    await ensureItem("FOOTER", shopCol, "All items", { kind: "route", route: "shop" });
+    if (publicArchive) await ensureItem("FOOTER", shopCol, "Sold archive", { kind: "url", url: "/archive" });
+    await ensureItem("FOOTER", shopCol, "Sell your collection", { kind: "url", url: "/sell" });
+    await ensureItem("FOOTER", shopCol, "Verify a certificate", { kind: "url", url: "/verify" });
   }
-  await updatePage(ctx, home.id, { published: true });
-  return "yes";
+  const service = await ensureItem("FOOTER", null, "Service", null);
+  if (info.full) {
+    await ensureItem("FOOTER", service, "Shipping & zones", page("shipping"));
+    await ensureItem("FOOTER", service, "Returns", page("returns"));
+  }
+  await ensureItem("FOOTER", service, "About", page("about"));
+  await ensureItem("FOOTER", service, "Contact", page("contact"));
+
+  // Header (the storefront always shows "Shop" first): top-level demo categories with their children,
+  // only when the shop has no header menu yet.
+  if (!items.some((m) => m.location === "HEADER")) {
+    const cats = await db.category.findMany({ where: { tenantId, isActive: true }, select: { id: true, title: true, parentId: true } });
+    for (const root of spec.categories) {
+      const cat = cats.find((c) => !c.parentId && c.title === root.title);
+      if (!cat) continue;
+      const rootId = await ensureItem("HEADER", null, root.title, { kind: "category", categoryId: cat.id });
+      for (const child of root.children ?? []) {
+        const sub = cats.find((c) => c.parentId === cat.id && c.title === child.title);
+        if (sub) await ensureItem("HEADER", rootId, child.title, { kind: "category", categoryId: sub.id });
+      }
+    }
+  }
+  return `${pageIds.size} pages, ${items.length} menu items`;
 }
 
 // ─── Newsletter ─────────────────────────────────────────────────────────────
@@ -1405,6 +1634,53 @@ async function seedPageViews(tenantId: string, spec: TenantSpec, products: Creat
   return rows.length;
 }
 
+// ─── Refresh (existing demo data) ───────────────────────────────────────────
+
+/**
+ * Regenerates the artwork of the demo products (legacyData.demo = true, matched to the item list by
+ * title) in place: same number of photos, new image ids (image URLs are cached as immutable), old
+ * images removed through the media service, order-line snapshots pointed at the new cover thumbnail.
+ * Products created by hand (no demo mark) are never touched.
+ */
+async function refreshProductImages(spec: TenantSpec, ctx: ServiceContext): Promise<number> {
+  const items = new Map(spec.items.map((i) => [i.title, i]));
+  const products = await db.product.findMany({
+    where: { tenantId: ctx.tenantId, legacyData: { path: ["demo"], equals: true } },
+    orderBy: { stockCode: "asc" },
+    select: { id: true, title: true, stockCode: true, images: { orderBy: { sortOrder: "asc" }, select: { id: true, storageKey: true, variants: true } } },
+  });
+  let images = 0;
+  for (const [n, p] of products.entries()) {
+    const item = items.get(p.title);
+    if (!item || !p.images.length) continue;
+    await addProductImages(ctx, p.id, await productImageFiles(spec, item, p.stockCode, p.stockCode, Math.min(p.images.length, 4)));
+    const oldKeys = p.images.flatMap((img) => [img.storageKey, ...Object.values((img.variants ?? {}) as Record<string, { key?: string }>).map((v) => v?.key ?? "")]).filter(Boolean);
+    for (const img of p.images) await deleteProductImage(ctx, img.id);
+    const cover = await db.productImage.findFirst({ where: { productId: p.id }, orderBy: { sortOrder: "asc" }, select: { storageKey: true, variants: true } });
+    const thumbKey = (cover?.variants as { thumb?: { key?: string } } | null)?.thumb?.key ?? cover?.storageKey ?? null;
+    await db.orderLine.updateMany({ where: { tenantId: ctx.tenantId, productId: p.id, imagePath: { in: oldKeys } }, data: { imagePath: thumbKey } });
+    images += Math.min(p.images.length, 4);
+    progress(`  ${spec.slug}: products ${n + 1}/${products.length} (${images} images)`);
+  }
+  progress("\n");
+  return images;
+}
+
+async function refreshTenant(spec: TenantSpec, opts: { images: boolean; home: boolean; content: boolean }): Promise<Summary | null> {
+  const tenant = await db.tenant.findUnique({ where: { slug: spec.slug } });
+  if (!tenant) {
+    console.log(`- ${spec.slug}: tenant not found, skipped`);
+    return null;
+  }
+  const { owner, superadmin } = await actorsFor(tenant.id);
+  const ctx: ServiceContext = { tenantId: tenant.id, actor: owner };
+  const summary: Summary = { tenant: spec.slug };
+  if (opts.images) summary.images = await refreshProductImages(spec, ctx);
+  if (opts.home && spec.homePage) summary.homePage = await seedHomePage(ctx);
+  if (opts.content) summary.content = await seedShopContent(ctx, spec, superadmin);
+  return summary;
+}
+
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 function printSummary(summaries: Summary[]) {
@@ -1427,6 +1703,18 @@ async function main() {
   await loadServices();
   console.log("Quartermaster demo data");
   const summaries: Summary[] = [];
+  const refresh = process.argv.includes("--refresh");
+  const images = refresh || process.argv.includes("--images-only");
+  const home = refresh || process.argv.includes("--home-only");
+  const content = refresh || process.argv.includes("--content-only");
+  if (images || home || content) {
+    for (const spec of [CONCEPT, VELDPOST]) {
+      const s = await refreshTenant(spec, { images, home, content });
+      if (s) summaries.push(s);
+    }
+    printSummary(summaries);
+    return;
+  }
   for (const spec of [CONCEPT, VELDPOST]) {
     const s = await seedTenant(spec);
     if (s) summaries.push(s);

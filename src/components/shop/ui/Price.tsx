@@ -26,7 +26,7 @@ export function Price({
   className?: string;
 }) {
   const indicative = display && display.currency !== currency ? formatIndicative(cents, currency, display.currency, display.rate) : null;
-  const sizes = { sm: "text-sm", md: "text-base", lg: "text-xl", xl: "text-3xl" } as const;
+  const sizes = { sm: "text-sm", md: "text-base", lg: "text-xl", xl: "text-[1.9rem] leading-none tracking-[-0.02em] sm:text-[2.2rem]" } as const;
   return (
     <span className={cn("inline-flex flex-wrap items-baseline gap-x-2 gap-y-0.5", className)}>
       <span className={cn("font-semibold text-shop-ink tabular-nums", sizes[size], size === "xl" && "font-shop-heading")}>{formatMoney(cents, currency)}</span>

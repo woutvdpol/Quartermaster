@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Select } from "@/components/shop/ui/Field";
 import { formatMoney } from "@/components/shop/ui/money";
 import type { CheckoutQuote } from "@/server/checkout";
 import { cartEstimateAction } from "./actions";
@@ -50,7 +51,7 @@ export function CartSummary({
 
   return (
     <div className="flex flex-col gap-4">
-      <dl className="flex flex-col gap-2 text-sm">
+      <dl className="flex flex-col gap-3 text-[0.95rem]">
         <div className="flex justify-between gap-4">
           <dt className="text-shop-ink-2">{t.subtotal}</dt>
           <dd className="font-semibold tabular-nums">{fmt(quote?.totals.subtotal ?? subtotal)}</dd>
@@ -68,12 +69,12 @@ export function CartSummary({
           <dt className="flex items-center justify-between gap-2 text-shop-ink-2">
             <label htmlFor="cart-country">{t.shippingEstimate}</label>
           </dt>
-          <dd className="flex flex-col gap-1.5">
-            <select
+          <dd className="flex flex-col gap-2">
+            <Select
               id="cart-country"
               value={country}
               onChange={(e) => onCountry(e.target.value)}
-              className="h-10 w-full rounded-shop-sm border border-shop-line-strong bg-shop-surface px-2 text-sm text-shop-ink"
+              className="text-sm"
               aria-describedby="cart-shipping-result"
             >
               <option value="">{t.shipTo}…</option>
@@ -82,8 +83,8 @@ export function CartSummary({
                   {c.name}
                 </option>
               ))}
-            </select>
-            <p id="cart-shipping-result" aria-live="polite" className="flex justify-between gap-3 text-shop-ink">
+            </Select>
+            <p id="cart-shipping-result" aria-live="polite" className="flex justify-between gap-3 px-1 text-sm text-shop-ink">
               {pending ? (
                 <span className="text-shop-muted">{t.calculating}</span>
               ) : !quote ? (
@@ -108,13 +109,13 @@ export function CartSummary({
 
       {quote?.freeShipping ? <FreeShippingBar progress={quote.freeShipping} currency={currency} /> : null}
       {quote && quote.minimumShortfall > 0 ? (
-        <p className="rounded-shop-sm bg-shop-warn-soft px-3 py-2 text-sm text-shop-warn">{t.minimumOrder(fmt(quote.minimumShortfall))}</p>
+        <p className="rounded-shop bg-shop-warn-soft px-4 py-2.5 text-sm text-shop-warn">{t.minimumOrder(fmt(quote.minimumShortfall))}</p>
       ) : null}
 
       {shipping !== null && quote ? (
-        <div className="flex items-baseline justify-between gap-4 border-t border-shop-line pt-3">
-          <span className="font-medium">{cartCopy.checkout.total}</span>
-          <span className="font-shop-heading text-xl font-semibold tabular-nums">{fmt(quote.totals.subtotal - discount + shipping)}</span>
+        <div className="flex items-baseline justify-between gap-4 border-t border-shop-line-strong/40 pt-4">
+          <span className="font-semibold">{cartCopy.checkout.total}</span>
+          <span className="font-shop-heading text-2xl font-semibold tracking-tight tabular-nums">{fmt(quote.totals.subtotal - discount + shipping)}</span>
         </div>
       ) : null}
     </div>

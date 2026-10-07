@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useActionState, useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 import { Alert, Field, Honeypot, SubmitButton } from "@/components/shop/account/form";
-import { ButtonLink } from "@/components/shop/ui/Button";
+import { ButtonLink, buttonClasses } from "@/components/shop/ui/Button";
 import { cn } from "@/components/shop/ui/cn";
+import { checkClasses, textareaClasses } from "@/components/shop/ui/Field";
 import { Turnstile } from "@/components/shop/turnstile/Turnstile";
 import { submitLeadAction } from "@/app/(shop)/sell/actions";
 import { leadsCopy } from "./_copy";
@@ -25,19 +26,14 @@ type PhotoItem = {
   error?: string;
 };
 
-const textareaClass =
-  "block w-full rounded-shop-sm border border-shop-line-strong bg-shop-surface px-3 py-2.5 text-shop-ink " +
-  "placeholder:text-shop-muted focus:border-shop-primary focus:outline-none focus-visible:outline-2 " +
-  "focus-visible:outline-offset-1 focus-visible:outline-shop-primary aria-invalid:border-shop-crit";
-
 function TextArea({ id, label, hint, error, ...rest }: { id: string; label: string; hint?: string; error?: string } & React.ComponentPropsWithoutRef<"textarea">) {
   const describedBy = [error ? `${id}-error` : null, hint ? `${id}-hint` : null].filter(Boolean).join(" ") || undefined;
   return (
     <div className="grid gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium text-shop-ink-2">
+      <label htmlFor={id} className="text-sm font-medium text-shop-ink">
         {label}
       </label>
-      <textarea id={id} name={id} rows={5} aria-invalid={error ? true : undefined} aria-describedby={describedBy} className={textareaClass} {...rest} />
+      <textarea id={id} name={id} rows={5} aria-invalid={error ? true : undefined} aria-describedby={describedBy} className={textareaClasses} {...rest} />
       {hint ? (
         <p id={`${id}-hint`} className="text-xs text-shop-muted">
           {hint}
@@ -63,6 +59,7 @@ export function SellForm({ draft, shopName, privacyHref }: { draft: string; shop
   const [state, action] = useActionState(submitLeadAction, undefined);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const photosRef = useRef(photos);
   const doneRef = useRef<HTMLDivElement>(null);
@@ -100,6 +97,10 @@ export function SellForm({ draft, shopName, privacyHref }: { draft: string; shop
   function onFiles(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     e.target.value = "";
+    addFiles(files);
+  }
+
+  function addFiles(files: File[]) {
     setPhotoError(null);
     const room = MAX_PHOTOS - photos.length;
     if (files.length > room) setPhotoError(t.errors.tooMany(MAX_PHOTOS));
@@ -144,9 +145,9 @@ export function SellForm({ draft, shopName, privacyHref }: { draft: string; shop
 
   if (state?.ok) {
     return (
-      <div ref={doneRef} tabIndex={-1} className="rounded-shop border border-shop-line bg-shop-surface p-6 outline-none sm:p-8" role="status">
-        <h2 className="text-2xl text-shop-ink">{t.done.title}</h2>
-        <p className="mt-3 text-shop-muted">{t.done.body}</p>
+      <div ref={doneRef} tabIndex={-1} className="rounded-shop bg-shop-sunken p-6 outline-none sm:p-8" role="status">
+        <h2 className="text-2xl text-shop-ink sm:text-3xl">{t.done.title}</h2>
+        <p className="mt-3 text-shop-ink-2">{t.done.body}</p>
         <ButtonLink href="/" variant="outline" className="mt-6">
           {t.done.again}
         </ButtonLink>
@@ -189,14 +190,14 @@ export function SellForm({ draft, shopName, privacyHref }: { draft: string; shop
       />
 
       <fieldset className="grid gap-2" aria-describedby={`${photosId}-hint`}>
-        <legend className="mb-1.5 text-sm font-medium text-shop-ink-2">{t.fields.photos}</legend>
+        <legend className="mb-1.5 text-sm font-medium text-shop-ink">{t.fields.photos}</legend>
         <p id={`${photosId}-hint`} className="text-xs text-shop-muted">
           {t.fields.photosHint(MAX_PHOTOS, MAX_MB)} <span aria-live="polite">{t.fields.photoCount(photos.length, MAX_PHOTOS)}</span>
         </p>
         {photos.length ? (
           <ul role="list" className="grid grid-cols-3 gap-2 sm:grid-cols-5">
             {photos.map((p, i) => (
-              <li key={p.localId} className="relative overflow-hidden rounded-shop-sm border border-shop-line bg-shop-sunken">
+              <li key={p.localId} className="relative overflow-hidden rounded-shop bg-shop-sunken">
                 {/* eslint-disable-next-line @next/next/no-img-element -- local object URL preview */}
                 <img src={p.preview} alt="" className={cn("aspect-square w-full object-cover", p.status !== "done" && "opacity-60")} />
                 {p.status === "uploading" ? (
@@ -212,9 +213,13 @@ export function SellForm({ draft, shopName, privacyHref }: { draft: string; shop
                   type="button"
                   onClick={() => remove(p)}
                   aria-label={t.fields.removePhoto(i + 1)}
-                  className="absolute top-1 right-1 grid size-7 place-items-center rounded-full bg-shop-surface/95 text-shop-ink shadow-sm hover:bg-shop-surface"
+                  className="absolute top-0 right-0 grid size-11 place-items-center text-shop-ink"
                 >
-                  <span aria-hidden="true">×</span>
+                  <span aria-hidden="true" className="grid size-7 place-items-center rounded-shop-control bg-shop-surface shadow-shop">
+                    <svg viewBox="0 0 16 16" width="12" height="12">
+                      <path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    </svg>
+                  </span>
                 </button>
               </li>
             ))}
@@ -233,17 +238,36 @@ export function SellForm({ draft, shopName, privacyHref }: { draft: string; shop
           </p>
         ) : null}
         {fe.photos ? <p className="text-sm text-shop-crit">{fe.photos}</p> : null}
-        <div>
-          <input ref={inputRef} id={photosId} type="file" accept={ACCEPT} multiple className="sr-only" onChange={onFiles} disabled={photos.length >= MAX_PHOTOS} />
+        <div
+          className="relative"
+          onDragOver={(e) => {
+            if (photos.length >= MAX_PHOTOS || !e.dataTransfer.types.includes("Files")) return;
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            if (photos.length < MAX_PHOTOS) addFiles(Array.from(e.dataTransfer.files));
+          }}
+        >
+          <input ref={inputRef} id={photosId} type="file" accept={ACCEPT} multiple className="peer sr-only" onChange={onFiles} disabled={photos.length >= MAX_PHOTOS} />
           <label
             htmlFor={photosId}
             className={cn(
-              "inline-flex h-11 cursor-pointer items-center gap-2 rounded-shop-sm border border-dashed border-shop-line-strong px-4 text-sm font-medium text-shop-ink hover:bg-shop-sunken",
-              "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-shop-primary",
+              "flex min-h-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-shop border border-dashed border-shop-line-strong bg-shop-sunken/50 px-4 py-6 text-center text-sm transition-colors hover:border-shop-ink hover:bg-shop-sunken",
+              "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-shop-primary",
+              dragging && "border-shop-primary bg-shop-primary-soft",
               photos.length >= MAX_PHOTOS && "pointer-events-none opacity-55",
             )}
           >
-            <span aria-hidden="true">+</span> {t.fields.addPhotos}
+            <span aria-hidden="true" className="grid size-11 place-items-center rounded-shop-control bg-shop-surface text-shop-ink shadow-shop">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 16V5M7.5 9.5L12 5l4.5 4.5M5 19h14" />
+              </svg>
+            </span>
+            <span className="font-semibold text-shop-ink">{t.fields.addPhotos}</span>
           </label>
         </div>
       </fieldset>
@@ -251,7 +275,7 @@ export function SellForm({ draft, shopName, privacyHref }: { draft: string; shop
       <TextArea id="message" label={t.fields.message} hint={t.fields.messageHint} rows={3} maxLength={5000} defaultValue={v?.message} error={fe.message} />
 
       <div className="grid gap-1.5">
-        <label className="flex items-start gap-3 text-sm text-shop-ink-2">
+        <label className="flex cursor-pointer items-start gap-3 py-1 text-sm text-shop-ink-2">
           <input
             type="checkbox"
             name="consent"
@@ -259,7 +283,7 @@ export function SellForm({ draft, shopName, privacyHref }: { draft: string; shop
             defaultChecked={v?.consent}
             aria-invalid={fe.consent ? true : undefined}
             aria-describedby={fe.consent ? "consent-error" : undefined}
-            className="mt-0.5 size-4 shrink-0 accent-[var(--shop-primary)]"
+            className={cn(checkClasses, "mt-0.5")}
           />
           <span>
             {t.fields.consent(shopName)}
@@ -285,11 +309,13 @@ export function SellForm({ draft, shopName, privacyHref }: { draft: string; shop
       {uploading ? <p className="text-sm text-shop-muted">{t.waitForUploads}</p> : null}
       <div>
         {uploading ? (
-          <button type="button" disabled className="inline-flex h-11 items-center rounded-shop-sm bg-shop-primary px-5 text-shop-on-primary opacity-55">
+          <button type="button" disabled className={buttonClasses("primary", "lg", "w-full sm:w-auto")}>
             {t.fields.uploading}
           </button>
         ) : (
-          <SubmitButton pendingLabel={t.submitting}>{t.submit}</SubmitButton>
+          <SubmitButton pendingLabel={t.submitting} size="lg" className="w-full sm:w-auto">
+            {t.submit}
+          </SubmitButton>
         )}
       </div>
     </form>

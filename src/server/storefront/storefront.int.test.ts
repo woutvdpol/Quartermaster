@@ -73,6 +73,15 @@ describe("storefront product reads", () => {
     expect((await listProductsForSitemap(a.tenantId, true)).length).toBe(2);
   });
 
+  it("category tiles count products in subcategories", async () => {
+    const helmets = await createCategory(a, { title: "Helmets" });
+    const german = await createCategory(a, { title: "German", parentId: helmets.id });
+    const inSub = await createProduct(a, { title: "M35", price: 100, status: "ACTIVE" });
+    await db.product.update({ where: { id: inSub.id }, data: { categoryId: german.id } });
+    const [tile] = await queryCategoryTiles(a.tenantId, [helmets.id]);
+    expect(tile.productCount).toBe(1);
+  });
+
   it("sitemap facet values: filterable values with a visible product in their subtree", async () => {
     const period = await db.facet.create({ data: { tenantId: a.tenantId, kind: "PERIOD", name: "Period", slug: "period" } });
     const hidden = await db.facet.create({ data: { tenantId: a.tenantId, kind: "CUSTOM", name: "Internal", slug: "internal", isFilterable: false } });

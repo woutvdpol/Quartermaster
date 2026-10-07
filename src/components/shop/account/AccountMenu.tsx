@@ -20,7 +20,7 @@ function PersonIcon() {
 }
 
 const linkClass =
-  "inline-flex h-10 items-center gap-2 rounded-shop-sm px-2.5 text-sm font-medium text-shop-ink hover:bg-shop-sunken";
+  "inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-shop-control px-2.5 text-sm font-medium text-shop-ink hover:bg-shop-sunken";
 
 export async function AccountMenu() {
   const c = await getShopCustomer();

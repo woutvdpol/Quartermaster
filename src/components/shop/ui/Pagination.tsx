@@ -19,13 +19,13 @@ export function Pagination({
 }) {
   if (pageCount <= 1) return null;
   const pages = pageWindow(page, pageCount);
-  const item = "inline-flex h-10 min-w-10 items-center justify-center rounded-shop-sm px-3 text-sm tabular-nums";
+  const item = "inline-flex h-10 min-w-10 items-center justify-center rounded-shop-control px-3 text-sm font-medium tabular-nums transition-colors";
   return (
     <nav aria-label={uiCopy.pagination.label} className={cn("flex justify-center", className)}>
-      <ul className="flex flex-wrap items-center gap-1">
+      <ul className="flex flex-wrap items-center justify-center gap-1.5">
         <li>
           {page > 1 ? (
-            <Link href={hrefFor(page - 1)} rel="prev" className={cn(item, "hover:bg-shop-sunken")}>
+            <Link href={hrefFor(page - 1)} rel="prev" className={cn(item, "border border-shop-line-strong text-shop-ink hover:border-shop-ink")}>
               <span aria-hidden="true">←</span> <span className="ml-1 hidden sm:inline">{uiCopy.pagination.previous}</span>
               <span className="sr-only sm:hidden">{uiCopy.pagination.previous}</span>
             </Link>
@@ -39,12 +39,12 @@ export function Pagination({
           ) : (
             <li key={p}>
               {p === page ? (
-                <span aria-current="page" className={cn(item, "bg-shop-primary font-semibold text-shop-on-primary")}>
+                <span aria-current="page" className={cn(item, "bg-shop-ink font-semibold text-shop-bg")}>
                   <span className="sr-only">{uiCopy.pagination.page} </span>
                   {p}
                 </span>
               ) : (
-                <Link href={hrefFor(p)} className={cn(item, "text-shop-ink-2 hover:bg-shop-sunken")}>
+                <Link href={hrefFor(p)} className={cn(item, "text-shop-ink-2 hover:bg-shop-sunken hover:text-shop-ink")}>
                   <span className="sr-only">{uiCopy.pagination.page} </span>
                   {p}
                 </Link>
@@ -54,7 +54,7 @@ export function Pagination({
         )}
         <li>
           {page < pageCount ? (
-            <Link href={hrefFor(page + 1)} rel="next" className={cn(item, "hover:bg-shop-sunken")}>
+            <Link href={hrefFor(page + 1)} rel="next" className={cn(item, "border border-shop-line-strong text-shop-ink hover:border-shop-ink")}>
               <span className="mr-1 hidden sm:inline">{uiCopy.pagination.next}</span>
               <span className="sr-only sm:hidden">{uiCopy.pagination.next}</span> <span aria-hidden="true">→</span>
             </Link>

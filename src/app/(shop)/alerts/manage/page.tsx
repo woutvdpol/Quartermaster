@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: t.manageTitle, robots: { index: false
 export default function ManageAlertsPage({ searchParams }: PageProps<"/alerts/manage">) {
   return (
     <Container size="narrow" className="py-10 sm:py-16">
-      <h1 className="text-3xl text-shop-ink sm:text-4xl">{t.manageTitle}</h1>
+      <h1 className="text-[2.1rem] leading-[1.05] tracking-[-0.03em] text-shop-ink sm:text-[2.6rem]">{t.manageTitle}</h1>
       <Suspense fallback={<Skeleton className="mt-6 h-40 w-full" />}>
         <Content searchParams={searchParams} />
       </Suspense>

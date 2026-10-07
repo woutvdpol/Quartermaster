@@ -88,17 +88,17 @@ export function AlertDialogButton({
       <dialog
         ref={dialogRef}
         aria-labelledby={`${id}-title`}
-        className="m-auto w-[calc(100%-2rem)] max-w-md rounded-shop border border-shop-line bg-shop-surface p-0 text-shop-ink shadow-shop-pop backdrop:bg-black/40"
+        className="m-auto w-[calc(100%-2rem)] max-w-md rounded-shop bg-shop-surface p-0 text-shop-ink shadow-shop-pop backdrop:bg-shop-scrim"
       >
-        <div className="p-5 sm:p-6">
+        <div className="p-6 sm:p-8">
           <div className="mb-3 flex items-start justify-between gap-4">
-            <h2 id={`${id}-title`} className="text-xl">
+            <h2 id={`${id}-title`} className="text-2xl">
               {title}
             </h2>
             <button
               type="button"
               onClick={() => dialogRef.current?.close()}
-              className="-m-1 rounded-shop-sm p-1 text-shop-muted hover:bg-shop-sunken"
+              className="-m-2 grid size-10 shrink-0 place-items-center rounded-shop-control text-shop-muted hover:bg-shop-sunken hover:text-shop-ink"
               aria-label={t.form.close}
             >
               <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2">
@@ -108,7 +108,7 @@ export function AlertDialogButton({
           </div>
           {done ? (
             <div className="grid gap-4">
-              <p role="status" className="rounded-shop-sm border border-shop-ok/30 bg-shop-ok-soft px-4 py-3 text-sm text-shop-ok">
+              <p role="status" className="rounded-shop bg-shop-ok-soft px-4 py-3 text-sm text-shop-ok">
                 {message}
               </p>
               <div className="flex justify-end gap-2">
@@ -126,7 +126,7 @@ export function AlertDialogButton({
             <form action={submit} className="grid gap-4">
               <p className="text-sm text-shop-ink-2">{intro}</p>
               {state?.summary ? (
-                <p className="rounded-shop-sm bg-shop-sunken px-3 py-2 text-sm">
+                <p className="rounded-shop bg-shop-sunken px-4 py-3 text-sm">
                   <span className="text-shop-muted">{t.form.criteria}: </span>
                   {state.summary}
                 </p>
@@ -164,7 +164,7 @@ export function AlertDialogButton({
                 <input id={`${id}-website`} name="website" type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
               </div>
               {message ? (
-                <p role="alert" className="rounded-shop-sm border border-shop-crit/30 bg-shop-crit-soft px-4 py-3 text-sm text-shop-crit">
+                <p role="alert" className="rounded-shop bg-shop-crit-soft px-4 py-3 text-sm text-shop-crit">
                   {message}
                 </p>
               ) : null}

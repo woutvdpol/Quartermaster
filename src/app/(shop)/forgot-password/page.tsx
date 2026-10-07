@@ -14,7 +14,7 @@ export default function ForgotPasswordPage() {
       title={t.title}
       intro={t.intro}
       footer={
-        <Link href="/login" className="font-medium text-shop-primary underline-offset-4 hover:underline">
+        <Link href="/login" className="font-semibold text-shop-ink underline underline-offset-4 hover:text-shop-primary">
           {t.back}
         </Link>
       }

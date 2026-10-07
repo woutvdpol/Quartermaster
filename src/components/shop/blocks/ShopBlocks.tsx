@@ -10,6 +10,7 @@ import { SectionHeading } from "@/components/shop/ui/SectionHeading";
 import { ShopImg } from "@/components/shop/ui/ShopImg";
 import { NewsletterForm } from "@/components/shop/layout/NewsletterForm";
 import type { BlockContext } from "./context";
+import { emphasis, stripEmphasis } from "./Emphasis";
 import { blocksCopy } from "./_copy";
 
 export async function TextProductBlock({ data, ctx }: { data: BlockData<"TEXT_PRODUCT">; ctx: BlockContext }) {
@@ -19,10 +20,10 @@ export async function TextProductBlock({ data, ctx }: { data: BlockData<"TEXT_PR
   return (
     <Container className="grid items-center gap-8 md:grid-cols-12 md:gap-14">
       <div className="md:col-span-7">
-        {data.title ? <h2 className="mb-5 text-3xl text-shop-ink">{data.title}</h2> : null}
+        {data.title ? <h2 className="mb-5 text-[1.75rem] leading-[1.08] tracking-[-0.025em] text-shop-ink sm:text-[2.25rem]">{emphasis(data.title)}</h2> : null}
         <Markdown source={data.markdown} />
         {product ? (
-          <Link href={product.href} className="mt-6 inline-flex text-sm font-medium text-shop-primary underline-offset-4 hover:underline">
+          <Link href={product.href} className="mt-6 inline-flex text-[0.95rem] font-semibold text-shop-ink underline-offset-4 hover:text-shop-primary hover:underline">
             {blocksCopy.viewProduct} <span aria-hidden="true">&nbsp;→</span>
           </Link>
         ) : null}
@@ -41,8 +42,8 @@ export async function NewItemsBlock({ data, ctx, priority }: { data: BlockData<"
   const reserved = await liveReservedIds(ctx.tenantId, rows.map((r) => r.id));
   const products = rows.map((r) => toProductCardData(r, { ...ctx.card, reservedIds: reserved }));
   return (
-    <Container size="wide">
-      {data.title || data.cta ? <SectionHeading title={data.title || "New arrivals"} action={data.cta ? { label: data.cta.label, href: data.cta.href } : null} /> : null}
+    <Container>
+      {data.title || data.cta ? <SectionHeading title={emphasis(data.title || "New arrivals")} action={data.cta ? { label: data.cta.label, href: data.cta.href } : null} /> : null}
       {products.length ? (
         <ProductGrid products={products} columns={ctx.gridColumns} showStockCode={ctx.showStockCode} priorityCount={priority ? ctx.gridColumns : 0} />
       ) : (
@@ -52,21 +53,31 @@ export async function NewItemsBlock({ data, ctx, priority }: { data: BlockData<"
   );
 }
 
+/**
+ * Category tiles: square images (sunken placeholder without one) with the name underneath. A grid
+ * from sm up; a horizontal scroll-snap rail on phones.
+ */
 export async function CategoriesBlock({ data, ctx }: { data: BlockData<"CATEGORIES">; ctx: BlockContext }) {
   const tiles = await getCategoryTiles(ctx.tenantId, data.categoryIds);
   if (!tiles.length) return null;
   return (
-    <Container size="wide">
-      {data.title ? <SectionHeading title={data.title} /> : null}
-      <ul aria-label={data.title || blocksCopy.categoriesLabel} tabIndex={0} className="shop-rail auto-cols-[62%] gap-4 pb-3 sm:auto-cols-[38%] lg:auto-cols-[calc((100%-3rem)/4)]">
+    <Container>
+      {data.title ? <SectionHeading title={emphasis(data.title)} /> : null}
+      <ul
+        aria-label={data.title ? stripEmphasis(data.title) : blocksCopy.categoriesLabel}
+        className="grid snap-x snap-mandatory auto-cols-[42%] grid-flow-col gap-3 overflow-x-auto overscroll-x-contain pb-2 sm:snap-none sm:auto-cols-auto sm:grid-flow-row sm:grid-cols-3 sm:overflow-visible sm:pb-0 md:grid-cols-4 lg:grid-cols-6 [&>li]:snap-start"
+      >
         {tiles.map((c) => (
           <li key={c.id}>
-            <Link href={c.href} className="group relative block aspect-[3/4] overflow-hidden rounded-shop bg-shop-primary text-white">
-              {c.image ? <ShopImg image={{ ...c.image, alt: "" }} fill sizes="(min-width: 1024px) 25vw, 60vw" className="opacity-90 transition duration-500 group-hover:scale-[1.04] group-hover:opacity-100" /> : null}
-              <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent" />
-              <span className="absolute inset-x-0 bottom-0 p-4">
-                <span className="block font-shop-heading text-xl leading-tight sm:text-2xl">{c.title}</span>
-                <span className="mt-1 block text-xs tracking-[0.12em] uppercase opacity-80">{blocksCopy.items(c.productCount)}</span>
+            <Link href={c.href} className="group flex flex-col gap-2.5">
+              <span className="relative block aspect-square overflow-hidden rounded-shop bg-shop-sunken">
+                {c.image ? (
+                  <ShopImg image={{ ...c.image, alt: "" }} fill sizes="(min-width: 1024px) 220px, (min-width: 768px) 25vw, (min-width: 640px) 33vw, 42vw" className="transition duration-500 group-hover:scale-[1.04]" />
+                ) : null}
+              </span>
+              <span className="flex flex-col">
+                <span className="text-[0.95rem] leading-snug font-semibold text-shop-ink group-hover:text-shop-primary">{c.title}</span>
+                <span className="text-sm text-shop-muted">{blocksCopy.items(c.productCount)}</span>
               </span>
             </Link>
           </li>
@@ -78,12 +89,15 @@ export async function CategoriesBlock({ data, ctx }: { data: BlockData<"CATEGORI
 
 export function NewsletterBlock({ data, ctx }: { data: BlockData<"NEWSLETTER_SIGNUP">; ctx: BlockContext }) {
   if (!ctx.newsletterEnabled) return null;
+  // data-newsletter-block: the footer hides its own sign-up strip on pages that have this block.
   return (
-    <Container size="narrow">
-      <div className="rounded-shop border border-shop-line bg-shop-surface px-6 py-10 text-center sm:px-12">
-        <h2 className="text-3xl text-shop-ink">{data.title}</h2>
-        {data.text ? <p className="mx-auto mt-3 max-w-md text-shop-muted">{data.text}</p> : null}
-        <NewsletterForm source="block" className="mx-auto mt-6 max-w-md text-left" />
+    <Container data-newsletter-block="">
+      <div className="flex flex-col gap-6 rounded-shop border border-shop-line bg-shop-surface p-6 sm:p-10 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex max-w-[520px] flex-col gap-1.5">
+          <h2 className="text-[1.75rem] leading-[1.1] tracking-[-0.02em] text-shop-ink">{emphasis(data.title)}</h2>
+          {data.text ? <p className="text-shop-muted">{data.text}</p> : null}
+        </div>
+        <NewsletterForm source="block" className="w-full lg:max-w-[520px] lg:flex-[1_1_380px]" />
       </div>
     </Container>
   );

@@ -55,18 +55,19 @@ export function ProductDetail({
     { label: product.title },
   ];
   const eyebrowFacets = EYEBROW_KINDS.flatMap((kind) => product.facets.filter((f) => f.facet.kind === kind).map((f) => f.values[0]?.name)).filter(Boolean).slice(0, 3);
-  const eyebrow = [...eyebrowFacets, product.categoryPath.at(-1)?.title, copy.product.stockCode(product.stockCode)].filter(Boolean).join(" · ");
+  const eyebrow = [product.categoryPath.at(-1)?.title, ...eyebrowFacets].filter(Boolean).join(" · ");
   const geoBlurred = Boolean(geo?.blurred) && !locked;
   // Facet values are the structured truth: free-text spec rows with the same label are not repeated.
   const facetLabels = new Set(product.facets.map((f) => f.facet.name.trim().toLowerCase()));
   const specs = product.specifications.filter((s) => !facetLabels.has(s.label.trim().toLowerCase()));
+  const notice = "rounded-shop px-4 py-3 text-sm";
 
   return (
     <Container className="py-6 sm:py-10">
       <RecentlyViewedTracker productId={product.id} />
       <Breadcrumbs items={crumbs} jsonLdBase={shop.origin} />
 
-      <div className="mt-5 grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:gap-12">
+      <div className="mt-6 grid gap-8 sm:mt-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:gap-14 xl:gap-20">
         <div className="min-w-0">
           {locked ? (
             <div className="relative aspect-[4/3] overflow-hidden rounded-shop bg-shop-sunken">
@@ -77,81 +78,93 @@ export function ProductDetail({
               <div className="relative aspect-[4/3] overflow-hidden rounded-shop bg-shop-sunken">
                 <LockedImg blurDataUrl={product.images[0]?.blurDataUrl ?? null} />
               </div>
-              <figcaption className="mt-2 text-sm text-shop-muted">{copy.product.geoBlurred}</figcaption>
+              <figcaption className="mt-3 text-sm text-shop-muted">{copy.product.geoBlurred}</figcaption>
             </figure>
           ) : (
             <ProductGallery images={product.images} title={product.title} />
           )}
         </div>
 
-        <div className="min-w-0">
-          <p className="font-mono text-[0.72rem] tracking-[0.08em] text-shop-muted uppercase">{eyebrow}</p>
-          <h1 className="mt-2 text-3xl text-shop-ink sm:text-4xl">{product.title}</h1>
+        <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
+          <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 font-shop-mono text-[0.8rem] text-shop-muted">
+            <span className="text-shop-accent">{copy.product.stockCode(product.stockCode)}</span>
+            {eyebrow ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>{eyebrow}</span>
+              </>
+            ) : null}
+          </p>
+          <h1 className="mt-3 text-[2rem] leading-[1.05] tracking-[-0.03em] text-shop-ink sm:text-[2.6rem]">{product.title}</h1>
 
           {locked ? (
-            <div className="mt-6">
+            <div className="mt-8">
               <LockedPanel returnTo={product.href} />
             </div>
           ) : (
             <>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
+              <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3">
                 {showPrice ? <Price cents={product.price} currency={currency} display={display} size="xl" /> : null}
-                <StatusBadge status={status} />
-                {product.onSale && status !== "sold" ? <Badge tone="accent">{copy.product.sale}</Badge> : null}
+                <div className="flex flex-wrap gap-1.5">
+                  <StatusBadge status={status} />
+                  {product.onSale && status !== "sold" ? <Badge tone="accent">{copy.product.sale}</Badge> : null}
+                </div>
               </div>
 
               {status === "reserved" ? (
-                <p className="mt-4 rounded-shop-sm border border-shop-warn/30 bg-shop-warn-soft px-3 py-2.5 text-sm text-shop-warn">{copy.product.reservedHint}</p>
+                <p className={`mt-5 bg-shop-warn-soft text-shop-warn ${notice}`}>{copy.product.reservedHint}</p>
               ) : status === "sold" ? (
-                <p className="mt-4 text-sm text-shop-muted">{copy.product.soldHint}</p>
+                <p className="mt-5 text-sm text-shop-muted">{copy.product.soldHint}</p>
               ) : null}
 
               {geo?.noShipping && geo.country && status !== "sold" ? (
-                <p role="note" className="mt-4 rounded-shop-sm border border-shop-warn/30 bg-shop-warn-soft px-3 py-2.5 text-sm text-shop-warn">
+                <p role="note" className={`mt-5 bg-shop-warn-soft text-shop-warn ${notice}`}>
                   {copy.product.noShipping(countryName(geo.country))}
                 </p>
               ) : null}
 
               {status !== "sold" ? (
-                <div className="mt-6 flex flex-col gap-3">
+                <div className="mt-7 flex flex-col gap-3">
                   <ProductBuyBox product={product} available={status === "available"} />
                   {status === "available" ? (
                     <Suspense fallback={null}>
                       <OfferButton productId={product.id} />
                     </Suspense>
                   ) : null}
-                  <Suspense fallback={<p className="h-5" aria-hidden="true" />}>
-                    <ShippingHint
-                      tenantId={shop.tenant.id}
-                      currency={currency}
-                      weightGrams={product.weightGrams}
-                      price={product.price}
-                      shopCountry={general.address.country}
-                      freeShippingThreshold={checkout.freeShippingThresholdCents}
-                    />
-                  </Suspense>
-                  {product.ageRestricted ? <p className="text-sm text-shop-muted">{copy.product.ageRestricted(legal.minimumAge)}</p> : null}
+                  <div className="mt-1 flex flex-col gap-1.5">
+                    <Suspense fallback={<p className="h-5" aria-hidden="true" />}>
+                      <ShippingHint
+                        tenantId={shop.tenant.id}
+                        currency={currency}
+                        weightGrams={product.weightGrams}
+                        price={product.price}
+                        shopCountry={general.address.country}
+                        freeShippingThreshold={checkout.freeShippingThresholdCents}
+                      />
+                    </Suspense>
+                    {product.ageRestricted ? <p className="text-sm text-shop-muted">{copy.product.ageRestricted(legal.minimumAge)}</p> : null}
+                  </div>
                 </div>
               ) : (
-                <div className="mt-6">
-                  <WishlistButton productId={product.id} variant="full" />
+                <div className="mt-7">
+                  <WishlistButton productId={product.id} variant="full" className="w-full" />
                 </div>
               )}
 
               {product.restrictedSymbols ? (
-                <p role="note" className="mt-6 rounded-shop-sm border border-shop-line bg-shop-sunken px-3 py-2.5 text-sm text-shop-ink-2">
+                <p role="note" className={`mt-7 bg-shop-sunken text-shop-ink-2 ${notice}`}>
                   {copy.product.restrictedNotice}
                 </p>
               ) : null}
 
               {specs.length || product.facets.length ? (
-                <section className="mt-8 border-t border-shop-line pt-5" aria-labelledby="pd-specs">
-                  <h2 id="pd-specs" className="mb-3 text-lg text-shop-ink">
+                <section className="mt-10" aria-labelledby="pd-specs">
+                  <h2 id="pd-specs" className="mb-2 font-shop-body text-sm font-semibold tracking-normal text-shop-ink">
                     {copy.product.specifications}
                   </h2>
-                  <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+                  <dl className="divide-y divide-shop-line border-y border-shop-line text-sm">
                     {product.facets.map((f) => (
-                      <div key={f.facet.id} className="contents">
+                      <div key={f.facet.id} className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-x-6 py-3">
                         <dt className="text-shop-muted">{f.facet.name}</dt>
                         <dd className="text-shop-ink">
                           {f.values.map((v, i) => (
@@ -170,7 +183,7 @@ export function ProductDetail({
                       </div>
                     ))}
                     {specs.map((s, i) => (
-                      <div key={`${i}-${s.label}`} className="contents">
+                      <div key={`${i}-${s.label}`} className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-x-6 py-3">
                         <dt className="text-shop-muted">{s.label}</dt>
                         <dd className="text-shop-ink">{s.value}</dd>
                       </div>
@@ -184,51 +197,58 @@ export function ProductDetail({
       </div>
 
       {!locked ? (
-        <>
-          {product.description ? (
-            <section className="mt-12 max-w-3xl" aria-labelledby="pd-desc">
-              <h2 id="pd-desc" className="mb-4 text-2xl text-shop-ink">
-                {copy.product.description}
-              </h2>
-              <Markdown source={product.description} />
-            </section>
-          ) : null}
-
-          <Suspense fallback={null}>
-            <ProvenanceBlock productId={product.id} />
-          </Suspense>
-
-          {catalog.showTags && product.tags.length ? (
-            <section className="mt-8" aria-labelledby="pd-tags">
-              <h2 id="pd-tags" className="sr-only">
-                {copy.product.tags}
-              </h2>
-              <ul className="flex flex-wrap gap-2" role="list">
-                {product.tags.map((t) => (
-                  <li key={t.id}>
-                    <Link href={tagHref(t.slug)} className="inline-flex h-8 items-center rounded-full border border-shop-line-strong bg-shop-surface px-3 text-sm text-shop-ink-2 hover:border-shop-ink hover:text-shop-ink">
-                      {t.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-
-          {legal.disclaimers.product ? <p className="mt-8 max-w-3xl text-xs text-shop-muted">{legal.disclaimers.product}</p> : null}
-
-          {status !== "available" ? (
-            <section className="mt-10 flex flex-col items-start justify-between gap-3 rounded-shop border border-dashed border-shop-accent/50 bg-shop-surface p-4 sm:flex-row sm:items-center" aria-labelledby="pd-notify">
-              <div>
-                <h2 id="pd-notify" className="font-shop-body text-base font-semibold text-shop-ink">
-                  {copy.product.notifyTitle}
+        <div className="mt-16 grid gap-12 sm:mt-20 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:gap-14 xl:gap-20">
+          <div className="flex min-w-0 flex-col gap-10 empty:hidden">
+            {product.description ? (
+              <section className="max-w-3xl" aria-labelledby="pd-desc">
+                <h2 id="pd-desc" className="mb-5 text-2xl text-shop-ink sm:text-[1.75rem]">
+                  {copy.product.description}
                 </h2>
-                <p className="text-sm text-shop-muted">{copy.product.notifyBody}</p>
-              </div>
-              <NotifyMeButton productId={product.id} fullWidth={false} />
-            </section>
-          ) : null}
-        </>
+                <Markdown source={product.description} />
+              </section>
+            ) : null}
+
+            {catalog.showTags && product.tags.length ? (
+              <section aria-labelledby="pd-tags">
+                <h2 id="pd-tags" className="sr-only">
+                  {copy.product.tags}
+                </h2>
+                <ul className="flex flex-wrap gap-2" role="list">
+                  {product.tags.map((t) => (
+                    <li key={t.id}>
+                      <Link
+                        href={tagHref(t.slug)}
+                        className="inline-flex h-8 items-center rounded-shop-control bg-shop-sunken px-3.5 text-sm font-medium text-shop-ink-2 transition-colors hover:bg-shop-line hover:text-shop-ink"
+                      >
+                        {t.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {legal.disclaimers.product ? <p className="max-w-3xl text-xs text-shop-muted">{legal.disclaimers.product}</p> : null}
+          </div>
+
+          <div className="flex min-w-0 flex-col gap-6 empty:hidden">
+            <Suspense fallback={null}>
+              <ProvenanceBlock productId={product.id} />
+            </Suspense>
+
+            {status !== "available" ? (
+              <section className="flex flex-col gap-4 rounded-shop border border-shop-line p-6" aria-labelledby="pd-notify">
+                <div>
+                  <h2 id="pd-notify" className="text-xl text-shop-ink">
+                    {copy.product.notifyTitle}
+                  </h2>
+                  <p className="mt-1 text-sm text-shop-muted">{copy.product.notifyBody}</p>
+                </div>
+                <NotifyMeButton productId={product.id} />
+              </section>
+            ) : null}
+          </div>
+        </div>
       ) : null}
 
       <Suspense fallback={null}>
@@ -241,7 +261,7 @@ export function ProductDetail({
         columns={catalog.gridColumns}
         display={display}
         showStockCode={catalog.showStockCode}
-        className="mt-16"
+        className="mt-20 border-t border-shop-line pt-12"
       />
     </Container>
   );
@@ -287,7 +307,7 @@ async function RelatedProducts({
     ),
   );
   return (
-    <section className="mt-16 border-t border-shop-line pt-10" aria-labelledby="pd-related">
+    <section className="mt-20 border-t border-shop-line pt-12" aria-labelledby="pd-related">
       <SectionHeading title={<span id="pd-related">{copy.product.related}</span>} />
       <ProductGrid products={cards} columns={4} display={display} showStockCode={shop.settings.catalog.showStockCode} headingLevel={3} wishlistSlot={(p) => <WishlistButton productId={p.id} />} />
     </section>

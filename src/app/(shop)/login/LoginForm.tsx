@@ -30,12 +30,12 @@ export function LoginForm({ next }: { next: string }) {
         aria-describedby={err}
       />
       <Field id="password" label={accountCopy.common.password} type="password" autoComplete="current-password" required aria-describedby={err} />
-      <div className="-mt-1 text-right text-sm">
-        <Link href="/forgot-password" className="text-shop-primary underline-offset-4 hover:underline">
+      <div className="-mt-2 -mb-1 text-right text-sm">
+        <Link href="/forgot-password" className="inline-flex min-h-11 items-center font-medium text-shop-ink-2 underline underline-offset-4 hover:text-shop-primary">
           {t.forgot}
         </Link>
       </div>
-      <SubmitButton pendingLabel={t.submitting} fullWidth>
+      <SubmitButton pendingLabel={t.submitting} size="lg" fullWidth>
         {t.submit}
       </SubmitButton>
     </form>

@@ -5,14 +5,21 @@ import type { SystemPageKey } from "./rules";
 const text = (markdown: string, title = ""): ParsedBlock => ({ type: "TEXT", data: { title, markdown, cta: null } });
 
 export const SYSTEM_PAGE_STARTER_BLOCKS: Record<SystemPageKey, ParsedBlock[]> = {
+  // Same order as the storefront design: hero, categories, new items, a story with image.
+  // (A newsletter signup block can follow once the newsletter feature is enabled for the shop.)
   HOME: [
     { type: "HERO", data: defaultBlockData("HERO") },
-    { type: "NEW_ITEMS", data: defaultBlockData("NEW_ITEMS") },
-    { type: "CATEGORIES", data: defaultBlockData("CATEGORIES") },
-    text(
-      "We specialise in original militaria. Every item is checked, described honestly and photographed in detail.\n\nHave a question about an item? [Contact us](/contact).",
-      "About our shop",
-    ),
+    { type: "CATEGORIES", data: { ...defaultBlockData("CATEGORIES"), title: "" } },
+    { type: "NEW_ITEMS", data: { title: "Just in", count: 8, cta: { label: "See all", href: "/shop" } } },
+    {
+      type: "TEXT_IMAGE",
+      data: {
+        ...defaultBlockData("TEXT_IMAGE"),
+        title: "About our shop",
+        markdown: "Tell your visitors what you specialise in and how you describe and photograph every item.\n\nHave a question about an item? [Contact us](/contact).",
+        cta: { label: "Get in touch", href: "/contact" },
+      },
+    },
   ],
   TERMS: [
     text(

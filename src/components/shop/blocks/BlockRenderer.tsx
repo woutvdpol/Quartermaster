@@ -42,17 +42,22 @@ export function BlockRenderer({ blocks, ctx, heroIsTitle = false }: { blocks: Pu
   // A disabled newsletter feature hides its sign-up blocks entirely (no empty section).
   const groups = group(ctx.newsletterEnabled ? blocks : blocks.filter((b) => b.type !== "NEWSLETTER_SIGNUP"));
   return (
-    <div className="flex flex-col">
+    // A plain block flow (not flex) so the sections' vertical margins collapse into one gap.
+    <div>
       {groups.map((g, i) => {
-        if (g.kind === "testimonials") return <Section key={g.id}>
+        if (g.kind === "testimonials") {
+          return (
+            <Section key={g.id}>
               <TestimonialsBlock items={g.items} />
-            </Section>;
+            </Section>
+          );
+        }
         const b = g.block;
         if (b.type === "HERO") {
           return <HeroBlock key={b.id} data={b.data} fallbackImage={ctx.bannerPath} shopName={ctx.shopName} isFirst={i === 0 && heroIsTitle} />;
         }
         return (
-          <Section key={b.id} tone={b.type === "QUOTE" ? "sunken" : undefined}>
+          <Section key={b.id} tone={b.type === "QUOTE" || b.type === "TEXT_IMAGE" ? "sunken" : undefined}>
             {renderBlock(b, ctx, i)}
           </Section>
         );
@@ -61,8 +66,9 @@ export function BlockRenderer({ blocks, ctx, heroIsTitle = false }: { blocks: Pu
   );
 }
 
+/** ~72px between sections on desktop (margins collapse); "sunken" = full-bleed tinted band. */
 function Section({ children, tone }: { children: ReactNode; tone?: "sunken" }) {
-  return <section className={cn("py-12 sm:py-16", tone === "sunken" && "my-4 bg-shop-sunken")}>{children}</section>;
+  return <section className={cn("my-12 last:mb-0! lg:my-18", tone === "sunken" && "bg-shop-sunken py-12 lg:py-18")}>{children}</section>;
 }
 
 function renderBlock(b: PublicBlock, ctx: BlockContext, index: number): ReactNode {
@@ -89,13 +95,13 @@ function renderBlock(b: PublicBlock, ctx: BlockContext, index: number): ReactNod
       );
     case "NEW_ITEMS":
       return (
-        <Suspense fallback={<Container size="wide"><ProductGridSkeleton count={Math.min(b.data.count, 8)} columns={ctx.gridColumns} /></Container>}>
+        <Suspense fallback={<Container><ProductGridSkeleton count={Math.min(b.data.count, 8)} columns={ctx.gridColumns} /></Container>}>
           <NewItemsBlock data={b.data} ctx={ctx} priority={index <= 1} />
         </Suspense>
       );
     case "CATEGORIES":
       return (
-        <Suspense fallback={<Container size="wide"><Skeleton className="aspect-[4/1] w-full" /></Container>}>
+        <Suspense fallback={<Container><Skeleton className="aspect-[6/1] w-full" /></Container>}>
           <CategoriesBlock data={b.data} ctx={ctx} />
         </Suspense>
       );

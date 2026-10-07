@@ -24,9 +24,9 @@ export function SearchBox({ className, id = "shop-search", autoFocus }: { classN
         maxLength={200}
         placeholder={t.searchPlaceholder}
         autoFocus={autoFocus}
-        className="h-10 w-full rounded-full border border-transparent bg-shop-surface/95 pr-10 pl-4 text-sm text-shop-ink placeholder:text-shop-muted focus:border-shop-secondary focus:outline-none"
+        className="h-11 w-full appearance-none rounded-shop-control border border-transparent bg-shop-sunken pr-4 pl-11 text-[0.95rem] text-shop-ink placeholder:text-shop-muted focus:border-shop-line-strong focus:bg-shop-surface focus:outline-none [&::-webkit-search-cancel-button]:hidden"
       />
-      <button type="submit" className="absolute top-0 right-0 grid size-10 place-items-center rounded-full text-shop-muted hover:text-shop-ink" aria-label={t.search}>
+      <button type="submit" className="absolute top-0 left-0 grid size-11 place-items-center rounded-shop-control text-shop-muted hover:text-shop-ink" aria-label={t.search}>
         <SearchIcon className="size-[1.1rem]" />
       </button>
     </Form>

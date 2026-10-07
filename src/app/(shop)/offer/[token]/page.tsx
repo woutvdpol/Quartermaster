@@ -20,8 +20,8 @@ export default async function OfferCheckoutPage({ params }: { params: Promise<{ 
 
   if (!view) {
     return (
-      <Container size="narrow" className="py-12">
-        <EmptyState title={t.checkoutTitle} action={<ButtonLink href="/shop" variant="primary">{t.viewShop}</ButtonLink>}>
+      <Container size="narrow" className="py-14 sm:py-24">
+        <EmptyState title={t.checkoutTitle} className="border-0 bg-shop-sunken" action={<ButtonLink href="/shop" variant="primary">{t.viewShop}</ButtonLink>}>
           {t.notFound}
         </EmptyState>
       </Container>
@@ -32,8 +32,8 @@ export default async function OfferCheckoutPage({ params }: { params: Promise<{ 
   const notice = { ready: null, expired: t.expired, used: t.used, sold: t.sold, closed: t.closed }[view.state];
 
   return (
-    <Container size="narrow" className="py-8 sm:py-12">
-      <h1 className="mb-6 text-3xl sm:text-4xl">{t.checkoutTitle}</h1>
+    <Container size="narrow" className="py-12 sm:py-20">
+      <h1 className="mb-8 text-center text-[2.1rem] leading-[1.05] tracking-[-0.03em] text-shop-ink sm:mb-10 sm:text-[2.6rem]">{t.checkoutTitle}</h1>
       <OfferProductCard product={view.product} showImage={showImage}>
         <dl className="flex flex-col gap-1 text-sm">
           <div className="flex justify-between gap-4">
@@ -52,7 +52,7 @@ export default async function OfferCheckoutPage({ params }: { params: Promise<{ 
             <p className="text-xs text-shop-muted">{t.private}</p>
           </>
         ) : (
-          <p role="status" className="rounded-shop-sm bg-shop-warn-soft px-3 py-2 text-sm text-shop-warn">{notice}</p>
+          <p role="status" className="rounded-shop bg-shop-warn-soft px-4 py-3 text-sm text-shop-warn">{notice}</p>
         )}
       </OfferProductCard>
     </Container>

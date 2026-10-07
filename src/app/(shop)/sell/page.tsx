@@ -19,26 +19,26 @@ export default async function SellPage() {
   const shop = await requireShop();
   return (
     <Container className="py-10 sm:py-16">
-      <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
-        <div>
-          <p className="mb-1.5 text-xs font-semibold tracking-[0.14em] text-shop-muted uppercase">{t.eyebrow}</p>
-          <h1 className="text-3xl text-shop-ink sm:text-4xl">{t.title}</h1>
-          <p className="mt-4 text-shop-muted">{t.intro(shop.shopName)}</p>
-          <ol className="mt-8 grid gap-5">
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-20">
+        <div className="lg:sticky lg:top-24 lg:self-start">
+          <p className="mb-3 text-sm font-semibold text-shop-primary">{t.eyebrow}</p>
+          <h1 className="text-[2.25rem] leading-[1.05] tracking-tight text-shop-ink sm:text-5xl">{t.title}</h1>
+          <p className="mt-5 text-lg text-shop-ink-2">{t.intro(shop.shopName)}</p>
+          <ol className="mt-10 grid border-t border-shop-line">
             {t.steps.map((s, i) => (
-              <li key={s.title} className="flex gap-4">
-                <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-shop-sunken font-semibold text-shop-ink">
-                  {i + 1}
+              <li key={s.title} className="flex gap-5 border-b border-shop-line py-5">
+                <span aria-hidden="true" className="w-6 shrink-0 pt-0.5 font-shop-mono text-sm text-shop-accent">
+                  {String(i + 1).padStart(2, "0")}
                 </span>
                 <div>
-                  <h2 className="font-semibold text-shop-ink">{s.title}</h2>
-                  <p className="text-sm text-shop-muted">{s.body}</p>
+                  <h2 className="font-shop-body text-base font-semibold tracking-normal text-shop-ink">{s.title}</h2>
+                  <p className="mt-1 text-sm text-shop-ink-2">{s.body}</p>
                 </div>
               </li>
             ))}
           </ol>
         </div>
-        <div className="rounded-shop border border-shop-line bg-shop-surface p-5 sm:p-8">
+        <div className="rounded-shop border border-shop-line bg-shop-surface p-5 sm:p-9">
           <Suspense fallback={<FormSkeleton fields={5} />}>
             <SellFormLoader tenantId={shop.tenant.id} shopName={shop.shopName} />
           </Suspense>

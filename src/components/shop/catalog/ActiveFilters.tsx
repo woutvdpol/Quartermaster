@@ -58,16 +58,18 @@ export function ActiveFilters({
           scroll={false}
           rel="nofollow"
           aria-label={copy.filters.remove(c.label)}
-          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-shop-line-strong bg-shop-surface pr-2 pl-3 text-sm text-shop-ink hover:border-shop-ink"
+          className="group inline-flex h-8 items-center gap-1.5 rounded-shop-control bg-shop-sunken pr-1.5 pl-3.5 text-sm font-medium text-shop-ink transition-colors hover:bg-shop-line"
         >
           <span className="max-w-[16rem] truncate">{c.label}</span>
-          <span aria-hidden="true" className="text-shop-muted">
-            ×
+          <span aria-hidden="true" className="grid size-5 place-items-center rounded-shop-control text-shop-muted group-hover:bg-shop-surface group-hover:text-shop-ink">
+            <svg viewBox="0 0 20 20" className="size-3" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <path d="M5.5 5.5l9 9M14.5 5.5l-9 9" strokeLinecap="round" />
+            </svg>
           </span>
         </Link>
       ))}
       {chips.length > 1 ? (
-        <Link href={clear} scroll={false} className="px-1 text-sm font-medium text-shop-primary underline-offset-4 hover:underline">
+        <Link href={clear} scroll={false} className="px-2 text-sm font-medium text-shop-ink-2 underline decoration-shop-line-strong underline-offset-4 hover:text-shop-ink hover:decoration-shop-ink">
           {copy.filters.clearAll}
         </Link>
       ) : null}

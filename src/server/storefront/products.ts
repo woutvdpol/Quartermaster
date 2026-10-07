@@ -153,20 +153,38 @@ export type CategoryTile = { id: string; title: string; href: string; productCou
 
 /**
  * Category tiles: the chosen ids (in that order) or, when empty, all active top-level categories.
- * The image is the cover of the newest public non-sensitive product in the category (categories
- * have no image of their own).
+ * Count and image cover the category and all its subcategories; the image is the cover of the newest
+ * public non-sensitive product in that subtree (categories have no image of their own).
  */
 export async function queryCategoryTiles(tenantId: string, ids: string[]): Promise<CategoryTile[]> {
-  const cats = await db.category.findMany({
-    where: ids.length ? { tenantId, id: { in: ids }, isActive: true } : { tenantId, parentId: null, isActive: true },
+  // All active categories of the shop (a small table): tiles count and picture their whole subtree,
+  // since products usually sit in subcategories ("Helmets" → "Steel helmets").
+  const all = await db.category.findMany({
+    where: { tenantId, isActive: true },
     orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
-    select: { id: true, title: true, slug: true, _count: { select: { products: { where: { status: "ACTIVE" } } } } },
+    select: { id: true, parentId: true, title: true, slug: true },
   });
-  const ordered = ids.length ? ids.flatMap((id) => cats.filter((c) => c.id === id)) : cats;
+  const children = new Map<string, string[]>();
+  for (const c of all) if (c.parentId) children.set(c.parentId, [...(children.get(c.parentId) ?? []), c.id]);
+  const subtree = (id: string): string[] => {
+    const out: string[] = [];
+    const stack = [id];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      if (out.includes(cur)) continue;
+      out.push(cur);
+      stack.push(...(children.get(cur) ?? []));
+    }
+    return out;
+  };
+  const cats = ids.length ? ids.flatMap((id) => all.filter((c) => c.id === id)) : all.filter((c) => c.parentId === null);
+  const counts = await db.product.groupBy({ by: ["categoryId"], where: { tenantId, status: "ACTIVE" }, _count: { _all: true } });
+  const countBy = new Map(counts.map((r) => [r.categoryId, r._count._all]));
   return Promise.all(
-    ordered.map(async (c) => {
+    cats.map(async (c) => {
+      const tree = subtree(c.id);
       const p = await db.product.findFirst({
-        where: { tenantId, categoryId: c.id, status: { in: ["ACTIVE", "SOLD"] }, blurred: false, images: { some: {} } },
+        where: { tenantId, categoryId: { in: tree }, status: { in: ["ACTIVE", "SOLD"] }, blurred: false, images: { some: {} } },
         orderBy: [{ status: "asc" }, { publishedAt: { sort: "desc", nulls: "last" } }],
         select: { title: true, images: productCardSelect.images },
       });
@@ -174,7 +192,7 @@ export async function queryCategoryTiles(tenantId: string, ids: string[]): Promi
         id: c.id,
         title: c.title,
         href: categoryHref(c.slug),
-        productCount: c._count.products,
+        productCount: tree.reduce((n, id) => n + (countBy.get(id) ?? 0), 0),
         image: p?.images[0] ? toShopImage(p.images[0], c.title) : null,
       };
     }),

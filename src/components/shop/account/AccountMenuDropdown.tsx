@@ -42,7 +42,7 @@ export function AccountMenuDropdown({ name, email }: { name: string | null; emai
     };
   }, [open]);
 
-  const item = "block rounded-shop-sm px-3 py-2 text-sm text-shop-ink hover:bg-shop-sunken";
+  const item = "flex min-h-11 items-center rounded-shop px-3 text-sm text-shop-ink hover:bg-shop-sunken";
   return (
     <div ref={root} className="relative">
       <button
@@ -51,7 +51,7 @@ export function AccountMenuDropdown({ name, email }: { name: string | null; emai
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex h-10 items-center gap-2 rounded-shop-sm px-2.5 text-sm font-medium text-shop-ink hover:bg-shop-sunken"
+        className="inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-shop-control px-2.5 text-sm font-medium text-shop-ink hover:bg-shop-sunken"
       >
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7">
           <circle cx="12" cy="8" r="4" />

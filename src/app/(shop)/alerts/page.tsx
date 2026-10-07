@@ -32,7 +32,7 @@ async function Status({ searchParams }: { searchParams: PageProps<"/alerts">["se
   const s = t.status[key];
   return (
     <>
-      <h1 className="text-3xl text-shop-ink sm:text-4xl">{s.title}</h1>
+      <h1 className="text-[2.1rem] leading-[1.05] tracking-[-0.03em] text-shop-ink sm:text-[2.6rem]">{s.title}</h1>
       <div className="mt-5 text-left">
         <Alert tone={key === "confirmed" || key === "unsubscribed" ? "success" : key === "unknown" ? "info" : "error"}>{s.body}</Alert>
       </div>

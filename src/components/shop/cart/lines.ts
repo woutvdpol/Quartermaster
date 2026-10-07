@@ -4,11 +4,12 @@ import { minutesUntil, type CartView } from "@/server/cart";
 import type { CartLineData } from "./CartLineItem";
 
 /** Maps the cart service view to the serialisable rows the cart UI renders. */
-export function toCartLineData(cart: CartView, opts: { guest: boolean; blurSensitiveForGuests: boolean }): CartLineData[] {
+export function toCartLineData(cart: CartView, opts: { guest: boolean; blurSensitiveForGuests: boolean; showStockCode?: boolean }): CartLineData[] {
   return cart.lines.map((l) => {
     const locked = l.blurred && opts.guest && opts.blurSensitiveForGuests;
     return {
       productId: l.productId,
+      stockCode: opts.showStockCode === false ? null : l.stockCode,
       title: l.title,
       href: productHref(l),
       price: l.price,

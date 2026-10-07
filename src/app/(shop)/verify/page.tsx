@@ -20,11 +20,15 @@ export default async function VerifyPage({ searchParams }: PageProps<"/verify">)
     if (code) redirect(`/verify/${code}`);
   }
   return (
-    <Container size="narrow" className="py-10 sm:py-16">
-      <h1 className="text-3xl text-shop-ink sm:text-4xl">{t.title}</h1>
-      <p className="mt-3 text-shop-ink-2">{t.intro}</p>
-      <div className="mt-8">
-        <VerifyForm defaultValue={input.slice(0, 32)} error={input ? t.invalidCode : null} />
+    <Container size="narrow" className="py-14 sm:py-24">
+      <div className="mx-auto max-w-xl">
+        <header className="text-center">
+          <h1 className="text-[2.1rem] leading-[1.05] tracking-[-0.03em] text-shop-ink sm:text-[2.6rem]">{t.title}</h1>
+          <p className="mx-auto mt-4 max-w-md text-[1.05rem] text-shop-muted">{t.intro}</p>
+        </header>
+        <div className="mt-10 rounded-shop bg-shop-sunken p-5 sm:p-7">
+          <VerifyForm defaultValue={input.slice(0, 32)} error={input ? t.invalidCode : null} />
+        </div>
       </div>
     </Container>
   );

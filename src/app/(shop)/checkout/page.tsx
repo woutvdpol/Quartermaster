@@ -24,8 +24,8 @@ export const metadata: Metadata = { title: t.metaTitle, robots: { index: false, 
 
 export default function CheckoutPage() {
   return (
-    <Container className="py-8 sm:py-12">
-      <h1 className="mb-6 text-3xl sm:text-4xl">{t.title}</h1>
+    <Container className="py-8 sm:py-14">
+      <h1 className="mb-6 text-[2.25rem] tracking-tight sm:mb-10 sm:text-5xl">{t.title}</h1>
       <Suspense fallback={<CheckoutSkeleton />}>
         <CheckoutContent />
       </Suspense>
@@ -35,7 +35,7 @@ export default function CheckoutPage() {
 
 function CheckoutSkeleton() {
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+    <div className="grid gap-10 lg:grid-cols-[1fr_400px] lg:gap-14">
       <div className="flex flex-col gap-6">
         {[0, 1, 2].map((i) => (
           <Skeleton key={i} className="h-48 w-full" />
@@ -69,13 +69,13 @@ async function CheckoutContent() {
     );
   }
 
-  const lines = toCartLineData(cart, { guest: !viewer, blurSensitiveForGuests: shop.settings.legal.blurSensitiveForGuests });
+  const lines = toCartLineData(cart, { guest: !viewer, blurSensitiveForGuests: shop.settings.legal.blurSensitiveForGuests, showStockCode: shop.settings.catalog.showStockCode });
   const blocked = lines.some((l) => l.state === "taken" || l.state === "unavailable");
 
   if (ctx.requirements.loginRequired) {
     return (
-      <div className="grid items-start gap-6 lg:grid-cols-[1fr_380px]">
-        <section className="rounded-shop border border-shop-line bg-shop-surface p-6">
+      <div className="grid items-start gap-10 lg:grid-cols-[1fr_400px] lg:gap-14">
+        <section className="border-t border-shop-line pt-7">
           <p className="text-shop-ink-2">{ctx.requirements.loginReason === "sensitive" ? t.loginRequiredSensitive : t.loginRequiredGuestOff}</p>
           <div className="mt-5 flex flex-wrap gap-3">
             <ButtonLink href={loginHref("/checkout")} variant="primary">
@@ -86,7 +86,7 @@ async function CheckoutContent() {
             </ButtonLink>
           </div>
         </section>
-        <aside aria-label={t.summary} className="rounded-shop border border-shop-line bg-shop-surface p-5">
+        <aside aria-label={t.summary} className="rounded-shop bg-shop-sunken p-5 sm:p-7">
           <h2 className="mb-2 text-xl">{t.summary}</h2>
           <ul className="divide-y divide-shop-line">
             {lines.map((l) => (
@@ -107,7 +107,7 @@ async function CheckoutContent() {
   return (
     <>
       {blocked ? (
-        <div role="alert" className="mb-6 rounded-shop-sm border border-shop-warn/30 bg-shop-warn-soft px-4 py-3 text-sm text-shop-warn">
+        <div role="alert" className="mb-6 rounded-shop border border-shop-warn/30 bg-shop-warn-soft px-4 py-3 text-sm text-shop-warn">
           {t.blocked}{" "}
           <Link href="/cart" className="font-medium underline">
             {t.backToCart}

@@ -29,14 +29,16 @@ export default async function VerifyCodePage({ params }: PageProps<"/verify/[cod
   const result = code ? await verifyCertificateForVisitor(shop.tenant.id, code, ip) : ({ status: "unknown", code: null } as const);
 
   return (
-    <Container size="narrow" className="py-10 sm:py-16">
-      <h1 className="text-3xl text-shop-ink sm:text-4xl">{t.title}</h1>
-      <div className="mt-6">
-        <VerifyResult result={result} timeZone={shop.tenant.timezone} />
-      </div>
-      <div className="mt-10 border-t border-shop-line pt-6">
-        <h2 className="mb-3 font-shop-body text-base font-semibold text-shop-ink">{t.checkAnother}</h2>
-        <VerifyForm />
+    <Container size="narrow" className="py-14 sm:py-24">
+      <div className="mx-auto max-w-2xl">
+        <h1 className="text-center text-[2.1rem] leading-[1.05] tracking-[-0.03em] text-shop-ink sm:text-[2.6rem]">{t.title}</h1>
+        <div className="mt-10">
+          <VerifyResult result={result} timeZone={shop.tenant.timezone} />
+        </div>
+        <div className="mt-12 rounded-shop bg-shop-sunken p-5 sm:p-7">
+          <h2 className="mb-4 font-shop-body text-base font-semibold tracking-normal text-shop-ink">{t.checkAnother}</h2>
+          <VerifyForm />
+        </div>
       </div>
     </Container>
   );

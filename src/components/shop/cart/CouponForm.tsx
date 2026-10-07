@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
+import { cn } from "@/components/shop/ui/cn";
+import { inputClasses } from "@/components/shop/ui/Field";
 import { PendingButton } from "./PendingButton";
 import { applyCouponAction, removeCouponAction, type CouponFormState } from "./actions";
 import { cartCopy } from "./_copy";
@@ -16,12 +18,12 @@ export function CouponForm({ code, problem, hasOfferLines }: { code: string | nu
   if (code) {
     return (
       <div className="flex flex-col gap-1.5 text-sm">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 rounded-shop-control bg-shop-surface py-1 pr-1 pl-4">
           <span>
-            {t.label}: <strong className="font-mono">{code}</strong>
+            {t.label}: <strong className="font-shop-mono font-medium">{code}</strong>
           </span>
           <form action={removeCouponAction}>
-            <PendingButton variant="link" size="sm">
+            <PendingButton variant="ghost" size="sm" className="h-11! sm:h-9!">
               {t.remove}
             </PendingButton>
           </form>
@@ -50,9 +52,9 @@ export function CouponForm({ code, problem, hasOfferLines }: { code: string | nu
           placeholder={t.placeholder}
           aria-invalid={state && !state.ok ? true : undefined}
           aria-describedby={state ? "cart-coupon-msg" : undefined}
-          className="h-10 min-w-0 flex-1 rounded-shop-sm border border-shop-line-strong bg-shop-surface px-3 text-sm uppercase text-shop-ink focus:border-shop-primary focus:outline-none"
+          className={cn(inputClasses, "min-w-0 flex-1 font-shop-mono text-sm uppercase placeholder:font-shop-body placeholder:normal-case")}
         />
-        <PendingButton variant="outline" size="sm" pendingLabel={t.applying} className="h-10!">
+        <PendingButton variant="outline" size="md" pendingLabel={t.applying}>
           {t.apply}
         </PendingButton>
       </div>

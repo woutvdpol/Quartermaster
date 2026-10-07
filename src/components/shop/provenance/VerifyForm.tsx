@@ -24,9 +24,9 @@ export function VerifyForm({ defaultValue, error }: { defaultValue?: string; err
           required
           invalid={!!error}
           aria-describedby={error ? "verify-code-error" : undefined}
-          className="font-mono tracking-wider uppercase"
+          className="font-shop-mono tracking-wider uppercase"
         />
-        <Button type="submit" variant="primary" className="h-11 shrink-0">
+        <Button type="submit" variant="primary" className="shrink-0 sm:px-7">
           {t.submit}
         </Button>
       </div>

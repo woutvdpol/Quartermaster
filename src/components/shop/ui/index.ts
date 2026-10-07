@@ -16,4 +16,4 @@ export { Skeleton, ProductGridSkeleton } from "./Skeleton";
 export { SectionHeading } from "./SectionHeading";
 export { Markdown } from "./Markdown";
 export { JsonLd } from "./JsonLd";
-export { Field, TextInput } from "./Field";
+export { Field, TextInput, Textarea, Select, inputClasses, textareaClasses, checkClasses } from "./Field";

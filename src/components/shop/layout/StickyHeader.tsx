@@ -22,7 +22,7 @@ export function StickyHeader({ children }: { children: ReactNode }) {
       <div ref={sentinel} aria-hidden="true" className="absolute top-0 h-px w-px" />
       <header
         data-scrolled={scrolled || undefined}
-        className="group/header sticky top-0 z-40 bg-shop-primary text-shop-on-primary transition-shadow data-[scrolled]:shadow-shop-pop"
+        className="group/header sticky top-0 z-40 border-b border-shop-line bg-shop-bg text-shop-ink transition-shadow data-[scrolled]:shadow-shop"
       >
         {children}
       </header>

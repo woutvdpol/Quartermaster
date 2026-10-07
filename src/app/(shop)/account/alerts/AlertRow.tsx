@@ -5,7 +5,7 @@ import { useActionState } from "react";
 import { ConfirmSubmit } from "@/components/shop/account/ConfirmSubmit";
 import { SubmitButton } from "@/components/shop/account/form";
 import { Badge } from "@/components/shop/ui/Badge";
-import { TextInput } from "@/components/shop/ui/Field";
+import { Select, TextInput } from "@/components/shop/ui/Field";
 import { cn } from "@/components/shop/ui/cn";
 import { alertsCopy } from "@/components/shop/alerts/_copy";
 import { deleteAccountAlertAction, updateAccountAlertAction } from "./actions";
@@ -20,14 +20,11 @@ export type AlertRowData = {
   lastNotified: string | null;
 };
 
-const selectClass =
-  "h-11 rounded-shop-sm border border-shop-line-strong bg-shop-surface px-3 text-[0.95rem] text-shop-ink focus:border-shop-primary focus:outline-none";
-
 export function AlertRow({ alert }: { alert: AlertRowData }) {
   const [state, action] = useActionState(updateAccountAlertAction, null);
   const f = alertsCopy.form;
   return (
-    <li className={cn("rounded-shop border border-shop-line bg-shop-surface p-4 sm:p-5", !alert.active && "opacity-75")}>
+    <li className={cn("rounded-shop border border-shop-line bg-shop-surface p-5 sm:p-6", !alert.active && "opacity-75")}>
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm text-shop-muted">{alert.summary}</p>
@@ -35,7 +32,7 @@ export function AlertRow({ alert }: { alert: AlertRowData }) {
         </div>
         <div className="flex items-center gap-3">
           {!alert.active ? <Badge tone="neutral">Paused</Badge> : null}
-          <Link href={alert.href} className="text-sm text-shop-primary underline underline-offset-4">
+          <Link href={alert.href} className="inline-flex min-h-11 items-center text-sm font-semibold text-shop-ink underline underline-offset-4 hover:text-shop-primary">
             View matches
           </Link>
         </div>
@@ -48,27 +45,27 @@ export function AlertRow({ alert }: { alert: AlertRowData }) {
         </label>
         <label className="grid gap-1.5 text-sm font-medium">
           {f.frequency}
-          <select name="frequency" defaultValue={alert.frequency} className={selectClass}>
+          <Select name="frequency" defaultValue={alert.frequency} className="sm:w-44">
             {(["INSTANT", "DAILY", "WEEKLY"] as const).map((v) => (
               <option key={v} value={v}>
                 {f.frequencies[v]}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <SubmitButton variant="outline">Save</SubmitButton>
       </form>
-      <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+      <div className="mt-2 flex flex-wrap items-center gap-x-5 text-sm">
         <form action={action}>
           <input type="hidden" name="id" value={alert.id} />
           <input type="hidden" name="op" value={alert.active ? "pause" : "resume"} />
-          <button type="submit" className="text-shop-primary underline underline-offset-4">
+          <button type="submit" className="inline-flex min-h-11 items-center font-semibold text-shop-ink underline underline-offset-4 hover:text-shop-primary">
             {alert.active ? "Pause" : "Resume"}
           </button>
         </form>
         <form action={deleteAccountAlertAction}>
           <input type="hidden" name="id" value={alert.id} />
-          <ConfirmSubmit message="Delete this alert?" className="text-shop-crit underline underline-offset-4">
+          <ConfirmSubmit message="Delete this alert?" className="inline-flex min-h-11 items-center font-semibold text-shop-crit underline underline-offset-4">
             Delete
           </ConfirmSubmit>
         </form>

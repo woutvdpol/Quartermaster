@@ -73,8 +73,8 @@ export function WishlistButton({
   className,
 }: {
   productId: string;
-  /** "icon": round overlay button (cards). "full": button with label (product page). */
-  variant?: "icon" | "full";
+  /** "icon": round overlay button (cards). "outline": round bordered icon button next to other buttons. "full": button with label. */
+  variant?: "icon" | "outline" | "full";
   className?: string;
 }) {
   const t = accountCopy.wishlist;
@@ -91,8 +91,10 @@ export function WishlistButton({
   const label = saved ? t.remove : t.add;
   const base =
     variant === "icon"
-      ? "inline-flex size-10 items-center justify-center rounded-full border border-shop-line bg-shop-surface/95 text-shop-ink shadow-shop backdrop-blur hover:text-shop-accent"
-      : "inline-flex h-11 items-center justify-center gap-2 rounded-shop-sm border border-shop-line-strong bg-shop-surface px-4 text-[0.95rem] font-medium text-shop-ink hover:border-shop-ink hover:bg-shop-sunken";
+      ? "inline-flex size-11 items-center justify-center rounded-shop-control bg-shop-surface text-shop-ink shadow-shop transition-colors hover:text-shop-accent"
+      : variant === "outline"
+        ? "inline-flex size-13 shrink-0 items-center justify-center rounded-shop-control border border-shop-line-strong bg-shop-surface text-shop-ink transition-colors hover:border-shop-ink hover:text-shop-accent"
+        : "inline-flex h-12 items-center justify-center gap-2 rounded-shop-control border border-shop-line-strong bg-shop-surface px-5 text-[0.95rem] font-semibold text-shop-ink transition-colors hover:border-shop-ink";
 
   if (state.status === "ready" && !state.loggedIn) {
     return (
@@ -126,7 +128,7 @@ export function WishlistButton({
       type="button"
       onClick={onClick}
       aria-pressed={saved}
-      aria-label={variant === "icon" ? label : undefined}
+      aria-label={variant !== "full" ? label : undefined}
       title={error ? t.error : label}
       aria-disabled={state.status !== "ready" || pending || undefined}
       className={cn(base, saved && "text-shop-accent", state.status !== "ready" && "opacity-70", className)}

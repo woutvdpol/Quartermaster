@@ -17,7 +17,7 @@ export function ForgotForm() {
       {state?.error ? <Alert tone="error">{state.error}</Alert> : null}
       <Field id="email" label={accountCopy.common.email} type="email" autoComplete="email" inputMode="email" required defaultValue={state?.email} />
       <Turnstile action="forgot_password" resetKey={state} />
-      <SubmitButton pendingLabel={t.submitting} fullWidth>
+      <SubmitButton pendingLabel={t.submitting} size="lg" fullWidth>
         {t.submit}
       </SubmitButton>
     </form>

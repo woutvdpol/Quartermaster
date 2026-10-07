@@ -17,7 +17,7 @@ export function RestoreCartPrompt({ token }: { token: string }) {
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState(false);
   return (
-    <div className="mb-6 flex flex-col gap-3 rounded-shop border border-shop-line bg-shop-primary-soft p-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mb-6 flex flex-col gap-3 rounded-shop bg-shop-primary-soft p-5 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <p className="font-medium text-shop-ink">{t.title}</p>
         <p className="text-sm text-shop-ink-2">{failed ? <span role="alert" className="text-shop-crit">{t.invalid}</span> : t.text}</p>

@@ -11,7 +11,7 @@ const t = layoutCopy.newsletter;
 
 /**
  * Email sign-up form (footer + NEWSLETTER_SIGNUP block). Progressive enhancement: works without JS.
- * `tone="dark"` for placement on the primary-coloured footer.
+ * `tone="dark"` for placement on a primary-coloured band (the gallery footer is light).
  */
 export function NewsletterForm({ source = "footer", tone = "light", className }: { source?: "footer" | "block" | "popup"; tone?: "light" | "dark"; className?: string }) {
   const [state, action, pending] = useActionState<NewsletterState, FormData>(subscribeNewsletter, { status: "idle" });
@@ -37,7 +37,7 @@ export function NewsletterForm({ source = "footer", tone = "light", className }:
       <label htmlFor={`${id}-email`} className="sr-only">
         {t.emailLabel}
       </label>
-      {/* The footer column is narrow: stack there; side by side only in wide (block) placements. */}
+      {/* Pill input + button side by side from sm up; stacked in narrow (dark) placements. */}
       <div className={cn("flex flex-col gap-2", tone !== "dark" && "sm:flex-row")}>
         <input
           id={`${id}-email`}
@@ -52,13 +52,13 @@ export function NewsletterForm({ source = "footer", tone = "light", className }:
           aria-invalid={isError || undefined}
           aria-describedby={message ? `${id}-msg` : undefined}
           className={cn(
-            "h-11 min-w-0 flex-1 rounded-shop-sm border px-3 text-[0.95rem] focus:outline-none",
+            "h-12 min-w-0 flex-none rounded-shop-control sm:flex-1 border px-[18px] text-[0.95rem] focus:outline-none",
             tone === "dark"
               ? "border-shop-on-primary/30 bg-shop-on-primary/10 text-shop-on-primary placeholder:text-shop-on-primary/60 focus:border-shop-on-primary"
               : "border-shop-line-strong bg-shop-surface text-shop-ink placeholder:text-shop-muted focus:border-shop-primary",
           )}
         />
-        <Button type="submit" variant={tone === "dark" ? "secondary" : "primary"} pending={pending}>
+        <Button type="submit" variant={tone === "dark" ? "secondary" : "primary"} pending={pending} className="h-12! px-6!">
           {pending ? t.submitting : t.submit}
         </Button>
       </div>

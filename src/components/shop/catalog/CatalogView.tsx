@@ -3,7 +3,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { permanentRedirect } from "next/navigation";
 import { complianceHideFilter, resolveCompliance, visitorCountry } from "@/server/compliance";
-import { Breadcrumbs, ButtonLink, Container, EmptyState, Pagination, ProductGrid, currencyExponent, type Crumb } from "@/components/shop/ui";
+import { Breadcrumbs, ButtonLink, Container, EmptyState, Pagination, ProductGrid, buttonClasses, currencyExponent, type Crumb } from "@/components/shop/ui";
 import { WishlistButton } from "@/components/shop/account/WishlistButton";
 import { SaveSearchButton } from "@/components/shop/alerts";
 import { getVisitorDisplayCurrency } from "@/server/rates/display";
@@ -179,24 +179,25 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
     <Container className="py-6 sm:py-10">
       <Breadcrumbs items={crumbs} jsonLdBase={shop.origin} />
 
-      <header className="mt-4 mb-6 sm:mb-8">
-        <h1 className="text-3xl text-shop-ink sm:text-4xl">{title}</h1>
-        {intro ? <div className="mt-3 text-shop-muted">{intro}</div> : null}
+      <header className="mt-5 mb-8 flex flex-col gap-6 sm:mt-6 sm:mb-10 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-[2.1rem] leading-[1.05] tracking-[-0.03em] text-shop-ink sm:text-[2.6rem]">{title}</h1>
+          {intro ? <div className="mt-3 max-w-2xl text-[1.05rem] text-shop-muted">{intro}</div> : null}
+        </div>
+        <div className="w-full lg:max-w-md">
+          <SearchBox action={basePath} params={params} defaultSort={defaultSort} />
+        </div>
       </header>
 
-      <div className="grid gap-8 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-10">
+      <div className="grid gap-8 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-12">
         <aside className="hidden lg:block" aria-label={copy.filters.heading}>
-          <div className="sticky top-24 max-h-[calc(100dvh-7rem)] overflow-y-auto pr-1 pb-6">
+          <div className="sticky top-24 max-h-[calc(100dvh-7rem)] overflow-y-auto pr-2 pb-6">
             <FacetPanel idPrefix="fd" {...facetProps} />
           </div>
         </aside>
 
         <div className="min-w-0">
-          <div className="mb-4">
-            <SearchBox action={basePath} params={params} defaultSort={defaultSort} />
-          </div>
-
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-shop-line pb-3">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-shop-line pb-4">
             <div className="flex items-center gap-3">
               <MobileFilters activeCount={activeCount} total={page.total}>
                 <FacetPanel idPrefix="fm" {...facetProps} />
@@ -205,7 +206,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
                 {copy.toolbar.results(page.total)}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {mode === "shop" ? <SaveSearchButton query={saveQuery} /> : null}
               <SortSelect action={basePath} value={params.sort} options={sortOptions}>
                 <HiddenParams params={params} keep={["q", "facets", "tags", "min", "max", "view"]} defaultSort={defaultSort} />
@@ -214,7 +215,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
             </div>
           </div>
 
-          <div className="mb-6 empty:hidden">
+          <div className="mb-8 empty:hidden">
             <ActiveFilters
               basePath={basePath}
               shopPath={SHOP_PATH}
@@ -231,6 +232,13 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
           {cards.length === 0 ? (
             <EmptyState
               title={copy.empty.title}
+              className="border-0 bg-shop-sunken py-16 sm:py-20"
+              icon={
+                <svg viewBox="0 0 24 24" className="size-7" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <circle cx="11" cy="11" r="6.5" />
+                  <path d="M20 20l-4.2-4.2M8.5 11h5" strokeLinecap="round" />
+                </svg>
+              }
               action={
                 filtered || params.page > 1 ? (
                   <ButtonLink href={basePath} variant="outline">
@@ -261,13 +269,13 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
 
           {cards.length > 0 ? (
             settings.endlessScroll ? (
-              <div className="mt-10 flex flex-col items-center gap-3">
+              <div className="mt-14 flex flex-col items-center gap-3">
                 <p className="text-sm text-shop-muted tabular-nums">{copy.showing(shown ?? Math.min(PAGE_SIZE, page.total), page.total)}</p>
                 {(shown ?? PAGE_SIZE) < page.total && nextShow > (params.show ?? PAGE_SIZE) ? (
                   <Link
                     href={`${basePath}${catalogQueryString(params, { show: nextShow, page: 1 }, defaultSort)}`}
                     scroll={false}
-                    className="inline-flex h-11 items-center rounded-shop-sm border border-shop-line-strong bg-shop-surface px-6 text-sm font-medium text-shop-ink hover:border-shop-ink"
+                    className={buttonClasses("outline", "md", "px-7")}
                   >
                     {copy.loadMore}
                   </Link>
@@ -275,7 +283,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
               </div>
             ) : (
               <Pagination
-                className="mt-10"
+                className="mt-14"
                 page={params.page}
                 pageCount={pageCount}
                 hrefFor={(p) => `${basePath}${catalogQueryString(params, { page: p, show: null }, defaultSort)}`}

@@ -11,14 +11,14 @@ const TONE: Record<OrderStatusLabel["tone"], BadgeTone> = { neutral: "neutral", 
 export function OrderList({ orders, timeZone }: { orders: CustomerOrderRow[]; timeZone: string }) {
   const t = accountCopy.orders;
   return (
-    <ul className="divide-y divide-shop-line rounded-shop border border-shop-line bg-shop-surface">
+    <ul className="divide-y divide-shop-line overflow-hidden rounded-shop border border-shop-line bg-shop-surface">
       {orders.map((o) => {
         const status = orderStatusLabel(o);
         return (
           <li key={o.uuid}>
             <Link
               href={`/order/${o.uuid}`}
-              className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-4 hover:bg-shop-sunken sm:grid-cols-[8rem_1fr_auto_auto] sm:px-5"
+              className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-4 transition-colors hover:bg-shop-sunken sm:grid-cols-[8rem_1fr_auto_auto] sm:px-6 sm:py-5"
             >
               <span className="font-semibold text-shop-ink tabular-nums">
                 <span className="sr-only">{t.number} </span>#{o.number}

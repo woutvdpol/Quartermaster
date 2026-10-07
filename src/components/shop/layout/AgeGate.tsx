@@ -29,11 +29,11 @@ export function AgeGate({ shopName, minimumAge }: { shopName: string; minimumAge
       aria-labelledby="age-gate-title"
       aria-describedby="age-gate-body"
       onCancel={(e) => e.preventDefault()}
-      className="m-auto w-[min(30rem,calc(100vw-2rem))] rounded-shop bg-shop-surface p-0 text-shop-ink shadow-shop-pop backdrop:bg-black/70 backdrop:backdrop-blur-sm"
+      className="m-auto w-[min(30rem,calc(100vw-2rem))] rounded-shop border border-shop-line bg-shop-surface p-0 text-shop-ink shadow-shop-pop backdrop:bg-black/70 backdrop:backdrop-blur-sm"
     >
-      <div className="border-t-4 border-shop-primary p-6 sm:p-8">
-        <p className="text-xs font-semibold tracking-[0.14em] text-shop-muted uppercase">{shopName}</p>
-        <h2 id="age-gate-title" className="mt-2 text-2xl sm:text-3xl">
+      <div className="p-6 sm:p-9">
+        <p className="text-sm font-semibold text-shop-primary">{shopName}</p>
+        <h2 id="age-gate-title" className="mt-2 text-2xl tracking-[-0.02em] sm:text-[2rem]">
           {t.title(minimumAge)}
         </h2>
         {denied ? (

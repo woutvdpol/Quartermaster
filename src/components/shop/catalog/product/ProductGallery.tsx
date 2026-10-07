@@ -33,7 +33,7 @@ export function ProductGallery({ images, title }: { images: GalleryImage[]; titl
 
   if (!current) {
     return (
-      <div className="grid aspect-[4/3] place-items-center rounded-shop bg-shop-sunken text-sm tracking-widest text-shop-muted uppercase">{t.noPhoto}</div>
+      <div className="grid aspect-[4/3] place-items-center rounded-shop bg-shop-sunken text-sm text-shop-muted">{t.noPhoto}</div>
     );
   }
 
@@ -51,7 +51,7 @@ export function ProductGallery({ images, title }: { images: GalleryImage[]; titl
   const alt = (img: GalleryImage, i: number) => img.alt || `${title} — ${t.counter(i + 1, count)}`;
 
   return (
-    <section aria-roledescription="carousel" aria-label={t.label} onKeyDown={onKey} className="flex flex-col gap-3">
+    <section aria-roledescription="carousel" aria-label={t.label} onKeyDown={onKey} className="flex flex-col gap-3 sm:gap-4">
       <div className="relative overflow-hidden rounded-shop bg-shop-sunken">
         <button
           type="button"
@@ -74,7 +74,7 @@ export function ProductGallery({ images, title }: { images: GalleryImage[]; titl
             style={current.blurDataUrl ? { backgroundImage: `url("${current.blurDataUrl}")`, backgroundSize: "cover" } : undefined}
             className="aspect-[4/3] w-full object-contain"
           />
-          <span className="pointer-events-none absolute right-3 bottom-3 grid size-10 place-items-center rounded-full bg-shop-surface/90 text-shop-ink shadow-shop opacity-90 transition group-hover:opacity-100">
+          <span className="pointer-events-none absolute right-4 bottom-4 grid size-10 place-items-center rounded-shop-control bg-shop-surface/90 text-shop-ink shadow-shop opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 max-lg:opacity-90">
             <ZoomIcon />
           </span>
         </button>
@@ -82,7 +82,7 @@ export function ProductGallery({ images, title }: { images: GalleryImage[]; titl
           <>
             <ArrowButton side="left" label={t.prev} onClick={() => go(-1)} />
             <ArrowButton side="right" label={t.next} onClick={() => go(1)} />
-            <p className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-shop-surface/90 px-2.5 py-1 text-xs text-shop-ink tabular-nums shadow-shop" aria-live="polite">
+            <p className="pointer-events-none absolute bottom-4 left-4 rounded-shop-control bg-shop-surface/90 px-3 py-1 font-shop-mono text-xs text-shop-ink tabular-nums" aria-live="polite">
               {t.counter(index + 1, count)}
             </p>
           </>
@@ -90,7 +90,7 @@ export function ProductGallery({ images, title }: { images: GalleryImage[]; titl
       </div>
 
       {count > 1 ? (
-        <ul className="grid grid-cols-5 gap-2 sm:grid-cols-6" role="list">
+        <ul className="grid grid-cols-5 gap-2 sm:grid-cols-6 sm:gap-3" role="list">
           {images.map((img, i) => (
             <li key={img.id}>
               <button
@@ -99,8 +99,8 @@ export function ProductGallery({ images, title }: { images: GalleryImage[]; titl
                 aria-label={t.thumb(i + 1)}
                 aria-current={i === index ? "true" : undefined}
                 className={cn(
-                  "block aspect-square w-full overflow-hidden rounded-shop-sm bg-shop-sunken outline-offset-2",
-                  i === index ? "outline-2 outline-shop-primary" : "opacity-80 hover:opacity-100",
+                  "block aspect-square w-full overflow-hidden rounded-shop bg-shop-sunken outline-offset-2 transition-opacity",
+                  i === index ? "outline-2 outline-shop-ink" : "opacity-70 hover:opacity-100",
                 )}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -123,7 +123,7 @@ function ArrowButton({ side, label, onClick }: { side: "left" | "right"; label: 
       onClick={onClick}
       aria-label={label}
       className={cn(
-        "absolute top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-shop-surface/90 text-shop-ink shadow-shop hover:bg-shop-surface",
+        "absolute top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-shop-control bg-shop-surface/90 text-shop-ink shadow-shop transition-colors hover:bg-shop-surface",
         side === "left" ? "left-3" : "right-3",
       )}
     >
@@ -257,7 +257,7 @@ function Lightbox({
       aria-label={t.label}
       onKeyDown={onKeyDown}
       onClose={() => setZ(IDENTITY)}
-      className="m-0 h-dvh max-h-none w-screen max-w-none bg-[#0d0c0a] p-0 text-white backdrop:bg-black/80 open:flex open:flex-col"
+      className="m-0 h-dvh max-h-none w-screen max-w-none bg-shop-lightbox p-0 text-shop-on-lightbox backdrop:bg-shop-scrim open:flex open:flex-col"
     >
       <div className="flex items-center justify-between gap-2 px-3 py-2 sm:px-4">
         <p className="text-sm tabular-nums opacity-80" aria-live="polite">
@@ -310,10 +310,10 @@ function Lightbox({
         </div>
         {count > 1 ? (
           <>
-            <button type="button" onClick={() => go(-1)} aria-label={t.prev} className="absolute top-1/2 left-2 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 hover:bg-white/20 sm:left-4">
+            <button type="button" onClick={() => go(-1)} aria-label={t.prev} className="absolute top-1/2 left-2 grid size-11 -translate-y-1/2 place-items-center rounded-shop-control bg-shop-on-lightbox/10 hover:bg-shop-on-lightbox/20 sm:left-4">
               <Chevron dir="left" />
             </button>
-            <button type="button" onClick={() => go(1)} aria-label={t.next} className="absolute top-1/2 right-2 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 hover:bg-white/20 sm:right-4">
+            <button type="button" onClick={() => go(1)} aria-label={t.next} className="absolute top-1/2 right-2 grid size-11 -translate-y-1/2 place-items-center rounded-shop-control bg-shop-on-lightbox/10 hover:bg-shop-on-lightbox/20 sm:right-4">
               <Chevron dir="right" />
             </button>
           </>
@@ -330,7 +330,7 @@ function ToolButton({ label, children, className, ...rest }: React.ComponentProp
       type="button"
       aria-label={label}
       title={label}
-      className={cn("grid h-10 min-w-10 place-items-center rounded-full px-2 text-lg hover:bg-white/15 disabled:opacity-35", className)}
+      className={cn("grid h-10 min-w-10 place-items-center rounded-shop-control px-2 text-lg hover:bg-shop-on-lightbox/15 disabled:opacity-35", className)}
       {...rest}
     >
       {children}

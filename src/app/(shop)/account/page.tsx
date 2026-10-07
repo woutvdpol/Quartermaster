@@ -34,7 +34,7 @@ async function Overview() {
   ]);
   const shipping = addresses.find((a) => a.type === "SHIPPING" && a.isDefault) ?? addresses.find((a) => a.type === "SHIPPING");
   const name = c.user.name || c.customer.firstName;
-  const linkClass = "text-sm font-medium text-shop-primary underline-offset-4 hover:underline";
+  const linkClass = "inline-flex min-h-11 items-center text-sm font-semibold text-shop-ink underline underline-offset-4 hover:text-shop-primary";
 
   return (
     <div className="grid gap-6">
@@ -57,7 +57,7 @@ async function Overview() {
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-shop-muted">{t.noOrders}</p>
-            <ButtonLink href="/" variant="outline" size="sm">
+            <ButtonLink href="/" variant="outline">
               {t.startShopping}
             </ButtonLink>
           </div>
@@ -67,13 +67,13 @@ async function Overview() {
       <div className="grid gap-6 sm:grid-cols-2">
         <Panel title={t.defaultAddress}>
           {shipping ? <AddressLines a={shipping} /> : <p className="text-sm text-shop-muted">{t.noAddress}</p>}
-          <Link href="/account/addresses" className={`${linkClass} mt-4 inline-block`}>
+          <Link href="/account/addresses" className={`${linkClass} mt-3`}>
             {t.manageAddresses}
           </Link>
         </Panel>
         <Panel title={accountCopy.wishlist.title}>
           <p className="text-sm text-shop-ink-2">{t.wishlistCount(wished)}</p>
-          <Link href="/wishlist" className={`${linkClass} mt-4 inline-block`}>
+          <Link href="/wishlist" className={`${linkClass} mt-3`}>
             {t.viewWishlist}
           </Link>
         </Panel>

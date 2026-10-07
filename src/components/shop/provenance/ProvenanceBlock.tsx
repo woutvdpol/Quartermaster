@@ -32,29 +32,29 @@ export async function ProvenanceBlock({ productId }: { productId: string }) {
   if (!data.provenance && !data.documents.length && !badge) return null;
 
   return (
-    <section className="mt-10 max-w-3xl" aria-labelledby="pd-provenance">
-      <h2 id="pd-provenance" className="mb-4 text-2xl text-shop-ink">
+    <section className="rounded-shop bg-shop-sunken p-6 sm:p-8" aria-labelledby="pd-provenance">
+      <h2 id="pd-provenance" className="mb-5 text-xl text-shop-ink sm:text-2xl">
         {t.title}
       </h2>
 
       {badge ? (
-        <div className="mb-5 grid grid-cols-[2.75rem_1fr] items-start gap-3 rounded-shop border border-shop-line-strong bg-shop-surface p-4">
-          <span className="grid size-11 place-items-center rounded-shop-sm bg-shop-primary-soft text-shop-primary" aria-hidden="true">
+        <div className="mb-6 flex items-start gap-4 rounded-shop bg-shop-surface p-4 sm:p-5">
+          <span className="grid size-10 shrink-0 place-items-center rounded-shop-control bg-shop-primary-soft text-shop-primary" aria-hidden="true">
             <svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M10 2.5l6 2.5v4.5c0 3.8-2.6 6.6-6 8-3.4-1.4-6-4.2-6-8V5z" strokeLinejoin="round" />
               <path d="M7.5 10l2 2 3.5-4" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </span>
-          <div className="grid gap-2 text-sm">
-            <div className="flex flex-wrap gap-2">
+          <div className="grid min-w-0 gap-2 text-sm">
+            <div className="flex flex-wrap gap-1.5">
               {data.certificateIncluded || data.authenticityGuaranteed ? <Badge tone="ok">{t.certificateIncluded}</Badge> : null}
               {data.authenticityGuaranteed ? <Badge tone="primary">{t.guaranteed}</Badge> : null}
             </div>
             {data.certificateIncluded ? <p className="text-shop-ink-2">{t.certificateIncludedBody}</p> : null}
             {data.authenticityGuaranteed ? <p className="text-shop-ink-2">{provenanceCopy.guaranteeText}</p> : null}
             <p>
-              <Link href="/verify" className="text-shop-primary underline underline-offset-2 hover:no-underline">
-                {t.verifyLink}
+              <Link href="/verify" className="font-medium text-shop-ink underline decoration-shop-line-strong underline-offset-4 hover:decoration-shop-ink">
+                {t.verifyLink} <span aria-hidden="true">→</span>
               </Link>
             </p>
           </div>
@@ -65,16 +65,16 @@ export async function ProvenanceBlock({ productId }: { productId: string }) {
 
       {data.documents.length ? (
         <div className="mt-6">
-          <h3 className="mb-2 font-shop-body text-base font-semibold text-shop-ink">{t.documents}</h3>
-          <ul className="divide-y divide-shop-line rounded-shop border border-shop-line bg-shop-surface" role="list">
+          <h3 className="mb-3 font-shop-body text-sm font-semibold tracking-normal text-shop-ink">{t.documents}</h3>
+          <ul className="divide-y divide-shop-line overflow-hidden rounded-shop bg-shop-surface" role="list">
             {data.documents.map((d) => (
               <li key={d.id}>
-                <a href={d.url} target="_blank" rel="noopener" className="flex items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-shop-sunken">
+                <a href={d.url} target="_blank" rel="noopener" className="group flex items-center justify-between gap-3 px-4 py-3 text-sm">
                   <span className="min-w-0">
-                    <span className="block truncate font-medium text-shop-ink">{d.title}</span>
+                    <span className="block truncate font-medium text-shop-ink underline-offset-4 group-hover:underline">{d.title}</span>
                     <span className="text-xs text-shop-muted">{t.kinds[d.kind]}</span>
                   </span>
-                  <span className="shrink-0 font-mono text-xs text-shop-muted">
+                  <span className="shrink-0 font-shop-mono text-xs text-shop-muted">
                     {d.mimeType === "application/pdf" ? "PDF" : d.mimeType.replace("image/", "").toUpperCase()} · {formatBytes(d.byteSize)}
                   </span>
                 </a>

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { ButtonLink } from "@/components/shop/ui/Button";
 import { Suspense } from "react";
 import { AccountShell } from "@/components/shop/account/AccountShell";
 import { FormSkeleton } from "@/components/shop/account/FormSkeleton";
@@ -31,9 +31,9 @@ async function Alerts() {
       <EmptyState
         title="No alerts yet"
         action={
-          <Link href="/shop" className="text-shop-primary underline underline-offset-4">
+          <ButtonLink href="/shop" variant="primary">
             Browse the shop
-          </Link>
+          </ButtonLink>
         }
       >
         Use “Save search” on any search, or “Notify me” on a sold item, and we&apos;ll email you when something matching arrives.

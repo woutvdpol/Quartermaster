@@ -14,9 +14,9 @@ export function FreeShippingBar({ progress, currency }: { progress: { threshold:
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={pct}
-        className="h-1.5 w-full overflow-hidden rounded-full bg-shop-sunken"
+        className="h-1.5 w-full overflow-hidden rounded-shop-control bg-shop-line"
       >
-        <div className={progress.reached ? "h-full bg-shop-ok" : "h-full bg-shop-primary"} style={{ width: `${pct}%` }} />
+        <div className={progress.reached ? "h-full rounded-shop-control bg-shop-ok" : "h-full rounded-shop-control bg-shop-primary"} style={{ width: `${pct}%` }} />
       </div>
     </div>
   );

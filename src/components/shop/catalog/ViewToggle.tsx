@@ -13,13 +13,16 @@ export function ViewToggle({ basePath, params, view, defaultSort }: { basePath: 
       aria-label={label}
       aria-current={view === v ? "true" : undefined}
       title={label}
-      className={cn("grid size-10 place-items-center", view === v ? "bg-shop-sunken text-shop-ink" : "text-shop-muted hover:text-shop-ink")}
+      className={cn(
+        "grid h-7 w-9 place-items-center rounded-shop-control transition-colors",
+        view === v ? "bg-shop-surface text-shop-ink shadow-shop" : "text-shop-muted hover:text-shop-ink",
+      )}
     >
       {icon}
     </Link>
   );
   return (
-    <div className="hidden overflow-hidden rounded-shop-sm border border-shop-line-strong sm:flex" role="group" aria-label={copy.toolbar.view}>
+    <div className="hidden h-9 items-center gap-0.5 rounded-shop-control bg-shop-sunken p-1 sm:flex" role="group" aria-label={copy.toolbar.view}>
       {item(
         "grid",
         copy.toolbar.grid,
