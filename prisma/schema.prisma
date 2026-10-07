@@ -30,6 +30,7 @@ model Tenant {
   updatedAt DateTime     @updatedAt
 
   domains   TenantDomain[]
+  redirects Redirect[]
   users     User[]
   settings  Setting[]
   auditLogs AuditLog[]
@@ -1513,4 +1514,32 @@ model Lead {
 
   @@index([tenantId, status, createdAt(sort: Desc)])
   @@map("leads")
+}
+
+// ─── Redirects (phase 4) ────────────────────────────────────────────────────
+
+enum RedirectSource {
+  LEGACY // created by the Concept500 ETL (old URL → new URL)
+  MANUAL // added by the shop owner
+}
+
+// Exact-path 301/302 redirects per shop, resolved for requests that would otherwise 404.
+// `fromPath` is normalised: leading "/", no trailing "/", lower-case, query string only when it is
+// part of the match (legacy "/shop.php?code=123").
+model Redirect {
+  id         String         @id @default(cuid())
+  tenantId   String
+  fromPath   String
+  toPath     String
+  statusCode Int            @default(301)
+  source     RedirectSource @default(MANUAL)
+  hits       Int            @default(0)
+  lastHitAt  DateTime?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, fromPath])
+  @@map("redirects")
 }

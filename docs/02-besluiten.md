@@ -102,3 +102,8 @@ Kanttekeningen:
 - **Gekozen: optie 3 "Gallery"** (wit, modern-minimaal, grote foto's, pill-knoppen) **met de itemnummers van optie 1** ("No. 50212" in mono, accentkleur).
 - **Archive, Field Kit en Vault blijven bewaard voor een latere themabuilder.** Daarom: componenten gebruiken alleen tokens (`--shop-*`); een thema-preset (`appearance.theme`, nu alleen `gallery`) overschrijft tokens via `.shop-root[data-shop-theme=…]`. Lettertypes voor de andere presets staan al in de allowlist.
 - Itemnummers standaard zichtbaar (`catalog.showStockCode` = aan).
+
+## Fase 4 — akkoord eigenaar (07-10-2026)
+- **Oude wachtwoorden:** eigen bcrypt-verificatie (geen package). ETL zet legacy-hashes als `bcrypt$…` in `passwordHash`; bij eerste geslaagde login wordt herhasht naar scrypt.
+- **Hosting:** generieke Kubernetes-manifests (Kustomize, ingress-nginx, cert-manager); provider later.
+- **Foto's uit Cloudflare:** nu niet downloaden. ETL krijgt een downloader-interface met `--skip-images` en een nep-downloader in tests; echte download pas bij de echte migratie.
