@@ -3,7 +3,12 @@
  * `#[Url]` state, made readable). Pure — used by pages, client filter components and tests.
  *
  *   q        search text (title / description / stock code "#50231")
- *   tag      tag slug, repeatable (AND: every selected tag must match)
+ *   f        facet value "<facetSlug>.<valueSlug>", repeatable — OR within a facet, AND across
+ *            facets; a value also matches its descendants (e.g. f=country.germany&f=period.ww2).
+ *            Also accepted: f=<facetValueId> (cuid; used by saved-search links) — the shop page
+ *            redirects those to the readable token form.
+ *   tag      tag slug, repeatable (AND: every selected tag must match) — for tags not (yet) mapped
+ *            to a facet
  *   min,max  price bounds in whole units of the shop currency
  *   sort     newest | oldest | price_asc | price_desc | featured | updated
  *   page     1-based page
@@ -19,11 +24,16 @@ export type CatalogView = "grid" | "list";
 export const PAGE_SIZE = 24;
 export const MAX_SHOW = PAGE_SIZE * 10;
 export const MAX_TAGS = 10;
+export const MAX_FACET_VALUES = 20;
 export const MAX_QUERY_LENGTH = 100;
 const MAX_PAGE = 1000;
 
 export type CatalogParams = {
   q: string | null;
+  /** Facet tokens "<facetSlug>.<valueSlug>" (deduplicated, input order). */
+  facets: string[];
+  /** Facet value ids given directly as f=<id> (saved-search links). Resolve both forms with selectedFacetValueIds(). */
+  facetValueIds: string[];
   tags: string[];
   /** Whole currency units. */
   min: number | null;
@@ -47,9 +57,35 @@ function positiveInt(v: string | undefined, max: number): number | null {
 }
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** Facet value id (cuid) in an `f` param. */
+const FACET_VALUE_ID = /^c[a-z0-9]{20,32}$/;
+const FACET_TOKEN = /^([a-z0-9]+(?:-[a-z0-9]+)*)\.([a-z0-9]+(?:-[a-z0-9]+)*)$/;
+
+/** URL token for a facet value: "<facetSlug>.<valueSlug>" (slugs never contain dots). */
+export const facetToken = (facetSlug: string, valueSlug: string) => `${facetSlug}.${valueSlug}`;
+
+/** Splits a facet token, or null when malformed. */
+export function parseFacetToken(token: string): { facet: string; value: string } | null {
+  const m = FACET_TOKEN.exec(token);
+  return m && token.length <= 200 ? { facet: m[1], value: m[2] } : null;
+}
+
+/** Tokens grouped by facet slug (insertion order). */
+export function groupFacetTokens(tokens: readonly string[]): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const t of tokens) {
+    const parsed = parseFacetToken(t);
+    if (!parsed) continue;
+    out.set(parsed.facet, [...(out.get(parsed.facet) ?? []), parsed.value]);
+  }
+  return out;
+}
 
 export function parseCatalogParams(raw: RawSearchParams, defaultSort: CatalogSort = "newest"): CatalogParams {
   const q = (first(raw.q) ?? "").replace(/\s+/g, " ").trim().slice(0, MAX_QUERY_LENGTH) || null;
+  const rawF = all(raw.f).map((t) => t.trim());
+  const facets = [...new Set(rawF.map((t) => t.toLowerCase()).filter((t) => parseFacetToken(t) !== null))].slice(0, MAX_FACET_VALUES);
+  const facetValueIds = [...new Set(rawF.filter((t) => FACET_VALUE_ID.test(t)))].slice(0, MAX_FACET_VALUES);
   const tags = [...new Set(all(raw.tag).map((t) => t.trim().toLowerCase()).filter((t) => t.length <= 120 && SLUG.test(t)))].slice(0, MAX_TAGS);
   let min = positiveInt(first(raw.min), 10_000_000);
   let max = positiveInt(first(raw.max), 10_000_000);
@@ -62,12 +98,12 @@ export function parseCatalogParams(raw: RawSearchParams, defaultSort: CatalogSor
   const show = showRaw && showRaw > PAGE_SIZE ? Math.min(MAX_SHOW, Math.ceil(showRaw / PAGE_SIZE) * PAGE_SIZE) : null;
   const viewRaw = first(raw.view);
   const view = viewRaw === "grid" || viewRaw === "list" ? viewRaw : null;
-  return { q, tags, min, max, sort, page, show, view };
+  return { q, facets, facetValueIds, tags, min, max, sort, page, show, view };
 }
 
 /** Filters that narrow the result set (used for "active filters", noindex and clear-all). */
 export function hasActiveFilters(p: CatalogParams): boolean {
-  return Boolean(p.q || p.tags.length || p.min !== null || p.max !== null);
+  return Boolean(p.q || p.facets.length || p.facetValueIds.length || p.tags.length || p.min !== null || p.max !== null);
 }
 
 /**
@@ -79,6 +115,8 @@ export function catalogQueryString(p: CatalogParams, patch: Partial<CatalogParam
   const next: CatalogParams = { ...p, ...(resetsPaging ? { page: 1, show: null } : {}), ...patch };
   const sp = new URLSearchParams();
   if (next.q) sp.set("q", next.q);
+  for (const f of next.facets) sp.append("f", f);
+  for (const f of next.facetValueIds) sp.append("f", f);
   for (const t of next.tags) sp.append("tag", t);
   if (next.min !== null) sp.set("min", String(next.min));
   if (next.max !== null) sp.set("max", String(next.max));

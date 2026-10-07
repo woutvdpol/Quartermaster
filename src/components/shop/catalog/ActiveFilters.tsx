@@ -9,6 +9,8 @@ export function ActiveFilters({
   params,
   defaultSort,
   tagNames,
+  facetNames = {},
+  lockedFacets = [],
   currency,
   category,
   shopPath,
@@ -17,6 +19,10 @@ export function ActiveFilters({
   params: CatalogParams;
   defaultSort: CatalogSort;
   tagNames: Record<string, string>;
+  /** Facet token → value name. */
+  facetNames?: Record<string, string>;
+  /** Facet tokens fixed by the page (landing page): their chip leaves the page. */
+  lockedFacets?: string[];
   currency: string;
   /** The current category (a chip that goes back to the unscoped list). */
   category?: { title: string } | null;
@@ -25,7 +31,15 @@ export function ActiveFilters({
   const chips: { key: string; label: string; href: string }[] = [];
   const qs = (patch: Partial<CatalogParams>) => catalogQueryString(params, patch, defaultSort);
   if (category) chips.push({ key: "cat", label: category.title, href: `${shopPath}${qs({ page: 1, show: null })}` });
+  for (const t of lockedFacets) {
+    const rest = [...new Set([...lockedFacets.filter((x) => x !== t), ...params.facets])];
+    chips.push({ key: `lf:${t}`, label: facetNames[t] ?? t, href: `${shopPath}${qs({ facets: rest })}` });
+  }
   if (params.q) chips.push({ key: "q", label: copy.filters.search(params.q), href: `${basePath}${qs({ q: null })}` });
+  for (const t of params.facets) {
+    if (lockedFacets.includes(t)) continue;
+    chips.push({ key: `f:${t}`, label: facetNames[t] ?? t, href: `${basePath}${qs({ facets: params.facets.filter((x) => x !== t) })}` });
+  }
   for (const t of params.tags) {
     chips.push({ key: `t:${t}`, label: tagNames[t] ?? t, href: `${basePath}${qs({ tags: params.tags.filter((x) => x !== t) })}` });
   }
@@ -34,7 +48,7 @@ export function ActiveFilters({
     chips.push({ key: "price", label: copy.filters.priceRange(fmt(params.min), fmt(params.max)), href: `${basePath}${qs({ min: null, max: null })}` });
   }
   if (!chips.length) return null;
-  const clear = `${category ? shopPath : basePath}${catalogQueryString({ ...params, q: null, tags: [], min: null, max: null }, { page: 1, show: null }, defaultSort)}`;
+  const clear = `${category || lockedFacets.length ? shopPath : basePath}${catalogQueryString({ ...params, q: null, facets: [], tags: [], min: null, max: null }, { page: 1, show: null }, defaultSort)}`;
   return (
     <div className="flex flex-wrap items-center gap-2" role="region" aria-label={copy.filters.active}>
       {chips.map((c) => (

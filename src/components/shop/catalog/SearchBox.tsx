@@ -3,11 +3,11 @@ import { HiddenParams } from "./HiddenParams";
 import type { CatalogParams, CatalogSort } from "@/server/storefront-catalog";
 import { catalogCopy as copy } from "./_copy";
 
-/** Catalog search (GET ?q=). Keeps tags/price/sort/view of the current scope; resets paging. */
+/** Catalog search (GET ?q=). Keeps facets/tags/price/sort/view of the current scope; resets paging. */
 export function SearchBox({ action, params, defaultSort, id = "catalog-q" }: { action: string; params: CatalogParams; defaultSort: CatalogSort; id?: string }) {
   return (
     <Form action={action} role="search" className="flex w-full max-w-xl items-stretch">
-      <HiddenParams params={params} keep={["tags", "min", "max", "sort", "view"]} defaultSort={defaultSort} />
+      <HiddenParams params={params} keep={["facets", "tags", "min", "max", "sort", "view"]} defaultSort={defaultSort} />
       <label htmlFor={id} className="sr-only">
         {copy.search.label}
       </label>

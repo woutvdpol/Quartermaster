@@ -5,6 +5,11 @@ export const catalogCopy = {
     metaDescription: (shop: string) => `Browse original items for sale at ${shop}.`,
     searchTitle: (q: string) => `Search: “${q}”`,
   },
+  facet: {
+    title: (value: string) => value,
+    intro: (facet: string, value: string) => `All items for sale with ${facet.toLowerCase()} “${value}”.`,
+    metaDescription: (facet: string, value: string, shop: string) => `${facet}: ${value} — original items for sale at ${shop}.`,
+  },
   archive: {
     title: "Sold archive",
     intro: "A reference archive of items that have found a new home.",
@@ -26,7 +31,7 @@ export const catalogCopy = {
     remove: (label: string) => `Remove filter: ${label}`,
     search: (q: string) => `“${q}”`,
     priceRange: (min: string | null, max: string | null) => (min && max ? `${min} – ${max}` : min ? `From ${min}` : `Up to ${max}`),
-    groups: { period: "Period", country: "Country", branch: "Branch", other: "More" } as Record<string, string>,
+    tags: "Tags",
     showMore: "Show more",
   },
   toolbar: {
@@ -70,13 +75,11 @@ export const catalogCopy = {
     shippingFree: (country: string) => `Free shipping to ${country}`,
     shippingPickupOnly: (country: string) => `No delivery to ${country}; pickup available`,
     shippingNone: (country: string) => `Currently no shipping to ${country}`,
-    provenanceTitle: "Provenance",
-    provenanceBody: "Provenance details and a certificate of authenticity will appear here.",
     notifyTitle: "Too late?",
     notifyBody: "Get an e-mail when a similar item comes in.",
-    notifyCta: "Notify me",
-    notifyComingSoon: "Coming soon",
     related: "You may also like",
+    noShipping: (country: string) => `Can't be shipped to ${country}. Local regulations do not allow this item to be sent there.`,
+    geoBlurred: "Photos of this item are not shown in your country.",
     restrictedNotice:
       "This item shows historical symbols. It is offered for historical and educational purposes only and does not express any endorsement.",
     ageRestricted: (age: number) => `Age-restricted item: you must be ${age} or older to buy it.`,

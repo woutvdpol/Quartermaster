@@ -3,11 +3,18 @@ import { db } from "@/server/db";
 import { Prisma } from "@/generated/prisma/client";
 import { imageUrl } from "@/server/media/product-images";
 import { VARIANT_NAMES, type VariantName } from "@/server/media/images";
-import { catalogWindow, type CatalogParams, type CatalogSort } from "./params";
+import { buildValueTree, valuePaths, type ValueNode } from "@/server/facets/tree";
+import { resolveFacetSelection, tokensForValueIds, type FacetSelection } from "./facet-selection";
+import type { ComplianceHide } from "@/server/compliance/resolve";
+import { catalogWindow, facetToken, type CatalogParams, type CatalogSort } from "./params";
 import { productHref } from "./urls";
 import type {
   CatalogCard,
   CatalogFacets,
+  FacetGroup,
+  FacetValueOption,
+  ProductFacet,
+  PublicTaxonomy,
   CatalogPage,
   PublicCategory,
   PublicCategoryNode,
@@ -150,17 +157,69 @@ export type ListScope = {
   categoryIds: string[] | null;
   /** Minor units per whole currency unit for the min/max price params (100; 1 for JPY). */
   priceUnit?: number;
+  /** Visitor-country compliance: products matching this predicate are excluded (src/server/compliance). */
+  hide?: ComplianceHide | null;
+  /** Facet tokens that are part of the page itself (SEO landing /shop/facet/x/y), ANDed with params.facets. */
+  lockedFacets?: string[];
 };
+
+// ─── Facet taxonomy ────────────────────────────────────────────────────────
+
+/** All facets and values of a shop (no counts). Small (tens to hundreds of rows). */
+export async function getPublicTaxonomy(tenantId: string): Promise<PublicTaxonomy> {
+  const [facets, values] = await Promise.all([
+    db.facet.findMany({
+      where: { tenantId },
+      select: { id: true, kind: true, name: true, slug: true, sortOrder: true, isFilterable: true },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    }),
+    db.facetValue.findMany({
+      where: { tenantId },
+      select: { id: true, facetId: true, parentId: true, name: true, slug: true, sortOrder: true },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    }),
+  ]);
+  return { facets, values };
+}
+
+function allTokens(scope: ListScope, params: Pick<CatalogParams, "facets">, tax?: PublicTaxonomy, ids: readonly string[] = []): string[] {
+  return [...new Set([...(scope.lockedFacets ?? []), ...params.facets, ...(tax ? tokensForValueIds(tax, ids) : [])])];
+}
 
 function escapeLike(s: string) {
   return s.replace(/[\\%_]/g, (m) => `\\${m}`);
 }
 
-type FilterParts = Pick<CatalogParams, "q" | "tags" | "min" | "max">;
+type FilterParts = Pick<CatalogParams, "q" | "tags" | "min" | "max"> & { selection?: FacetSelection[] };
 
-/** WHERE parts. `omit` leaves out one dimension (for facet counts of that dimension). */
-function whereSql(tenantId: string, scope: ListScope, f: FilterParts, omit: "category" | "price" | null = null): Prisma.Sql {
+/** Excludes products hidden for the visitor's country. */
+function hideSql(hide: ComplianceHide): Prisma.Sql | null {
+  const any: Prisma.Sql[] = [];
+  if (hide.categoryIds.length) any.push(Prisma.sql`coalesce(p."categoryId" = ANY(${hide.categoryIds}::text[]), false)`);
+  if (hide.restrictedSymbols) any.push(Prisma.sql`p."restrictedSymbols"`);
+  if (hide.ageRestricted) any.push(Prisma.sql`p."ageRestricted"`);
+  if (hide.deactivatedWeapons) any.push(Prisma.sql`p."requiresDeactivationCert"`);
+  return any.length ? Prisma.sql`NOT (${Prisma.join(any, " OR ")})` : null;
+}
+
+/**
+ * WHERE parts. `omit` leaves out one dimension (for facet counts of that dimension): "category",
+ * "price", or a facet id ("facet:<id>").
+ */
+function whereSql(tenantId: string, scope: ListScope, f: FilterParts, omit: "category" | "price" | `facet:${string}` | null = null): Prisma.Sql {
   const parts: Prisma.Sql[] = [Prisma.sql`p."tenantId" = ${tenantId}`, visibleSql(scope.mode)];
+  if (scope.hide) {
+    const h = hideSql(scope.hide);
+    if (h) parts.push(h);
+  }
+  for (const sel of f.selection ?? []) {
+    if (omit === `facet:${sel.facetId}`) continue;
+    // OR within a facet (any selected value or descendant), AND across facets.
+    parts.push(Prisma.sql`EXISTS (
+      SELECT 1 FROM product_facet_values pfv
+      WHERE pfv."productId" = p.id AND pfv."tenantId" = ${tenantId} AND pfv."facetValueId" = ANY(${sel.valueIds}::text[])
+    )`);
+  }
   if (scope.categoryIds && omit !== "category") {
     parts.push(scope.categoryIds.length ? Prisma.sql`p."categoryId" = ANY(${scope.categoryIds}::text[])` : Prisma.sql`FALSE`);
   }
@@ -257,7 +316,10 @@ export async function loadCards(tenantId: string, ids: string[]): Promise<Catalo
 
 /** One page of the catalog (or archive) under the given scope and filters. */
 export async function listCatalog(tenantId: string, scope: ListScope, params: CatalogParams): Promise<CatalogPage> {
-  const where = whereSql(tenantId, scope, params);
+  const needsTax = Boolean(scope.lockedFacets?.length || params.facets.length || params.facetValueIds?.length);
+  const tax = needsTax ? await getPublicTaxonomy(tenantId) : null;
+  const selection = tax ? resolveFacetSelection(tax, allTokens(scope, params, tax, params.facetValueIds ?? [])) : [];
+  const where = whereSql(tenantId, scope, { ...params, selection });
   const { offset, limit } = catalogWindow(params);
   const [idRows, [{ total }]] = await Promise.all([
     db.$queryRaw<{ id: string }[]>`
@@ -270,35 +332,111 @@ export async function listCatalog(tenantId: string, scope: ListScope, params: Ca
 }
 
 /**
- * Facets for the sidebar, three GROUP BY / aggregate queries:
+ * Facet value counts (descendant-inclusive, distinct products) under `where`, for the values of
+ * `facetIds`. A recursive closure maps every value to itself and its ancestors.
+ */
+async function facetValueCounts(tenantId: string, where: Prisma.Sql, facetIds: string[]): Promise<Map<string, number>> {
+  if (!facetIds.length) return new Map();
+  const rows = await db.$queryRaw<{ valueId: string; n: number }[]>`
+    WITH RECURSIVE closure(ancestor, descendant) AS (
+      SELECT fv.id, fv.id FROM facet_values fv
+      WHERE fv."tenantId" = ${tenantId} AND fv."facetId" = ANY(${facetIds}::text[])
+      UNION
+      SELECT c.ancestor, fv.id FROM closure c JOIN facet_values fv ON fv."parentId" = c.descendant
+    )
+    SELECT c.ancestor AS "valueId", count(DISTINCT p.id)::int AS n
+    FROM products p
+    JOIN product_facet_values pfv ON pfv."productId" = p.id
+    JOIN closure c ON c.descendant = pfv."facetValueId"
+    WHERE ${where}
+    GROUP BY c.ancestor`;
+  return new Map(rows.map((r) => [r.valueId, r.n]));
+}
+
+/**
+ * Facets for the sidebar (GROUP BY / aggregate queries):
  *  - category counts with every filter except the category (so siblings stay visible),
- *  - tag counts over the current result set,
+ *  - facet value counts per facet with every filter except that facet's own selection (OR within
+ *    a facet), one query for all unselected facets plus one per facet with a selection,
+ *  - counts of tags that are not mapped to a facet value, over the current result set,
  *  - price bounds with every filter except price.
  */
 export async function getCatalogFacets(tenantId: string, scope: ListScope, params: CatalogParams): Promise<CatalogFacets> {
-  const [cats, tags, [price]] = await Promise.all([
+  const tax = await getPublicTaxonomy(tenantId);
+  const tokens = allTokens(scope, params, tax, params.facetValueIds ?? []);
+  const selection = resolveFacetSelection(tax, tokens);
+  const f = { ...params, selection };
+  const filterable = tax.facets.filter((fc) => fc.isFilterable && tax.values.some((v) => v.facetId === fc.id));
+  const selectedFacetIds = new Set(selection.map((s) => s.facetId));
+  const unselected = filterable.filter((fc) => !selectedFacetIds.has(fc.id)).map((fc) => fc.id);
+
+  const [cats, tags, [price], baseCounts, ...selectedCounts] = await Promise.all([
     db.$queryRaw<{ categoryId: string; n: number }[]>`
       SELECT coalesce(p."categoryId", '') AS "categoryId", count(*)::int AS n FROM products p
-      WHERE ${whereSql(tenantId, scope, params, "category")}
+      WHERE ${whereSql(tenantId, scope, f, "category")}
       GROUP BY 1`,
     db.$queryRaw<{ id: string; name: string; slug: string; n: number }[]>`
       SELECT t.id, t.name, t.slug, count(*)::int AS n
       FROM products p
       JOIN product_tags pt ON pt."productId" = p.id
       JOIN tags t ON t.id = pt."tagId"
-      WHERE ${whereSql(tenantId, scope, params)}
+      WHERE ${whereSql(tenantId, scope, f)}
+        AND NOT (t."legacyId" IS NOT NULL AND EXISTS (
+          SELECT 1 FROM facet_values fv WHERE fv."tenantId" = ${tenantId} AND fv."legacyTagId" = t."legacyId"
+        ))
       GROUP BY t.id, t.name, t.slug
       ORDER BY n DESC, t.name ASC
       LIMIT 200`,
     db.$queryRaw<{ min: number | null; max: number | null }[]>`
       SELECT min(p.price)::int AS min, max(p.price)::int AS max FROM products p
-      WHERE ${whereSql(tenantId, scope, params, "price")}`,
+      WHERE ${whereSql(tenantId, scope, f, "price")}`,
+    facetValueCounts(tenantId, whereSql(tenantId, scope, f), unselected),
+    ...selection
+      .filter((sel) => filterable.some((fc) => fc.id === sel.facetId))
+      .map((sel) => facetValueCounts(tenantId, whereSql(tenantId, scope, f, `facet:${sel.facetId}`), [sel.facetId])),
   ]);
+  const counts = new Map<string, number>([...baseCounts, ...selectedCounts.flatMap((m) => [...m])]);
+  const selectedTokens = new Set(tokens);
+
+  const facets: FacetGroup[] = filterable.map((fc) => {
+    const own = tax.values.filter((v) => v.facetId === fc.id);
+    const toOption = (n: ValueNode<(typeof own)[number]>): FacetValueOption => {
+      const token = facetToken(fc.slug, n.slug);
+      return { id: n.id, name: n.name, slug: n.slug, token, count: counts.get(n.id) ?? 0, selected: selectedTokens.has(token), children: n.children.map(toOption) };
+    };
+    return { id: fc.id, kind: fc.kind, name: fc.name, slug: fc.slug, values: buildValueTree(own).map(toOption) };
+  });
+
   return {
     categoryCounts: Object.fromEntries(cats.map((c) => [c.categoryId, c.n])),
+    facets,
     tags: tags.map((t) => ({ id: t.id, name: t.name, slug: t.slug, count: t.n })),
     price: price && price.min !== null && price.max !== null ? { min: price.min, max: price.max } : null,
   };
+}
+
+/** Facet values linked to a product, grouped per facet (facet order, then value order). */
+export async function getProductFacets(tenantId: string, productId: string): Promise<ProductFacet[]> {
+  const [tax, links] = await Promise.all([
+    getPublicTaxonomy(tenantId),
+    db.productFacetValue.findMany({ where: { tenantId, productId }, select: { facetValueId: true } }),
+  ]);
+  if (!links.length) return [];
+  const linked = new Set(links.map((l) => l.facetValueId));
+  return tax.facets.flatMap((fc) => {
+    const own = tax.values.filter((v) => v.facetId === fc.id);
+    const paths = valuePaths(own);
+    const order = new Map(flattenIds(buildValueTree(own)).map((vid, i) => [vid, i]));
+    const values = own
+      .filter((v) => linked.has(v.id))
+      .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+      .map((v) => ({ id: v.id, name: v.name, slug: v.slug, token: facetToken(fc.slug, v.slug), path: paths.get(v.id) ?? [v.name] }));
+    return values.length ? [{ facet: { id: fc.id, kind: fc.kind, name: fc.name, slug: fc.slug, isFilterable: fc.isFilterable }, values }] : [];
+  });
+}
+
+function flattenIds<T extends { id: string; children: T[] }>(nodes: T[]): string[] {
+  return nodes.flatMap((n) => [n.id, ...flattenIds(n.children)]);
 }
 
 /** Tag rows (name/slug) for a set of slugs — used for active-filter chips and titles. */
@@ -340,6 +478,7 @@ export async function getPublicProduct(tenantId: string, stockCode: number): Pro
       blurred: true,
       ageRestricted: true,
       restrictedSymbols: true,
+      requiresDeactivationCert: true,
       acceptsOffers: true,
       publishedAt: true,
       soldAt: true,
@@ -357,8 +496,8 @@ export async function getPublicProduct(tenantId: string, stockCode: number): Pro
   if (p.status === "ACTIVE" && p.quantity <= 0) return null;
 
   let path: PublicProduct["categoryPath"] = [];
-  if (p.categoryId) {
-    const tree = await getPublicCategoryTree(tenantId);
+  const [tree, facets] = await Promise.all([p.categoryId ? getPublicCategoryTree(tenantId) : Promise.resolve(null), getProductFacets(tenantId, p.id)]);
+  if (p.categoryId && tree) {
     path = categoryPath(tree, p.categoryId).map((n) => ({ id: n.id, title: n.title, slug: n.slug }));
   }
   return {
@@ -378,6 +517,7 @@ export async function getPublicProduct(tenantId: string, stockCode: number): Pro
     blurred: p.blurred,
     ageRestricted: p.ageRestricted,
     restrictedSymbols: p.restrictedSymbols,
+    requiresDeactivationCert: p.requiresDeactivationCert,
     acceptsOffers: p.acceptsOffers,
     publishedAt: iso(p.publishedAt),
     soldAt: iso(p.soldAt),
@@ -387,6 +527,7 @@ export async function getPublicProduct(tenantId: string, stockCode: number): Pro
     categoryId: p.categoryId,
     categoryPath: path,
     tags: p.tags.map((t) => t.tag).sort((a, b) => a.name.localeCompare(b.name)),
+    facets,
     images: p.images.map(toPublicImage),
     relatedIds: p.relatedTo.map((r) => r.relatedProductId),
   };

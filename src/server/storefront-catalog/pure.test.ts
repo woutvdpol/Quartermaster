@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { catalogQueryString, catalogWindow, hasActiveFilters, parseCatalogParams, PAGE_SIZE, sortFromSetting } from "./params";
-import { classifyTag, groupTags } from "./tag-groups";
+import { catalogQueryString, catalogWindow, groupFacetTokens, hasActiveFilters, parseCatalogParams, parseFacetToken, PAGE_SIZE, sortFromSetting } from "./params";
+import { resolveFacetSelection } from "./facet-selection";
 import { visitorCountry } from "./country";
 import { parseStockCode, productHref } from "./urls";
 
 describe("parseCatalogParams", () => {
   it("parses and sanitises the URL state", () => {
     const p = parseCatalogParams({ q: "  stahl   helm ", tag: ["ww2", "Germany", "bad slug!", "ww2"], min: "500", max: "100", sort: "price_asc", page: "3", view: "list" });
-    expect(p).toEqual({ q: "stahl helm", tags: ["ww2", "germany"], min: 100, max: 500, sort: "price_asc", page: 3, show: null, view: "list" });
+    expect(p).toEqual({ q: "stahl helm", facets: [], facetValueIds: [], tags: ["ww2", "germany"], min: 100, max: 500, sort: "price_asc", page: 3, show: null, view: "list" });
   });
 
   it("falls back to defaults on garbage", () => {
@@ -38,20 +38,41 @@ describe("parseCatalogParams", () => {
   });
 });
 
-describe("tag groups", () => {
-  it("classifies known names and prefixes", () => {
-    expect(classifyTag("WW2").group).toBe("period");
-    expect(classifyTag("Cold War").group).toBe("period");
-    expect(classifyTag("1914-1918").group).toBe("period");
-    expect(classifyTag("Soviet Union").group).toBe("country");
-    expect(classifyTag("Luftwaffe").group).toBe("branch");
-    expect(classifyTag("Country: Japan")).toEqual({ group: "country", label: "Japan" });
-    expect(classifyTag("Field gear").group).toBe("other");
+describe("facet params", () => {
+  it("parses, dedupes and serialises facet tokens", () => {
+    const p = parseCatalogParams({ f: ["period.ww2", "Country.Germany", "bad", "period.ww2", "x.y.z", "country.netherlands"] });
+    expect(p.facets).toEqual(["period.ww2", "country.germany", "country.netherlands"]);
+    expect(hasActiveFilters(p)).toBe(true);
+    expect(catalogQueryString(p)).toBe("?f=period.ww2&f=country.germany&f=country.netherlands");
+    expect(catalogQueryString(p, { facets: [] })).toBe("");
+    const withId = parseCatalogParams({ f: ["cmg1abcdefghijklmnopqrstu", "period.ww2"] });
+    expect(withId).toMatchObject({ facets: ["period.ww2"], facetValueIds: ["cmg1abcdefghijklmnopqrstu"] });
+    expect(catalogQueryString(withId)).toBe("?f=period.ww2&f=cmg1abcdefghijklmnopqrstu");
+    expect(parseFacetToken("branch.air-force")).toEqual({ facet: "branch", value: "air-force" });
+    expect(parseFacetToken("branch")).toBeNull();
+    expect([...groupFacetTokens(p.facets)]).toEqual([
+      ["period", ["ww2"]],
+      ["country", ["germany", "netherlands"]],
+    ]);
   });
 
-  it("groups in fixed order and skips empty groups", () => {
-    const groups = groupTags([{ name: "Heer" }, { name: "Misc" }, { name: "WW1" }]);
-    expect(groups.map((g) => g.key)).toEqual(["period", "branch", "other"]);
+  it("resolves tokens against the taxonomy, expanding descendants", () => {
+    const tax = {
+      facets: [
+        { id: "F1", kind: "BRANCH", name: "Branch", slug: "branch", sortOrder: 0, isFilterable: true },
+        { id: "F2", kind: "PERIOD", name: "Period", slug: "period", sortOrder: 1, isFilterable: true },
+      ],
+      values: [
+        { id: "army", facetId: "F1", parentId: null, name: "Army", slug: "army", sortOrder: 0 },
+        { id: "heer", facetId: "F1", parentId: "army", name: "Heer", slug: "heer", sortOrder: 0 },
+        { id: "ww2", facetId: "F2", parentId: null, name: "WW2", slug: "ww2", sortOrder: 0 },
+      ],
+    };
+    expect(resolveFacetSelection(tax, ["branch.army", "period.ww2", "period.nope", "nope.x"])).toEqual([
+      { facetId: "F1", valueIds: ["army", "heer"] },
+      { facetId: "F2", valueIds: ["ww2"] },
+    ]);
+    expect(resolveFacetSelection(tax, ["branch.heer"])).toEqual([{ facetId: "F1", valueIds: ["heer"] }]);
   });
 });
 

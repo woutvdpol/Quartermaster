@@ -1,9 +1,17 @@
 import Link from "next/link";
-import { Badge, LockedImg, Price, ShopImg, cn, type ProductCardData } from "@/components/shop/ui";
+import { Badge, LockedImg, Price, ShopImg, cn, type DisplayCurrency, type ProductCardData } from "@/components/shop/ui";
 import { catalogCopy as copy } from "./_copy";
 
 /** List layout (settings.catalog.layout = "list"): image left, details right. Server component. */
-export function CatalogList({ products, showStockCode }: { products: ProductCardData[]; showStockCode?: boolean }) {
+export function CatalogList({
+  products,
+  showStockCode,
+  display = null,
+}: {
+  products: ProductCardData[];
+  showStockCode?: boolean;
+  display?: DisplayCurrency | null;
+}) {
   return (
     <ul role="list" className="flex flex-col divide-y divide-shop-line border-y border-shop-line">
       {products.map((p, i) => {
@@ -34,7 +42,7 @@ export function CatalogList({ products, showStockCode }: { products: ProductCard
                 {p.locked ? <Badge>{copy.product.lockedCta}</Badge> : null}
               </div>
               <div className="mt-auto pt-2">
-                {p.showPrice ? <Price cents={p.priceCents} currency={p.currency} size="md" /> : <span className="text-sm text-shop-muted">{copy.product.priceHidden}</span>}
+                {p.showPrice ? <Price cents={p.priceCents} currency={p.currency} display={display} size="md" /> : <span className="text-sm text-shop-muted">{copy.product.priceHidden}</span>}
               </div>
             </div>
           </li>

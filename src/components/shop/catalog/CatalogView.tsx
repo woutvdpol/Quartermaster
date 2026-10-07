@@ -1,7 +1,12 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { headers } from "next/headers";
+import { permanentRedirect } from "next/navigation";
+import { complianceHideFilter, resolveCompliance, visitorCountry } from "@/server/compliance";
 import { Breadcrumbs, ButtonLink, Container, EmptyState, Pagination, ProductGrid, currencyExponent, type Crumb } from "@/components/shop/ui";
 import { WishlistButton } from "@/components/shop/account/WishlistButton";
+import { SaveSearchButton } from "@/components/shop/alerts";
+import { getVisitorDisplayCurrency } from "@/server/rates/display";
 import type { ShopContext } from "@/server/storefront/context";
 import { getShopViewer } from "@/server/storefront/viewer";
 import {
@@ -14,9 +19,13 @@ import {
   getCategoryTree,
   getFacets,
   getTagsBySlug,
+  getTaxonomy,
+  facetToken,
+  tokensForValueIds,
   hasActiveFilters,
   liveReservedIds,
   parseCatalogParams,
+  selectedFacetValueIds,
   sortFromSetting,
   subtreeIds,
   withLiveStatus,
@@ -26,7 +35,7 @@ import {
   type ListScope,
   type RawSearchParams,
 } from "@/server/storefront-catalog";
-import type { PublicCategory } from "@/server/storefront-catalog/types";
+import type { FacetValueOption, PublicCategory } from "@/server/storefront-catalog/types";
 import { ActiveFilters } from "./ActiveFilters";
 import { CatalogList } from "./CatalogList";
 import { FacetPanel } from "./FacetPanel";
@@ -35,7 +44,7 @@ import { MobileFilters } from "./MobileFilters";
 import { SearchBox } from "./SearchBox";
 import { SortSelect } from "./SortSelect";
 import { ViewToggle } from "./ViewToggle";
-import { toCardData } from "./to-card";
+import { applyGeoBlur, toCardData } from "./to-card";
 import { catalogCopy as copy } from "./_copy";
 
 export type CatalogViewProps = {
@@ -48,6 +57,8 @@ export type CatalogViewProps = {
   title: string;
   intro?: ReactNode;
   crumbs: Crumb[];
+  /** Facet tokens fixed by the page (SEO landing /shop/facet/{facet}/{value}). */
+  lockedFacets?: string[];
 };
 
 /** Default sort for a mode (archive: most recently sold first). */
@@ -60,41 +71,83 @@ export function defaultSortFor(shop: ShopContext, mode: CatalogMode): CatalogSor
  * bottom sheet (mobile), search, sort, active filter chips, result count, grid or list, pagination or
  * "load more". All state lives in the URL; everything works without JS.
  */
-export async function CatalogView({ shop, mode, basePath, category, searchParams, title, intro, crumbs }: CatalogViewProps) {
+export async function CatalogView({ shop, mode, basePath, category, searchParams, title, intro, crumbs, lockedFacets = [] }: CatalogViewProps) {
   const tenantId = shop.tenant.id;
   const currency = shop.tenant.currency;
   const settings = shop.settings.catalog;
   const defaultSort = defaultSortFor(shop, mode);
   const params = parseCatalogParams(searchParams, defaultSort);
 
-  const tree = mode === "shop" ? await getCategoryTree(tenantId) : null;
+  // Visitor country (edge geo header) → per-country compliance rules; unknown country = no geo rules.
+  const country = visitorCountry(await headers());
+  const [tree, hide] = await Promise.all([mode === "shop" ? getCategoryTree(tenantId) : Promise.resolve(null), complianceHideFilter(tenantId, country)]);
   const node = category && tree ? (flattenTree(tree).find((n) => n.id === category.id) ?? null) : null;
   const scope: ListScope = {
     mode,
     categoryIds: category ? (node ? subtreeIds(node) : [category.id]) : null,
     priceUnit: 10 ** currencyExponent(currency),
+    hide,
+    lockedFacets,
   };
 
-  const [page, facets, selectedTags, viewer] = await Promise.all([
+  const [page, facets, selectedTags, viewer, display] = await Promise.all([
     getCatalogPage(tenantId, scope, params),
     getFacets(tenantId, scope, params),
     getTagsBySlug(tenantId, params.tags),
     getShopViewer(tenantId),
+    // Visitor's indicative display currency (cookie) — read here, outside the cached catalog reads.
+    getVisitorDisplayCurrency(tenantId),
   ]);
-  const reserved = mode === "shop" ? await liveReservedIds(tenantId, page.items.map((i) => i.id)) : new Set<string>();
+  // Canonical facet URLs: f=<valueId> (saved-search links) → f=<facet>.<value>; old tag links
+  // (?tag=ww2) whose tag was converted to a facet value → the facet filter.
+  const unknownTags = params.tags.filter((t) => !selectedTags.some((st) => st.slug === t));
+  if (unknownTags.length || params.facetValueIds.length) {
+    const tax = await getTaxonomy(tenantId);
+    const mapped = unknownTags.flatMap((slug) => {
+      const value = tax.values.find((v) => v.slug === slug);
+      const facet = value ? tax.facets.find((f) => f.id === value.facetId) : undefined;
+      return value && facet ? [{ slug, token: facetToken(facet.slug, value.slug) }] : [];
+    });
+    if (mapped.length || params.facetValueIds.length) {
+      const tags = params.tags.filter((t) => !mapped.some((m) => m.slug === t));
+      const facetsNext = [...new Set([...params.facets, ...tokensForValueIds(tax, params.facetValueIds), ...mapped.map((m) => m.token)])];
+      permanentRedirect(`${basePath}${catalogQueryString(params, { tags, facets: facetsNext, facetValueIds: [] }, defaultSort)}`);
+    }
+  }
+  const ids = page.items.map((i) => i.id);
+  const [reserved, verdicts, saveFacetValueIds] = await Promise.all([
+    mode === "shop" ? liveReservedIds(tenantId, ids) : Promise.resolve(new Set<string>()),
+    country ? resolveCompliance(tenantId, ids, country) : Promise.resolve({} as Awaited<ReturnType<typeof resolveCompliance>>),
+    mode === "shop" ? selectedFacetValueIds(tenantId, params, lockedFacets) : Promise.resolve([] as string[]),
+  ]);
+  // "Save this search" (alerts): the current filters as a stored query.
+  const saveQuery = {
+    q: params.q || null,
+    categoryId: category?.id ?? null,
+    tags: params.tags,
+    facetValueIds: saveFacetValueIds,
+    min: params.min,
+    max: params.max,
+  };
   const cardCtx = {
     currency,
     showPriceWhenSold: settings.showPriceWhenSold,
     lockSensitive: shop.settings.legal.blurSensitiveForGuests && !viewer,
   };
-  const cards = withLiveStatus(page.items, reserved).map((c) => toCardData(c, cardCtx));
+  const cards = withLiveStatus(page.items, reserved).map((c) => applyGeoBlur(toCardData(c, cardCtx), c, verdicts[c.id]?.blurred ?? false));
 
   const view = params.view ?? settings.layout;
   const filtered = hasActiveFilters(params);
   const tagNames = Object.fromEntries([...facets.tags, ...selectedTags].map((t) => [t.slug, t.name]));
+  const facetNames: Record<string, string> = {};
+  const collect = (v: FacetValueOption) => {
+    facetNames[v.token] = v.name;
+    v.children.forEach(collect);
+  };
+  facets.facets.forEach((g) => g.values.forEach(collect));
   const pageCount = Math.max(1, Math.ceil(page.total / PAGE_SIZE));
   const currentPath = category && tree ? categoryPath(tree, category.id).map((n) => n.id) : [];
-  const activeCount = params.tags.length + (params.q ? 1 : 0) + (params.min !== null || params.max !== null ? 1 : 0);
+  const activeCount = params.facets.length + params.tags.length + (params.q ? 1 : 0) + (params.min !== null || params.max !== null ? 1 : 0);
 
   const sortOptions = (
     mode === "archive"
@@ -116,6 +169,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
     currentPath,
     currency,
     priceFilter: settings.priceFilter,
+    lockedFacets,
   };
 
   const shown = params.show ? Math.min(params.show, page.total) : null;
@@ -152,8 +206,9 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
               </p>
             </div>
             <div className="flex items-center gap-2">
+              {mode === "shop" ? <SaveSearchButton query={saveQuery} /> : null}
               <SortSelect action={basePath} value={params.sort} options={sortOptions}>
-                <HiddenParams params={params} keep={["q", "tags", "min", "max", "view"]} defaultSort={defaultSort} />
+                <HiddenParams params={params} keep={["q", "facets", "tags", "min", "max", "view"]} defaultSort={defaultSort} />
               </SortSelect>
               <ViewToggle basePath={basePath} params={params} view={view} defaultSort={defaultSort} />
             </div>
@@ -166,6 +221,8 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
               params={params}
               defaultSort={defaultSort}
               tagNames={tagNames}
+              facetNames={facetNames}
+              lockedFacets={lockedFacets}
               currency={currency}
               category={category && filtered ? category : null}
             />
@@ -189,12 +246,13 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
               {filtered ? copy.empty.filtered : mode === "archive" ? copy.empty.archiveNone : copy.empty.none}
             </EmptyState>
           ) : view === "list" ? (
-            <CatalogList products={cards} showStockCode={settings.showStockCode} />
+            <CatalogList products={cards} showStockCode={settings.showStockCode} display={display} />
           ) : (
             <ProductGrid
               products={cards}
               columns={settings.gridColumns === 3 ? 3 : 4}
               showStockCode={settings.showStockCode}
+              display={display}
               priorityCount={4}
               headingLevel={2}
               wishlistSlot={mode === "shop" ? (p) => (p.availability === "sold" ? null : <WishlistButton productId={p.id} />) : undefined}

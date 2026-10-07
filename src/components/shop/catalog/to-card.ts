@@ -41,3 +41,16 @@ export function toCardData(c: CatalogCard, ctx: CardContext): ProductCardData {
     eyebrow: c.category?.title ?? null,
   };
 }
+
+/**
+ * Visitor-country compliance (BLUR_IMAGES rule): the card shows only the tiny `blur` variant scaled
+ * up (no sharp URL is sent), without the "Log in to view" label — logging in does not lift a
+ * country rule. Locked cards are already blurred.
+ */
+export function applyGeoBlur(card: ProductCardData, c: CatalogCard, blurred: boolean): ProductCardData {
+  if (!blurred || card.locked || !c.cover) return card;
+  return {
+    ...card,
+    image: { src: c.cover.blur, blurDataUrl: c.cover.blurDataUrl, alt: "", width: c.cover.width, height: c.cover.height },
+  };
+}

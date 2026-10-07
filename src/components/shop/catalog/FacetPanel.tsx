@@ -1,8 +1,8 @@
 import Link from "next/link";
 import Form from "next/form";
 import { cn, formatMoney, currencyExponent } from "@/components/shop/ui";
-import { catalogQueryString, groupTags, categoryHref, type CatalogParams, type CatalogSort } from "@/server/storefront-catalog";
-import type { CatalogFacets, PublicCategoryNode } from "@/server/storefront-catalog/types";
+import { catalogQueryString, categoryHref, type CatalogParams, type CatalogSort } from "@/server/storefront-catalog";
+import type { CatalogFacets, FacetGroup, FacetValueOption, PublicCategoryNode } from "@/server/storefront-catalog/types";
 import { HiddenParams } from "./HiddenParams";
 import { catalogCopy as copy } from "./_copy";
 
@@ -21,27 +21,35 @@ type Props = {
   currentPath: string[];
   currency: string;
   priceFilter: boolean;
+  /** Facet tokens fixed by the page (facet landing page); deselecting one leaves the landing page. */
+  lockedFacets?: string[];
 };
 
 /**
- * Sidebar facets: category tree (with live counts under the other filters), tag groups (Period /
- * Country / Branch / More) and a price range. Plain links and a GET form — works without JS.
+ * Sidebar facets: category tree (with live counts under the other filters), the shop's facet
+ * filters (Period / Country / Branch / … — multi-select: OR within a facet, AND across facets;
+ * hierarchical values), tags that are not mapped to a facet, and a price range.
+ * Plain links and a GET form — works without JS.
  */
 export function FacetPanel(props: Props) {
   const { idPrefix, basePath, params, defaultSort, facets, tree, currency, priceFilter } = props;
-  const groups = groupTags(facets.tags);
+  const tags = facets.tags.map((t) => ({ ...t, label: t.name }));
   return (
     <div className="flex flex-col gap-8">
       {tree ? <CategorySection {...props} tree={tree} /> : null}
 
-      {groups.map((g) => (
-        <section key={g.key} aria-labelledby={`${idPrefix}-tg-${g.key}`}>
-          <h2 id={`${idPrefix}-tg-${g.key}`} className="mb-3 text-xs font-semibold tracking-[0.14em] text-shop-muted uppercase font-shop-body">
-            {copy.filters.groups[g.key]}
-          </h2>
-          <TagList tags={g.tags} params={params} basePath={basePath} defaultSort={defaultSort} />
-        </section>
+      {facets.facets.map((g) => (
+        <FacetSection key={g.id} group={g} {...props} />
       ))}
+
+      {tags.length ? (
+        <section aria-labelledby={`${idPrefix}-tags`}>
+          <h2 id={`${idPrefix}-tags`} className="mb-3 text-xs font-semibold tracking-[0.14em] text-shop-muted uppercase font-shop-body">
+            {copy.filters.tags}
+          </h2>
+          <TagList tags={tags} params={params} basePath={basePath} defaultSort={defaultSort} />
+        </section>
+      ) : null}
 
       {priceFilter && (facets.price || params.min !== null || params.max !== null) ? (
         <section aria-labelledby={`${idPrefix}-price`}>
@@ -49,7 +57,7 @@ export function FacetPanel(props: Props) {
             {copy.filters.price}
           </h2>
           <Form action={basePath} scroll={false} className="flex flex-col gap-3">
-            <HiddenParams params={params} keep={["q", "tags", "sort", "view"]} defaultSort={defaultSort} />
+            <HiddenParams params={params} keep={["q", "facets", "tags", "sort", "view"]} defaultSort={defaultSort} />
             <div className="grid grid-cols-2 gap-2">
               <PriceInput id={`${idPrefix}-min`} name="min" label={copy.filters.priceMin} value={params.min} placeholder={facets.price ? Math.floor(facets.price.min / 10 ** currencyExponent(currency)) : undefined} currency={currency} />
               <PriceInput id={`${idPrefix}-max`} name="max" label={copy.filters.priceMax} value={params.max} placeholder={facets.price ? Math.ceil(facets.price.max / 10 ** currencyExponent(currency)) : undefined} currency={currency} />
@@ -97,6 +105,75 @@ function PriceInput({ id, name, label, value, placeholder, currency }: { id: str
 }
 
 const MAX_VISIBLE_TAGS = 8;
+const MAX_VISIBLE_VALUES = 8;
+
+/** Visible = has results, or is selected / has a selected descendant (so it can be deselected). */
+function pruneValues(values: FacetValueOption[]): FacetValueOption[] {
+  return values.flatMap((v) => {
+    const children = pruneValues(v.children);
+    return v.count > 0 || v.selected || children.length ? [{ ...v, children }] : [];
+  });
+}
+
+const hasSelected = (v: FacetValueOption): boolean => v.selected || v.children.some(hasSelected);
+
+function FacetSection({ group, idPrefix, basePath, shopPath, params, defaultSort, lockedFacets = [] }: Props & { group: FacetGroup }) {
+  const values = pruneValues(group.values);
+  if (!values.length) return null;
+  const locked = new Set(lockedFacets);
+  const hrefFor = (v: FacetValueOption) => {
+    if (locked.has(v.token)) {
+      // Leaving the landing page: keep the other locked tokens as normal filters.
+      const rest = [...lockedFacets.filter((t) => t !== v.token), ...params.facets];
+      return `${shopPath}${catalogQueryString(params, { facets: [...new Set(rest)] }, defaultSort)}`;
+    }
+    const next = v.selected ? params.facets.filter((t) => t !== v.token) : [...params.facets, v.token];
+    return `${basePath}${catalogQueryString(params, { facets: next }, defaultSort)}`;
+  };
+  const render = (v: FacetValueOption) => (
+    <li key={v.id}>
+      <Link
+        href={hrefFor(v)}
+        scroll={false}
+        rel="nofollow"
+        aria-pressed={v.selected}
+        className={cn(
+          "flex items-center justify-between gap-3 rounded-shop-sm px-2 py-1.5 text-sm",
+          v.selected ? "bg-shop-primary-soft font-medium text-shop-ink" : "text-shop-ink-2 hover:bg-shop-sunken",
+        )}
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <span
+            aria-hidden="true"
+            className={cn("grid size-4 shrink-0 place-items-center rounded-[3px] border text-[10px]", v.selected ? "border-shop-primary bg-shop-primary text-shop-on-primary" : "border-shop-line-strong bg-shop-surface")}
+          >
+            {v.selected ? "✓" : ""}
+          </span>
+          <span className="truncate">{v.name}</span>
+        </span>
+        <span className="text-xs text-shop-muted tabular-nums">{v.count}</span>
+      </Link>
+      {v.children.length ? <ul className="mt-0.5 ml-3 flex flex-col gap-0.5 border-l border-shop-line pl-2">{v.children.map(render)}</ul> : null}
+    </li>
+  );
+  const visible = values.slice(0, MAX_VISIBLE_VALUES);
+  const rest = values.slice(MAX_VISIBLE_VALUES);
+  const headingId = `${idPrefix}-fc-${group.slug}`;
+  return (
+    <section aria-labelledby={headingId}>
+      <h2 id={headingId} className="mb-3 text-xs font-semibold tracking-[0.14em] text-shop-muted uppercase font-shop-body">
+        {group.name}
+      </h2>
+      <ul className="flex flex-col gap-0.5">{visible.map(render)}</ul>
+      {rest.length ? (
+        <details open={rest.some(hasSelected)} className="mt-1">
+          <summary className="cursor-pointer px-2 py-1 text-sm font-medium text-shop-primary">{copy.filters.showMore}</summary>
+          <ul className="mt-1 flex flex-col gap-0.5">{rest.map(render)}</ul>
+        </details>
+      ) : null}
+    </section>
+  );
+}
 
 function TagList({ tags, params, basePath, defaultSort }: { tags: { slug: string; label: string; count: number }[]; params: CatalogParams; basePath: string; defaultSort: CatalogSort }) {
   const selected = new Set(params.tags);

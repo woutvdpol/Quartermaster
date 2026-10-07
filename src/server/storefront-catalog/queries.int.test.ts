@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
 import { createTenantContext, resetDb } from "../../../tests/integration/helpers";
-import { getCatalogFacets, getPublicCategoryTree, getPublicProduct, getRelatedProducts, listCatalog, liveReservedIds, type ListScope } from "./queries";
+import { getCatalogFacets, getProductFacets, getPublicCategoryTree, getPublicProduct, getRelatedProducts, listCatalog, liveReservedIds, type ListScope } from "./queries";
 import { parseCatalogParams } from "./params";
 
 let code = 50000;
@@ -125,5 +125,87 @@ describe("storefront-catalog queries", () => {
     await db.reservation.create({ data: { tenantId, productId: p.id, cartId: cart.id, status: "ACTIVE", expiresAt: new Date(Date.now() + 60_000) } });
     expect((await liveReservedIds(tenantId, [p.id])).has(p.id)).toBe(true);
     expect((await liveReservedIds(otherTenant, [p.id])).size).toBe(0);
+  });
+
+  it("filters by facets (OR within, AND across, descendants) with GROUP BY counts", async () => {
+    const period = await db.facet.create({ data: { tenantId, kind: "PERIOD", name: "Period", slug: "period", sortOrder: 0 } });
+    const branch = await db.facet.create({ data: { tenantId, kind: "BRANCH", name: "Branch", slug: "branch", sortOrder: 1 } });
+    const hidden = await db.facet.create({ data: { tenantId, kind: "MAKER", name: "Maker", slug: "maker", sortOrder: 2, isFilterable: false } });
+    const v = async (facetId: string, slug: string, parentId: string | null = null) => db.facetValue.create({ data: { tenantId, facetId, slug, name: slug.toUpperCase(), parentId } });
+    const ww1 = await v(period.id, "ww1");
+    const ww2 = await v(period.id, "ww2");
+    const army = await v(branch.id, "army");
+    const heer = await v(branch.id, "heer", army.id);
+    const navy = await v(branch.id, "navy");
+    const maker = await v(hidden.id, "erel");
+    const link = (productId: string, ...valueIds: string[]) => db.productFacetValue.createMany({ data: valueIds.map((facetValueId) => ({ tenantId, productId, facetValueId })) });
+    const p1 = await product(tenantId, { title: "M40" });
+    const p2 = await product(tenantId, { title: "M16" });
+    const p3 = await product(tenantId, { title: "Navy cap" });
+    const p4 = await product(tenantId, { title: "Untagged" });
+    const sold = await product(tenantId, { status: "SOLD", quantity: 0 });
+    await link(p1.id, ww2.id, heer.id, maker.id);
+    await link(p2.id, ww1.id, army.id);
+    await link(p3.id, ww2.id, navy.id);
+    await link(sold.id, ww2.id, heer.id);
+    // Other tenant: same slugs, must not leak.
+    const oFacet = await db.facet.create({ data: { tenantId: otherTenant, kind: "PERIOD", name: "Period", slug: "period" } });
+    const oVal = await db.facetValue.create({ data: { tenantId: otherTenant, facetId: oFacet.id, slug: "ww2", name: "WW2" } });
+    const op = await product(otherTenant, { title: "Other" });
+    await db.productFacetValue.create({ data: { tenantId: otherTenant, productId: op.id, facetValueId: oVal.id } });
+
+    const ids = async (raw: Record<string, string | string[]>, scope = shop()) => (await listCatalog(tenantId, scope, parseCatalogParams(raw))).items.map((i) => i.id).sort();
+    expect(await ids({ f: "period.ww2" })).toEqual([p1.id, p3.id].sort());
+    expect(await ids({ f: ["period.ww2", "period.ww1"] })).toEqual([p1.id, p2.id, p3.id].sort()); // OR within
+    expect(await ids({ f: ["period.ww2", "branch.army"] })).toEqual([p1.id]); // AND across + Army ⊃ Heer
+    expect(await ids({ f: "branch.heer" })).toEqual([p1.id]);
+    expect(await ids({ f: "period.nope" })).toHaveLength(4); // unknown tokens are ignored
+    expect(await ids({}, { ...shop(), lockedFacets: ["branch.navy"] })).toEqual([p3.id]);
+
+    const facets = await getCatalogFacets(tenantId, shop(), parseCatalogParams({ f: ["period.ww2", "branch.army"] }));
+    expect(facets.facets.map((f) => f.slug)).toEqual(["period", "branch"]); // not-filterable facet omitted
+    const periodGroup = facets.facets[0];
+    // Period counts ignore the period selection but keep branch=army (p1 ww2, p2 ww1).
+    expect(periodGroup.values.map((x) => [x.slug, x.count, x.selected])).toEqual([
+      ["ww1", 1, false],
+      ["ww2", 1, true],
+    ]);
+    const branchGroup = facets.facets[1];
+    // Branch counts keep period=ww2: army (incl. heer) = p1, navy = p3.
+    expect(branchGroup.values.map((x) => [x.slug, x.count])).toEqual([
+      ["army", 1],
+      ["navy", 1],
+    ]);
+    expect(branchGroup.values[0].children[0]).toMatchObject({ slug: "heer", count: 1, token: "branch.heer" });
+
+    // Unmapped tags only: a tag whose legacyId maps to a facet value is not offered as a tag filter.
+    const mapped = await db.tag.create({ data: { tenantId, name: "WW2", slug: "ww2-tag", legacyId: 5 } });
+    const free = await db.tag.create({ data: { tenantId, name: "Field gear", slug: "field-gear" } });
+    await db.facetValue.update({ where: { id: ww2.id }, data: { legacyTagId: 5 } });
+    await db.productTag.createMany({ data: [{ tenantId, productId: p4.id, tagId: mapped.id }, { tenantId, productId: p4.id, tagId: free.id }] });
+    expect((await getCatalogFacets(tenantId, shop(), parseCatalogParams({}))).tags.map((t) => t.slug)).toEqual(["field-gear"]);
+
+    const pf = await getProductFacets(tenantId, p1.id);
+    expect(pf.map((g) => [g.facet.slug, g.values.map((x) => x.path.join(" › "))])).toEqual([
+      ["period", ["WW2"]],
+      ["branch", ["ARMY › HEER"]],
+      ["maker", ["EREL"]],
+    ]);
+  });
+
+  it("excludes products hidden by country compliance", async () => {
+    const cat = await db.category.create({ data: { tenantId, title: "Reich", slug: "reich" } });
+    const a = await product(tenantId, { title: "In category", categoryId: cat.id });
+    const b = await product(tenantId, { title: "Symbols" });
+    await db.product.update({ where: { id: b.id }, data: { restrictedSymbols: true } });
+    const c = await product(tenantId, { title: "Plain" });
+    const hide = { categoryIds: [cat.id], restrictedSymbols: true, ageRestricted: false, deactivatedWeapons: false };
+    const page = await listCatalog(tenantId, { ...shop(), hide }, parseCatalogParams({}));
+    expect(page.items.map((i) => i.id)).toEqual([c.id]);
+    expect(page.total).toBe(1);
+    const facets = await getCatalogFacets(tenantId, { ...shop(), hide }, parseCatalogParams({}));
+    expect(facets.categoryCounts).toEqual({ "": 1 });
+    expect((await listCatalog(tenantId, shop(), parseCatalogParams({}))).total).toBe(3);
+    void a;
   });
 });

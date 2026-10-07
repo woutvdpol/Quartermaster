@@ -2,22 +2,50 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { Badge, Breadcrumbs, Container, LockedImg, Markdown, Price, ProductGrid, SectionHeading } from "@/components/shop/ui";
 import { WishlistButton } from "@/components/shop/account/WishlistButton";
+import { NotifyMeButton } from "@/components/shop/alerts";
+import { ProvenanceBlock } from "@/components/shop/provenance/ProvenanceBlock";
+import { RecentlyViewed, RecentlyViewedTracker } from "@/components/shop/recent";
+import type { DisplayCurrency } from "@/components/shop/ui/types";
 import type { ShopContext } from "@/server/storefront/context";
 import { getShopViewer } from "@/server/storefront/viewer";
-import { SHOP_PATH, categoryHref, getRelated, groupTags, liveReservedIds, tagHref, withLiveStatus } from "@/server/storefront-catalog";
+import { SHOP_PATH, categoryHref, facetValueHref, getRelated, liveReservedIds, tagHref, withLiveStatus } from "@/server/storefront-catalog";
+import { resolveCompliance } from "@/server/compliance";
+import { countryName } from "@/server/shipping/countries";
 import type { PublicProduct, PublicStatus } from "@/server/storefront-catalog/types";
-import { toCardData } from "../to-card";
+import { applyGeoBlur, toCardData } from "../to-card";
 import { catalogCopy as copy } from "../_copy";
 import { LockedPanel } from "./LockedPanel";
 import { ProductBuyBox } from "./ProductBuyBox";
+import { OfferButton } from "@/components/shop/offers/OfferButton";
 import { ProductGallery } from "./ProductGallery";
 import { ShippingHint } from "./ShippingHint";
+
+/** Visitor-country compliance for this product (src/server/compliance); null/absent = nothing applies. */
+export type ProductGeo = { country: string | null; blurred: boolean; noShipping: boolean };
+
+const EYEBROW_KINDS = ["PERIOD", "COUNTRY", "BRANCH"];
 
 /**
  * Product page body (design "Productpagina"): gallery left, info right on desktop; gallery on top on
  * phones. Sensitive items for guests render only a blurred cover, the title and a login panel.
+ * `geo` applies the visitor-country rules: blurred photos and a "can't be shipped" notice.
+ * `display` is the visitor's indicative display currency (cookie; loaded by the page, never cached).
  */
-export function ProductDetail({ shop, product, status, locked }: { shop: ShopContext; product: PublicProduct; status: PublicStatus; locked: boolean }) {
+export function ProductDetail({
+  shop,
+  product,
+  status,
+  locked,
+  geo = null,
+  display = null,
+}: {
+  shop: ShopContext;
+  product: PublicProduct;
+  status: PublicStatus;
+  locked: boolean;
+  geo?: ProductGeo | null;
+  display?: DisplayCurrency | null;
+}) {
   const { catalog, legal, checkout, general } = shop.settings;
   const currency = shop.tenant.currency;
   const showPrice = status !== "sold" || catalog.showPriceWhenSold;
@@ -26,12 +54,16 @@ export function ProductDetail({ shop, product, status, locked }: { shop: ShopCon
     ...product.categoryPath.map((c) => ({ label: c.title, href: categoryHref(c.slug) })),
     { label: product.title },
   ];
-  const tagGroups = groupTags(product.tags);
-  const eyebrowTags = tagGroups.filter((g) => g.key !== "other").flatMap((g) => g.tags.map((t) => t.label)).slice(0, 3);
-  const eyebrow = [...eyebrowTags, product.categoryPath.at(-1)?.title, copy.product.stockCode(product.stockCode)].filter(Boolean).join(" · ");
+  const eyebrowFacets = EYEBROW_KINDS.flatMap((kind) => product.facets.filter((f) => f.facet.kind === kind).map((f) => f.values[0]?.name)).filter(Boolean).slice(0, 3);
+  const eyebrow = [...eyebrowFacets, product.categoryPath.at(-1)?.title, copy.product.stockCode(product.stockCode)].filter(Boolean).join(" · ");
+  const geoBlurred = Boolean(geo?.blurred) && !locked;
+  // Facet values are the structured truth: free-text spec rows with the same label are not repeated.
+  const facetLabels = new Set(product.facets.map((f) => f.facet.name.trim().toLowerCase()));
+  const specs = product.specifications.filter((s) => !facetLabels.has(s.label.trim().toLowerCase()));
 
   return (
     <Container className="py-6 sm:py-10">
+      <RecentlyViewedTracker productId={product.id} />
       <Breadcrumbs items={crumbs} jsonLdBase={shop.origin} />
 
       <div className="mt-5 grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:gap-12">
@@ -40,6 +72,13 @@ export function ProductDetail({ shop, product, status, locked }: { shop: ShopCon
             <div className="relative aspect-[4/3] overflow-hidden rounded-shop bg-shop-sunken">
               <LockedImg blurDataUrl={product.images[0]?.blurDataUrl ?? null} />
             </div>
+          ) : geoBlurred ? (
+            <figure>
+              <div className="relative aspect-[4/3] overflow-hidden rounded-shop bg-shop-sunken">
+                <LockedImg blurDataUrl={product.images[0]?.blurDataUrl ?? null} />
+              </div>
+              <figcaption className="mt-2 text-sm text-shop-muted">{copy.product.geoBlurred}</figcaption>
+            </figure>
           ) : (
             <ProductGallery images={product.images} title={product.title} />
           )}
@@ -56,7 +95,7 @@ export function ProductDetail({ shop, product, status, locked }: { shop: ShopCon
           ) : (
             <>
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                {showPrice ? <Price cents={product.price} currency={currency} size="xl" /> : null}
+                {showPrice ? <Price cents={product.price} currency={currency} display={display} size="xl" /> : null}
                 <StatusBadge status={status} />
                 {product.onSale && status !== "sold" ? <Badge tone="accent">{copy.product.sale}</Badge> : null}
               </div>
@@ -67,9 +106,20 @@ export function ProductDetail({ shop, product, status, locked }: { shop: ShopCon
                 <p className="mt-4 text-sm text-shop-muted">{copy.product.soldHint}</p>
               ) : null}
 
+              {geo?.noShipping && geo.country && status !== "sold" ? (
+                <p role="note" className="mt-4 rounded-shop-sm border border-shop-warn/30 bg-shop-warn-soft px-3 py-2.5 text-sm text-shop-warn">
+                  {copy.product.noShipping(countryName(geo.country))}
+                </p>
+              ) : null}
+
               {status !== "sold" ? (
                 <div className="mt-6 flex flex-col gap-3">
                   <ProductBuyBox product={product} available={status === "available"} />
+                  {status === "available" ? (
+                    <Suspense fallback={null}>
+                      <OfferButton productId={product.id} />
+                    </Suspense>
+                  ) : null}
                   <Suspense fallback={<p className="h-5" aria-hidden="true" />}>
                     <ShippingHint
                       tenantId={shop.tenant.id}
@@ -94,13 +144,32 @@ export function ProductDetail({ shop, product, status, locked }: { shop: ShopCon
                 </p>
               ) : null}
 
-              {product.specifications.length ? (
+              {specs.length || product.facets.length ? (
                 <section className="mt-8 border-t border-shop-line pt-5" aria-labelledby="pd-specs">
                   <h2 id="pd-specs" className="mb-3 text-lg text-shop-ink">
                     {copy.product.specifications}
                   </h2>
                   <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-                    {product.specifications.map((s, i) => (
+                    {product.facets.map((f) => (
+                      <div key={f.facet.id} className="contents">
+                        <dt className="text-shop-muted">{f.facet.name}</dt>
+                        <dd className="text-shop-ink">
+                          {f.values.map((v, i) => (
+                            <span key={v.id}>
+                              {i > 0 ? ", " : null}
+                              {f.facet.isFilterable ? (
+                                <Link href={facetValueHref(f.facet.slug, v.slug)} className="underline decoration-shop-line-strong underline-offset-4 hover:decoration-shop-ink">
+                                  {v.path.join(" › ")}
+                                </Link>
+                              ) : (
+                                v.path.join(" › ")
+                              )}
+                            </span>
+                          ))}
+                        </dd>
+                      </div>
+                    ))}
+                    {specs.map((s, i) => (
                       <div key={`${i}-${s.label}`} className="contents">
                         <dt className="text-shop-muted">{s.label}</dt>
                         <dd className="text-shop-ink">{s.value}</dd>
@@ -109,19 +178,6 @@ export function ProductDetail({ shop, product, status, locked }: { shop: ShopCon
                   </dl>
                 </section>
               ) : null}
-
-              <aside className="mt-6 grid grid-cols-[2.75rem_1fr] items-center gap-3 rounded-shop border border-dashed border-shop-line-strong bg-shop-surface p-3 text-sm" aria-label={copy.product.provenanceTitle}>
-                <span className="grid size-11 place-items-center rounded-shop-sm bg-shop-sunken text-shop-muted" aria-hidden="true">
-                  <svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M10 2.5l6 2.5v4.5c0 3.8-2.6 6.6-6 8-3.4-1.4-6-4.2-6-8V5z" strokeLinejoin="round" />
-                    <path d="M7.5 10l2 2 3.5-4" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </span>
-                <div>
-                  <p className="font-medium text-shop-ink">{copy.product.provenanceTitle}</p>
-                  <p className="text-shop-muted">{copy.product.provenanceBody}</p>
-                </div>
-              </aside>
             </>
           )}
         </div>
@@ -137,6 +193,10 @@ export function ProductDetail({ shop, product, status, locked }: { shop: ShopCon
               <Markdown source={product.description} />
             </section>
           ) : null}
+
+          <Suspense fallback={null}>
+            <ProvenanceBlock productId={product.id} />
+          </Suspense>
 
           {catalog.showTags && product.tags.length ? (
             <section className="mt-8" aria-labelledby="pd-tags">
@@ -165,18 +225,24 @@ export function ProductDetail({ shop, product, status, locked }: { shop: ShopCon
                 </h2>
                 <p className="text-sm text-shop-muted">{copy.product.notifyBody}</p>
               </div>
-              {/* TODO(phase 5): saved searches / "notify me" (docs/analysis/03 §9 #4). */}
-              <button type="button" disabled title={copy.product.notifyComingSoon} className="inline-flex h-10 items-center rounded-shop-sm border border-shop-line-strong px-4 text-sm font-medium text-shop-ink opacity-60">
-                {copy.product.notifyCta}
-              </button>
+              <NotifyMeButton productId={product.id} fullWidth={false} />
             </section>
           ) : null}
         </>
       ) : null}
 
       <Suspense fallback={null}>
-        <RelatedProducts shop={shop} product={product} />
+        <RelatedProducts shop={shop} product={product} country={geo?.country ?? null} display={display} />
       </Suspense>
+
+      <RecentlyViewed
+        exclude={product.id}
+        limit={4}
+        columns={catalog.gridColumns}
+        display={display}
+        showStockCode={catalog.showStockCode}
+        className="mt-16"
+      />
     </Container>
   );
 }
@@ -187,22 +253,43 @@ function StatusBadge({ status }: { status: PublicStatus }) {
   return <Badge tone="ok">{copy.product.status.available}</Badge>;
 }
 
-async function RelatedProducts({ shop, product }: { shop: ShopContext; product: PublicProduct }) {
+async function RelatedProducts({
+  shop,
+  product,
+  country,
+  display,
+}: {
+  shop: ShopContext;
+  product: PublicProduct;
+  country: string | null;
+  display: DisplayCurrency | null;
+}) {
   const tenantId = shop.tenant.id;
-  const related = await getRelated(tenantId, { id: product.id, relatedIds: product.relatedIds, categoryId: product.categoryId, tagIds: product.tags.map((t) => t.id) }, 4);
+  const candidates = await getRelated(tenantId, { id: product.id, relatedIds: product.relatedIds, categoryId: product.categoryId, tagIds: product.tags.map((t) => t.id) }, 4);
+  if (!candidates.length) return null;
+  const ids = candidates.map((r) => r.id);
+  const [reserved, viewer, verdicts] = await Promise.all([
+    liveReservedIds(tenantId, ids),
+    getShopViewer(tenantId),
+    country ? resolveCompliance(tenantId, ids, country) : Promise.resolve({} as Awaited<ReturnType<typeof resolveCompliance>>),
+  ]);
+  const related = candidates.filter((c) => !verdicts[c.id]?.hidden);
   if (!related.length) return null;
-  const [reserved, viewer] = await Promise.all([liveReservedIds(tenantId, related.map((r) => r.id)), getShopViewer(tenantId)]);
   const cards = withLiveStatus(related, reserved).map((c) =>
-    toCardData(c, {
-      currency: shop.tenant.currency,
-      showPriceWhenSold: shop.settings.catalog.showPriceWhenSold,
-      lockSensitive: shop.settings.legal.blurSensitiveForGuests && !viewer,
-    }),
+    applyGeoBlur(
+      toCardData(c, {
+        currency: shop.tenant.currency,
+        showPriceWhenSold: shop.settings.catalog.showPriceWhenSold,
+        lockSensitive: shop.settings.legal.blurSensitiveForGuests && !viewer,
+      }),
+      c,
+      verdicts[c.id]?.blurred ?? false,
+    ),
   );
   return (
     <section className="mt-16 border-t border-shop-line pt-10" aria-labelledby="pd-related">
       <SectionHeading title={<span id="pd-related">{copy.product.related}</span>} />
-      <ProductGrid products={cards} columns={4} showStockCode={shop.settings.catalog.showStockCode} headingLevel={3} wishlistSlot={(p) => <WishlistButton productId={p.id} />} />
+      <ProductGrid products={cards} columns={4} display={display} showStockCode={shop.settings.catalog.showStockCode} headingLevel={3} wishlistSlot={(p) => <WishlistButton productId={p.id} />} />
     </section>
   );
 }

@@ -64,10 +64,38 @@ export type PublicCategory = {
 
 export type TagFacet = { id: string; name: string; slug: string; count: number };
 
+/** One facet value in the sidebar (tree). `count` includes products linked to any descendant. */
+export type FacetValueOption = {
+  id: string;
+  name: string;
+  slug: string;
+  /** URL token "<facetSlug>.<valueSlug>". */
+  token: string;
+  count: number;
+  selected: boolean;
+  children: FacetValueOption[];
+};
+
+/** A filterable facet with its value tree (counts under every filter except this facet's own). */
+export type FacetGroup = { id: string; kind: string; name: string; slug: string; values: FacetValueOption[] };
+
+/** Public taxonomy of a shop (cached; no counts). */
+export type PublicFacetValue = { id: string; facetId: string; parentId: string | null; name: string; slug: string; sortOrder: number };
+export type PublicFacet = { id: string; kind: string; name: string; slug: string; sortOrder: number; isFilterable: boolean };
+export type PublicTaxonomy = { facets: PublicFacet[]; values: PublicFacetValue[] };
+
+/** A product's values of one facet (product page eyebrow / details table). */
+export type ProductFacet = {
+  facet: { id: string; kind: string; name: string; slug: string; isFilterable: boolean };
+  values: { id: string; name: string; slug: string; token: string; path: string[] }[];
+};
+
 export type CatalogFacets = {
   /** Direct counts per category id under the non-category filters; key "" = uncategorised. */
   categoryCounts: Record<string, number>;
-  /** Tags of the current result set (count = results if the tag were added). */
+  /** Facet filters (filterable facets with at least one value), in facet order. */
+  facets: FacetGroup[];
+  /** Tags of the current result set that are not mapped to a facet value (count = results if the tag were added). */
   tags: TagFacet[];
   /** Price bounds (minor units) under every filter except price; null when empty. */
   price: { min: number; max: number } | null;
@@ -104,6 +132,10 @@ export type PublicProduct = {
   /** Root → leaf; empty when uncategorised or the category is hidden. */
   categoryPath: { id: string; title: string; slug: string }[];
   tags: { id: string; name: string; slug: string }[];
+  /** Facet values, grouped per facet in facet order. */
+  facets: ProductFacet[];
+  /** Deactivated weapon (EU 2018/337) — a certificate is on file before the item goes live. */
+  requiresDeactivationCert: boolean;
   images: PublicImage[];
   /** Manually related products (ProductRelation order), ids only — resolved via getRelatedProducts. */
   relatedIds: string[];
