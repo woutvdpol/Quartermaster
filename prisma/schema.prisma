@@ -1,5 +1,6 @@
-// Quartermaster — phase 0 foundation: tenants, users, auth, audit, settings.
-// Domain models (products, orders, …) are added in phase 1.
+// Quartermaster — phase 0 foundation (tenants, users, auth, audit, settings)
+// + phase 1 domain (catalog, purchasing, customers, cart, orders, shipping,
+// content, newsletter, analytics). See docs/schema.md for the design notes.
 
 generator client {
   provider = "prisma-client"
@@ -32,6 +33,38 @@ model Tenant {
   users     User[]
   settings  Setting[]
   auditLogs AuditLog[]
+
+  // phase 1 domain
+  sequences             TenantSequence[]
+  categories            Category[]
+  tags                  Tag[]
+  products              Product[]
+  productImages         ProductImage[]
+  productTags           ProductTag[]
+  productRelations      ProductRelation[]
+  suppliers             Supplier[]
+  purchaseRecords       PurchaseRecord[]
+  stockMovements        StockMovement[]
+  customers             Customer[]
+  addresses             Address[]
+  wishlistItems         WishlistItem[]
+  carts                 Cart[]
+  cartItems             CartItem[]
+  reservations          Reservation[]
+  orders                Order[]
+  orderLines            OrderLine[]
+  orderAddresses        OrderAddress[]
+  orderEvents           OrderEvent[]
+  payments              Payment[]
+  invoices              Invoice[]
+  shippingZones         ShippingZone[]
+  shippingRates         ShippingRate[]
+  contentPages          ContentPage[]
+  contentBlocks         ContentBlock[]
+  menuItems             MenuItem[]
+  newsletterSubscribers NewsletterSubscriber[]
+  newsletterCampaigns   NewsletterCampaign[]
+  pageViews             PageView[]
 
   @@map("tenants")
 }
@@ -78,6 +111,12 @@ model User {
   recoveryCodes RecoveryCode[]
   auditLogs     AuditLog[]
 
+  // phase 1 domain
+  customer            Customer? // CUSTOMER users have exactly one Customer row in their tenant
+  orderEvents         OrderEvent[]
+  stockMovements      StockMovement[]
+  newsletterCampaigns NewsletterCampaign[]
+
   // Uniqueness of SUPERADMIN emails (tenantId IS NULL) is enforced by a partial index in SQL.
   @@unique([tenantId, email])
   @@index([email])
@@ -85,16 +124,16 @@ model User {
 }
 
 model Session {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   userId      String
-  tokenHash   String    @unique // sha256(token), the raw token only lives in the cookie
+  tokenHash   String   @unique // sha256(token), the raw token only lives in the cookie
   expiresAt   DateTime
-  lastSeenAt  DateTime  @default(now())
+  lastSeenAt  DateTime @default(now())
   // A session created with a password but awaiting a TOTP code.
-  pendingTotp Boolean   @default(false)
+  pendingTotp Boolean  @default(false)
   ip          String?
   userAgent   String?
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -181,4 +220,899 @@ model Setting {
 
   @@unique([tenantId, group])
   @@map("settings")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE 1 — DOMAIN
+// Conventions (see docs/schema.md):
+// - Every shop-owned row carries `tenantId` (also child rows, so the tenant
+//   Prisma extension can filter every model uniformly).
+// - Money = Int minor units. Stored amounts on orders/payments carry a
+//   `currency Char(3)`; catalog prices are in the tenant currency (Tenant.currency).
+// - PKs are cuid strings; human-facing numbers (StockCode, order number,
+//   invoice number) are per-tenant Ints allocated from TenantSequence.
+// - Nothing commercial is hard-deleted: products → status ARCHIVED,
+//   orders → archivedAt. Tenants are archived, not deleted (Restrict).
+// ════════════════════════════════════════════════════════════════════════════
+
+// ─── Per-tenant counters ────────────────────────────────────────────────────
+
+// Gapless-ish per-tenant numbering for StockCodes, order and invoice numbers.
+// Allocate inside the business transaction:
+//   INSERT INTO tenant_sequences ("tenantId", name, value, "updatedAt") VALUES ($1, $2, $start, now())
+//   ON CONFLICT ("tenantId", name) DO UPDATE SET value = tenant_sequences.value + 1, "updatedAt" = now()
+//   RETURNING value;
+// Names: "product.stockCode" (start 50000, legacy), "order.number", "invoice.number".
+model TenantSequence {
+  tenantId  String
+  name      String
+  value     Int // last issued value
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, name])
+  @@map("tenant_sequences")
+}
+
+// ─── Catalog ────────────────────────────────────────────────────────────────
+
+// One stored status per product (decision 11); exact semantics decided later.
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  RESERVED
+  SOLD
+  ARCHIVED
+  STOLEN
+}
+
+model Category {
+  id             String   @id @default(cuid())
+  tenantId       String
+  parentId       String?
+  title          String
+  slug           String
+  description    String? // Markdown
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  seoTitle       String?
+  seoDescription String?
+  legacyId       Int? // Concept500 categories.id (ETL upsert key)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant   Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@unique([tenantId, slug])
+  @@unique([tenantId, legacyId])
+  @@index([tenantId, parentId, sortOrder])
+  @@map("categories")
+}
+
+model Tag {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  slug        String
+  description String? // Markdown
+  legacyId    Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  products ProductTag[]
+
+  @@unique([tenantId, slug])
+  @@unique([tenantId, name])
+  @@unique([tenantId, legacyId])
+  @@map("tags")
+}
+
+model Product {
+  id                String        @id @default(cuid())
+  tenantId          String
+  // Leading human id (decision 26): legacy products.id is preserved here,
+  // new ones come from TenantSequence "product.stockCode" (start 50000).
+  stockCode         Int
+  sku               String?
+  slug              String
+  title             String
+  description       String? // Markdown
+  specifications    Json? // [{ label, value }] — ordered list
+  status            ProductStatus @default(DRAFT)
+  price             Int // minor units, tenant currency
+  purchasePrice     Int? // minor units; current cost basis (OrderLine snapshots it)
+  weightGrams       Int           @default(0)
+  // Cached sum of StockMovement.delta — updated in the same transaction as the movement.
+  quantity          Int           @default(0)
+  importance        Int           @default(0) // manual sort weight (legacy "importance")
+  publishedAt       DateTime? // listing date; "bump to top" = set to now()
+  soldAt            DateTime?
+  ageRestricted     Boolean       @default(false)
+  blurred           Boolean       @default(false) // sensitive: blurred + login required for guests
+  acceptsOffers     Boolean       @default(false)
+  restrictedSymbols Boolean       @default(false) // e.g. §86a StGB — compliance display rules
+  onSale            Boolean       @default(false) // legacy "sale_item"
+  notes             String? // internal, never shown in shop
+  seoTitle          String?
+  seoDescription    String?
+  categoryId        String?
+  purchaseRecordId  String?
+  legacyData        Json? // ETL leftovers (photo_count, product_id, stock_control, …)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Full-text search: added later as a generated tsvector column + GIN index
+  // (title, description, sku, stockCode) in raw SQL, plus pg_trgm on title.
+
+  tenant         Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  category       Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  purchaseRecord PurchaseRecord?   @relation(fields: [purchaseRecordId], references: [id], onDelete: SetNull)
+  images         ProductImage[]
+  tags           ProductTag[]
+  relatedTo      ProductRelation[] @relation("ProductRelationFrom")
+  relatedFrom    ProductRelation[] @relation("ProductRelationTo")
+  stockMovements StockMovement[]
+  reservations   Reservation[]
+  cartItems      CartItem[]
+  orderLines     OrderLine[]
+  wishlistItems  WishlistItem[]
+
+  @@unique([tenantId, stockCode])
+  @@unique([tenantId, slug])
+  @@unique([tenantId, sku])
+  @@index([tenantId, status, publishedAt(sort: Desc)])
+  @@index([tenantId, categoryId, status])
+  @@index([tenantId, soldAt])
+  @@index([purchaseRecordId])
+  @@map("products")
+}
+
+// Images live on local storage via the StorageDriver (no Cloudflare).
+// storageKey = original, e.g. "{tenantId}/products/{productId}/{imageId}.jpg".
+// Variants are generated by sharp by convention next to the original:
+//   "{tenantId}/products/{productId}/{imageId}/{variant}.webp"
+//   with variant ∈ thumb(320) | card(640) | large(1600) | blur(64, blurred)
+// `variants` is the manifest written after processing ({ name: { key, width, height, bytes } });
+// null = not processed yet.
+model ProductImage {
+  id                 String    @id @default(cuid())
+  tenantId           String
+  productId          String
+  storageKey         String
+  originalFilename   String?
+  mimeType           String?
+  byteSize           Int?
+  width              Int?
+  height             Int?
+  sortOrder          Int       @default(0) // 0 = primary/thumbnail
+  alt                String?
+  variants           Json?
+  processedAt        DateTime?
+  legacyCloudflareId String? // Concept500 products.photos entry (ETL download source)
+  createdAt          DateTime  @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([storageKey])
+  @@index([productId, sortOrder])
+  @@index([tenantId])
+  @@map("product_images")
+}
+
+model ProductTag {
+  tenantId  String
+  productId String
+  tagId     String
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([productId, tagId])
+  @@index([tagId])
+  @@index([tenantId])
+  @@map("product_tags")
+}
+
+// Directed "related products" (legacy related_products, feature-toggled).
+model ProductRelation {
+  tenantId         String
+  productId        String
+  relatedProductId String
+  sortOrder        Int    @default(0)
+
+  tenant         Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  product        Product @relation("ProductRelationFrom", fields: [productId], references: [id], onDelete: Cascade)
+  relatedProduct Product @relation("ProductRelationTo", fields: [relatedProductId], references: [id], onDelete: Cascade)
+
+  @@id([productId, relatedProductId])
+  @@index([relatedProductId])
+  @@index([tenantId])
+  @@map("product_relations")
+}
+
+// ─── Purchasing (decision 12: inkoopadministratie + marge) ──────────────────
+
+// Legacy "product_origins": where items were bought (dealer, auction, private).
+model Supplier {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  contact   String? // free text: person, email, phone
+  notes     String?
+  legacyId  Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  purchaseRecords PurchaseRecord[]
+
+  @@unique([tenantId, name])
+  @@unique([tenantId, legacyId])
+  @@map("suppliers")
+}
+
+// One purchase (invoice / lot). N products → 1 record; each Product keeps its own
+// purchasePrice (allocated cost). Margin = Σ OrderLine.lineTotal − Σ purchasePriceSnapshot × qty.
+model PurchaseRecord {
+  id            String   @id @default(cuid())
+  tenantId      String
+  supplierId    String?
+  purchasedAt   DateTime @db.Date
+  invoiceNumber String?
+  totalCost     Int? // minor units, as invoiced
+  currency      String   @default("EUR") @db.Char(3)
+  notes         String?
+  legacyId      Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  supplier Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  products Product[]
+
+  @@unique([tenantId, legacyId])
+  @@index([tenantId, purchasedAt])
+  @@index([supplierId])
+  @@map("purchase_records")
+}
+
+// ─── Stock ledger ───────────────────────────────────────────────────────────
+
+enum StockMovementReason {
+  PURCHASE
+  SALE
+  ADJUSTMENT
+  RESERVE
+  RELEASE
+  RETURN
+}
+
+// Append-only ledger. Product.quantity = on-hand stock = Σ delta, kept in sync in
+// the same transaction. Cart/checkout holds live in Reservation and do NOT move
+// stock (available = quantity − Σ ACTIVE reservations). RESERVE/RELEASE rows are
+// audit entries (e.g. admin holds an item for a customer) and may have delta 0;
+// all other reasons require delta <> 0 (CHECK constraint in SQL).
+model StockMovement {
+  id            BigInt              @id @default(autoincrement())
+  tenantId      String
+  productId     String
+  delta         Int
+  quantityAfter Int
+  reason        StockMovementReason
+  orderId       String?
+  reservationId String?
+  actorId       String?
+  note          String?
+  createdAt     DateTime            @default(now())
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  product     Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order       Order?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  reservation Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  actor       User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([productId, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([orderId])
+  @@map("stock_movements")
+}
+
+// ─── Customers ──────────────────────────────────────────────────────────────
+
+// Guest or account. Identity per tenant = lower-cased email.
+model Customer {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String?  @unique
+  email     String // lower-case
+  firstName String?
+  lastName  String?
+  phone     String?
+  notes     String? // internal
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user                  User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  addresses             Address[]
+  orders                Order[]
+  carts                 Cart[]
+  wishlistItems         WishlistItem[]
+  newsletterSubscribers NewsletterSubscriber[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId, createdAt])
+  @@map("customers")
+}
+
+enum AddressType {
+  BILLING
+  SHIPPING
+}
+
+model Address {
+  id          String      @id @default(cuid())
+  tenantId    String
+  customerId  String
+  type        AddressType @default(SHIPPING)
+  isDefault   Boolean     @default(false)
+  firstName   String
+  lastName    String
+  company     String?
+  street      String
+  houseNumber String?
+  line2       String?
+  postalCode  String?
+  city        String
+  region      String? // state/province
+  countryCode String      @db.Char(2) // ISO 3166-1 alpha-2, upper-case
+  phone       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([tenantId])
+  @@map("addresses")
+}
+
+model WishlistItem {
+  id         String   @id @default(cuid())
+  tenantId   String
+  customerId String
+  productId  String
+  createdAt  DateTime @default(now())
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, productId])
+  @@index([productId])
+  @@index([tenantId])
+  @@map("wishlist_items")
+}
+
+// ─── Cart & reservation ─────────────────────────────────────────────────────
+
+model Cart {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tokenHash   String   @unique // sha256 of the cart cookie token
+  customerId  String?
+  countryCode String?  @db.Char(2) // chosen/derived shipping country (zone lookup)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer     Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  items        CartItem[]
+  reservations Reservation[]
+
+  @@index([tenantId, updatedAt])
+  @@index([customerId])
+  @@index([expiresAt])
+  @@map("carts")
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  tenantId  String
+  cartId    String
+  productId String
+  quantity  Int      @default(1)
+  addedAt   DateTime @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+  @@index([productId])
+  @@index([tenantId])
+  @@map("cart_items")
+}
+
+enum ReservationStatus {
+  ACTIVE // holds the product
+  CONVERTED // became a sale (order paid/finalized)
+  RELEASED // removed from cart / payment failed / canceled
+  EXPIRED // TTL passed (set by sweeper or by the next reserve attempt)
+}
+
+// Hold on a product for 15 min (decision 18). Created on add-to-cart, moved to the
+// order (orderId) at checkout and extended while the Mollie payment is open.
+// At most ONE ACTIVE reservation per product: partial unique index in SQL
+// ("reservations_active_product_key" … WHERE status = 'ACTIVE').
+// expiresAt cannot be in an index predicate, so a reserve attempt first flips
+// expired ACTIVE rows to EXPIRED inside the same transaction.
+model Reservation {
+  id         String            @id @default(cuid())
+  tenantId   String
+  productId  String
+  cartId     String?
+  orderId    String?
+  quantity   Int               @default(1)
+  status     ReservationStatus @default(ACTIVE)
+  expiresAt  DateTime
+  releasedAt DateTime? // set when leaving ACTIVE
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cart           Cart?           @relation(fields: [cartId], references: [id], onDelete: SetNull)
+  order          Order?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  stockMovements StockMovement[]
+
+  @@index([productId, status])
+  @@index([status, expiresAt])
+  @@index([cartId])
+  @@index([orderId])
+  @@index([tenantId])
+  @@map("reservations")
+}
+
+// ─── Orders ─────────────────────────────────────────────────────────────────
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELED
+  EXPIRED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+// WIP (decision 8): model ready, UI shows a WIP label.
+enum FulfillmentStatus {
+  UNFULFILLED
+  PACKED
+  SHIPPED
+  DELIVERED
+}
+
+enum ShippingMethod {
+  SHIP
+  PICKUP
+}
+
+model Order {
+  id                  String            @id @default(cuid())
+  tenantId            String
+  number              Int // per-tenant sequence "order.number"; legacy orders.id preserved
+  uuid                String            @unique @default(uuid()) @db.Uuid // public status-page token
+  customerId          String?
+  // snapshot of the customer at checkout
+  email               String
+  customerName        String
+  phone               String?
+  // amounts (minor units, `currency`)
+  currency            String            @db.Char(3)
+  subtotal            Int
+  shippingTotal       Int               @default(0)
+  surchargeTotal      Int               @default(0)
+  total               Int // subtotal + shipping + surcharge
+  paymentStatus       PaymentStatus     @default(PENDING)
+  fulfillmentStatus   FulfillmentStatus @default(UNFULFILLED)
+  paymentMethod       String? // snapshot of chosen method ("ideal", "creditcard", legacy "BANK_TRANSFER", …)
+  // shipping snapshot
+  shippingMethod      ShippingMethod    @default(SHIP)
+  shippingZoneId      String?
+  shippingZoneName    String?
+  shippingWeightGrams Int?
+  // fulfillment (WIP)
+  carrier             String?
+  trackingNumber      String?
+  trackingUrl         String?
+  shippedAt           DateTime?
+  deliveredAt         DateTime?
+  // lifecycle
+  placedAt            DateTime          @default(now())
+  paidAt              DateTime?
+  canceledAt          DateTime?
+  // Idempotent completion marker: the webhook/finalizer sets this in the same
+  // transaction as stock SALE movements; `WHERE finalizedAt IS NULL` guards re-runs.
+  finalizedAt         DateTime?
+  confirmationSentAt  DateTime? // order mail sent (idempotency for mail job)
+  archivedAt          DateTime? // orders are never deleted (decision 10)
+  customerNote        String? // message from the customer at checkout
+  notes               String? // internal
+  legacyData          Json? // ETL: raw payment_status/method, legacyNoLines, region, …
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  customer       Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  shippingZone   ShippingZone?   @relation(fields: [shippingZoneId], references: [id], onDelete: SetNull)
+  lines          OrderLine[]
+  addresses      OrderAddress[]
+  payments       Payment[]
+  events         OrderEvent[]
+  reservations   Reservation[]
+  stockMovements StockMovement[]
+  invoice        Invoice?
+
+  @@unique([tenantId, number])
+  @@index([tenantId, placedAt(sort: Desc)])
+  @@index([tenantId, paymentStatus, placedAt(sort: Desc)])
+  @@index([tenantId, fulfillmentStatus])
+  @@index([tenantId, archivedAt])
+  @@index([tenantId, email])
+  @@index([customerId])
+  @@map("orders")
+}
+
+model OrderLine {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  orderId               String
+  productId             String? // null when the product was deleted; snapshot stays
+  // snapshot
+  title                 String
+  stockCode             Int?
+  sku                   String?
+  imagePath             String? // storage key of the primary image variant at order time
+  unitPrice             Int
+  quantity              Int      @default(1)
+  lineTotal             Int // unitPrice × quantity
+  purchasePriceSnapshot Int? // cost basis at sale time → margin report
+  priceReconstructed    Boolean  @default(false) // ETL: legacy order_details.price was rounded euros
+  sortOrder             Int      @default(0)
+  createdAt             DateTime @default(now())
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([tenantId])
+  @@map("order_lines")
+}
+
+model OrderAddress {
+  id          String      @id @default(cuid())
+  tenantId    String
+  orderId     String
+  type        AddressType
+  firstName   String
+  lastName    String
+  company     String?
+  street      String
+  houseNumber String?
+  line2       String?
+  postalCode  String?
+  city        String
+  region      String?
+  countryCode String      @db.Char(2)
+  phone       String?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  order  Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, type])
+  @@index([tenantId])
+  @@map("order_addresses")
+}
+
+// Timeline / status history. type examples: "created", "payment.paid",
+// "payment.failed", "fulfillment.shipped", "note", "email.sent", "archived".
+model OrderEvent {
+  id        BigInt   @id @default(autoincrement())
+  tenantId  String
+  orderId   String
+  type      String
+  data      Json? // e.g. { from, to } or { note }
+  actorId   String? // null = system/webhook/customer
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  order  Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  actor  User?  @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, createdAt])
+  @@index([tenantId, createdAt])
+  @@map("order_events")
+}
+
+enum PaymentProvider {
+  MOLLIE // only live provider (decision 16)
+  MANUAL // admin "mark as paid" / legacy bank transfer & cash (ETL)
+}
+
+enum PaymentAttemptStatus {
+  OPEN
+  PENDING
+  AUTHORIZED
+  PAID
+  FAILED
+  CANCELED
+  EXPIRED
+}
+
+// One row per payment attempt; an order may have several (retries).
+model Payment {
+  id                String               @id @default(cuid())
+  tenantId          String
+  orderId           String
+  provider          PaymentProvider      @default(MOLLIE)
+  providerPaymentId String?              @unique // Mollie "tr_…"; null for MANUAL
+  method            String? // ideal, bancontact, creditcard, paypal, …
+  status            PaymentAttemptStatus @default(OPEN)
+  amount            Int
+  amountRefunded    Int                  @default(0)
+  currency          String               @db.Char(3)
+  checkoutUrl       String?
+  raw               Json? // last provider payload (debugging)
+  paidAt            DateTime?
+  failedAt          DateTime?
+  canceledAt        DateTime?
+  expiredAt         DateTime?
+  expiresAt         DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  order  Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([tenantId, createdAt])
+  @@map("payments")
+}
+
+// WIP (decision 9): stub so invoice numbering has a home; PDF/margin-scheme later.
+model Invoice {
+  id         String   @id @default(cuid())
+  tenantId   String
+  orderId    String   @unique
+  number     Int // per-tenant sequence "invoice.number"
+  issuedAt   DateTime @default(now())
+  total      Int
+  currency   String   @db.Char(3)
+  vatScheme  String? // e.g. "MARGIN" (margeregeling) — WIP
+  storageKey String? // generated PDF
+  createdAt  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  order  Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, number])
+  @@map("invoices")
+}
+
+// ─── Shipping (decision 21: zones per ISO country + weight tiers) ───────────
+
+model ShippingZone {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  countries String[] // ISO 3166-1 alpha-2, upper-case; ["*"] = rest of world
+  sortOrder Int      @default(0) // first matching zone wins
+  isPickup  Boolean  @default(false) // "pickup in store": no address/weight needed
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  rates  ShippingRate[]
+  orders Order[]
+
+  @@index([tenantId, sortOrder])
+  @@map("shipping_zones")
+}
+
+// Rate = first tier with maxWeightGrams ≥ cart weight.
+model ShippingRate {
+  id              String   @id @default(cuid())
+  tenantId        String
+  zoneId          String
+  maxWeightGrams  Int
+  price           Int // minor units, tenant currency
+  // optional insurance
+  insurancePrice  Int? // extra charge when insured
+  maxInsuredValue Int? // insured up to this order value
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  zone   ShippingZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@unique([zoneId, maxWeightGrams])
+  @@index([tenantId])
+  @@map("shipping_rates")
+}
+
+// ─── Content (one block CMS) ────────────────────────────────────────────────
+
+enum ContentBlockType {
+  HERO
+  TEXT
+  TEXT_HORIZONTAL
+  TEXT_IMAGE
+  TEXT_PRODUCT
+  TEXT_CAROUSEL
+  QUOTE
+  CTA
+  TESTIMONIAL
+  NEW_ITEMS
+  GALLERY
+  CATEGORIES
+  NEWSLETTER_SIGNUP // legacy EMAILER
+}
+
+model ContentPage {
+  id             String    @id @default(cuid())
+  tenantId       String
+  slug           String // "" = home is avoided; home uses systemKey HOME + slug "home"
+  title          String
+  systemKey      String? // HOME, TERMS, PRIVACY, ABOUT, CONTACT, … (legacy ShopPageEnum)
+  seoTitle       String?
+  seoDescription String?
+  publishedAt    DateTime? // null = draft
+  legacyId       Int?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  blocks    ContentBlock[]
+  menuItems MenuItem[]
+
+  @@unique([tenantId, slug])
+  @@unique([tenantId, systemKey])
+  @@unique([tenantId, legacyId])
+  @@map("content_pages")
+}
+
+// `data` is validated by a Zod discriminated union on `type` (relative URLs only).
+model ContentBlock {
+  id        String           @id @default(cuid())
+  tenantId  String
+  pageId    String
+  type      ContentBlockType
+  data      Json
+  sortOrder Int              @default(0)
+  isVisible Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  tenant Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  page   ContentPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, sortOrder])
+  @@index([tenantId])
+  @@map("content_blocks")
+}
+
+enum MenuLocation {
+  HEADER
+  FOOTER
+}
+
+model MenuItem {
+  id        String       @id @default(cuid())
+  tenantId  String
+  location  MenuLocation
+  parentId  String?
+  label     String
+  url       String? // relative ("/shop") or absolute external; else pageId
+  pageId    String?
+  sortOrder Int          @default(0)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  parent   MenuItem?    @relation("MenuTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children MenuItem[]   @relation("MenuTree")
+  page     ContentPage? @relation(fields: [pageId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, location, parentId, sortOrder])
+  @@map("menu_items")
+}
+
+// ─── Newsletter (decision 14: own sending) ──────────────────────────────────
+
+// Status is derived: confirmedAt null → pending; unsubscribedAt set → unsubscribed.
+// Unsubscribe links use an HMAC(subscriberId) signature, so no stored token is needed.
+model NewsletterSubscriber {
+  id               String    @id @default(cuid())
+  tenantId         String
+  email            String // lower-case
+  customerId       String?
+  confirmTokenHash String?   @unique // sha256 of the double-opt-in token
+  confirmSentAt    DateTime?
+  confirmedAt      DateTime? // = consent timestamp (AVG)
+  unsubscribedAt   DateTime?
+  source           String? // "footer", "checkout", "popup", "import"
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, email])
+  @@index([tenantId, confirmedAt, unsubscribedAt])
+  @@map("newsletter_subscribers")
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  FAILED
+}
+
+model NewsletterCampaign {
+  id             String         @id @default(cuid())
+  tenantId       String
+  subject        String
+  body           String // Markdown; rendered via React Email template
+  status         CampaignStatus @default(DRAFT)
+  scheduledAt    DateTime?
+  sentAt         DateTime?
+  recipientCount Int            @default(0)
+  sentCount      Int            @default(0)
+  failedCount    Int            @default(0)
+  createdById    String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  createdBy User?  @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, createdAt])
+  @@map("newsletter_campaigns")
+}
+
+// ─── Analytics (own, cookieless) ────────────────────────────────────────────
+
+// visitorHash = sha256(dailySalt + tenantId + ip + userAgent); the salt rotates
+// daily and is discarded, so visitors cannot be tracked across days. No raw IP/UA stored.
+model PageView {
+  id           BigInt   @id @default(autoincrement())
+  tenantId     String
+  path         String // without query string
+  referrerHost String?
+  countryCode  String?  @db.Char(2)
+  visitorHash  String
+  createdAt    DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, path, createdAt])
+  @@index([tenantId, visitorHash, createdAt])
+  @@map("page_views")
 }
