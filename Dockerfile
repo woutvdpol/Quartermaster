@@ -53,8 +53,13 @@ COPY --from=build /app/src/generated ./src/generated
 COPY prisma ./prisma
 COPY prisma.config.ts tsconfig.json ./
 COPY src ./src
+COPY scripts ./scripts
 USER node
 CMD ["npx", "prisma", "migrate", "deploy"]
+
+# Background worker (pg-boss jobs + cron): same image as migrate, different command.
+FROM migrate AS worker
+CMD ["npx", "tsx", "scripts/worker.ts"]
 
 # ─── runner: production server ───────────────────────────────────────────────
 FROM base AS runner

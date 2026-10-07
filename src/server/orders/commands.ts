@@ -7,6 +7,7 @@ import { getSettings } from "@/server/settings";
 import type { Prisma } from "@/generated/prisma/client";
 import type { FulfillmentStatus, PaymentStatus } from "@/generated/prisma/enums";
 import { recordMovement } from "@/server/stock/ledger";
+import { queueOrderConfirmation } from "@/server/mail";
 import {
   isFinalAttemptStatus,
   isMollieStatus,
@@ -150,8 +151,10 @@ export async function finalizeOrderTx(
 
   await addEvent(tx, tenantId, orderId, "finalized", { source: opts.source }, actorId);
   if (oversold.length) await addEvent(tx, tenantId, orderId, "stock.oversold", { lines: oversold }, null);
-  // TODO(mail): enqueue the confirmation job (customer + owner) here; it sets confirmationSentAt when sent.
-  await addEvent(tx, tenantId, orderId, "confirmation_queued", undefined, null);
+  // Customer + owner confirmation mails, queued in this transaction (claims confirmationSentAt once).
+  if (await queueOrderConfirmation(tenantId, orderId, { tx })) {
+    await addEvent(tx, tenantId, orderId, "confirmation_queued", undefined, null);
+  }
   return { finalized: true, oversold };
 }
 

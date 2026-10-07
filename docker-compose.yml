@@ -61,6 +61,31 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  # Background jobs (pg-boss): mail, newsletter fan-out, cron (reservation expiry, rate-limit pruning).
+  # Reuses the `migrate` image (full deps incl. tsx + sources). TODO(Dockerfile): `COPY scripts ./scripts`
+  # in that stage (or a dedicated `worker` target) — until then scripts/ is mounted read-only.
+  worker:
+    profiles: ["app"]
+    build:
+      context: .
+      target: worker
+    image: quartermaster-worker:dev
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://quartermaster:quartermaster@postgres:5432/quartermaster
+      # Without SMTP_URL, mails are written as .eml files here: `docker compose exec worker ls /tmp/qm-mail`
+      MAIL_OUTBOX_DIR: /tmp/qm-mail
+    stop_signal: SIGTERM
+    stop_grace_period: 35s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   uploads:

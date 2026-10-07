@@ -116,3 +116,31 @@ Not deployed yet; the image is prepared for it:
 - **Multiple replicas.** Set the same `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` at build time for all instances, and consider `deploymentId` for version-skew protection (see the Next.js self-hosting guide). The Next.js cache is per pod by default.
 - **Security context.** `runAsNonRoot: true`, `runAsUser: 1001`, `fsGroup: 1001`; the root filesystem can be read-only apart from `/app/uploads` and `/app/.next/cache` (mount an `emptyDir` there).
 - **Ingress.** Terminate TLS at the ingress/reverse proxy; disable response buffering there so streaming works.
+
+## Background jobs
+
+Mail, newsletter fan-out and recurring maintenance run as [pg-boss](https://pgboss.io) jobs in the
+same Postgres database (schema `pgboss`, created automatically). Web code only *queues* work; a separate
+worker process executes it.
+
+```bash
+npx tsx scripts/worker.ts                 # local worker (reads .env)
+docker compose --profile app up -d worker # containerised worker
+```
+
+- **Jobs** are defined with `defineJob(name, zodSchema, handler)` and listed in `src/server/jobs/definitions.ts`;
+  queue them with `enqueue(name, payload, { tx? })` (`tx` = inside a Prisma transaction). Handlers can be
+  run in-process with `runJobNow()` (tests, scripts).
+- **Mail** always goes through the `mail.send` job (6 attempts, exponential backoff): `queueMail()`,
+  `queueOrderConfirmation(tenantId, orderId)`, `requestPasswordResetEmail()`. Templates are React Email
+  components in `src/emails/`. Without `SMTP_URL`, mails are written to `.local/mail/*.eml`.
+- **Cron** (UTC, registered by the worker): `reservations.expire` every minute, `rate-limit.prune` hourly.
+  Alternatively trigger them externally, e.g. from a Kubernetes CronJob:
+  `curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://<host>/api/cron/reservations.expire`.
+  Set `WORKER_CRON=0` on the worker if only the external trigger should run them.
+- **Kubernetes**: run the worker as its own Deployment (any number of replicas; jobs are claimed with
+  `SKIP LOCKED`). On SIGTERM it stops fetching and waits up to `WORKER_SHUTDOWN_TIMEOUT_MS` (default 25 s)
+  for running jobs — keep `terminationGracePeriodSeconds` above that.
+- **Newsletter**: double opt-in (`/api/newsletter/confirm`), HMAC-signed unsubscribe links with RFC 8058
+  one-click (`List-Unsubscribe` + `List-Unsubscribe-Post`, `POST /api/newsletter/unsubscribe`), campaigns
+  fanned out in batches of 200, monthly quota from `platform.newsletterQuota`.
