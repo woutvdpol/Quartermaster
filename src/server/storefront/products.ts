@@ -1,0 +1,197 @@
+import "server-only";
+import type { Prisma } from "@/generated/prisma/client";
+import { db } from "@/server/db";
+import { imageUrl } from "@/server/media/product-images";
+import { categoryHref } from "@/server/content/rules";
+import type { ProductAvailability, ProductCardData, ShopImage } from "@/components/shop/ui/types";
+import { shopCache } from "./cache";
+
+/*
+ * Public product reads shared by the home page blocks, sitemap and (optionally) other shop areas.
+ * Rules: only ACTIVE/RESERVED/SOLD products are ever public (never DRAFT/ARCHIVED/STOLEN); no
+ * purchase prices, notes or legacyData leave this module; sensitive (`blurred`) products are
+ * "locked" for guests when legal.blurSensitiveForGuests is on.
+ */
+
+/** Prisma select for everything a product card needs (nothing internal). */
+export const productCardSelect = {
+  id: true,
+  stockCode: true,
+  slug: true,
+  title: true,
+  price: true,
+  status: true,
+  onSale: true,
+  blurred: true,
+  quantity: true,
+  publishedAt: true,
+  category: { select: { title: true } },
+  images: {
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    take: 1,
+    select: { storageKey: true, variants: true, alt: true, width: true, height: true },
+  },
+} satisfies Prisma.ProductSelect;
+
+export type ProductCardRow = Prisma.ProductGetPayload<{ select: typeof productCardSelect }>;
+
+/** Cache-safe version of a card row (publishedAt as ISO string). */
+export type ProductCardRowJson = Omit<ProductCardRow, "publishedAt"> & { publishedAt: string | null };
+
+export const PUBLIC_PRODUCT_STATUSES = ["ACTIVE", "RESERVED", "SOLD"] as const;
+
+export function productHref(p: { stockCode: number; slug: string }): string {
+  return `/product/${p.stockCode}/${p.slug}`;
+}
+export { categoryHref };
+
+type ImageRow = ProductCardRow["images"][number];
+
+function manifestEntry(variants: unknown, name: string): { key?: string; dataUrl?: string; width?: number } | null {
+  if (!variants || typeof variants !== "object" || Array.isArray(variants)) return null;
+  const e = (variants as Record<string, unknown>)[name];
+  return e && typeof e === "object" ? (e as { key?: string; dataUrl?: string; width?: number }) : null;
+}
+
+/** Card image: card (800w) as src, thumb/card/large in srcSet, inline blur placeholder. */
+export function toShopImage(img: ImageRow, fallbackAlt: string): ShopImage {
+  const url = (v: "thumb" | "card" | "large") => {
+    const key = manifestEntry(img.variants, v)?.key;
+    return key ? `/uploads/${key}` : imageUrl(img.storageKey, v);
+  };
+  const processed = !!manifestEntry(img.variants, "card");
+  return {
+    src: processed ? url("card") : imageUrl(img.storageKey),
+    srcSet: processed ? `${url("thumb")} 320w, ${url("card")} 800w, ${url("large")} 2000w` : undefined,
+    blurDataUrl: manifestEntry(img.variants, "blur")?.dataUrl ?? null,
+    alt: img.alt ?? fallbackAlt,
+    width: img.width,
+    height: img.height,
+  };
+}
+
+export type CardOptions = {
+  currency: string;
+  /** Signed-in customer/owner of this shop. */
+  viewerSignedIn: boolean;
+  /** legal.blurSensitiveForGuests */
+  blurSensitiveForGuests: boolean;
+  /** catalog.showPriceWhenSold */
+  showPriceWhenSold: boolean;
+  /** Ids with a live (unexpired ACTIVE) reservation — see `liveReservedIds`. */
+  reservedIds?: ReadonlySet<string>;
+};
+
+export function availabilityOf(p: { id: string; status: string; quantity: number }, reservedIds?: ReadonlySet<string>): ProductAvailability {
+  if (p.status === "SOLD" || p.quantity <= 0) return "sold";
+  if (p.status === "RESERVED" || reservedIds?.has(p.id)) return "reserved";
+  return "available";
+}
+
+/** Maps a card row to the client-safe ProductCardData. */
+export function toProductCardData(p: ProductCardRow | ProductCardRowJson, opts: CardOptions): ProductCardData {
+  const availability = availabilityOf(p, opts.reservedIds);
+  const locked = p.blurred && opts.blurSensitiveForGuests && !opts.viewerSignedIn;
+  const img = p.images[0];
+  let image: ShopImage | null = img ? toShopImage(img, p.title) : null;
+  if (image && locked) image = { src: "", blurDataUrl: image.blurDataUrl, alt: "" }; // never leak the real URL
+  return {
+    id: p.id,
+    stockCode: p.stockCode,
+    title: p.title,
+    href: productHref(p),
+    priceCents: p.price,
+    currency: opts.currency,
+    availability,
+    showPrice: availability !== "sold" || opts.showPriceWhenSold,
+    onSale: p.onSale,
+    locked,
+    image,
+    eyebrow: p.category?.title ?? null,
+  };
+}
+
+function toJson(rows: ProductCardRow[]): ProductCardRowJson[] {
+  return rows.map((r) => ({ ...r, publishedAt: r.publishedAt?.toISOString() ?? null }));
+}
+
+/** Product ids among `ids` with a live reservation (not cached: changes every few minutes). */
+export async function liveReservedIds(tenantId: string, ids: string[]): Promise<Set<string>> {
+  if (!ids.length) return new Set();
+  const rows = await db.reservation.findMany({
+    where: { tenantId, productId: { in: ids }, status: "ACTIVE", expiresAt: { gt: new Date() } },
+    select: { productId: true },
+  });
+  return new Set(rows.map((r) => r.productId));
+}
+
+/** Latest ACTIVE products (newest listing first). Uncached; see `getNewItems`. */
+export async function queryNewItems(tenantId: string, count: number): Promise<ProductCardRowJson[]> {
+  const rows = await db.product.findMany({
+    where: { tenantId, status: "ACTIVE", quantity: { gt: 0 } },
+    orderBy: [{ publishedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
+    take: Math.min(Math.max(count, 1), 48),
+    select: productCardSelect,
+  });
+  return toJson(rows);
+}
+export const getNewItems = shopCache("new-items", "catalog", queryNewItems);
+
+/** Public products by id (for TEXT_PRODUCT), in the given order; non-public ids are dropped. */
+export async function queryProductsByIds(tenantId: string, ids: string[]): Promise<ProductCardRowJson[]> {
+  if (!ids.length) return [];
+  const rows = await db.product.findMany({
+    where: { tenantId, id: { in: ids }, status: { in: [...PUBLIC_PRODUCT_STATUSES] } },
+    select: productCardSelect,
+  });
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return toJson(ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])));
+}
+export const getProductsByIds = shopCache("products-by-ids", "catalog", queryProductsByIds);
+
+export type CategoryTile = { id: string; title: string; href: string; productCount: number; image: ShopImage | null };
+
+/**
+ * Category tiles: the chosen ids (in that order) or, when empty, all active top-level categories.
+ * The image is the cover of the newest public non-sensitive product in the category (categories
+ * have no image of their own).
+ */
+export async function queryCategoryTiles(tenantId: string, ids: string[]): Promise<CategoryTile[]> {
+  const cats = await db.category.findMany({
+    where: ids.length ? { tenantId, id: { in: ids }, isActive: true } : { tenantId, parentId: null, isActive: true },
+    orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
+    select: { id: true, title: true, slug: true, _count: { select: { products: { where: { status: "ACTIVE" } } } } },
+  });
+  const ordered = ids.length ? ids.flatMap((id) => cats.filter((c) => c.id === id)) : cats;
+  return Promise.all(
+    ordered.map(async (c) => {
+      const p = await db.product.findFirst({
+        where: { tenantId, categoryId: c.id, status: { in: ["ACTIVE", "SOLD"] }, blurred: false, images: { some: {} } },
+        orderBy: [{ status: "asc" }, { publishedAt: { sort: "desc", nulls: "last" } }],
+        select: { title: true, images: productCardSelect.images },
+      });
+      return {
+        id: c.id,
+        title: c.title,
+        href: categoryHref(c.slug),
+        productCount: c._count.products,
+        image: p?.images[0] ? toShopImage(p.images[0], c.title) : null,
+      };
+    }),
+  );
+}
+export const getCategoryTiles = shopCache("category-tiles", "catalog", queryCategoryTiles);
+
+/** Public, indexable products for the sitemap (sensitive items excluded: guests cannot open them). */
+export async function listProductsForSitemap(tenantId: string, includeSold: boolean) {
+  return db.product.findMany({
+    where: { tenantId, blurred: false, status: { in: includeSold ? ["ACTIVE", "RESERVED", "SOLD"] : ["ACTIVE", "RESERVED"] } },
+    select: { stockCode: true, slug: true, updatedAt: true },
+    orderBy: { stockCode: "desc" },
+    take: 45_000,
+  });
+}
+
+export async function listCategoriesForSitemap(tenantId: string) {
+  return db.category.findMany({ where: { tenantId, isActive: true }, select: { slug: true, updatedAt: true } });
+}

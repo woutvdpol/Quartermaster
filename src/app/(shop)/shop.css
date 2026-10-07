@@ -1,0 +1,203 @@
+/*
+ * Storefront theme (white-label)
+ * ──────────────────────────────
+ * Imported only by src/app/(shop)/layout.tsx, so nothing here reaches the admin.
+ *
+ * The shop layout sets the raw tenant values as inline CSS variables on the `.shop-root` element:
+ *   --shop-primary / --shop-secondary / --shop-accent           (appearance.colors, #rrggbb)
+ *   --shop-on-primary / --shop-on-secondary / --shop-on-accent  (black or white, computed for contrast)
+ *   --shop-font-heading / --shop-font-body                      (next/font family of the chosen allowlist font)
+ * Everything else (paper background, ink, lines, tints) is derived below with color-mix, so a shop
+ * only ever configures three colours and two fonts.
+ *
+ * Utilities: this file generates Tailwind utilities for the shop sources only (`source(none)` + the
+ * two @source lines) with the extra `shop-*` tokens. Common utilities (flex, px-4 …) are therefore
+ * emitted twice (here and in globals.css); that is harmless because for any element in a shop file
+ * both conflicting classes live in this sheet, which loads after globals.css, in Tailwind's order.
+ *
+ * Usage: bg-shop-bg, bg-shop-surface, text-shop-ink, text-shop-muted, border-shop-line,
+ * bg-shop-primary text-shop-on-primary, bg-shop-primary-soft, text-shop-primary, bg-shop-accent …,
+ * font-shop-heading, font-shop-body, rounded-shop, shadow-shop. Plus `shop-prose` for Markdown.
+ */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+
+@source "./";
+@source "../../components/shop";
+
+@theme inline {
+  --color-shop-bg: var(--shop-bg);
+  --color-shop-surface: var(--shop-surface);
+  --color-shop-sunken: var(--shop-sunken);
+  --color-shop-ink: var(--shop-ink);
+  --color-shop-ink-2: var(--shop-ink-2);
+  --color-shop-muted: var(--shop-muted);
+  --color-shop-line: var(--shop-line);
+  --color-shop-line-strong: var(--shop-line-strong);
+
+  --color-shop-primary: var(--shop-primary);
+  --color-shop-primary-strong: var(--shop-primary-strong);
+  --color-shop-primary-soft: var(--shop-primary-soft);
+  --color-shop-on-primary: var(--shop-on-primary);
+  --color-shop-secondary: var(--shop-secondary);
+  --color-shop-secondary-soft: var(--shop-secondary-soft);
+  --color-shop-on-secondary: var(--shop-on-secondary);
+  --color-shop-accent: var(--shop-accent);
+  --color-shop-accent-soft: var(--shop-accent-soft);
+  --color-shop-on-accent: var(--shop-on-accent);
+
+  --color-shop-ok: var(--shop-ok);
+  --color-shop-ok-soft: var(--shop-ok-soft);
+  --color-shop-warn: var(--shop-warn);
+  --color-shop-warn-soft: var(--shop-warn-soft);
+  --color-shop-crit: var(--shop-crit);
+  --color-shop-crit-soft: var(--shop-crit-soft);
+
+  --font-shop-heading: var(--shop-font-heading);
+  --font-shop-body: var(--shop-font-body);
+
+  --radius-shop: var(--shop-radius);
+  --radius-shop-sm: var(--shop-radius-sm);
+  --shadow-shop: var(--shop-shadow);
+  --shadow-shop-pop: var(--shop-shadow-pop);
+}
+
+.shop-root {
+  /* Fallbacks (the layout always sets these inline). */
+  --shop-primary: #3f4a2c;
+  --shop-secondary: #c2b280;
+  --shop-accent: #8b1e1e;
+  --shop-on-primary: #ffffff;
+  --shop-on-secondary: #1c1a16;
+  --shop-on-accent: #ffffff;
+  --shop-font-heading: Georgia, serif;
+  --shop-font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Derived neutrals: warm paper tinted by the secondary colour, ink tinted by the primary. */
+  --shop-bg: color-mix(in oklab, var(--shop-secondary) 9%, #fffdf8);
+  --shop-surface: #ffffff;
+  --shop-sunken: color-mix(in oklab, var(--shop-secondary) 18%, #fffdf8);
+  --shop-ink: color-mix(in oklab, var(--shop-primary) 22%, #191712);
+  --shop-ink-2: color-mix(in oklab, var(--shop-ink) 82%, var(--shop-bg));
+  --shop-muted: color-mix(in oklab, var(--shop-ink) 62%, var(--shop-bg));
+  --shop-line: color-mix(in oklab, var(--shop-secondary) 32%, #fbf8f1);
+  --shop-line-strong: color-mix(in oklab, var(--shop-secondary) 60%, #8a8270);
+
+  --shop-primary-strong: color-mix(in oklab, var(--shop-primary) 82%, #000);
+  --shop-primary-soft: color-mix(in oklab, var(--shop-primary) 11%, #fff);
+  --shop-secondary-soft: color-mix(in oklab, var(--shop-secondary) 22%, #fff);
+  --shop-accent-soft: color-mix(in oklab, var(--shop-accent) 10%, #fff);
+
+  --shop-ok: #2f6b3a;
+  --shop-ok-soft: #e1eedd;
+  --shop-warn: #8a5b00;
+  --shop-warn-soft: #f7ebcd;
+  --shop-crit: #a2342a;
+  --shop-crit-soft: #f6dfdb;
+
+  --shop-radius: 6px;
+  --shop-radius-sm: 4px;
+  --shop-shadow: 0 1px 2px rgb(28 26 22 / 0.06), 0 4px 14px rgb(28 26 22 / 0.06);
+  --shop-shadow-pop: 0 10px 40px rgb(28 26 22 / 0.22);
+
+  background-color: var(--shop-bg);
+  color: var(--shop-ink);
+  font-family: var(--shop-font-body);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  color-scheme: light;
+}
+
+.shop-root :where(h1, h2, h3, h4) {
+  font-family: var(--shop-font-heading);
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.shop-root :focus-visible {
+  outline: 2px solid var(--shop-primary);
+  outline-offset: 2px;
+}
+
+.shop-root ::selection {
+  background: var(--shop-secondary-soft);
+}
+
+/* Markdown output of <Markdown> (CMS blocks, product/category descriptions). */
+.shop-prose {
+  color: var(--shop-ink-2);
+  max-width: 68ch;
+}
+.shop-prose > * + * {
+  margin-top: 0.9em;
+}
+.shop-prose :where(h2, h3, h4) {
+  color: var(--shop-ink);
+  margin-top: 1.4em;
+}
+.shop-prose h2 {
+  font-size: 1.6rem;
+}
+.shop-prose h3 {
+  font-size: 1.3rem;
+}
+.shop-prose h4 {
+  font-size: 1.1rem;
+}
+.shop-prose a {
+  color: var(--shop-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.shop-prose a:hover {
+  color: var(--shop-primary-strong);
+}
+.shop-prose strong {
+  color: var(--shop-ink);
+  font-weight: 600;
+}
+.shop-prose ul {
+  list-style: disc;
+  padding-left: 1.3em;
+}
+.shop-prose ol {
+  list-style: decimal;
+  padding-left: 1.3em;
+}
+.shop-prose li + li {
+  margin-top: 0.3em;
+}
+.shop-prose blockquote {
+  border-left: 3px solid var(--shop-secondary);
+  padding-left: 1em;
+  font-style: italic;
+}
+.shop-prose hr {
+  border: 0;
+  border-top: 1px solid var(--shop-line);
+  margin: 1.6em 0;
+}
+
+/* Horizontal scroll-snap rails (carousels, category sliders) without a library. */
+.shop-rail {
+  display: grid;
+  grid-auto-flow: column;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.shop-rail > * {
+  scroll-snap-align: start;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shop-root * {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}

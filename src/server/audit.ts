@@ -1,6 +1,7 @@
 import "server-only";
 import { headers } from "next/headers";
 import { db } from "@/server/db";
+import { invalidateShopForAction } from "@/server/storefront/cache";
 import type { Prisma } from "@/generated/prisma/client";
 
 type AuditEntry = {
@@ -29,4 +30,5 @@ export async function audit(entry: AuditEntry) {
       ip,
     },
   });
+  invalidateShopForAction(entry.tenantId, entry.action);
 }

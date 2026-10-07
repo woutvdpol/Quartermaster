@@ -1,0 +1,47 @@
+/** English copy for the shop chrome (header, footer, age gate, newsletter). */
+export const layoutCopy = {
+  skipToContent: "Skip to content",
+  header: {
+    homeLabel: "home",
+    mainNav: "Main",
+    openMenu: "Open menu",
+    closeMenu: "Close menu",
+    menu: "Menu",
+    search: "Search",
+    searchPlaceholder: "Search the shop…",
+    searchLabel: "Search products",
+    account: "Account",
+    wishlist: "Wishlist",
+    cart: "Cart",
+    cartCount: (n: number) => (n === 1 ? "1 item in cart" : `${n} items in cart`),
+    wishlistCount: (n: number) => (n === 1 ? "1 saved item" : `${n} saved items`),
+    shop: "Shop",
+  },
+  footer: {
+    newsletterTitle: "Newsletter",
+    newsletterText: "New arrivals and stories from the collection, straight to your inbox.",
+    contact: "Contact",
+    poweredBy: "Powered by",
+    legal: "Legal",
+    rights: "All rights reserved.",
+  },
+  newsletter: {
+    emailLabel: "Email address",
+    placeholder: "you@example.com",
+    submit: "Subscribe",
+    submitting: "Subscribing…",
+    success: "Thanks! Check your inbox to confirm your subscription.",
+    invalid: "Enter a valid email address.",
+    unavailable: "Signing up is not possible right now. Please try again later.",
+    tooMany: "Too many attempts. Please try again later.",
+    honeypot: "Leave this field empty",
+  },
+  ageGate: {
+    title: (age: number) => `Are you ${age} or older?`,
+    body: (shop: string, age: number) =>
+      `${shop} sells items that are only intended for adults. Please confirm that you are at least ${age} years old to continue.`,
+    confirm: (age: number) => `Yes, I am ${age} or older`,
+    leave: "No, leave",
+    denied: (age: number) => `Sorry, you must be ${age} or older to visit this shop.`,
+  },
+} as const;
