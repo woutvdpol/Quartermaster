@@ -133,6 +133,10 @@ async function main() {
   await seedUser({ role: "SUPERADMIN", tenantId: null, name: "Quartermaster Admin", ...superadmin });
   await seedUser({ role: "OWNER", tenantId: concept.id, name: "Concept Owner", ...owner });
 
+  // Draft system pages (home, terms, privacy, contact, about) with starter blocks.
+  const { ensureSystemPages } = await import("../src/server/content/pages");
+  for (const t of tenants) await ensureSystemPages(t.id);
+
   await seedCatalog(tenants);
 
   console.log(`Seeded ${tenants.length} tenants (${tenants.map((t) => t.slug).join(", ")}), superadmin and owner.`);
