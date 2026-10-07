@@ -40,3 +40,8 @@ CLAUDE.md
 Dockerfile
 .dockerignore
 docker-compose.yml
+# Test files colocated in src/ (they import tests/ helpers, which are excluded above)
+src/**/*.test.ts
+src/**/*.test.tsx
+vitest.config.ts
+vitest.integration.config.ts
