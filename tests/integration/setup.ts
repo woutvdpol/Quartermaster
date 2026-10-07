@@ -1,8 +1,8 @@
 import "dotenv/config";
-import { vi } from "vitest";
+import { inject, vi } from "vitest";
 
 // Point the app's db client at the test database before any module imports it.
-process.env.DATABASE_URL = process.env.DATABASE_URL_TEST;
+process.env.DATABASE_URL = inject("databaseUrl");
 process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32, 7).toString("base64");
 
 // Services may read request headers/cookies (audit IP, tenant cookie); outside Next there is no request.
