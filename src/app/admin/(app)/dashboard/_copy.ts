@@ -1,0 +1,105 @@
+/* Dashboard screen copy (English). */
+
+export const PERIODS = [7, 30, 90] as const;
+export type Period = (typeof PERIODS)[number];
+
+export function parsePeriod(value: string | string[] | undefined): Period {
+  const n = Number(Array.isArray(value) ? value[0] : value);
+  return (PERIODS as readonly number[]).includes(n) ? (n as Period) : 30;
+}
+
+export const copy = {
+  crumb: "Quartermaster",
+  title: "Dashboard",
+  periodLegend: "Period",
+  periodOption: (d: number) => `${d} days`,
+  periodLabel: (d: number) => `Last ${d} days`,
+  newProduct: "+ New product",
+  kpis: {
+    label: (d: number) => `Key figures, last ${d} days`,
+    revenue: "Revenue",
+    orders: "Orders",
+    aov: "Avg. order value",
+    margin: "Margin",
+    vsPrevious: (d: number) => `vs. previous ${d} days`,
+    vs: "vs.",
+    noPrevious: "no sales in previous period",
+    marginNote: "from purchase prices",
+    revenueNote: "paid · excl. shipping",
+  },
+  chart: {
+    title: "Revenue per day",
+    aside: "paid · excl. shipping",
+    aria: (d: number) => `Revenue per day, last ${d} days`,
+    empty: "No paid orders in this period yet.",
+    table: "Show as table",
+    day: "Day",
+    revenue: "Revenue",
+    orders: "Orders",
+    ordersCount: (n: number) => `${n} ${n === 1 ? "order" : "orders"}`,
+    total: "Total",
+  },
+  todo: {
+    title: "To do today",
+    open: (n: number) => (n === 0 ? "all clear" : `${n} open`),
+    paidNotShipped: "Paid, not yet shipped",
+    awaitingTransfer: "Bank transfer awaiting payment",
+    openPayments: "Online payment not completed",
+    failed: "Failed payments (last 7 days)",
+    reserved: "Reserved in a cart now",
+    allClear: "Nothing waiting. Nice work.",
+  },
+  visitors: {
+    title: "Visitors",
+    aside: (d: number) => `last ${d} days`,
+    unique: "Unique visitors",
+    pageviews: "Page views",
+    live: "Live now",
+    topPages: "Top pages",
+    topReferrers: "Top referrers",
+    none: "No data yet",
+    sparkAria: (d: number, total: number) => `Visitors per day over the last ${d} days, ${total} in total`,
+    notConfigured: "Analytics not configured",
+    notConfiguredBody: "Matomo could not be reached or is not set up. Check the analytics settings, or switch to the built-in analytics.",
+    settings: "Analytics settings",
+    error: "Visitor statistics are unavailable right now.",
+  },
+  latest: {
+    title: "Latest orders",
+    all: "All orders →",
+    order: "Order",
+    customer: "Customer",
+    payment: "Payment",
+    fulfillment: "Fulfillment",
+    total: "Total",
+    placed: "Placed",
+    empty: "No orders yet",
+    emptyBody: "Orders appear here as soon as customers check out.",
+  },
+  stock: {
+    title: "Stock",
+    forSale: "For sale",
+    reserved: "In a cart",
+    sold30d: "Sold (30 days)",
+    valueAtPrice: "Stock value (price)",
+    valueAtCost: "Stock value (cost)",
+    withoutCost: (n: number) => `${n} ${n === 1 ? "item has" : "items have"} no purchase price`,
+    inventory: "Inventory →",
+  },
+  margin: {
+    title: "Margin by category",
+    aside: "last 30 days",
+    report: "Margin report →",
+    empty: "No paid sales with a purchase price in the last 30 days.",
+    missing: (n: number) => `${n} sold ${n === 1 ? "line has" : "lines have"} no purchase price and ${n === 1 ? "is" : "are"} left out.`,
+    noCost: "no cost",
+    aria: "Margin percentage per category, last 30 days",
+    more: (n: number) => `+ ${n} more in the report`,
+  },
+  error: {
+    title: "The dashboard could not be loaded",
+    body: "Something went wrong while fetching the figures. Try again in a moment.",
+    retry: "Try again",
+    section: "This section could not be loaded.",
+  },
+} as const;
