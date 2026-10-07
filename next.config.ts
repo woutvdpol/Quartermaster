@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   // Self-contained server bundle for the Docker image.
   output: "standalone",
   // Loaded at runtime from node_modules instead of being bundled (native/large server deps).
-  serverExternalPackages: ["pg-boss", "sharp"],
+  serverExternalPackages: ["pg-boss", "sharp", "@react-pdf/renderer"],
   experimental: {
     // Image uploads go through server actions; images may be up to 25 MB (src/server/media/images.ts).
     serverActions: { bodySizeLimit: "26mb" },

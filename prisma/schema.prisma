@@ -65,6 +65,17 @@ model Tenant {
   newsletterSubscribers NewsletterSubscriber[]
   newsletterCampaigns   NewsletterCampaign[]
   pageViews             PageView[]
+  facets                Facet[]
+  facetValues           FacetValue[]
+  productFacetValues    ProductFacetValue[]
+  savedSearches         SavedSearch[]
+  alertDeliveries       AlertDelivery[]
+  productDocuments      ProductDocument[]
+  certificates          Certificate[]
+  complianceRules       ComplianceRule[]
+  offers                Offer[]
+  coupons               Coupon[]
+  couponRedemptions     CouponRedemption[]
 
   @@map("tenants")
 }
@@ -282,10 +293,11 @@ model Category {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  tenant   Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
-  children Category[] @relation("CategoryTree")
-  products Product[]
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  parent          Category?        @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children        Category[]       @relation("CategoryTree")
+  products        Product[]
+  complianceRules ComplianceRule[]
 
   @@unique([tenantId, slug])
   @@unique([tenantId, legacyId])
@@ -313,54 +325,63 @@ model Tag {
 }
 
 model Product {
-  id                String        @id @default(cuid())
-  tenantId          String
+  id                       String        @id @default(cuid())
+  tenantId                 String
   // Leading human id (decision 26): legacy products.id is preserved here,
   // new ones come from TenantSequence "product.stockCode" (start 50000).
-  stockCode         Int
-  sku               String?
-  slug              String
-  title             String
-  description       String? // Markdown
-  specifications    Json? // [{ label, value }] — ordered list
-  status            ProductStatus @default(DRAFT)
-  price             Int // minor units, tenant currency
-  purchasePrice     Int? // minor units; current cost basis (OrderLine snapshots it)
-  weightGrams       Int           @default(0)
+  stockCode                Int
+  sku                      String?
+  slug                     String
+  title                    String
+  description              String? // Markdown
+  specifications           Json? // [{ label, value }] — ordered list
+  status                   ProductStatus @default(DRAFT)
+  price                    Int // minor units, tenant currency
+  purchasePrice            Int? // minor units; current cost basis (OrderLine snapshots it)
+  weightGrams              Int           @default(0)
   // Cached sum of StockMovement.delta — updated in the same transaction as the movement.
-  quantity          Int           @default(0)
-  importance        Int           @default(0) // manual sort weight (legacy "importance")
-  publishedAt       DateTime? // listing date; "bump to top" = set to now()
-  soldAt            DateTime?
-  ageRestricted     Boolean       @default(false)
-  blurred           Boolean       @default(false) // sensitive: blurred + login required for guests
-  acceptsOffers     Boolean       @default(false)
-  restrictedSymbols Boolean       @default(false) // e.g. §86a StGB — compliance display rules
-  onSale            Boolean       @default(false) // legacy "sale_item"
-  notes             String? // internal, never shown in shop
-  seoTitle          String?
-  seoDescription    String?
-  categoryId        String?
-  purchaseRecordId  String?
-  legacyData        Json? // ETL leftovers (photo_count, product_id, stock_control, …)
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  quantity                 Int           @default(0)
+  importance               Int           @default(0) // manual sort weight (legacy "importance")
+  publishedAt              DateTime? // listing date; "bump to top" = set to now()
+  soldAt                   DateTime?
+  ageRestricted            Boolean       @default(false)
+  blurred                  Boolean       @default(false) // sensitive: blurred + login required for guests
+  acceptsOffers            Boolean       @default(false)
+  restrictedSymbols        Boolean       @default(false) // e.g. §86a StGB — compliance display rules
+  onSale                   Boolean       @default(false) // legacy "sale_item"
+  // Phase 5 — provenance & compliance
+  provenance               String? // public Markdown provenance (collection history); legacy: none (new)
+  authenticityGuaranteed   Boolean       @default(false) // shows the lifetime authenticity guarantee
+  requiresDeactivationCert Boolean       @default(false) // deactivated weapons (EU 2018/337): certificate must be on file before ACTIVE
+  notes                    String? // internal, never shown in shop
+  seoTitle                 String?
+  seoDescription           String?
+  categoryId               String?
+  purchaseRecordId         String?
+  legacyData               Json? // ETL leftovers (photo_count, product_id, stock_control, …)
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
 
   // Full-text search: added later as a generated tsvector column + GIN index
   // (title, description, sku, stockCode) in raw SQL, plus pg_trgm on title.
 
-  tenant         Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  category       Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  purchaseRecord PurchaseRecord?   @relation(fields: [purchaseRecordId], references: [id], onDelete: SetNull)
-  images         ProductImage[]
-  tags           ProductTag[]
-  relatedTo      ProductRelation[] @relation("ProductRelationFrom")
-  relatedFrom    ProductRelation[] @relation("ProductRelationTo")
-  stockMovements StockMovement[]
-  reservations   Reservation[]
-  cartItems      CartItem[]
-  orderLines     OrderLine[]
-  wishlistItems  WishlistItem[]
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  category           Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  purchaseRecord     PurchaseRecord?     @relation(fields: [purchaseRecordId], references: [id], onDelete: SetNull)
+  images             ProductImage[]
+  tags               ProductTag[]
+  relatedTo          ProductRelation[]   @relation("ProductRelationFrom")
+  relatedFrom        ProductRelation[]   @relation("ProductRelationTo")
+  stockMovements     StockMovement[]
+  reservations       Reservation[]
+  cartItems          CartItem[]
+  orderLines         OrderLine[]
+  wishlistItems      WishlistItem[]
+  productFacetValues ProductFacetValue[]
+  alertDeliveries    AlertDelivery[]
+  productDocuments   ProductDocument[]
+  certificates       Certificate[]
+  offers             Offer[]
 
   @@unique([tenantId, stockCode])
   @@unique([tenantId, slug])
@@ -546,6 +567,9 @@ model Customer {
   carts                 Cart[]
   wishlistItems         WishlistItem[]
   newsletterSubscribers NewsletterSubscriber[]
+  savedSearches         SavedSearch[]
+  alertDeliveries       AlertDelivery[]
+  offers                Offer[]
 
   @@unique([tenantId, email])
   @@index([tenantId, createdAt])
@@ -605,14 +629,19 @@ model WishlistItem {
 // ─── Cart & reservation ─────────────────────────────────────────────────────
 
 model Cart {
-  id          String   @id @default(cuid())
-  tenantId    String
-  tokenHash   String   @unique // sha256 of the cart cookie token
-  customerId  String?
-  countryCode String?  @db.Char(2) // chosen/derived shipping country (zone lookup)
-  expiresAt   DateTime
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                  String    @id @default(cuid())
+  tenantId            String
+  tokenHash           String    @unique // sha256 of the cart cookie token
+  customerId          String?
+  countryCode         String?   @db.Char(2) // chosen/derived shipping country (zone lookup)
+  couponCode          String? // code entered in the cart (validated again at checkout)
+  // Abandoned-cart reminder (only with consent: logged-in customer or explicit opt-in at checkout)
+  email               String?
+  reminderConsent     Boolean   @default(false)
+  abandonedMailSentAt DateTime?
+  expiresAt           DateTime
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer     Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -631,6 +660,7 @@ model CartItem {
   cartId    String
   productId String
   quantity  Int      @default(1)
+  offerId   String? // accepted offer → line uses the offer price instead of the list price
   addedAt   DateTime @default(now())
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -723,6 +753,9 @@ model Order {
   subtotal            Int
   shippingTotal       Int               @default(0)
   surchargeTotal      Int               @default(0)
+  discountTotal       Int               @default(0) // coupon discount (phase 5); total = subtotal - discount + shipping + surcharge
+  couponCode          String? // snapshot of the applied code
+  offerId             String? // set when the order came from an accepted offer
   total               Int // subtotal + shipping + surcharge
   paymentStatus       PaymentStatus     @default(PENDING)
   fulfillmentStatus   FulfillmentStatus @default(UNFULFILLED)
@@ -1115,4 +1148,337 @@ model PageView {
   @@index([tenantId, path, createdAt])
   @@index([tenantId, visitorHash, createdAt])
   @@map("page_views")
+}
+
+// ═══ Phase 5 ═════════════════════════════════════════════════════════════════
+// ETL notes (Concept500 → Quartermaster) are kept next to each model.
+
+// ─── Facet taxonomy ─────────────────────────────────────────────────────────
+// Structured classification: period · country · branch · unit · type · maker (+ custom).
+// ETL: legacy tags/categories are mapped to facet values via FacetValue.legacyTagId / a mapping file;
+// unmapped legacy tags stay plain Tags.
+
+enum FacetKind {
+  PERIOD
+  COUNTRY
+  BRANCH
+  UNIT
+  TYPE
+  MAKER
+  CUSTOM
+}
+
+model Facet {
+  id           String    @id @default(cuid())
+  tenantId     String
+  kind         FacetKind
+  name         String
+  slug         String
+  sortOrder    Int       @default(0)
+  isFilterable Boolean   @default(true) // shown as a filter in the shop
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  tenant Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  values FacetValue[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, sortOrder])
+  @@map("facets")
+}
+
+model FacetValue {
+  id          String   @id @default(cuid())
+  tenantId    String
+  facetId     String
+  parentId    String? // hierarchy, e.g. Germany › Heer › Infanterie
+  name        String
+  slug        String
+  sortOrder   Int      @default(0)
+  legacyTagId Int? // ETL: Concept500 tags.id this value replaces
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  facet    Facet               @relation(fields: [facetId], references: [id], onDelete: Cascade)
+  parent   FacetValue?         @relation("FacetValueTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children FacetValue[]        @relation("FacetValueTree")
+  products ProductFacetValue[]
+
+  @@unique([facetId, slug])
+  @@index([tenantId, facetId, sortOrder])
+  @@index([parentId])
+  @@map("facet_values")
+}
+
+model ProductFacetValue {
+  tenantId     String
+  productId    String
+  facetValueId String
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  facetValue FacetValue @relation(fields: [facetValueId], references: [id], onDelete: Cascade)
+
+  @@id([productId, facetValueId])
+  @@index([tenantId, facetValueId])
+  @@map("product_facet_values")
+}
+
+// ─── Saved searches & alerts ("notify me") ──────────────────────────────────
+// Guests confirm by email (double opt-in, like the newsletter); customers are confirmed at once.
+
+enum AlertFrequency {
+  INSTANT
+  DAILY
+  WEEKLY
+}
+
+model SavedSearch {
+  id               String         @id @default(cuid())
+  tenantId         String
+  customerId       String?
+  email            String // lower-case
+  name             String
+  query            Json // normalised catalog params: { q, categoryId, facetValueIds[], tagIds[], priceMin, priceMax }
+  frequency        AlertFrequency @default(DAILY)
+  confirmedAt      DateTime?
+  confirmTokenHash String?        @unique
+  unsubscribedAt   DateTime?
+  lastNotifiedAt   DateTime?
+  lastMatchedAt    DateTime? // publishedAt watermark: only products published after this are new
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer   Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  deliveries AlertDelivery[]
+
+  @@index([tenantId, confirmedAt])
+  @@index([customerId])
+  @@index([tenantId, email])
+  @@map("saved_searches")
+}
+
+enum AlertKind {
+  SAVED_SEARCH // new product matches a saved search
+  BACK_AVAILABLE // wishlist item released from a cart / reservation
+  PRICE_DROP // wishlist item price lowered
+}
+
+/// One row per (alert, product) so nobody gets the same product twice.
+model AlertDelivery {
+  id            String    @id @default(cuid())
+  tenantId      String
+  kind          AlertKind
+  savedSearchId String?
+  customerId    String?
+  productId     String
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  savedSearch SavedSearch? @relation(fields: [savedSearchId], references: [id], onDelete: Cascade)
+  customer    Customer?    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  product     Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([savedSearchId, productId])
+  @@unique([kind, customerId, productId])
+  @@index([tenantId, sentAt])
+  @@map("alert_deliveries")
+}
+
+// ─── Provenance documents & certificates of authenticity ────────────────────
+// ETL: Concept500 product_origins / purchase_records stay internal (PurchaseRecord); public
+// provenance text is new. Legacy has no documents/certificates.
+
+enum ProductDocumentKind {
+  PROVENANCE // letters, photos, collection labels
+  DEACTIVATION_CERT // EU deactivation certificate (required when requiresDeactivationCert)
+  INVOICE_HISTORIC
+  OTHER
+}
+
+model ProductDocument {
+  id         String              @id @default(cuid())
+  tenantId   String
+  productId  String
+  kind       ProductDocumentKind
+  title      String
+  storageKey String // local storage: {tenantId}/products/{productId}/docs/{id}.{ext}
+  mimeType   String
+  byteSize   Int
+  isPublic   Boolean             @default(false) // visible on the product page
+  createdAt  DateTime            @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, productId])
+  @@map("product_documents")
+}
+
+model Certificate {
+  id         String    @id @default(cuid())
+  tenantId   String
+  productId  String
+  code       String    @unique // short public verification code, e.g. QM-7K4P-2XQ9 (printed + QR)
+  issuedAt   DateTime  @default(now())
+  issuedById String?
+  revokedAt  DateTime?
+  reason     String? // revocation reason
+  snapshot   Json // product facts at issue time (title, stockCode, specs, provenance, image key)
+  storageKey String? // generated PDF
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, productId])
+  @@map("certificates")
+}
+
+// ─── Compliance per country ─────────────────────────────────────────────────
+// Rules are matched by category (incl. descendants) or by a product flag, for the visitor's /
+// shipping country. ETL: legacy "blur" stays Product.blurred; no legacy rules.
+
+enum ComplianceMatch {
+  CATEGORY
+  RESTRICTED_SYMBOLS
+  AGE_RESTRICTED
+  DEACTIVATED_WEAPON
+}
+
+enum ComplianceAction {
+  BLUR_IMAGES // show blurred images to visitors from these countries
+  HIDE_PRODUCT // hide from listings and product pages
+  NO_SHIPPING // cannot be shipped to these countries (checkout blocks)
+}
+
+model ComplianceRule {
+  id         String           @id @default(cuid())
+  tenantId   String
+  name       String
+  match      ComplianceMatch
+  categoryId String? // when match = CATEGORY
+  countries  String[] // ISO-2
+  action     ComplianceAction
+  isActive   Boolean          @default(true)
+  note       String? // e.g. "§86a StGB"
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, isActive])
+  @@map("compliance_rules")
+}
+
+// ─── Offers ("make an offer") ───────────────────────────────────────────────
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  COUNTERED
+  REJECTED
+  EXPIRED
+  WITHDRAWN
+  CONVERTED // paid through the personal checkout link
+}
+
+model Offer {
+  id                String      @id @default(cuid())
+  tenantId          String
+  productId         String
+  customerId        String?
+  email             String
+  name              String
+  amount            Int // offered price, minor units
+  currency          String      @db.Char(3)
+  message           String?
+  status            OfferStatus @default(PENDING)
+  counterAmount     Int?
+  agreedAmount      Int? // final price when ACCEPTED / counter accepted
+  responseNote      String?
+  respondedAt       DateTime?
+  respondedById     String?
+  checkoutTokenHash String?     @unique // personal link to buy at the agreed price
+  checkoutExpiresAt DateTime?
+  orderId           String?     @unique
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  product  Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, createdAt(sort: Desc)])
+  @@index([productId])
+  @@map("offers")
+}
+
+// ─── Coupons ────────────────────────────────────────────────────────────────
+
+enum CouponType {
+  PERCENT // value = basis points of the subtotal (1000 = 10%)
+  FIXED // value = minor units off the subtotal
+  FREE_SHIPPING
+}
+
+model Coupon {
+  id             String     @id @default(cuid())
+  tenantId       String
+  code           String // stored upper-case
+  description    String?
+  type           CouponType
+  value          Int        @default(0)
+  minSubtotal    Int        @default(0)
+  startsAt       DateTime?
+  endsAt         DateTime?
+  maxRedemptions Int? // total across all customers
+  perEmailLimit  Int?       @default(1)
+  isActive       Boolean    @default(true)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  redemptions CouponRedemption[]
+
+  @@unique([tenantId, code])
+  @@map("coupons")
+}
+
+model CouponRedemption {
+  id        String   @id @default(cuid())
+  tenantId  String
+  couponId  String
+  orderId   String   @unique
+  email     String
+  amount    Int // discount granted, minor units (shipping value for FREE_SHIPPING)
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Restrict)
+
+  @@index([couponId])
+  @@index([tenantId, email])
+  @@map("coupon_redemptions")
+}
+
+// ─── Exchange rates (display only — checkout is always in the shop currency) ─
+// Platform-wide, refreshed daily from the ECB reference rates. ETL: legacy currencies table is
+// replaced by this history.
+
+model ExchangeRate {
+  id        String   @id @default(cuid())
+  base      String   @db.Char(3) // "EUR"
+  quote     String   @db.Char(3)
+  rate      Decimal  @db.Decimal(18, 8)
+  rateDate  DateTime @db.Date
+  source    String   @default("ECB")
+  createdAt DateTime @default(now())
+
+  @@unique([base, quote, rateDate])
+  @@index([base, quote, rateDate(sort: Desc)])
+  @@map("exchange_rates")
 }
