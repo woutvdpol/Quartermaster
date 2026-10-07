@@ -1,0 +1,27 @@
+# Private local data (dumps, exports)
+.local/
+*.sql
+*.sql.gz
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Dependencies / build
+node_modules/
+.next/
+out/
+dist/
+coverage/
+.turbo/
+
+# Uploads
+uploads/
+public/uploads/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.log

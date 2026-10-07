@@ -1,0 +1,561 @@
+<title>Quartermaster Ontwerp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap">
+<style>
+/* Layout: document met tab-navigatie; elk scherm is een app-frame (sidebar + werkvlak) in een horizontaal scrollbare container */
+:root{
+  --bg:#ECECE5; --panel:#FAFAF6; --panel-2:#F3F3EC; --ink:#1E2119; --muted:#666A5A; --line:#D7D8CC;
+  --rail:#2F3526; --rail-ink:#D9DCCB; --rail-muted:#8E937E; --rail-active:#3E4532;
+  --brass:#9C6B22; --brass-strong:#7E5416; --brass-soft:#F1E5CC;
+  --ok:#2F6B3A; --ok-soft:#DCEBD9; --warn:#946200; --warn-soft:#F5E7C4; --crit:#A2342A; --crit-soft:#F4DAD6; --info:#2C5873; --info-soft:#D8E5EE;
+  --img-a:#C9C7B6; --img-b:#B7B49F;
+  --f-display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --f-shop:"Playfair Display",Georgia,serif;
+  --r:6px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#121410; --panel:#1A1D16; --panel-2:#20241B; --ink:#E7E6DA; --muted:#9A9D89; --line:#30352A;
+  --rail:#0D0F0A; --rail-ink:#D9DCCB; --rail-muted:#7D8270; --rail-active:#262B1F;
+  --brass:#D19C48; --brass-strong:#E2B468; --brass-soft:#3A2E1B;
+  --ok:#7DBB84; --ok-soft:#1F3322; --warn:#E0B04A; --warn-soft:#3A2E12; --crit:#E07F73; --crit-soft:#3D1F1B; --info:#86B5D3; --info-soft:#1C2E3A;
+  --img-a:#3A3C31; --img-b:#2D2F26; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121410; --panel:#1A1D16; --panel-2:#20241B; --ink:#E7E6DA; --muted:#9A9D89; --line:#30352A;
+  --rail:#0D0F0A; --rail-ink:#D9DCCB; --rail-muted:#7D8270; --rail-active:#262B1F;
+  --brass:#D19C48; --brass-strong:#E2B468; --brass-soft:#3A2E1B;
+  --ok:#7DBB84; --ok-soft:#1F3322; --warn:#E0B04A; --warn-soft:#3A2E12; --crit:#E07F73; --crit-soft:#3D1F1B; --info:#86B5D3; --info-soft:#1C2E3A;
+  --img-a:#3A3C31; --img-b:#2D2F26; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--f-body);padding-inline:16px;padding-block:0 64px}
+.wrap{max-width:1240px;margin:0 auto}
+header.top{padding-block:32px 8px;display:flex;flex-wrap:wrap;gap:16px;align-items:end;justify-content:space-between}
+.brand{display:flex;gap:14px;align-items:center}
+.mark{width:44px;height:44px;border:2px solid var(--brass);border-radius:4px;display:grid;place-items:center;font:700 22px var(--f-display);color:var(--brass);letter-spacing:.02em}
+h1{font:700 40px/1 var(--f-display);text-transform:uppercase;letter-spacing:.04em;margin:0}
+.sub{color:var(--muted);margin:4px 0 0;max-width:62ch}
+.stamp{font:500 12px var(--f-mono);color:var(--muted);border:1px dashed var(--line);padding:6px 10px;border-radius:4px}
+nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;gap:4px;overflow-x:auto;padding-block:12px;border-bottom:1px solid var(--line);margin-bottom:24px}
+nav.tabs button{font:600 15px var(--f-display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:none;border:1px solid transparent;border-radius:4px;padding:6px 12px;cursor:pointer;white-space:nowrap}
+nav.tabs button:hover{color:var(--ink)}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-color:var(--line);background:var(--panel)}
+nav.tabs .grp{font:500 11px var(--f-mono);color:var(--muted);align-self:center;padding:0 6px 0 14px;text-transform:uppercase;letter-spacing:.08em}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+section[role=tabpanel]{display:grid;gap:16px}
+.intro{display:grid;gap:4px;max-width:75ch}
+.intro h2{font:700 26px/1.1 var(--f-display);text-transform:uppercase;letter-spacing:.04em;margin:0;text-wrap:balance}
+.intro p{margin:0;color:var(--muted)}
+.notes{display:flex;flex-wrap:wrap;gap:8px}
+.note{font-size:12.5px;background:var(--brass-soft);color:var(--ink);border-radius:4px;padding:4px 10px}
+.scroll{overflow-x:auto;border-radius:10px;border:1px solid var(--line)}
+
+/* ---------- App frame ---------- */
+.app{min-width:1040px;display:grid;grid-template-columns:216px 1fr;background:var(--panel-2);min-height:640px}
+.rail{background:var(--rail);color:var(--rail-ink);padding:16px 10px;display:flex;flex-direction:column;gap:2px}
+.rail .logo{display:flex;align-items:center;gap:10px;padding:4px 8px 16px}
+.rail .logo b{font:700 18px var(--f-display);letter-spacing:.08em;text-transform:uppercase}
+.rail .logo i{width:26px;height:26px;border:1.5px solid var(--brass);border-radius:3px;display:grid;place-items:center;font:700 13px var(--f-display);color:var(--brass);font-style:normal}
+.rail .search{margin:0 4px 12px;border:1px solid var(--rail-active);border-radius:5px;padding:6px 8px;font-size:12.5px;color:var(--rail-muted);display:flex;justify-content:space-between}
+.rail .search kbd{font:500 11px var(--f-mono);border:1px solid var(--rail-active);border-radius:3px;padding:0 4px}
+.rail h6{font:600 11px var(--f-display);letter-spacing:.14em;text-transform:uppercase;color:var(--rail-muted);margin:12px 8px 4px}
+.rail a{display:flex;justify-content:space-between;align-items:center;color:var(--rail-ink);text-decoration:none;padding:6px 8px;border-radius:4px;font-size:13px}
+.rail a.on{background:var(--rail-active);box-shadow:inset 2px 0 0 var(--brass)}
+.rail a .c{font:500 11px var(--f-mono);color:var(--rail-muted)}
+.rail a .c.hot{color:var(--rail);background:var(--brass);padding:0 6px;border-radius:9px}
+.rail .me{margin-top:auto;padding:10px 8px 0;border-top:1px solid var(--rail-active);font-size:12px;color:var(--rail-muted)}
+.main{display:flex;flex-direction:column;min-width:0}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--panel)}
+.crumb{font-size:12px;color:var(--muted)}
+.bar h3{margin:0;font:700 22px/1.1 var(--f-display);text-transform:uppercase;letter-spacing:.04em}
+.actions{display:flex;gap:8px;align-items:center}
+.btn{font:500 13px var(--f-body);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:5px;padding:6px 12px;cursor:pointer;white-space:nowrap}
+.btn.primary{background:var(--brass);border-color:var(--brass);color:#fff}
+.btn.ghost{background:none}
+.body{padding:20px 22px;display:grid;gap:16px;align-content:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r)}
+.card > .hd{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
+.card > .hd b{font:600 14px var(--f-display);letter-spacing:.08em;text-transform:uppercase}
+.card > .hd span{font-size:12px;color:var(--muted)}
+.card > .bd{padding:14px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:5px;font:500 11.5px var(--f-body);padding:1px 8px;border-radius:10px;white-space:nowrap}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.p-ok{background:var(--ok-soft);color:var(--ok)} .p-warn{background:var(--warn-soft);color:var(--warn)}
+.p-crit{background:var(--crit-soft);color:var(--crit)} .p-info{background:var(--info-soft);color:var(--info)}
+.p-mute{background:var(--panel-2);color:var(--muted);border:1px solid var(--line)}
+.img{background:repeating-linear-gradient(135deg,var(--img-a) 0 6px,var(--img-b) 6px 12px);border-radius:4px;display:grid;place-items:center;color:var(--muted);font:500 10px var(--f-mono)}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.kpi{padding:14px}
+.kpi .l{font:600 12px var(--f-display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.kpi .v{font:600 26px/1.2 var(--f-mono);margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:12px;margin-top:2px}
+.up{color:var(--ok)} .down{color:var(--crit)}
+.grid-2{display:grid;grid-template-columns:1.6fr 1fr;gap:12px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+svg text{fill:var(--muted);font:11px var(--f-mono)}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font:600 11.5px var(--f-display);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.r,th.r{text-align:right}
+tr.sel td{background:var(--brass-soft)}
+.tt{display:flex;gap:10px;align-items:center}
+.tt .img{width:38px;height:38px;flex:none}
+.tt small{display:block;color:var(--muted);font-size:11.5px}
+.chk{width:14px;height:14px;border:1.5px solid var(--muted);border-radius:3px;display:inline-block;vertical-align:middle}
+.chk.on{background:var(--brass);border-color:var(--brass);box-shadow:inset 0 0 0 2px var(--panel)}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
+.views{display:flex;gap:2px;padding:0 14px;border-bottom:1px solid var(--line)}
+.views span{padding:9px 10px;font-size:13px;color:var(--muted);border-bottom:2px solid transparent}
+.views span.on{color:var(--ink);border-color:var(--brass)}
+.views span i{font:500 11px var(--f-mono);font-style:normal;color:var(--muted);margin-left:4px}
+.inp{border:1px solid var(--line);background:var(--panel);border-radius:5px;padding:6px 10px;font-size:13px;color:var(--muted);min-width:240px}
+.chip{font-size:12px;border:1px dashed var(--line);border-radius:12px;padding:3px 10px;color:var(--muted)}
+.chip.set{border-style:solid;background:var(--panel-2);color:var(--ink)}
+.bulk{display:flex;gap:10px;align-items:center;padding:8px 14px;background:var(--rail);color:var(--rail-ink);font-size:13px}
+.bulk .btn{background:var(--rail-active);border-color:var(--rail-active);color:var(--rail-ink);padding:4px 10px}
+
+/* Editor */
+.ed{display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start}
+.field{display:grid;gap:4px}
+.field label{font:600 11.5px var(--f-display);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.field .in{border:1px solid var(--line);border-radius:5px;padding:7px 10px;background:var(--panel);font-size:13.5px}
+.field .in.area{min-height:84px;line-height:1.55}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.gallery{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.gallery .img{aspect-ratio:1;position:relative}
+.gallery .img.cover{grid-column:span 2;grid-row:span 2}
+.gallery .img b{position:absolute;left:6px;top:6px;font:600 10px var(--f-display);letter-spacing:.1em;background:var(--brass);color:#fff;padding:1px 6px;border-radius:3px}
+.drop{aspect-ratio:1;border:1.5px dashed var(--line);border-radius:4px;display:grid;place-items:center;text-align:center;font-size:11px;color:var(--muted);padding:6px}
+.tax{display:flex;flex-wrap:wrap;gap:6px}
+.tax span{font-size:12px;background:var(--panel-2);border:1px solid var(--line);border-radius:4px;padding:2px 8px}
+.tax span em{font-style:normal;color:var(--muted);font:500 10.5px var(--f-mono);margin-right:4px;text-transform:uppercase}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:13px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;text-align:right}
+.seg{display:flex;border:1px solid var(--line);border-radius:5px;overflow:hidden}
+.seg span{flex:1;text-align:center;font-size:12px;padding:6px 4px;border-right:1px solid var(--line)}
+.seg span:last-child{border-right:0}
+.seg span.on{background:var(--brass);color:#fff}
+.serp{border:1px solid var(--line);border-radius:5px;padding:10px;font-size:12.5px;display:grid;gap:2px}
+.serp .u{color:var(--ok);font:12px var(--f-mono)} .serp .t{color:var(--info);font-size:15px}
+
+/* Order */
+.steps{display:flex;gap:0;align-items:center}
+.step{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.step i{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font:600 11px var(--f-mono);font-style:normal}
+.step.done{color:var(--ink)} .step.done i{background:var(--ok);border-color:var(--ok);color:#fff}
+.step.now{color:var(--ink);font-weight:600} .step.now i{border-color:var(--brass);color:var(--brass)}
+.step + .step::before{content:"";width:40px;height:1.5px;background:var(--line);margin:0 10px}
+.tl{display:grid;gap:12px;font-size:13px}
+.tl div{display:grid;grid-template-columns:12px 1fr;gap:10px}
+.tl div::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--line);margin-top:5px}
+.tl div.k::before{background:var(--brass)}
+.tl small{display:block;color:var(--muted);font:11.5px var(--f-mono)}
+
+/* Settings */
+.set{display:grid;grid-template-columns:200px 1fr;gap:16px}
+.set nav{display:grid;gap:2px;align-content:start}
+.set nav span{padding:7px 10px;border-radius:4px;font-size:13px;color:var(--muted)}
+.set nav span.on{background:var(--panel);color:var(--ink);border:1px solid var(--line)}
+.tog{width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;flex:none}
+.tog::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--panel)}
+.tog.on{background:var(--brass)} .tog.on::after{left:16px}
+.srow{display:flex;justify-content:space-between;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.srow:last-child{border-bottom:0}
+.srow p{margin:0;font-size:12.5px;color:var(--muted)}
+.swatch{width:22px;height:22px;border-radius:4px;border:1px solid var(--line);display:inline-block;vertical-align:middle}
+
+/* Board */
+.board{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.col{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px;display:grid;gap:8px;align-content:start}
+.col h5{margin:0 0 2px;font:600 13px var(--f-display);letter-spacing:.1em;text-transform:uppercase;display:flex;justify-content:space-between}
+.oc{border:1px solid var(--line);border-radius:5px;padding:8px 10px;background:var(--panel-2);display:grid;gap:4px;font-size:12.5px}
+.oc .h{display:flex;justify-content:space-between}
+
+/* Shop */
+.shop{min-width:1040px;background:#FDFAF4;color:#2C2316;font-family:var(--f-body)}
+.shop .nav{display:flex;justify-content:space-between;align-items:center;padding:14px 28px;background:#2C2316;color:#F5EDD8}
+.shop .nav b{font:700 20px var(--f-shop);letter-spacing:.02em}
+.shop .nav span{font-size:13px;opacity:.85;margin-left:18px}
+.shop .pdp{display:grid;grid-template-columns:1.2fr 1fr;gap:32px;padding:28px}
+.shop .big{aspect-ratio:4/3;background:repeating-linear-gradient(135deg,#E2D5B9 0 8px,#D7C8A8 8px 16px);border-radius:8px;position:relative}
+.shop .lens{position:absolute;right:16%;top:22%;width:120px;height:120px;border-radius:50%;border:3px solid #fff;box-shadow:0 6px 18px rgba(44,35,22,.3);background:repeating-linear-gradient(135deg,#CDBB94 0 4px,#C1AD82 4px 8px);display:grid;place-items:center;font:600 10px var(--f-mono);color:#2C2316}
+.shop .thumbs{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:8px}
+.shop .thumbs div{aspect-ratio:1;border-radius:4px;background:repeating-linear-gradient(135deg,#E9DFC8 0 6px,#DCCEB0 6px 12px)}
+.shop .thumbs div.on{outline:2px solid #C17F3B;outline-offset:1px}
+.shop h4{font:700 30px/1.15 var(--f-shop);margin:6px 0 8px}
+.shop .eyebrow{font:500 11.5px var(--f-mono);color:#7A6248;letter-spacing:.06em;text-transform:uppercase}
+.shop .price{font:700 28px var(--f-shop);color:#2C2316}
+.shop .res{display:flex;gap:10px;align-items:center;background:#FBF3E4;border:1px solid #E8C98A;border-radius:6px;padding:10px 12px;font-size:13px;margin:14px 0}
+.shop .res b{font:600 15px var(--f-mono)}
+.shop .cta{display:flex;gap:8px}
+.shop .cta span{flex:1;text-align:center;padding:11px;border-radius:6px;font-weight:600;font-size:14px}
+.shop .cta .a{background:#C17F3B;color:#fff} .shop .cta .b{border:1px solid #D9CCAD}
+.shop .spec{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:13px;margin-top:18px;border-top:1px solid #EDE0C4;padding-top:14px}
+.shop .spec dt{color:#7A6248}
+.shop .spec dd{margin:0}
+.shop .prov{margin-top:16px;border:1px solid #EDE0C4;border-radius:8px;padding:12px;display:grid;grid-template-columns:52px 1fr;gap:12px;align-items:center;background:#fff;font-size:13px}
+.shop .qr{width:52px;height:52px;background:conic-gradient(#2C2316 25%,#fff 0 50%,#2C2316 0 75%,#fff 0) 0 0/13px 13px;border:3px solid #2C2316}
+.shop .alert{margin:0 28px 28px;border:1px dashed #C17F3B;border-radius:8px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;font-size:13.5px;background:#fff}
+
+/* Roadmap */
+.phases{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.ph{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:grid;gap:8px;align-content:start}
+.ph .n{font:500 11px var(--f-mono);color:var(--muted)}
+.ph h4{margin:0;font:700 18px var(--f-display);text-transform:uppercase;letter-spacing:.05em}
+.ph ul{margin:0;padding-left:18px;font-size:13px;display:grid;gap:3px}
+.ph.prio{border-color:var(--brass);box-shadow:inset 0 3px 0 var(--brass)}
+.fix{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.fix div{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;font-size:13px;display:grid;gap:4px}
+.fix b{font-weight:600}
+.fix .was{color:var(--crit);font-size:12.5px} .fix .wordt{color:var(--ok);font-size:12.5px}
+.stack{display:flex;flex-wrap:wrap;gap:6px}
+.stack span{font:500 12px var(--f-mono);border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:3px 8px}
+.stack span b{color:var(--brass);font-weight:500}
+@media (max-width:640px){h1{font-size:30px}.kpis{grid-template-columns:1fr 1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="brand">
+    <div class="mark">QM</div>
+    <div>
+      <h1>Quartermaster</h1>
+      <p class="sub">Plan en ontwerp voor de overstap van Concept500 (Laravel, Backpack) naar Next.js en Prisma. Admin eerst, daarna de shop.</p>
+    </div>
+  </div>
+  <div class="stamp">CONCEPT · v0.1 · 07-10-2026</div>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="Schermen">
+  <button role="tab" aria-selected="true" aria-controls="t-plan" id="b-plan">Plan</button>
+  <span class="grp">Admin</span>
+  <button role="tab" aria-selected="false" aria-controls="t-dash" id="b-dash">Dashboard</button>
+  <button role="tab" aria-selected="false" aria-controls="t-prod" id="b-prod">Voorraad</button>
+  <button role="tab" aria-selected="false" aria-controls="t-edit" id="b-edit">Product</button>
+  <button role="tab" aria-selected="false" aria-controls="t-order" id="b-order">Order</button>
+  <button role="tab" aria-selected="false" aria-controls="t-board" id="b-board">Verzendbord</button>
+  <button role="tab" aria-selected="false" aria-controls="t-set" id="b-set">Instellingen</button>
+  <span class="grp">Shop</span>
+  <button role="tab" aria-selected="false" aria-controls="t-shop" id="b-shop">Productpagina</button>
+</nav>
+
+<!-- ================= PLAN ================= -->
+<section role="tabpanel" id="t-plan" aria-labelledby="b-plan">
+  <div class="intro"><h2>Wat we oplossen</h2><p>Geen één-op-één port. Deze punten uit de analyse krijgen in Quartermaster een andere opzet.</p></div>
+  <div class="fix">
+    <div><b>Order-afronding</b><span class="was">Nu: voorraad en mails pas op de bedankpagina</span><span class="wordt">Straks: idempotente Mollie/PayPal-webhook + job-queue</span></div>
+    <div><b>Unieke items dubbel verkocht</b><span class="was">Nu: geen reservering bij bestellen</span><span class="wordt">Straks: reservering per mandje met aftelklok, atomaire voorraad</span></div>
+    <div><b>Rechten</b><span class="was">Nu: owner kan via URL bij Rollen; mutaties via GET</span><span class="wordt">Straks: RBAC-check per actie, alleen POST, audit-log, 2FA</span></div>
+    <div><b>Statussen</b><span class="was">Nu: losse strings, geen verzendstatus, geen factuur</span><span class="wordt">Straks: betaal- en verzendstatus, historie, factuur-PDF</span></div>
+    <div><b>Instellingen</b><span class="was">Nu: ~60 key/value-rijen, type geraden uit naam</span><span class="wordt">Straks: getypeerde groepen met eigen formulier</span></div>
+    <div><b>Content</b><span class="was">Nu: twee CMS'en naast elkaar</span><span class="wordt">Straks: één block-CMS</span></div>
+  </div>
+
+  <div class="intro" style="margin-top:12px"><h2>Fasering</h2><p>Admin wordt gebouwd en getest op een kopie van de echte data. Admin en shop gaan samen live.</p></div>
+  <div class="phases">
+    <div class="ph"><span class="n">Fase 0</span><h4>Fundament</h4><ul><li>Repo, CI, Docker</li><li>Prisma + Postgres</li><li>Auth, 2FA, rollen</li><li>Admin-shell, ⌘K</li><li>ETL-skelet</li></ul></div>
+    <div class="ph prio"><span class="n">Fase 1 · prioriteit</span><h4>Admin kern</h4><ul><li>Producten + foto's</li><li>Categorieën, tags</li><li>Orders, pakbon, factuur</li><li>Klanten</li><li>Voorraadoverzicht</li></ul></div>
+    <div class="ph prio"><span class="n">Fase 2</span><h4>Admin compleet</h4><ul><li>Dashboard</li><li>Instellingen</li><li>Verzending, betaalmethoden</li><li>Block-CMS, menu's</li><li>Nieuwsbrief, import/export</li></ul></div>
+    <div class="ph"><span class="n">Fase 3</span><h4>Shop</h4><ul><li>Catalogus, filters, zoeken</li><li>Productpagina</li><li>Mandje + reservering</li><li>Checkout, webhooks, mails</li><li>Account, SEO</li></ul></div>
+    <div class="ph"><span class="n">Fase 4</span><h4>Overgang</h4><ul><li>ETL dry-runs</li><li>Validatierapport</li><li>Redirects (301)</li><li>E2E op staging</li><li>DNS-switch</li></ul></div>
+    <div class="ph"><span class="n">Fase 5</span><h4>Vernieuwingen</h4><ul><li>Facet-taxonomie</li><li>Saved searches</li><li>Echtheidscertificaat</li><li>Bieden</li><li>Compliance per land</li></ul></div>
+  </div>
+
+  <div class="intro" style="margin-top:12px"><h2>Stack</h2></div>
+  <div class="stack">
+    <span><b>next</b> 16 app router</span><span><b>prisma</b> 7</span><span><b>postgres</b> 17</span><span><b>better-auth</b> + 2fa</span><span><b>tailwind</b> v4</span><span><b>shadcn/ui</b></span><span><b>tanstack</b> table</span><span><b>zod</b></span><span><b>cloudflare</b> images</span><span><b>mollie</b> + paypal</span><span><b>react-email</b></span><span><b>react-pdf</b></span><span><b>pg-boss</b> jobs</span><span><b>vitest</b> + playwright</span><span><b>sentry</b></span><span><b>docker</b> · coolify</span>
+  </div>
+</section>
+
+<!-- ================= DASHBOARD ================= -->
+<section role="tabpanel" id="t-dash" aria-labelledby="b-dash" hidden>
+  <div class="intro"><h2>Dashboard</h2><p>Eerst wat aandacht vraagt (te verzenden, verlopen reserveringen, mislukte betalingen), daarna de cijfers. Omzet telt alleen betaalde orders.</p></div>
+  <div class="notes"><span class="note">Nieuw: actiekaart "Vandaag te doen"</span><span class="note">Fix: omzet excl. onbetaalde overschrijvingen</span><span class="note">Matomo gecachet, niet blokkerend</span></div>
+  <div class="scroll"><div class="app">
+    <aside class="rail" data-rail="dash"></aside>
+    <div class="main">
+      <div class="bar"><div><div class="crumb">Quartermaster</div><h3>Dashboard</h3></div><div class="actions"><span class="btn ghost">Laatste 30 dagen ▾</span><span class="btn primary">+ Nieuw product</span></div></div>
+      <div class="body">
+        <div class="kpis">
+          <div class="card kpi"><div class="l">Omzet</div><div class="v">€ 18.420</div><div class="d"><span class="up">▲ 12,4%</span> <span class="muted">vs. vorige 30 d</span></div></div>
+          <div class="card kpi"><div class="l">Orders</div><div class="v">47</div><div class="d"><span class="up">▲ 6</span> <span class="muted">vs. 41</span></div></div>
+          <div class="card kpi"><div class="l">Gem. orderwaarde</div><div class="v">€ 391,91</div><div class="d"><span class="down">▼ 3,1%</span> <span class="muted">vs. € 404,40</span></div></div>
+          <div class="card kpi"><div class="l">Marge</div><div class="v">38%</div><div class="d"><span class="muted">uit inkoopprijs · 41 van 47 orders</span></div></div>
+        </div>
+        <div class="grid-2">
+          <div class="card"><div class="hd"><b>Omzet per dag</b><span>betaald · excl. verzending</span></div><div class="bd">
+            <svg viewBox="0 0 560 190" width="100%" role="img" aria-label="Omzet per dag, laatste 30 dagen">
+              <g stroke="var(--line)" stroke-width="1"><line x1="40" y1="20" x2="550" y2="20"/><line x1="40" y1="70" x2="550" y2="70"/><line x1="40" y1="120" x2="550" y2="120"/><line x1="40" y1="170" x2="550" y2="170"/></g>
+              <text x="34" y="24" text-anchor="end">€1.5k</text><text x="34" y="74" text-anchor="end">€1k</text><text x="34" y="124" text-anchor="end">€500</text><text x="34" y="174" text-anchor="end">€0</text>
+              <path d="M40 140 L57 128 L74 150 L91 112 L108 120 L125 96 L142 134 L159 104 L176 116 L193 88 L210 140 L227 124 L244 100 L261 92 L278 130 L295 76 L312 110 L329 118 L346 84 L363 98 L380 62 L397 120 L414 90 L431 104 L448 70 L465 96 L482 58 L499 88 L516 74 L533 44 L550 66 L550 170 L40 170 Z" fill="var(--brass-soft)"/>
+              <path d="M40 140 L57 128 L74 150 L91 112 L108 120 L125 96 L142 134 L159 104 L176 116 L193 88 L210 140 L227 124 L244 100 L261 92 L278 130 L295 76 L312 110 L329 118 L346 84 L363 98 L380 62 L397 120 L414 90 L431 104 L448 70 L465 96 L482 58 L499 88 L516 74 L533 44 L550 66" fill="none" stroke="var(--brass)" stroke-width="2"/>
+              <circle cx="533" cy="44" r="4" fill="var(--brass)"/>
+              <text x="40" y="186">8 sep</text><text x="295" y="186" text-anchor="middle">22 sep</text><text x="550" y="186" text-anchor="end">7 okt</text>
+            </svg>
+          </div></div>
+          <div class="card"><div class="hd"><b>Vandaag te doen</b><span>9 open</span></div><div class="bd" style="display:grid;gap:10px;font-size:13px">
+            <div style="display:flex;justify-content:space-between"><span>Betaald, nog niet verzonden</span><span class="pill p-warn">5</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Overschrijving wacht op betaling</span><span class="pill p-info">2</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Mislukte betaling, item weer vrij</span><span class="pill p-crit">1</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Bod ontvangen (make-an-offer)</span><span class="pill p-mute">1</span></div>
+            <hr style="border:0;border-top:1px solid var(--line);margin:4px 0">
+            <div style="display:flex;justify-content:space-between"><span class="muted">Live bezoekers (Matomo)</span><span class="mono">14</span></div>
+            <div style="display:flex;justify-content:space-between"><span class="muted">In een mandje gereserveerd</span><span class="mono">3 items</span></div>
+          </div></div>
+        </div>
+        <div class="grid-2">
+          <div class="card"><div class="hd"><b>Laatste orders</b><span>alle orders →</span></div>
+            <table><thead><tr><th>Order</th><th>Klant</th><th>Betaling</th><th>Verzending</th><th class="r">Totaal</th></tr></thead><tbody>
+              <tr><td class="mono">#24117</td><td>H. de Groot</td><td><span class="pill p-ok">Betaald · iDEAL</span></td><td><span class="pill p-warn">Te verzenden</span></td><td class="r mono">€ 845,00</td></tr>
+              <tr><td class="mono">#24116</td><td>M. Fischer (DE)</td><td><span class="pill p-info">Overschrijving</span></td><td><span class="pill p-mute">Wacht</span></td><td class="r mono">€ 312,50</td></tr>
+              <tr><td class="mono">#24115</td><td>J. Peeters (BE)</td><td><span class="pill p-ok">Betaald · Bancontact</span></td><td><span class="pill p-ok">Verzonden</span></td><td class="r mono">€ 129,00</td></tr>
+              <tr><td class="mono">#24114</td><td>R. Clarke (UK)</td><td><span class="pill p-crit">Mislukt · PayPal</span></td><td><span class="pill p-mute">—</span></td><td class="r mono">€ 1.250,00</td></tr>
+            </tbody></table>
+          </div>
+          <div class="card"><div class="hd"><b>Meest op verlanglijst</b><span>niet verkocht</span></div>
+            <table><tbody>
+              <tr><td><div class="tt"><div class="img">IMG</div><div>Stahlhelm M40 Heer, ET64<small class="mono">#50231</small></div></div></td><td class="r mono">23</td></tr>
+              <tr><td><div class="tt"><div class="img">IMG</div><div>KNIL koppelslot, messing<small class="mono">#50198</small></div></div></td><td class="r mono">17</td></tr>
+              <tr><td><div class="tt"><div class="img">IMG</div><div>Fliegerbluse, 2e model<small class="mono">#48812</small></div></div></td><td class="r mono">11</td></tr>
+            </tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ================= PRODUCTEN ================= -->
+<section role="tabpanel" id="t-prod" aria-labelledby="b-prod" hidden>
+  <div class="intro"><h2>Voorraad</h2><p>Eén lijst voor shop en archief, met opgeslagen weergaven in plaats van losse menu-items. Selecteer rijen voor bulk-acties.</p></div>
+  <div class="notes"><span class="note">Opgeslagen weergaven</span><span class="note">Bulk: status, categorie, prijs ±%</span><span class="note">Inline voorraad en prijs</span><span class="note">Zoeken op StockCode via ⌘K</span></div>
+  <div class="scroll"><div class="app">
+    <aside class="rail" data-rail="prod"></aside>
+    <div class="main">
+      <div class="bar"><div><div class="crumb">Catalogus</div><h3>Voorraad</h3></div><div class="actions"><span class="btn">Importeren</span><span class="btn">Exporteren</span><span class="btn primary">+ Nieuw product</span></div></div>
+      <div class="body">
+        <div class="card">
+          <div class="views"><span class="on">Te koop<i>412</i></span><span>Gereserveerd<i>3</i></span><span>Concept<i>18</i></span><span>Verkocht<i>2.906</i></span><span>Archief<i>5.114</i></span><span>Zonder foto<i>7</i></span><span>+ weergave</span></div>
+          <div class="toolbar"><span class="inp">Zoek titel, StockCode, SKU…</span><span class="chip set">Periode: WO2 ✕</span><span class="chip set">Land: Duitsland ✕</span><span class="chip">+ Categorie</span><span class="chip">+ Prijs</span><span class="chip">+ Herkomst</span><span style="margin-left:auto" class="muted">Sorteer: Gepubliceerd ↓</span></div>
+          <div class="bulk"><span class="chk on"></span> 2 geselecteerd <span class="btn">Status wijzigen</span><span class="btn">Categorie</span><span class="btn">Prijs aanpassen</span><span class="btn">Naar boven halen</span><span style="margin-left:auto;opacity:.7">Esc om te wissen</span></div>
+          <table><thead><tr><th><span class="chk"></span></th><th>Product</th><th>StockCode</th><th>Categorie</th><th>Status</th><th class="r">Voorraad</th><th class="r">Inkoop</th><th class="r">Prijs</th><th>Gepubliceerd</th></tr></thead><tbody>
+            <tr class="sel"><td><span class="chk on"></span></td><td><div class="tt"><div class="img">IMG</div><div>Stahlhelm M40 Heer, ET64<small>WO2 · Duitsland · Heer · Helmen</small></div></div></td><td class="mono">50231</td><td>Helmen</td><td><span class="pill p-ok">Te koop</span></td><td class="r mono">1</td><td class="r mono muted">€ 610</td><td class="r mono">€ 1.450,00</td><td class="mono muted">06-10-2026</td></tr>
+            <tr class="sel"><td><span class="chk on"></span></td><td><div class="tt"><div class="img">IMG</div><div>Koppelslot Heer, aluminium<small>WO2 · Duitsland · Heer · Uitrusting</small></div></div></td><td class="mono">50229</td><td>Uitrusting</td><td><span class="pill p-ok">Te koop</span></td><td class="r mono">1</td><td class="r mono muted">€ 45</td><td class="r mono">€ 115,00</td><td class="mono muted">06-10-2026</td></tr>
+            <tr><td><span class="chk"></span></td><td><div class="tt"><div class="img">IMG</div><div>Fliegerbluse, 2e model<small>WO2 · Duitsland · Luftwaffe · Uniformen</small></div></div></td><td class="mono">48812</td><td>Uniformen</td><td><span class="pill p-warn">In mandje · 11:42</span></td><td class="r mono">1</td><td class="r mono muted">€ 980</td><td class="r mono">€ 2.350,00</td><td class="mono muted">02-10-2026</td></tr>
+            <tr><td><span class="chk"></span></td><td><div class="tt"><div class="img">IMG</div><div>Brotbeutel M31, gemerkt 1940<small>WO2 · Duitsland · Heer · Uitrusting</small></div></div></td><td class="mono">50201</td><td>Uitrusting</td><td><span class="pill p-ok">Te koop</span></td><td class="r mono">1</td><td class="r mono muted">—</td><td class="r mono">€ 185,00</td><td class="mono muted">29-09-2026</td></tr>
+            <tr><td><span class="chk"></span></td><td><div class="tt"><div class="img">IMG</div><div>Feldmütze M34, met Trapez-adelaar<small>WO2 · Duitsland · Heer · Hoofddeksels</small></div></div></td><td class="mono">50187</td><td>Hoofddeksels</td><td><span class="pill p-info">Bod open</span></td><td class="r mono">1</td><td class="r mono muted">€ 220</td><td class="r mono">€ 595,00</td><td class="mono muted">24-09-2026</td></tr>
+            <tr><td><span class="chk"></span></td><td><div class="tt"><div class="img">IMG</div><div>Gasmaskerbus M38, origineel gelakt<small>WO2 · Duitsland · Heer · Uitrusting</small></div></div></td><td class="mono">50176</td><td>Uitrusting</td><td><span class="pill p-mute">Concept</span></td><td class="r mono">2</td><td class="r mono muted">€ 30</td><td class="r mono">€ 89,00</td><td class="mono muted">—</td></tr>
+          </tbody></table>
+          <div class="toolbar" style="border-top:1px solid var(--line);border-bottom:0;justify-content:space-between"><span class="muted">1–25 van 412</span><span class="muted">‹ 1 2 3 … 17 ›</span></div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ================= PRODUCT EDIT ================= -->
+<section role="tabpanel" id="t-edit" aria-labelledby="b-edit" hidden>
+  <div class="intro"><h2>Product bewerken</h2><p>Foto's slepen naar Cloudflare zonder wachten op een queue. Status, prijs en zichtbaarheid staan rechts, altijd in beeld. Herkomst en certificaat zijn eigen blokken.</p></div>
+  <div class="notes"><span class="note">Direct upload, sorteren met slepen</span><span class="note">Taxonomie: periode · land · onderdeel · type</span><span class="note">Compliance-vlaggen</span><span class="note">SEO-voorbeeld</span></div>
+  <div class="scroll"><div class="app">
+    <aside class="rail" data-rail="prod"></aside>
+    <div class="main">
+      <div class="bar"><div><div class="crumb">Voorraad › <span class="mono">#50231</span></div><h3>Stahlhelm M40 Heer, ET64</h3></div><div class="actions"><span class="muted" style="font-size:12px">Opgeslagen 14:02</span><span class="btn">Bekijk in shop ↗</span><span class="btn">Dupliceren</span><span class="btn primary">Opslaan</span></div></div>
+      <div class="body">
+        <div class="ed">
+          <div style="display:grid;gap:16px">
+            <div class="card"><div class="hd"><b>Foto's</b><span>7 van 20 · eerste = omslag</span></div><div class="bd">
+              <div class="gallery">
+                <div class="img cover"><b>OMSLAG</b>cf:7f3a…e21</div>
+                <div class="img">zijkant</div><div class="img">binnenkant</div><div class="img">ET64-stempel</div><div class="img">kinriem</div>
+                <div class="img">decal</div><div class="img">lot-nr.</div>
+                <div class="drop">Sleep foto's hierheen of plak met ⌘V</div>
+              </div>
+            </div></div>
+            <div class="card"><div class="hd"><b>Beschrijving</b><span>NL · EN</span></div><div class="bd" style="display:grid;gap:12px">
+              <div class="field"><label>Titel</label><div class="in">Stahlhelm M40 Heer, ET64</div></div>
+              <div class="field"><label>Omschrijving</label><div class="in area">Originele M40-helm met enkele Heer-decal, ca. 80% aanwezig. Gestempeld ET64 met lotnummer 3721. Liner van leer, maat 57, compleet met kinriem. Fabrieksverf origineel, lichte slijtage aan de rand.</div></div>
+              <div class="field"><label>Classificatie</label><div class="tax"><span><em>periode</em>WO2 (1939–45)</span><span><em>land</em>Duitsland</span><span><em>onderdeel</em>Heer</span><span><em>type</em>Helmen › M40</span><span><em>maker</em>Eisenhüttenwerke Thale (ET)</span><span style="border-style:dashed;color:var(--muted)">+ toevoegen</span></div></div>
+            </div></div>
+            <div class="card"><div class="hd"><b>Herkomst en echtheid</b><span>intern · publiek</span></div><div class="bd" style="display:grid;gap:12px">
+              <div class="row3"><div class="field"><label>Ingekocht van</label><div class="in">Collectie v. d. Berg</div></div><div class="field"><label>Inkoopdatum</label><div class="in mono">14-09-2026</div></div><div class="field"><label>Inkoopprijs</label><div class="in mono">€ 610,00</div></div></div>
+              <div class="field"><label>Publieke herkomst</label><div class="in">Uit een Nederlandse privécollectie, sinds 1978 in één hand.</div></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px"><span>Certificaat van echtheid met QR-verificatie</span><span class="tog on"></span></div>
+            </div></div>
+          </div>
+          <div style="display:grid;gap:16px">
+            <div class="card"><div class="hd"><b>Status</b></div><div class="bd" style="display:grid;gap:10px">
+              <div class="seg"><span>Concept</span><span class="on">Te koop</span><span>Verkocht</span><span>Archief</span></div>
+              <dl class="kv"><dt>Gepubliceerd</dt><dd class="mono">06-10-2026</dd><dt>Gereserveerd</dt><dd>nee</dd><dt>Op verlanglijst</dt><dd class="mono">23×</dd></dl>
+              <span class="btn" style="text-align:center">Naar boven halen</span>
+            </div></div>
+            <div class="card"><div class="hd"><b>Prijs en voorraad</b></div><div class="bd" style="display:grid;gap:10px">
+              <div class="row2"><div class="field"><label>Prijs</label><div class="in mono">€ 1.450,00</div></div><div class="field"><label>Voorraad</label><div class="in mono">1</div></div></div>
+              <div class="row2"><div class="field"><label>Gewicht</label><div class="in mono">1.250 g</div></div><div class="field"><label>SKU</label><div class="in mono">QM-H-0231</div></div></div>
+              <div style="display:flex;justify-content:space-between;font-size:13px"><span>Bod toestaan</span><span class="tog on"></span></div>
+              <dl class="kv"><dt>Marge</dt><dd class="mono up">€ 840 · 58%</dd></dl>
+            </div></div>
+            <div class="card"><div class="hd"><b>Zichtbaarheid</b></div><div class="bd" style="display:grid;gap:8px;font-size:13px">
+              <div style="display:flex;justify-content:space-between"><span>Alleen voor ingelogde klanten</span><span class="tog"></span></div>
+              <div style="display:flex;justify-content:space-between"><span>Bevat beperkte symbolen</span><span class="tog on"></span></div>
+              <div style="display:flex;justify-content:space-between"><span>18+ vereist</span><span class="tog"></span></div>
+              <p class="muted" style="margin:0;font-size:12px">Niet verzenden naar: DE, AT (regel uit categorie)</p>
+            </div></div>
+            <div class="card"><div class="hd"><b>Zoekmachine</b></div><div class="bd"><div class="serp"><span class="u">shop.nl/product/50231/stahlhelm-m40-heer-et64</span><span class="t">Stahlhelm M40 Heer, ET64 | Quartermaster</span><span class="muted">Originele M40-helm met Heer-decal, gestempeld ET64, lotnummer 3721…</span></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ================= ORDER ================= -->
+<section role="tabpanel" id="t-order" aria-labelledby="b-order" hidden>
+  <div class="intro"><h2>Order</h2><p>Betaling en verzending zijn aparte statussen. Elke wijziging komt in de tijdlijn, met wie het deed. Factuur en pakbon in één klik.</p></div>
+  <div class="notes"><span class="note">Webhook bepaalt "betaald"</span><span class="note">Track &amp; trace + verzendmail</span><span class="note">Factuur (margeregeling)</span><span class="note">Terugbetalen via Mollie</span></div>
+  <div class="scroll"><div class="app">
+    <aside class="rail" data-rail="order"></aside>
+    <div class="main">
+      <div class="bar"><div><div class="crumb">Orders › <span class="mono">#24117</span></div><h3>Order #24117</h3></div><div class="actions"><span class="btn">Pakbon</span><span class="btn">Factuur F-2026-0412</span><span class="btn">Terugbetalen</span><span class="btn primary">Markeer als verzonden</span></div></div>
+      <div class="body">
+        <div class="card"><div class="bd" style="display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:center">
+          <div class="steps"><div class="step done"><i>✓</i>Geplaatst</div><div class="step done"><i>✓</i>Betaald</div><div class="step now"><i>3</i>Inpakken</div><div class="step"><i>4</i>Verzonden</div><div class="step"><i>5</i>Afgeleverd</div></div>
+          <div style="display:flex;gap:8px"><span class="pill p-ok">Betaald · iDEAL</span><span class="pill p-warn">Te verzenden</span></div>
+        </div></div>
+        <div class="ed">
+          <div style="display:grid;gap:16px">
+            <div class="card"><div class="hd"><b>Artikelen</b><span>prijzen vastgelegd bij bestelling</span></div>
+              <table><thead><tr><th>Product</th><th>StockCode</th><th class="r">Aantal</th><th class="r">Prijs</th><th class="r">Totaal</th></tr></thead><tbody>
+                <tr><td><div class="tt"><div class="img">IMG</div><div>KNIL koppelslot, messing<small>snapshot 05-10-2026</small></div></div></td><td class="mono">50198</td><td class="r mono">1</td><td class="r mono">€ 395,00</td><td class="r mono">€ 395,00</td></tr>
+                <tr><td><div class="tt"><div class="img">IMG</div><div>Mobilisatie-veldjas M34, 1939<small>snapshot 05-10-2026</small></div></div></td><td class="mono">49720</td><td class="r mono">1</td><td class="r mono">€ 425,00</td><td class="r mono">€ 425,00</td></tr>
+              </tbody></table>
+              <div class="bd" style="border-top:1px solid var(--line)"><dl class="kv" style="max-width:320px;margin-left:auto"><dt>Subtotaal</dt><dd class="mono">€ 820,00</dd><dt>Verzending · NL verzekerd</dt><dd class="mono">€ 25,00</dd><dt>Btw (margeregeling)</dt><dd class="mono muted">n.v.t.</dd><dt><b>Totaal</b></dt><dd class="mono"><b>€ 845,00</b></dd></dl></div>
+            </div>
+            <div class="card"><div class="hd"><b>Verzending</b><span>PostNL via Sendcloud</span></div><div class="bd row2">
+              <div class="field"><label>Track &amp; trace</label><div class="in mono muted">plak of scan code…</div></div>
+              <div class="field"><label>Verzekerde waarde</label><div class="in mono">€ 820,00</div></div>
+            </div></div>
+          </div>
+          <div style="display:grid;gap:16px">
+            <div class="card"><div class="hd"><b>Klant</b><span>3e order</span></div><div class="bd" style="font-size:13px;display:grid;gap:4px">
+              <b>Henk de Groot</b><span class="muted">h.degroot@example.nl</span><span class="muted">+31 6 1234 5678</span>
+              <span style="margin-top:6px">Dorpsstraat 12<br>7311 AB Apeldoorn<br>Nederland</span>
+            </div></div>
+            <div class="card"><div class="hd"><b>Tijdlijn</b></div><div class="bd"><div class="tl">
+              <div class="k">Betaling ontvangen via Mollie-webhook<small>05-10 21:14 · tr_7Gk…Qe</small></div>
+              <div>Voorraad afgeboekt (2 items)<small>05-10 21:14 · systeem</small></div>
+              <div>Bevestiging naar klant en shop<small>05-10 21:14 · systeem</small></div>
+              <div>Order geplaatst, items gereserveerd<small>05-10 21:11 · klant</small></div>
+              <div class="k">Notitie: "Jas apart in zuurvrij papier"<small>06-10 09:02 · Wout</small></div>
+            </div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ================= BOARD ================= -->
+<section role="tabpanel" id="t-board" aria-labelledby="b-board" hidden>
+  <div class="intro"><h2>Verzendbord</h2><p>Nieuw idee voor de dagelijkse routine: betaalde orders schuiven van inpakken naar verzonden. Bij "Verzonden" gaat automatisch een mail met track &amp; trace.</p></div>
+  <div class="scroll"><div class="app">
+    <aside class="rail" data-rail="board"></aside>
+    <div class="main">
+      <div class="bar"><div><div class="crumb">Orders</div><h3>Verzendbord</h3></div><div class="actions"><span class="btn">Lijst</span><span class="btn">Alle pakbonnen printen (5)</span></div></div>
+      <div class="body"><div class="board">
+        <div class="col"><h5>Wacht op betaling <span class="mono muted">2</span></h5>
+          <div class="oc"><div class="h"><b class="mono">#24116</b><span class="mono">€ 312,50</span></div><span>M. Fischer · DE</span><span class="pill p-info">Overschrijving · dag 2 van 7</span></div>
+          <div class="oc"><div class="h"><b class="mono">#24109</b><span class="mono">€ 74,00</span></div><span>A. Janssen · NL</span><span class="pill p-info">Overschrijving · dag 5 van 7</span></div>
+        </div>
+        <div class="col"><h5>Inpakken <span class="mono muted">3</span></h5>
+          <div class="oc"><div class="h"><b class="mono">#24117</b><span class="mono">€ 845,00</span></div><span>H. de Groot · NL · 2 items</span><span class="pill p-warn">Betaald 05-10</span></div>
+          <div class="oc"><div class="h"><b class="mono">#24112</b><span class="mono">€ 1.980,00</span></div><span>P. Laurent · FR · verzekerd</span><span class="pill p-warn">Betaald 04-10</span></div>
+          <div class="oc"><div class="h"><b class="mono">#24111</b><span class="mono">€ 59,00</span></div><span>S. Visser · NL</span><span class="pill p-warn">Betaald 04-10</span></div>
+        </div>
+        <div class="col"><h5>Klaar voor verzending <span class="mono muted">2</span></h5>
+          <div class="oc"><div class="h"><b class="mono">#24110</b><span class="mono">€ 215,00</span></div><span>K. Müller · AT</span><span class="pill p-mute">Label aangemaakt</span></div>
+          <div class="oc"><div class="h"><b class="mono">#24108</b><span class="mono">€ 488,00</span></div><span>T. Brown · UK · douane</span><span class="pill p-mute">CN22 nodig</span></div>
+        </div>
+        <div class="col"><h5>Verzonden <span class="mono muted">14</span></h5>
+          <div class="oc"><div class="h"><b class="mono">#24115</b><span class="mono">€ 129,00</span></div><span>J. Peeters · BE</span><span class="pill p-ok">3SQM…1124</span></div>
+          <div class="oc"><div class="h"><b class="mono">#24107</b><span class="mono">€ 640,00</span></div><span>L. Bakker · NL</span><span class="pill p-ok">Afgeleverd</span></div>
+        </div>
+      </div></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ================= SETTINGS ================= -->
+<section role="tabpanel" id="t-set" aria-labelledby="b-set" hidden>
+  <div class="intro"><h2>Instellingen</h2><p>De ~60 losse key/value-rijen worden groepen met een eigen formulier en validatie. Wat alleen de beheerder van het platform mag wijzigen, staat apart en is voor de shop-eigenaar niet bereikbaar.</p></div>
+  <div class="scroll"><div class="app">
+    <aside class="rail" data-rail="set"></aside>
+    <div class="main">
+      <div class="bar"><div><div class="crumb">Systeem</div><h3>Instellingen</h3></div><div class="actions"><span class="btn primary">Opslaan</span></div></div>
+      <div class="body"><div class="set">
+        <nav><span>Algemeen</span><span class="on">Shop &amp; catalogus</span><span>Uiterlijk</span><span>Checkout</span><span>Mails</span><span>Juridisch &amp; leeftijd</span><span>Integraties</span><span style="color:var(--muted);border-top:1px solid var(--line);margin-top:6px;padding-top:10px;font-size:12px">Platform (superadmin)</span></nav>
+        <div class="card"><div class="hd"><b>Shop &amp; catalogus</b><span>wijzigingen direct live</span></div><div class="bd">
+          <div class="srow"><div><b>Reserveringstijd mandje</b><p>Hoe lang een uniek item vastligt voor een klant die het in het mandje heeft.</p></div><span class="in mono" style="border:1px solid var(--line);border-radius:5px;padding:6px 10px">15 min</span></div>
+          <div class="srow"><div><b>Prijs tonen bij verkochte items</b><p>Toon "Verkocht voor € …" in het archief.</p></div><span class="tog"></span></div>
+          <div class="srow"><div><b>Referentie-archief openbaar</b><p>Verkochte items blijven vindbaar voor verzamelaars en zoekmachines.</p></div><span class="tog on"></span></div>
+          <div class="srow"><div><b>Bieden standaard toestaan</b><p>Per product te overschrijven.</p></div><span class="tog"></span></div>
+          <div class="srow"><div><b>Weergave catalogus</b><p>Standaard voor nieuwe bezoekers.</p></div><div class="seg" style="width:180px"><span class="on">Raster</span><span>Lijst</span></div></div>
+          <div class="srow"><div><b>Accentkleur</b><p>Wordt token <span class="mono">--qm-accent</span> in de shop.</p></div><span><span class="swatch" style="background:#C17F3B"></span> <span class="mono">#C17F3B</span></span></div>
+        </div></div>
+      </div></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ================= SHOP ================= -->
+<section role="tabpanel" id="t-shop" aria-labelledby="b-shop" hidden>
+  <div class="intro"><h2>Productpagina (concept)</h2><p>Fase 3. Bouwt verder op het bestaande messing/leer-redesign. Nieuw: deep zoom op markeringen, zichtbare reservering met aftelklok, herkomst met QR-certificaat en "meld me" voor vergelijkbare items.</p></div>
+  <div class="notes"><span class="note">Kleuren komen uit instellingen (white-label)</span><span class="note">Mobiel: galerij boven, sticky koopknop</span></div>
+  <div class="scroll"><div class="shop">
+    <div class="nav"><div><b>Quartermaster</b><span>Helmen</span><span>Uniformen</span><span>Uitrusting</span><span>Insignes</span><span>Archief</span></div><div style="font-size:13px">Zoeken · Verlanglijst (4) · Mandje (1)</div></div>
+    <div class="pdp">
+      <div>
+        <div class="big"><div class="lens">ET64 · 3721</div></div>
+        <div class="thumbs"><div class="on"></div><div></div><div></div><div></div><div></div><div></div></div>
+      </div>
+      <div>
+        <div class="eyebrow">WO2 · Duitsland · Heer · Helmen · #50231</div>
+        <h4>Stahlhelm M40 Heer, ET64</h4>
+        <div class="price">€ 1.450,00</div>
+        <div style="font-size:12.5px;color:#7A6248">Margeregeling, btw niet aftrekbaar · Verzekerde verzending vanaf € 25</div>
+        <div class="res"><span>⏱</span><span>Dit item ligt <b>11:42</b> voor je vast in je mandje.</span></div>
+        <div class="cta"><span class="a">Afrekenen</span><span class="b">Doe een bod</span><span class="b" style="flex:0 0 52px">♡</span></div>
+        <dl class="spec"><dt>Maker</dt><dd>Eisenhüttenwerke Thale (ET), maat 64</dd><dt>Lotnummer</dt><dd>3721</dd><dt>Liner</dt><dd>Leer, maat 57, compleet</dd><dt>Decal</dt><dd>Heer, enkel, ca. 80%</dd><dt>Staat</dt><dd>Zeer goed, originele verf</dd></dl>
+        <div class="prov"><div class="qr" aria-hidden="true"></div><div><b>Certificaat van echtheid</b><br><span style="color:#7A6248">Uit een Nederlandse privécollectie sinds 1978. Levenslange garantie op echtheid.</span></div></div>
+      </div>
+    </div>
+    <div class="shop alert" style="min-width:0"><span><b>Te laat?</b> Ontvang een mail zodra er een nieuwe M40 Heer binnenkomt.</span><span style="background:#2C2316;color:#F5EDD8;padding:8px 14px;border-radius:6px;font-size:13px">Meld me</span></div>
+  </div></div>
+</section>
+</div>
+
+<script>
+(function(){
+  var items=[["Overzicht",[["dash","Dashboard",""]]],["Catalogus",[["prod","Voorraad","412"],["","Categorieën",""],["","Inkoop & herkomst",""]]],["Verkoop",[["order","Orders","5"],["board","Verzendbord",""],["","Klanten",""],["","Biedingen","1"]]],["Website",[["","Pagina's",""],["","Menu's",""],["","Nieuwsbrief",""]]],["Systeem",[["","Verzending",""],["","Betaalmethoden",""],["set","Instellingen",""],["","Gebruikers",""],["","Audit-log",""]]]];
+  document.querySelectorAll(".rail").forEach(function(r){
+    var on=r.getAttribute("data-rail"),h='<div class="logo"><i>QM</i><b>Quartermaster</b></div><div class="search"><span>Zoeken…</span><kbd>⌘K</kbd></div>';
+    items.forEach(function(g){h+="<h6>"+g[0]+"</h6>";g[1].forEach(function(it){var hot=it[0]==="order"||it[1]==="Biedingen";h+='<a href="#" class="'+(it[0]&&it[0]===on?"on":"")+'" tabindex="-1">'+it[1]+(it[2]?'<span class="c'+(hot?" hot":"")+'">'+it[2]+"</span>":"")+"</a>"})});
+    h+='<div class="me">Wout · Eigenaar</div>';r.innerHTML=h;
+  });
+  var tabs=[].slice.call(document.querySelectorAll('[role="tab"]'));
+  function show(id){tabs.forEach(function(t){var s=t.getAttribute("aria-controls")===id;t.setAttribute("aria-selected",s);document.getElementById(t.getAttribute("aria-controls")).hidden=!s});try{localStorage.setItem("qm-tab",id)}catch(e){}}
+  tabs.forEach(function(t){t.addEventListener("click",function(){show(t.getAttribute("aria-controls"))})});
+  var h=(location.hash||"").slice(1);if(h&&document.getElementById(h))show(h);else{try{var s=localStorage.getItem("qm-tab");if(s&&document.getElementById(s))show(s)}catch(e){}}
+})();
+</script>

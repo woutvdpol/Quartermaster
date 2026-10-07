@@ -1,0 +1,1037 @@
+// =============================================================================
+// Quartermaster — Prisma schema DRAFT (fase 0, analyse)
+// -----------------------------------------------------------------------------
+// Doel: het HUIDIGE Concept500 schema (Laravel 12, MariaDB 10.11) 1-op-1
+// beschrijven met @map/@@map naar de bestaande tabel- en kolomnamen, zodat
+// Prisma tegen een KOPIE van de productie-DB kan draaien (read-only extractie
+// voor de ETL, zie docs/analysis/02-data-model.md §"Data-migratie strategie").
+//
+// Conventies in dit bestand:
+//   * Bestaande kolommen  -> camelCase veld + @map("snake_case")
+//   * `// NEW:`           -> voorgestelde toevoeging voor het doel-schema.
+//                            Nieuwe KOLOMMEN op bestaande tabellen staan als
+//                            commentaar (anders breekt dit schema tegen de
+//                            bestaande DB). Nieuwe MODELLEN staan onderaan als
+//                            echte models (eigen tabellen, `qm_` prefix) en
+//                            raken de bestaande tabellen niet.
+//   * `// LEGACY:`        -> kolom/tabel die in het doel-schema verdwijnt.
+//   * `// DQ:`            -> bekend data-kwaliteitsprobleem.
+//   * Geld: altijd Int in MINOR units (centen) + currency code (ISO 4217).
+//     Uitzonderingen in het huidige schema (decimal major units) zijn gemarkeerd.
+//   * Laravel `id()` = BIGINT UNSIGNED -> BigInt @db.UnsignedBigInt. In het
+//     doel-schema (Postgres) wordt dit Int/String(cuid) — zie md.
+//   * Laravel slaat PHP pure enums op als VARCHAR met de case-NAAM
+//     ('ACTIVE', 'SOLD', ...). Daarom hier `String` + verwijzing naar de
+//     Prisma enum die onderaan is gedeclareerd voor het doel-schema.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+  // Aparte output zodat deze "legacy" client naast de Quartermaster client kan
+  // bestaan in het ETL-script.
+  output   = "../../node_modules/.prisma/legacy-client"
+}
+
+datasource db {
+  provider = "mysql" // MariaDB 10.11 (docker-compose: mariadb:10.11)
+  url      = env("LEGACY_DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// AUTH / USERS
+// -----------------------------------------------------------------------------
+
+model User {
+  id              BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name            String    @db.VarChar(255)
+  email           String    @unique @db.VarChar(255)
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamp(0)
+  password        String    @db.VarChar(255) // bcrypt "$2y$10$..." — compatibel met bcryptjs/argon-migratie
+  birthDate       DateTime  @map("birth_date") @db.Date // NOT NULL: leeftijdscheck (is_adult >= 18) voor age_restricted producten
+  rememberToken   String?   @map("remember_token") @db.VarChar(100) // LEGACY: Laravel "remember me"
+  createdAt       DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime? @map("updated_at") @db.Timestamp(0)
+
+  orders    Order[]
+  addresses Address[]
+  wishlist  Wishlist[]
+
+  // NEW: role       UserRole @default(CUSTOMER)   // vervangt spatie roles/model_has_roles (user/owner/admin)
+  // NEW: deletedAt  DateTime?                      // soft delete i.p.v. cascade-delete van orders
+  // NEW: sessions / accounts / verificationTokens -> Auth.js / better-auth tabellen
+  auditLogs AuditLog[] // NEW: relatie naar audit log (actor)
+
+  @@map("users")
+}
+
+/// LEGACY: vervangen door verification-token tabel van de auth-library.
+model PasswordResetToken {
+  email     String    @id @db.VarChar(255)
+  token     String    @db.VarChar(255)
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+
+  @@map("password_reset_tokens")
+}
+
+/// LEGACY: Sanctum API tokens. Alleen gebruikt door default route GET /api/user.
+/// Polymorf (tokenable_type/tokenable_id). Niet migreren.
+model PersonalAccessToken {
+  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  tokenableType String    @map("tokenable_type") @db.VarChar(255)
+  tokenableId   BigInt    @map("tokenable_id") @db.UnsignedBigInt
+  name          String    @db.VarChar(255)
+  token         String    @unique @db.VarChar(64)
+  abilities     String?   @db.Text
+  lastUsedAt    DateTime? @map("last_used_at") @db.Timestamp(0)
+  expiresAt     DateTime? @map("expires_at") @db.Timestamp(0)
+  createdAt     DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime? @map("updated_at") @db.Timestamp(0)
+
+  @@index([tokenableType, tokenableId])
+  @@map("personal_access_tokens")
+}
+
+// --- spatie/laravel-permission (via backpack/permissionmanager) --------------
+// LEGACY: in Quartermaster vervangen door User.role enum. Rollen in gebruik:
+// 'user', 'owner', 'admin' (UserSeeder). Permissions-tabel vermoedelijk leeg.
+
+model Permission {
+  id        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name      String    @db.VarChar(255)
+  guardName String    @map("guard_name") @db.VarChar(255)
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @map("updated_at") @db.Timestamp(0)
+
+  modelHasPermissions ModelHasPermission[]
+  roleHasPermissions  RoleHasPermission[]
+
+  @@unique([name, guardName])
+  @@map("permissions")
+}
+
+model Role {
+  id        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name      String    @db.VarChar(255)
+  guardName String    @map("guard_name") @db.VarChar(255)
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @map("updated_at") @db.Timestamp(0)
+
+  modelHasRoles      ModelHasRole[]
+  roleHasPermissions RoleHasPermission[]
+
+  @@unique([name, guardName])
+  @@map("roles")
+}
+
+/// Polymorf: model_type = 'App\Models\User' (of legacy 'App\User'), model_id = users.id (geen FK!)
+model ModelHasPermission {
+  permissionId BigInt     @map("permission_id") @db.UnsignedBigInt
+  modelType    String     @map("model_type") @db.VarChar(255)
+  modelId      BigInt     @map("model_id") @db.UnsignedBigInt
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([permissionId, modelId, modelType])
+  @@index([modelId, modelType])
+  @@map("model_has_permissions")
+}
+
+/// Polymorf: model_type = 'App\Models\User', model_id = users.id (geen FK!)
+model ModelHasRole {
+  roleId    BigInt @map("role_id") @db.UnsignedBigInt
+  modelType String @map("model_type") @db.VarChar(255)
+  modelId   BigInt @map("model_id") @db.UnsignedBigInt
+  role      Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, modelId, modelType])
+  @@index([modelId, modelType])
+  @@map("model_has_roles")
+}
+
+model RoleHasPermission {
+  permissionId BigInt     @map("permission_id") @db.UnsignedBigInt
+  roleId       BigInt     @map("role_id") @db.UnsignedBigInt
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([permissionId, roleId])
+  @@map("role_has_permissions")
+}
+
+// -----------------------------------------------------------------------------
+// CATALOGUS
+// -----------------------------------------------------------------------------
+
+model Category {
+  id        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt // legacy Cat1.CatID behouden
+  parentId  BigInt?   @map("parent_id") @db.UnsignedBigInt
+  title     String    @db.VarChar(255)
+  slug      String    @unique @db.VarChar(255)
+  active    Boolean
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @map("updated_at") @db.Timestamp(0)
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  // NEW: description     String?  @db.Text
+  // NEW: position        Int      @default(0)
+  // NEW: seoTitle        String?
+  // NEW: seoDescription  String?
+  // NEW: imageId         String?  // Cloudflare Images id
+
+  @@index([parentId], map: "categories_parent_id_foreign")
+  @@map("categories")
+}
+
+/// products.id == legacy Stock.StockCode (zichtbaar voor klanten, in URL /product/{id}/{slug}).
+/// AUTO_INCREMENT >= 50000 voor nieuwe producten (migratie 2025_10_30).
+model Product {
+  id                BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  purchaseRecordId  BigInt?   @map("purchase_record_id") @db.UnsignedBigInt
+  productId         BigInt?   @map("product_id") @db.UnsignedBigInt // DQ: 2e "productnummer" (max+1, start 5001). Onduidelijk doel, niet uniek, geen index.
+  categoryId        BigInt?   @map("category_id") @db.UnsignedBigInt
+  title             String    @db.VarChar(250)
+  slug              String    @db.VarChar(250) // DQ: NIET uniek (unique gedropt 2024_08_29); URL bevat id
+  description       String?   @db.Text // Markdown (gerenderd + HTMLPurifier)
+  price             Int // MINOR units, in shop-valuta (settings.currency, default EUR)
+  purchasePrice     Int?      @map("purchase_price") // MINOR units, inkoopprijs (intern)
+  weight            Int       @default(0) // gram (matcht weights.weight)
+  quantity          Int       @default(0) // voorraad; meestal 0/1 (unieke militaria-items)
+  stockControl      String    @map("stock_control") @db.VarChar(255) // enum StockControlType (RESERVED|SOLD|STOLEN|NOT_IN_SHOP): gedrag bij voorraad 0
+  notes             String?   @db.Text // interne notities
+  ageRestricted     Boolean   @default(false) @map("age_restricted")
+  saleItem          Boolean   @default(false) @map("sale_item")
+  active            String    @db.VarChar(255) // enum ActiveType (INACTIVE|ACTIVE|ARCHIVED)
+  photos            String?   @db.Text // DQ: JSON array Cloudflare Image IDs, vaak DUBBEL ge-encodeerd ("\"[...]\"")
+  photoCount        Int       @default(0) @map("photo_count") // LEGACY: verwacht aantal foto's uit oude DB (PhotoQuant)
+  blur              Boolean   @default(false) // foto blurren voor gasten (Cloudflare variant 'blur')
+  soldOn            DateTime? @map("sold_on") @db.DateTime(0) // gezet als quantity -> 0; ArchiveOldProducts archiveert na 2 weken
+  sku               String?   @db.VarChar(255) // DQ: niet uniek, geen index; gegenereerd als max(sku)+1 (string-sort op LENGTH)
+  productReservedOn DateTime? @map("product_reserved_on") @db.DateTime(0) // soft-reservering tijdens checkout (settings.reserved_time sec)
+  createdAt         DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt         DateTime? @map("updated_at") @db.Timestamp(0) // DQ: gebruikt als "listing/bump datum" (sortering), timestamps worden bij updates van ACTIVE producten bewust NIET bijgewerkt
+  specifications    String?   @db.Text // JSON (lijst key/value) als TEXT
+  importance        Int       @default(0) // sortering "featured"
+
+  category       Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  purchaseRecord PurchaseRecord? @relation(fields: [purchaseRecordId], references: [id], onDelete: SetNull)
+  orderDetails   OrderDetail[]
+  productTags    ProductTag[]
+  relatedFrom    RelatedProduct[] @relation("RelatedProductSource")
+  relatedTo      RelatedProduct[] @relation("RelatedProductTarget")
+  wishlist       Wishlist[]
+  contentBlocks  ContentBlock[]
+
+  // NEW: stockCode       String   @unique            // expliciet legacy StockCode, los van PK
+  // NEW: slug            -> @unique (na de-duplicatie) of @@unique([slug, id]) blijven via URL
+  // NEW: status          ProductStatus              // ACTIVE|RESERVED|SOLD|STOLEN|ARCHIVED|DRAFT expliciet opgeslagen i.p.v. afgeleid
+  // NEW: publishedAt     DateTime?                  // vervangt misbruik van updated_at als bump/listing-datum
+  // NEW: bumpedAt        DateTime?
+  // NEW: currency        String   @default("EUR") @db.Char(3)
+  // NEW: compareAtPrice  Int?                       // "was"-prijs bij sale_item
+  // NEW: seoTitle        String?
+  // NEW: seoDescription  String?                    // nu afgeleid uit description (strip_tags)
+  // NEW: searchVector    Unsupported("tsvector")?   // Postgres full-text (title+description+sku)
+  // NEW: deletedAt       DateTime?                  // soft delete (orders verwijzen naar product)
+  // NEW: version         Int @default(0)            // optimistic locking voor voorraad
+  images         ProductImage[]  // NEW: vervangt photos JSON
+  variants       ProductVariant[] // NEW: optioneel (maten/conditie)
+  stockMovements StockMovement[] // NEW: voorraad-ledger
+  specs          ProductSpec[]   // NEW: vervangt specifications JSON
+
+  @@index([categoryId], map: "products_category_id_foreign")
+  @@index([purchaseRecordId], map: "products_purchase_record_id_foreign")
+  @@map("products")
+}
+
+/// Tags. Kolom deleted_at bestaat maar het model gebruikt GEEN SoftDeletes trait -> altijd NULL.
+model Tag {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name        String    @db.VarChar(255) // DQ: niet uniek
+  createdAt   DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime? @map("updated_at") @db.Timestamp(0)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(0) // LEGACY: ongebruikt
+  description String?   @db.Text // Markdown
+
+  productTags ProductTag[]
+
+  // NEW: slug String @unique
+
+  @@map("tags")
+}
+
+/// Pivot met eigen id + timestamps; DQ: geen unique(product_id, tag_id) -> duplicaten mogelijk.
+model ProductTag {
+  id        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  productId BigInt    @map("product_id") @db.UnsignedBigInt
+  tagId     BigInt    @map("tag_id") @db.UnsignedBigInt
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @map("updated_at") @db.Timestamp(0)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Restrict)
+
+  @@index([productId], map: "product_tag_product_id_foreign")
+  @@index([tagId], map: "product_tag_tag_id_foreign")
+  @@map("product_tag")
+}
+
+/// Self-referencing many-to-many (eenrichting: product -> related).
+model RelatedProduct {
+  id               BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  productId        BigInt    @map("product_id") @db.UnsignedBigInt
+  relatedProductId BigInt    @map("related_product_id") @db.UnsignedBigInt
+  createdAt        DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt        DateTime? @map("updated_at") @db.Timestamp(0)
+
+  product        Product @relation("RelatedProductSource", fields: [productId], references: [id], onDelete: Cascade)
+  relatedProduct Product @relation("RelatedProductTarget", fields: [relatedProductId], references: [id], onDelete: Cascade)
+
+  @@index([productId], map: "related_products_product_id_foreign")
+  @@index([relatedProductId], map: "related_products_related_product_id_foreign")
+  @@map("related_products")
+}
+
+// --- Inkoop-herkomst (feature toggle settings.purchase_information) ----------
+
+model ProductOrigin {
+  id        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name      String    @db.VarChar(255)
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @map("updated_at") @db.Timestamp(0)
+
+  purchaseRecords PurchaseRecord[]
+
+  @@map("product_origins")
+}
+
+model PurchaseRecord {
+  id              BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  productOriginId BigInt    @map("product_origin_id") @db.UnsignedBigInt // DQ: bedoeld nullable, maar ->constrained()->nullable() maakt kolom NOT NULL
+  invoiceNumber   String?   @map("invoice_number") @db.VarChar(255)
+  createdAt       DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime? @map("updated_at") @db.Timestamp(0)
+
+  productOrigin ProductOrigin @relation(fields: [productOriginId], references: [id], onDelete: Restrict)
+  products      Product[]
+
+  // NEW: purchasedAt DateTime?
+  // NEW: totalCost   Int?      // minor units
+  // NEW: currency    String?   @db.Char(3)
+
+  @@index([productOriginId], map: "purchase_records_product_origin_id_foreign")
+  @@map("purchase_records")
+}
+
+// -----------------------------------------------------------------------------
+// ORDERS
+// -----------------------------------------------------------------------------
+
+/// Order header. Adres als vrije tekst + losse velden (zip/city/state/country/region).
+/// Bedragen in MINOR units in shop-valuta (orders.currency = settings.currency op moment van bestellen).
+model Order {
+  id                      BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                    String    @db.Char(36) // DQ: geen unique/index; oude rijen mogelijk '' (kolom zonder default toegevoegd)
+  customerId              BigInt?   @map("customer_id") @db.UnsignedBigInt
+  name                    String    @db.VarChar(255) // voor+achternaam samengevoegd
+  address                 String    @db.Text // straat + huisnummer
+  deliveryAddress         String?   @map("delivery_address") @db.Text // LEGACY: niet meer gevuld door checkout
+  phone                   String    @db.VarChar(255)
+  email                   String    @db.VarChar(255) // sleutel voor "Customer" (virtueel model, GROUP BY email)
+  currency                String    @db.VarChar(3)
+  exchangeRate            Int       @default(100) @map("exchange_rate") // DQ: nooit gezet, gecast als Money (onzin). LEGACY
+  delivery                Int       @default(0) // MINOR units, verzendkosten
+  tax                     Int       @default(0) // DQ: nooit gevuld (altijd 0)
+  total                   Int       @default(0) // MINOR units, INCLUSIEF delivery (subtotal = total - delivery)
+  ageVerify               String    @default("Not Required") @map("age_verify") @db.VarChar(255)
+  paymentMethod           String    @default("btrans") @map("payment_method") @db.VarChar(255) // MOLLIE|PAYPAL|BANK_TRANSFER|CASH (+ legacy 'btrans')
+  paymentStatus           String    @default("failed") @map("payment_status") @db.VarChar(255) // paid|manual|failed (pending -> failed gemigreerd 2026_07_28)
+  paymentId               String?   @map("payment_id") @db.VarChar(255) // Mollie tr_xxx / PayPal id
+  paymentMessage          String?   @map("payment_message") @db.VarChar(255)
+  archive                 Boolean   @default(false) // admin "afgehandeld/gearchiveerd"
+  emailSentOn             DateTime? @map("email_sent_on") @db.Date // idempotency vlag bevestigingsmail
+  createdAt               DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt               DateTime? @map("updated_at") @db.Timestamp(0)
+  orderPaidOn             DateTime? @map("order_paid_on") @db.Timestamp(0)
+  zip                     String?   @db.VarChar(255)
+  city                    String?   @db.VarChar(255)
+  state                   String?   @db.VarChar(255)
+  country                 String?   @db.VarChar(255) // landnaam/-code uit Google Places / country-list (geen ISO-garantie)
+  region                  String?   @db.VarChar(255) // DQ: regions.title als STRING-snapshot, geen FK
+  notes                   String?   @db.Text // klantopmerking (vervangt 'comment')
+  isOrderPlacedEventFired Boolean   @default(false) @map("is_order_placed_event_fired") // idempotency OrderPlaced event (voorraad + mails)
+
+  // DQ: onDelete Cascade -> een user verwijderen verwijdert zijn orders!
+  customer User?         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  details  OrderDetail[]
+
+  // NEW: number          String   @unique              // leesbaar ordernummer (bv. CQ-2026-000123)
+  // NEW: status          OrderStatus                   // fulfilment status (NEW|PAID|PACKED|SHIPPED|COMPLETED|CANCELLED|REFUNDED)
+  // NEW: subtotal        Int                           // minor
+  // NEW: surcharge       Int  @default(0)              // payment-method toeslag, minor
+  // NEW: displayCurrency String? @db.Char(3)           // valuta die klant zag
+  // NEW: displayRate     Decimal? @db.Decimal(18, 8)   // rate snapshot
+  // NEW: shippingZoneId  Int?                          // FK i.p.v. region string
+  // NEW: trackingCode    String?
+  statusHistory OrderStatusHistory[] // NEW
+  payments      Payment[]            // NEW: vervangt payment_* kolommen
+  addresses     OrderAddress[]       // NEW: billing/shipping snapshots
+
+  @@index([customerId], map: "orders_customer_id_foreign")
+  @@map("orders")
+}
+
+/// Orderregel. DQ: kolom 'price' bevat de REGELTOTAAL (unit * qty), en wordt in
+/// OrderService via insert() ZONDER MoneyCast weggeschreven met
+/// ->getAmount() (MAJOR units, BigDecimal string) -> waarschijnlijk hele euro's
+/// i.p.v. centen. Te verifiëren tegen orders.total!
+model OrderDetail {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  orderId     BigInt    @map("order_id") @db.UnsignedBigInt
+  productId   BigInt    @map("product_id") @db.UnsignedBigInt
+  description String    @db.Text // DQ: altijd letterlijk 'description' -> geen titel-snapshot!
+  quantity    Int       @default(0)
+  price       Int       @default(0) // zie DQ hierboven
+  message     String?   @db.VarChar(255)
+  createdAt   DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime? @map("updated_at") @db.Timestamp(0)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: NoAction)
+
+  // NEW: productTitle  String     // snapshot
+  // NEW: sku           String?    // snapshot
+  // NEW: unitPrice     Int        // minor
+  // NEW: lineTotal     Int        // minor
+  // NEW: variantId     Int?
+
+  @@index([orderId], map: "order_details_order_id_foreign")
+  @@index([productId], map: "order_details_product_id_foreign")
+  @@map("order_details")
+}
+
+/// Klant-adresboek (ingelogde users).
+model Address {
+  id        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  userId    BigInt    @map("user_id") @db.UnsignedBigInt // DQ: ->constrained()->nullable() maakt kolom NOT NULL
+  firstname String    @db.VarChar(255)
+  lastname  String    @db.VarChar(255)
+  address   String    @db.VarChar(255)
+  city      String    @db.VarChar(255)
+  state     String?   @db.VarChar(255)
+  zip       String?   @db.VarChar(255)
+  country   String    @db.VarChar(255)
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @map("updated_at") @db.Timestamp(0)
+  // DQ: model $fillable bevat 'default', maar kolom bestaat niet.
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  // NEW: isDefault   Boolean @default(false)
+  // NEW: countryCode String  @db.Char(2)   // ISO 3166-1 alpha-2
+  // NEW: phone       String?
+
+  @@index([userId], map: "addresses_user_id_foreign")
+  @@map("addresses")
+}
+
+model Wishlist {
+  id        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  userId    BigInt    @map("user_id") @db.UnsignedBigInt
+  productId BigInt    @map("product_id") @db.UnsignedBigInt
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @map("updated_at") @db.Timestamp(0)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, productId])
+  @@index([productId], map: "wishlist_product_id_foreign")
+  @@map("wishlist")
+}
+
+/// Payment methods. name = 'Mollie' | 'Paypal' | 'Bank transfer' | 'Cash'
+/// (orders.payment_method gebruikt UPPER_SNAKE: MOLLIE, BANK_TRANSFER ...).
+model PaymentMethod {
+  id        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name      String    @unique @db.VarChar(255)
+  surcharge Decimal?  @db.Decimal(10, 2) // PERCENTAGE (factor 1 + surcharge/100), geen bedrag
+  visible   Boolean   @default(false)
+  active    Boolean
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @map("updated_at") @db.Timestamp(0)
+
+  // NEW: code        PaymentProvider @unique  // stabiele sleutel i.p.v. naam
+  // NEW: surchargeBp Int?                     // toeslag in basispunten (250 = 2,5%)
+  // NEW: position    Int @default(0)
+
+  @@map("payment_methods")
+}
+
+// -----------------------------------------------------------------------------
+// VERZENDING (regio x gewichtsklasse)
+// -----------------------------------------------------------------------------
+
+model Region {
+  id        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  title     String    @db.VarChar(255) // bv. "Netherlands", "Europe", "World"
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @map("updated_at") @db.Timestamp(0)
+
+  // NEW: countries String[] / RegionCountry tabel (ISO codes) -> automatische zone-keuze
+
+  @@map("regions")
+}
+
+/// Gewichtsklassen in gram (1, 50, 100, 250, 500, 1000 ... 30000).
+model Weight {
+  id        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  weight    Int // gram, bovengrens van de klasse
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @map("updated_at") @db.Timestamp(0)
+
+  @@map("weights")
+}
+
+/// Pivot regio x gewicht -> tarief. DQ: GEEN foreign keys in DB
+/// (unsignedBigInteger()->constrained() is een no-op), alleen unique(region_id, weight_id).
+/// Tarief = eerste weight >= totaalgewicht mandje.
+model RegionWeight {
+  id             BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  regionId       BigInt    @map("region_id") @db.UnsignedBigInt
+  weightId       BigInt    @map("weight_id") @db.UnsignedBigInt
+  deliveryCharge Decimal   @map("delivery_charge") @db.Decimal(8, 2) // DQ: MAJOR units (decimal), niet minor!
+  createdAt      DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt      DateTime? @map("updated_at") @db.Timestamp(0)
+
+  @@unique([regionId, weightId])
+  @@map("region_weights")
+}
+
+// -----------------------------------------------------------------------------
+// VALUTA
+// -----------------------------------------------------------------------------
+
+/// Weergave-valuta's (EUR, USD, GBP, AUD, JPY, CAD, CNY, NZD). Rate t.o.v. settings.currency.
+/// Bijgewerkt via app:update-currencies-command (ashallendesign/laravel-exchange-rates).
+model Currency {
+  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  code         String    @db.VarChar(255) // DQ: niet uniek
+  exchangeRate Decimal   @map("exchange_rate") @db.Decimal(8, 2) // DQ: slechts 2 decimalen (GBP 0.85 -> afrondfout tot ~0,6%)
+  createdAt    DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt    DateTime? @map("updated_at") @db.Timestamp(0)
+
+  // NEW: code         String  @id @db.Char(3)
+  // NEW: exchangeRate Decimal @db.Decimal(18, 8)
+  // NEW: enabled      Boolean @default(true)
+
+  @@map("currencies")
+}
+
+// -----------------------------------------------------------------------------
+// CMS
+// -----------------------------------------------------------------------------
+
+/// "Oude" content: items per vaste pagina (ShopPageEnum: HOME, SHOP, TERMS, LINKS,
+/// PRIVACY, CONTACT, EVENTS, NEWS, BANNER, ABOUT). Nested-set kolommen (Backpack reorder).
+model Content {
+  id        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  page      String    @db.VarChar(255) // enum ShopPage
+  title     String?   @db.VarChar(255)
+  content   String?   @db.Text // Markdown
+  url       String?   @db.VarChar(255)
+  startDate DateTime? @map("start_date") @db.Date // events/news
+  endDate   DateTime? @map("end_date") @db.Date
+  active    Boolean?
+  contact   String?   @db.Text // JSON (contactgegevens)
+  parentId  Int?      @default(0) @map("parent_id") // DQ: 0 i.p.v. NULL, geen FK
+  lft       Int       @default(0) // LEGACY: Backpack nested set
+  rgt       Int       @default(0) // LEGACY
+  depth     Int       @default(0) // LEGACY
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @map("updated_at") @db.Timestamp(0)
+
+  @@map("contents")
+}
+
+/// Pagebuilder-pagina's (o.a. 'home').
+model ContentPage {
+  id        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  url       String    @unique @db.VarChar(255)
+  title     String    @db.VarChar(255)
+  slug      String    @unique @db.VarChar(255)
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @map("updated_at") @db.Timestamp(0)
+
+  blocks ContentBlock[]
+
+  // NEW: seoTitle       String?
+  // NEW: seoDescription String?
+  // NEW: publishedAt    DateTime?
+
+  @@map("content_pages")
+}
+
+/// Pagebuilder-blokken. type = ContentBlockType enum. "God table": velden per type wisselend gebruikt.
+model ContentBlock {
+  id              BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  contentPageId   BigInt    @map("content_page_id") @db.UnsignedBigInt
+  productId       BigInt?   @map("product_id") @db.UnsignedBigInt // TEXT_PRODUCT blok
+  type            String    @db.VarChar(255) // enum ContentBlockType
+  title           String?   @db.VarChar(255)
+  content         String?   @db.Text // Markdown
+  author          String?   @db.VarChar(255) // QUOTE/TESTIMONIAL
+  mediaType       String?   @map("media_type") @db.VarChar(255) // enum MediaType (IMAGE|BACKGROUND_COLOR)
+  image           String?   @db.Text // JSON array Cloudflare Image IDs
+  backgroundColor String?   @map("background_color") @db.Text
+  buttonLink      String?   @map("button_link") @db.VarChar(255) // DQ: absolute URL's (url() tijdens migratie)
+  siteLink        String?   @map("site_link") @db.VarChar(255)
+  linkText        String?   @map("link_text") @db.VarChar(255)
+  amount          Int? // NEW_ITEMS: aantal producten
+  order           Int       @default(0)
+  createdAt       DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime? @map("updated_at") @db.Timestamp(0)
+
+  contentPage ContentPage @relation(fields: [contentPageId], references: [id], onDelete: Cascade)
+  product     Product?    @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  // NEW: data Json   // type-specifieke props (zod discriminated union) i.p.v. losse kolommen
+
+  @@index([contentPageId], map: "content_blocks_content_page_id_foreign")
+  @@index([productId], map: "content_blocks_product_id_foreign")
+  @@map("content_blocks")
+}
+
+/// Menu (HEADER/FOOTER). Nested set + parent_id.
+model MenuItem {
+  id        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  location  String?   @db.VarChar(255) // enum MenuItemLocation
+  mainName  String?   @map("main_name") @db.VarChar(255)
+  url       String?   @db.VarChar(255) // DQ: absolute URL's
+  subName   String?   @map("sub_name") @db.VarChar(255)
+  subUrl    String?   @map("sub_url") @db.VarChar(255)
+  order     Int       @default(0)
+  parentId  BigInt?   @map("parent_id") @db.UnsignedBigInt
+  lft       Int? // LEGACY
+  rgt       Int? // LEGACY
+  depth     Int? // LEGACY
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @map("updated_at") @db.Timestamp(0)
+
+  parent   MenuItem?  @relation("MenuTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children MenuItem[] @relation("MenuTree")
+
+  @@index([parentId], map: "menu_items_parent_id_foreign")
+  @@map("menu_items")
+}
+
+// -----------------------------------------------------------------------------
+// SETTINGS (key/value, EAV-achtig met kolom per type)
+// -----------------------------------------------------------------------------
+
+/// Waarde-kolom wordt gekozen op setting_type: boolean->boolean_value (STRING "1"/"0"/"true"),
+/// string->string_value, int->int_value (STRING), enum->list_value, image->image_value (JSON),
+/// list->list (JSON). Kolom 'value' is fallback. role = OWNER | ADMIN (wie mag wijzigen).
+/// Geladen in config('settings.*') via LoadSettingsMiddleware (cache).
+model Setting {
+  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  key          String    @unique @db.VarChar(255)
+  value        String?   @db.VarChar(255)
+  createdAt    DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt    DateTime? @map("updated_at") @db.Timestamp(0)
+  role         String?   @db.VarChar(255)
+  title        String?   @db.VarChar(255)
+  description  String?   @db.VarChar(255)
+  settingType  String?   @map("setting_type") @db.VarChar(255) // enum SettingType
+  stringValue  String?   @map("string_value") @db.VarChar(255)
+  booleanValue String?   @map("boolean_value") @db.VarChar(255) // DQ: boolean als string
+  intValue     String?   @map("int_value") @db.VarChar(255) // DQ: int als string
+  listValue    String?   @map("list_value") @db.VarChar(255)
+  imageValue   String?   @map("image_value") @db.VarChar(255) // JSON array Cloudflare IDs in VARCHAR(255)
+  list         Json?
+
+  // NEW: doel = één kolom `value Json` + zod-schema per key (typed settings registry in code)
+
+  @@map("settings")
+}
+
+// -----------------------------------------------------------------------------
+// NIEUWSBRIEF ("Emailer")
+// -----------------------------------------------------------------------------
+
+model EmailerSubscriber {
+  id                 BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  emailAddress       String    @unique @map("email_address") @db.VarChar(255)
+  verificationCode   String?   @map("verification_code") @db.VarChar(255) // double opt-in token (8 chars, ook gebruikt voor unsubscribe)
+  verificationStatus String    @map("verification_status") @db.VarChar(255) // enum EmailerStatus: pending|active|unsubscribed
+  resendAttempts     Int       @default(0) @map("resend_attempts")
+  emailSentAt        DateTime? @map("email_sent_at") @db.Timestamp(0)
+  emailVerifiedAt    DateTime? @map("email_verified_at") @db.Timestamp(0)
+  createdAt          DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt          DateTime? @map("updated_at") @db.Timestamp(0)
+  lastUpdatedByIp    String    @map("last_updated_by_ip") @db.VarChar(255) // PII (AVG)
+
+  // NEW: consentAt      DateTime?   // AVG bewijs
+  // NEW: unsubscribedAt DateTime?
+
+  @@map("emailer_subscribers")
+}
+
+/// Verzonden/te verzenden mailings. Quotum in settings.emailer_quota.
+model EmailerMail {
+  id        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  subject   String    @db.VarChar(255)
+  content   String    @db.Text // HTML/Markdown body
+  sentAt    DateTime? @map("sent_at") @db.Timestamp(0)
+  sentCount Int?      @map("sent_count")
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @map("updated_at") @db.Timestamp(0)
+
+  @@map("emailer_mails")
+}
+
+// -----------------------------------------------------------------------------
+// FRAMEWORK / INFRA  (LEGACY — niet migreren)
+// -----------------------------------------------------------------------------
+
+/// Laravel database queue (QUEUE_CONNECTION in .env.example = sync).
+model Job {
+  id          BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  queue       String @db.VarChar(255)
+  payload     String @db.LongText
+  attempts    Int    @db.UnsignedTinyInt
+  reservedAt  Int?   @map("reserved_at") @db.UnsignedInt
+  availableAt Int    @map("available_at") @db.UnsignedInt
+  createdAt   Int    @map("created_at") @db.UnsignedInt
+
+  @@index([queue])
+  @@map("jobs")
+}
+
+model FailedJob {
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid       String   @unique @db.VarChar(255)
+  connection String   @db.Text
+  queue      String   @db.Text
+  payload    String   @db.LongText
+  exception  String   @db.LongText
+  failedAt   DateTime @default(now()) @map("failed_at") @db.Timestamp(0)
+
+  @@map("failed_jobs")
+}
+
+/// Backpack import operation (CSV product import, toggle settings.product_import).
+model ImportLog {
+  id                    BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  userId                BigInt?   @map("user_id") // geen FK
+  filePath              String    @map("file_path") @db.Text
+  disk                  String    @default("local") @db.VarChar(255)
+  modelPrimaryKey       String?   @map("model_primary_key") @db.VarChar(255)
+  model                 String    @db.Text
+  config                String?   @db.LongText
+  deleteFileAfterImport Boolean   @default(false) @map("delete_file_after_import")
+  startedAt             DateTime? @map("started_at") @db.DateTime(0)
+  completedAt           DateTime? @map("completed_at") @db.DateTime(0)
+  createdAt             DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt             DateTime? @map("updated_at") @db.Timestamp(0)
+
+  @@index([userId], map: "import_log_user_id")
+  @@map("import_log")
+}
+
+// NB: tabel `migrations` (Laravel) bestaat ook; bewust niet gemodelleerd.
+// NB: GEEN sessions/cache/job_batches tabellen: SESSION_DRIVER=file, CACHE_DRIVER=file.
+
+// =============================================================================
+// NEW: voorgestelde modellen voor het Quartermaster doel-schema
+// (eigen tabellen met prefix qm_, raken bestaande tabellen niet)
+// =============================================================================
+
+// NEW
+enum UserRole {
+  CUSTOMER
+  OWNER
+  ADMIN
+}
+
+// NEW (huidige waarden van products.active)
+enum ActiveType {
+  INACTIVE
+  ACTIVE
+  ARCHIVED
+}
+
+// NEW (huidige waarden van products.stock_control)
+enum StockControlType {
+  RESERVED
+  SOLD
+  STOLEN
+  NOT_IN_SHOP
+}
+
+// NEW: expliciete, opgeslagen productstatus (nu runtime afgeleid in ProductStatusService)
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  RESERVED
+  SOLD
+  STOLEN
+  NOT_IN_SHOP
+  ARCHIVED
+}
+
+// NEW
+enum OrderStatus {
+  PENDING_PAYMENT
+  AWAITING_MANUAL_PAYMENT // bank transfer / cash (nu 'manual')
+  PAID
+  PACKED
+  SHIPPED
+  COMPLETED
+  CANCELLED
+  PAYMENT_FAILED
+  REFUNDED
+}
+
+// NEW
+enum PaymentProvider {
+  MOLLIE
+  PAYPAL
+  BANK_TRANSFER
+  CASH
+}
+
+// NEW
+enum PaymentStatus {
+  OPEN
+  PENDING
+  PAID
+  FAILED
+  CANCELED
+  EXPIRED
+  REFUNDED
+}
+
+// NEW (huidige waarden van emailer_subscribers.verification_status)
+enum EmailerStatus {
+  pending
+  active
+  unsubscribed
+}
+
+// NEW
+enum StockMovementReason {
+  INITIAL
+  PURCHASE // inkoop
+  SALE // order geplaatst
+  ORDER_CANCELLED
+  RESERVATION
+  RESERVATION_RELEASED
+  CORRECTION
+  STOLEN
+  RETURN
+}
+
+// NEW (huidige waarden van content_blocks.type)
+enum ContentBlockType {
+  TEXT
+  TEXT_HORIZONTAL
+  TEXT_IMAGE
+  QUOTE
+  CTA
+  TESTIMONIAL
+  NEW_ITEMS
+  GALLERY
+  CATEGORIES
+  HERO
+  TEXT_PRODUCT
+  TEXT_CAROUSEL
+  EMAILER
+}
+
+// NEW (huidige waarden van contents.page)
+enum ShopPage {
+  HOME
+  SHOP
+  TERMS
+  LINKS
+  PRIVACY
+  CONTACT
+  EVENTS
+  NEWS
+  BANNER
+  ABOUT
+}
+
+// NEW: vervangt products.photos JSON (Cloudflare Images ids blijven geldig)
+model ProductImage {
+  id           Int      @id @default(autoincrement())
+  productId    BigInt   @map("product_id") @db.UnsignedBigInt
+  cloudflareId String   @unique @map("cloudflare_id") @db.VarChar(64)
+  position     Int      @default(0)
+  alt          String?  @db.VarChar(255)
+  width        Int?
+  height       Int?
+  filename     String?  @db.VarChar(255) // origineel, bv. "12345b.jpg"
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, position])
+  @@map("qm_product_images")
+}
+
+// NEW: optioneel — alleen nodig als items in maten/varianten komen (nu: ieder item uniek)
+model ProductVariant {
+  id        Int      @id @default(autoincrement())
+  productId BigInt   @map("product_id") @db.UnsignedBigInt
+  sku       String   @unique @db.VarChar(64)
+  title     String   @db.VarChar(255) // bv. "Maat 52 / conditie B"
+  price     Int? // minor units, null = productprijs
+  weight    Int? // gram
+  quantity  Int      @default(0)
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stockMovements StockMovement[]
+
+  @@map("qm_product_variants")
+}
+
+// NEW: gestructureerde specificaties (nu JSON in products.specifications)
+model ProductSpec {
+  id        Int    @id @default(autoincrement())
+  productId BigInt @map("product_id") @db.UnsignedBigInt
+  key       String @db.VarChar(100)
+  value     String @db.VarChar(500)
+  position  Int    @default(0)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("qm_product_specs")
+}
+
+// NEW: voorraad-ledger; products.quantity wordt een (gecachte) som hiervan
+model StockMovement {
+  id        Int                 @id @default(autoincrement())
+  productId BigInt              @map("product_id") @db.UnsignedBigInt
+  variantId Int?                @map("variant_id")
+  delta     Int // +n / -n
+  reason    StockMovementReason
+  orderId   BigInt?             @map("order_id") @db.UnsignedBigInt
+  actorId   BigInt?             @map("actor_id") @db.UnsignedBigInt
+  note      String?             @db.VarChar(500)
+  createdAt DateTime            @default(now()) @map("created_at")
+
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([productId, createdAt])
+  @@index([orderId])
+  @@map("qm_stock_movements")
+}
+
+// NEW: order status machine + historie
+model OrderStatusHistory {
+  id         Int         @id @default(autoincrement())
+  orderId    BigInt      @map("order_id") @db.UnsignedBigInt
+  fromStatus OrderStatus? @map("from_status")
+  toStatus   OrderStatus @map("to_status")
+  actorId    BigInt?     @map("actor_id") @db.UnsignedBigInt // null = systeem/webhook
+  note       String?     @db.VarChar(500)
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("qm_order_status_history")
+}
+
+// NEW: betalingen los van order (meerdere pogingen, refunds, webhooks)
+model Payment {
+  id                Int             @id @default(autoincrement())
+  orderId           BigInt          @map("order_id") @db.UnsignedBigInt
+  provider          PaymentProvider
+  providerPaymentId String?         @unique @map("provider_payment_id") @db.VarChar(128) // tr_xxx / PayPal order id
+  status            PaymentStatus
+  amount            Int // minor units
+  currency          String          @db.Char(3)
+  surchargeAmount   Int             @default(0) @map("surcharge_amount")
+  rawPayload        Json?           @map("raw_payload") // laatste webhook response
+  paidAt            DateTime?       @map("paid_at")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("qm_payments")
+}
+
+// NEW: gestructureerde adres-snapshots per order
+model OrderAddress {
+  id          Int     @id @default(autoincrement())
+  orderId     BigInt  @map("order_id") @db.UnsignedBigInt
+  type        String  @db.VarChar(16) // 'billing' | 'shipping'
+  firstName   String  @map("first_name") @db.VarChar(255)
+  lastName    String  @map("last_name") @db.VarChar(255)
+  street      String  @db.VarChar(255)
+  houseNumber String? @map("house_number") @db.VarChar(32)
+  zip         String? @db.VarChar(32)
+  city        String  @db.VarChar(255)
+  state       String? @db.VarChar(255)
+  countryCode String  @map("country_code") @db.Char(2)
+  phone       String? @db.VarChar(64)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, type])
+  @@map("qm_order_addresses")
+}
+
+// NEW: generieke audit log (admin-mutaties op products/orders/settings)
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  actorId    BigInt?  @map("actor_id") @db.UnsignedBigInt
+  entityType String   @map("entity_type") @db.VarChar(64) // 'Product' | 'Order' | 'Setting' ...
+  entityId   String   @map("entity_id") @db.VarChar(64)
+  action     String   @db.VarChar(32) // create | update | delete | status_change
+  diff       Json? // { field: [old, new] }
+  ip         String?  @db.VarChar(64)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("qm_audit_log")
+}
+
+// NEW: historische wisselkoersen (voor rapportage + snapshot op order)
+model ExchangeRate {
+  id        Int      @id @default(autoincrement())
+  base      String   @db.Char(3)
+  quote     String   @db.Char(3)
+  rate      Decimal  @db.Decimal(18, 8)
+  source    String   @db.VarChar(64)
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+
+  @@index([base, quote, fetchedAt])
+  @@map("qm_exchange_rates")
+}
+
+// NEW: legacy URL redirects (/product/{id}/{slug} e.d.) voor SEO-behoud
+model Redirect {
+  id         Int      @id @default(autoincrement())
+  fromPath   String   @unique @map("from_path") @db.VarChar(512)
+  toPath     String   @map("to_path") @db.VarChar(512)
+  statusCode Int      @default(301) @map("status_code")
+  hits       Int      @default(0)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("qm_redirects")
+}
