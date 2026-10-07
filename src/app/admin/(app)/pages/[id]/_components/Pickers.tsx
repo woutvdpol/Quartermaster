@@ -22,7 +22,7 @@ import { searchImagesAction, searchProductsAction, uploadBlockImageAction } from
 import type { PickerImage, PickerProduct } from "./types";
 
 const ti = copy.image;
-const MAX_UPLOAD = 1024 * 1024 - 16 * 1024;
+const MAX_UPLOAD = 25 * 1024 * 1024;
 
 /** Debounced search through a server action; results for the latest query win. */
 function useSearch<T>(open: boolean, search: (q: string) => Promise<{ ok: boolean; message?: string; data?: unknown }>) {

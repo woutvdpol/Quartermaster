@@ -162,8 +162,9 @@ export async function searchImagesAction(query: string): Promise<ActionResult<st
 
 // ─── Image upload for content blocks ─────────────────────────────────────────
 
-/** Server Action bodies are capped at 1 MB by Next.js (serverActions.bodySizeLimit). */
-const MAX_CONTENT_UPLOAD = 1024 * 1024 - 16 * 1024;
+/** Upload cap; Server Action bodies are limited by serverActions.bodySizeLimit. */
+// Matches serverActions.bodySizeLimit (26mb) in next.config.ts minus form overhead.
+const MAX_CONTENT_UPLOAD = 25 * 1024 * 1024;
 
 /**
  * Stores an image for this page under `{tenantId}/content/{pageId}/{imageId}.{ext}` with WebP
