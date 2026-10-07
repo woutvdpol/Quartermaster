@@ -39,7 +39,7 @@ export const hexColor = z
 
 const font = z.enum(FONT_ALLOWLIST);
 
-function isValidTimeZone(tz: string): boolean {
+export function isValidTimeZone(tz: string): boolean {
   try {
     new Intl.DateTimeFormat("en", { timeZone: tz });
     return true;
@@ -80,7 +80,7 @@ export const generalSchema = z.object({
         .default("NL"),
     })
     .prefault({}),
-  timezone: z.string().refine(isValidTimeZone, "Unknown IANA time zone").default("Europe/Amsterdam"),
+  // Time zone lives on Tenant.timezone (single source of truth); validate writes with isValidTimeZone.
   // Extra currencies prices may be *displayed* in. Checkout is always in the shop currency (decision 17).
   displayCurrencies: z.array(z.enum(DISPLAY_CURRENCIES)).max(DISPLAY_CURRENCIES.length).default([]),
 });
@@ -295,7 +295,7 @@ export const LEGACY_KEY_MAP: Record<string, LegacyMapping> = {
   shop_name: { to: "general.shopName" },
   email: { to: "general.contactEmail" },
   currency: { to: "Tenant.currency", transform: "base currency; general.displayCurrencies starts empty" },
-  timezone: { to: "general.timezone", transform: "also write Tenant.timezone; legacy default UTC" },
+  timezone: { to: "Tenant.timezone", transform: "legacy default UTC" },
   matomo_id: { to: "analytics.matomoSiteId", transform: "int; set analytics.provider='matomo' when present" },
   confirmation_message: { to: "mail.confirmationMessage", transform: "legacy value looked unused; import if non-empty" },
 

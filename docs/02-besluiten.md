@@ -79,3 +79,13 @@ Kanttekeningen:
 - **Ontwerp A ("Depot")** is de standaard voor de admin.
 - **B ("Field Ledger") en C ("Naval Quiet") blijven altijd beschikbaar.** De admin-UI wordt volledig via design-tokens gebouwd (`data-admin-theme="depot|ledger|naval"`), zodat B en C als thema toegevoegd/gekozen kunnen worden zonder componenten te herschrijven. C wordt als moderne kandidaat gezien.
 - Mockups: `docs/design/quartermaster-design{,-b,-c}.html`.
+
+## Fundament — akkoord eigenaar (07-10-2026)
+- Elk product is een uniek item; max. één actieve reservering per product.
+- Onbetaalde overschrijvingen (legacy `manual`) = `PENDING`, tellen niet als omzet.
+- `PaymentProvider.MANUAL` blijft naast Mollie (admin "markeer als betaald", legacy).
+- Verlanglijst alleen voor ingelogde klanten.
+- Tijdzone alleen op `Tenant.timezone` (niet in settings).
+- Reserveringstijd instelbaar door eigenaar, 5–60 min (standaard 15).
+- Leeftijdsverificatie: modi off / popup / checkout.
+- Standaarden: gast-checkout aan, gevoelige items blurren voor gasten, eigen analytics.
