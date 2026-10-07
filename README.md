@@ -50,6 +50,7 @@ Work in progress (modelled, not yet built): shipment tracking, invoices.
 | [`docs/analysis/02-data-model.md`](docs/analysis/02-data-model.md) | Current data model, issues, proposed model, migration strategy |
 | [`docs/analysis/schema.draft.prisma`](docs/analysis/schema.draft.prisma) | Prisma mapping of the legacy schema (reference only) |
 | [`docs/analysis/03-shop-and-integrations.md`](docs/analysis/03-shop-and-integrations.md) | Shop flows, integrations, hosting, SEO, feature ideas |
+| [`docs/analysis/04-testdump-bevindingen.md`](docs/analysis/04-testdump-bevindingen.md) | Findings from the Concept500 test-shop dump |
 | [`docs/design/`](docs/design) | Admin & shop design mockups (variants A, B, C) |
 
 Docs are written in Dutch; code and code comments will be in English.
