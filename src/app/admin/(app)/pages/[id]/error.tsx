@@ -1,0 +1,8 @@
+"use client";
+
+import { copy } from "../_copy";
+import { RouteError } from "../_components/RouteError";
+
+export default function PageEditorError(props: { error: Error & { digest?: string }; retry: () => void }) {
+  return <RouteError {...props} crumb={copy.editor.crumb} title="Page editor" />;
+}
