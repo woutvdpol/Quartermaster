@@ -31,3 +31,6 @@ public/uploads/
 # TypeScript / Next generated
 *.tsbuildinfo
 next-env.d.ts
+
+# Local Claude config
+.claude/

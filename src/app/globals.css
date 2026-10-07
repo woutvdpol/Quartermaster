@@ -1,26 +1,499 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * Quartermaster theme system
+ * ──────────────────────────
+ * The admin root element carries `data-admin-theme="depot" | "ledger" | "naval"` and, when the
+ * user picked an explicit colour mode, `data-theme="light" | "dark"` (no attribute = follow the OS).
+ * Each theme defines the same set of `--qm-*` custom properties for light and dark. They are mapped
+ * into Tailwind below with `@theme inline`, so components only ever use semantic utilities
+ * (bg-panel, text-muted, border-line, bg-accent, text-ok, rounded-card, font-display, type-label …)
+ * and never theme-specific colours.
+ *
+ * Source mockups: docs/design/quartermaster-design.html (A "Depot", implemented layout),
+ * quartermaster-design-b.html (B "Field Ledger") and quartermaster-design-c.html (C "Naval Quiet").
+ * Tokens marked "derived" have no direct counterpart in a mockup and were interpolated from it.
+ *
+ * Font variables (--font-barlow-condensed, …) come from next/font in src/lib/admin-fonts.ts and are
+ * set as classes on the same admin root element.
+ */
 
+/* ── Semantic tokens → Tailwind utilities ─────────────────────────────────── */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-canvas: var(--qm-canvas);
+  --color-panel: var(--qm-panel);
+  --color-panel-2: var(--qm-panel-2);
+  --color-panel-3: var(--qm-panel-3);
+  --color-ink: var(--qm-ink);
+  --color-ink-2: var(--qm-ink-2);
+  --color-muted: var(--qm-muted);
+  --color-line: var(--qm-line);
+  --color-line-strong: var(--qm-line-strong);
+
+  --color-rail: var(--qm-rail);
+  --color-rail-ink: var(--qm-rail-ink);
+  --color-rail-muted: var(--qm-rail-muted);
+  --color-rail-active: var(--qm-rail-active);
+  --color-rail-raised: var(--qm-rail-raised);
+  --color-rail-line: var(--qm-rail-line);
+
+  --color-accent: var(--qm-accent);
+  --color-accent-strong: var(--qm-accent-strong);
+  --color-accent-soft: var(--qm-accent-soft);
+  --color-on-accent: var(--qm-on-accent);
+  --color-focus: var(--qm-focus);
+
+  --color-ok: var(--qm-ok);
+  --color-ok-soft: var(--qm-ok-soft);
+  --color-warn: var(--qm-warn);
+  --color-warn-soft: var(--qm-warn-soft);
+  --color-crit: var(--qm-crit);
+  --color-crit-soft: var(--qm-crit-soft);
+  --color-info: var(--qm-info);
+  --color-info-soft: var(--qm-info-soft);
+
+  --color-img-a: var(--qm-img-a);
+  --color-img-b: var(--qm-img-b);
+
+  --font-display: var(--qm-font-display);
+  --font-label: var(--qm-font-label);
+  --font-sans: var(--qm-font-body);
+  --font-mono: var(--qm-font-mono);
+
+  --radius-card: var(--qm-radius);
+  --radius-control: var(--qm-radius-control);
+
+  --shadow-card: var(--qm-shadow-card);
+  --shadow-pop: var(--qm-shadow-pop);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Headings: family, weight, case and tracking all come from the theme. */
+@utility type-display {
+  font-family: var(--qm-font-display);
+  font-weight: var(--qm-display-weight);
+  text-transform: var(--qm-display-case);
+  letter-spacing: var(--qm-display-tracking);
+  line-height: 1.1;
+}
+
+/* Small uppercase labels (card headers, nav groups, table heads, KPI labels). */
+@utility type-label {
+  font-family: var(--qm-font-label);
+  font-weight: var(--qm-label-weight);
+  text-transform: uppercase;
+  letter-spacing: var(--qm-label-tracking);
+}
+
+/* Fallbacks outside the admin (storefront placeholder); the admin root overrides these per theme. */
+:root {
+  --qm-font-display: system-ui, sans-serif;
+  --qm-font-label: system-ui, sans-serif;
+  --qm-font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --qm-font-mono: ui-monospace, Menlo, monospace;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--qm-font-body);
+}
+
+/* ── A · Depot (default) ──────────────────────────────────────────────────── */
+[data-admin-theme="depot"] {
+  --qm-canvas: #ecece5;
+  --qm-canvas-image: none;
+  --qm-panel: #fafaf6;
+  --qm-panel-2: #f3f3ec;
+  --qm-panel-3: #e6e6dd; /* derived */
+  --qm-ink: #1e2119;
+  --qm-ink-2: #3a3e32; /* derived */
+  --qm-muted: #666a5a;
+  --qm-line: #d7d8cc;
+  --qm-line-strong: #bdbfaf; /* derived */
+  --qm-rail: #2f3526;
+  --qm-rail-ink: #d9dccb;
+  --qm-rail-muted: #8e937e;
+  --qm-rail-active: #3e4532;
+  --qm-rail-raised: #383f2d; /* derived */
+  --qm-rail-line: #3e4532;
+  --qm-accent: #9c6b22; /* brass */
+  --qm-accent-strong: #7e5416;
+  --qm-accent-soft: #f1e5cc;
+  --qm-on-accent: #ffffff;
+  --qm-focus: #9c6b22;
+  --qm-ok: #2f6b3a;
+  --qm-ok-soft: #dcebd9;
+  --qm-warn: #946200;
+  --qm-warn-soft: #f5e7c4;
+  --qm-crit: #a2342a;
+  --qm-crit-soft: #f4dad6;
+  --qm-info: #2c5873;
+  --qm-info-soft: #d8e5ee;
+  --qm-img-a: #c9c7b6;
+  --qm-img-b: #b7b49f;
+
+  --qm-font-display: var(--font-barlow-condensed), "Arial Narrow", sans-serif;
+  --qm-font-label: var(--font-barlow-condensed), "Arial Narrow", sans-serif;
+  --qm-font-body: var(--font-ibm-plex-sans), system-ui, -apple-system, sans-serif;
+  --qm-font-mono: var(--font-ibm-plex-mono), ui-monospace, Menlo, monospace;
+  --qm-display-weight: 700;
+  --qm-display-case: uppercase;
+  --qm-display-tracking: 0.04em;
+  --qm-label-weight: 600;
+  --qm-label-tracking: 0.12em;
+  --qm-text-base: 14px;
+
+  --qm-radius: 6px;
+  --qm-radius-control: 5px;
+  --qm-shadow-card: none;
+  --qm-shadow-pop: 0 8px 24px rgb(30 33 25 / 0.18);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-admin-theme="depot"]:not([data-theme="light"]) {
+    --qm-canvas: #121410;
+    --qm-panel: #1a1d16;
+    --qm-panel-2: #20241b;
+    --qm-panel-3: #272b21; /* derived */
+    --qm-ink: #e7e6da;
+    --qm-ink-2: #c9c8bb; /* derived */
+    --qm-muted: #9a9d89;
+    --qm-line: #30352a;
+    --qm-line-strong: #474d3e; /* derived */
+    --qm-rail: #0d0f0a;
+    --qm-rail-ink: #d9dccb;
+    --qm-rail-muted: #7d8270;
+    --qm-rail-active: #262b1f;
+    --qm-rail-raised: #1c2016; /* derived */
+    --qm-rail-line: #262b1f;
+    --qm-accent: #d19c48;
+    --qm-accent-strong: #e2b468;
+    --qm-accent-soft: #3a2e1b;
+    --qm-on-accent: #1a1306; /* dark ink on light brass for contrast */
+    --qm-focus: #d19c48;
+    --qm-ok: #7dbb84;
+    --qm-ok-soft: #1f3322;
+    --qm-warn: #e0b04a;
+    --qm-warn-soft: #3a2e12;
+    --qm-crit: #e07f73;
+    --qm-crit-soft: #3d1f1b;
+    --qm-info: #86b5d3;
+    --qm-info-soft: #1c2e3a;
+    --qm-img-a: #3a3c31;
+    --qm-img-b: #2d2f26;
+    --qm-shadow-pop: 0 8px 24px rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+}
+
+[data-admin-theme="depot"][data-theme="dark"] {
+  --qm-canvas: #121410;
+  --qm-panel: #1a1d16;
+  --qm-panel-2: #20241b;
+  --qm-panel-3: #272b21;
+  --qm-ink: #e7e6da;
+  --qm-ink-2: #c9c8bb;
+  --qm-muted: #9a9d89;
+  --qm-line: #30352a;
+  --qm-line-strong: #474d3e;
+  --qm-rail: #0d0f0a;
+  --qm-rail-ink: #d9dccb;
+  --qm-rail-muted: #7d8270;
+  --qm-rail-active: #262b1f;
+  --qm-rail-raised: #1c2016;
+  --qm-rail-line: #262b1f;
+  --qm-accent: #d19c48;
+  --qm-accent-strong: #e2b468;
+  --qm-accent-soft: #3a2e1b;
+  --qm-on-accent: #1a1306;
+  --qm-focus: #d19c48;
+  --qm-ok: #7dbb84;
+  --qm-ok-soft: #1f3322;
+  --qm-warn: #e0b04a;
+  --qm-warn-soft: #3a2e12;
+  --qm-crit: #e07f73;
+  --qm-crit-soft: #3d1f1b;
+  --qm-info: #86b5d3;
+  --qm-info-soft: #1c2e3a;
+  --qm-img-a: #3a3c31;
+  --qm-img-b: #2d2f26;
+  --qm-shadow-pop: 0 8px 24px rgb(0 0 0 / 0.5);
+  color-scheme: dark;
+}
+
+/* ── B · Field Ledger ─────────────────────────────────────────────────────── */
+[data-admin-theme="ledger"] {
+  --qm-canvas: #f1efe8; /* paper */
+  --qm-canvas-grid: #e5e1d5;
+  --qm-canvas-image: linear-gradient(var(--qm-canvas-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--qm-canvas-grid) 1px, transparent 1px);
+  --qm-panel: #fbfaf6; /* sheet */
+  --qm-panel-2: #f4f1e8;
+  --qm-panel-3: #ece8dc;
+  --qm-ink: #23241e;
+  --qm-ink-2: #44453b;
+  --qm-muted: #6f6c5e;
+  --qm-line: #d3cdbc; /* rule */
+  --qm-line-strong: #a69d84;
+  --qm-rail: #2a2b24; /* bar */
+  --qm-rail-ink: #ece9dd;
+  --qm-rail-muted: #a19e8c;
+  --qm-rail-active: #36372e;
+  --qm-rail-raised: #36372e;
+  --qm-rail-line: #3e3f35;
+  --qm-accent: #c63f1c; /* signal */
+  --qm-accent-strong: #a8320f;
+  --qm-accent-soft: #f7e0d6;
+  --qm-on-accent: #ffffff;
+  --qm-focus: #c63f1c;
+  --qm-ok: #3d6a2c;
+  --qm-ok-soft: #dfe8d3;
+  --qm-warn: #8e6400;
+  --qm-warn-soft: #f3e6c2;
+  --qm-crit: #a3271a;
+  --qm-crit-soft: #f4dad4;
+  --qm-info: #38596c;
+  --qm-info-soft: #dae4ea;
+  --qm-img-a: #d6cfbc;
+  --qm-img-b: #c9c0a8;
+
+  --qm-font-display: var(--font-big-shoulders-stencil), "Arial Narrow", Impact, sans-serif;
+  --qm-font-label: var(--font-public-sans), system-ui, sans-serif;
+  --qm-font-body: var(--font-public-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --qm-font-mono: var(--font-jetbrains-mono), ui-monospace, Menlo, Consolas, monospace;
+  --qm-display-weight: 800;
+  --qm-display-case: uppercase;
+  --qm-display-tracking: 0.03em;
+  --qm-label-weight: 600;
+  --qm-label-tracking: 0.14em;
+  --qm-text-base: 14px;
+
+  --qm-radius: 2px;
+  --qm-radius-control: 2px;
+  --qm-shadow-card: none;
+  --qm-shadow-pop: 4px 4px 0 #e8e1ce; /* khaki-soft offset shadow */
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-admin-theme="ledger"]:not([data-theme="light"]) {
+    --qm-canvas: #14160f;
+    --qm-canvas-grid: #1c1f16;
+    --qm-panel: #1b1e15;
+    --qm-panel-2: #20241a;
+    --qm-panel-3: #272b20;
+    --qm-ink: #e6e3d3;
+    --qm-ink-2: #c6c3b2;
+    --qm-muted: #9a977f;
+    --qm-line: #363a2b;
+    --qm-line-strong: #5a5c46;
+    --qm-rail: #0e100a;
+    --qm-rail-ink: #e3e0cf;
+    --qm-rail-muted: #8d8b75;
+    --qm-rail-active: #22261b;
+    --qm-rail-raised: #22261b;
+    --qm-rail-line: #2a2d21;
+    --qm-accent: #f06a3a;
+    --qm-accent-strong: #ff8558;
+    --qm-accent-soft: #3e2117;
+    --qm-on-accent: #160c07;
+    --qm-focus: #f06a3a;
+    --qm-ok: #8dbe76;
+    --qm-ok-soft: #1f2e19;
+    --qm-warn: #e2b54e;
+    --qm-warn-soft: #382c10;
+    --qm-crit: #ee8473;
+    --qm-crit-soft: #3e1c17;
+    --qm-info: #8db6ce;
+    --qm-info-soft: #1a2b35;
+    --qm-img-a: #2f3226;
+    --qm-img-b: #26291e;
+    --qm-shadow-pop: 4px 4px 0 #2c2a1d;
+    color-scheme: dark;
+  }
+}
+
+[data-admin-theme="ledger"][data-theme="dark"] {
+  --qm-canvas: #14160f;
+  --qm-canvas-grid: #1c1f16;
+  --qm-panel: #1b1e15;
+  --qm-panel-2: #20241a;
+  --qm-panel-3: #272b20;
+  --qm-ink: #e6e3d3;
+  --qm-ink-2: #c6c3b2;
+  --qm-muted: #9a977f;
+  --qm-line: #363a2b;
+  --qm-line-strong: #5a5c46;
+  --qm-rail: #0e100a;
+  --qm-rail-ink: #e3e0cf;
+  --qm-rail-muted: #8d8b75;
+  --qm-rail-active: #22261b;
+  --qm-rail-raised: #22261b;
+  --qm-rail-line: #2a2d21;
+  --qm-accent: #f06a3a;
+  --qm-accent-strong: #ff8558;
+  --qm-accent-soft: #3e2117;
+  --qm-on-accent: #160c07;
+  --qm-focus: #f06a3a;
+  --qm-ok: #8dbe76;
+  --qm-ok-soft: #1f2e19;
+  --qm-warn: #e2b54e;
+  --qm-warn-soft: #382c10;
+  --qm-crit: #ee8473;
+  --qm-crit-soft: #3e1c17;
+  --qm-info: #8db6ce;
+  --qm-info-soft: #1a2b35;
+  --qm-img-a: #2f3226;
+  --qm-img-b: #26291e;
+  --qm-shadow-pop: 4px 4px 0 #2c2a1d;
+  color-scheme: dark;
+}
+
+/* ── C · Naval Quiet ──────────────────────────────────────────────────────── */
+[data-admin-theme="naval"] {
+  --qm-canvas: #eef1f5;
+  --qm-canvas-image: none;
+  --qm-panel: #ffffff; /* surface */
+  --qm-panel-2: #f6f8fa;
+  --qm-panel-3: #ebeff4;
+  --qm-ink: #13203a;
+  --qm-ink-2: #3a4761;
+  --qm-muted: #667288;
+  --qm-line: #e3e8ee;
+  --qm-line-strong: #cdd5e0;
+  --qm-rail: #13203a;
+  --qm-rail-ink: #dce3ee;
+  --qm-rail-muted: #8a97af;
+  --qm-rail-active: #273859; /* rail-3 */
+  --qm-rail-raised: #1b2a46; /* rail-2 */
+  --qm-rail-line: #1b2a46;
+  --qm-accent: #a47a2c; /* ochre, primary actions only */
+  --qm-accent-strong: #8d6823;
+  --qm-accent-soft: #f6efe1;
+  --qm-on-accent: #ffffff;
+  --qm-focus: #a47a2c;
+  --qm-ok: #2c6a56;
+  --qm-ok-soft: #e2f0ea;
+  --qm-warn: #93650f;
+  --qm-warn-soft: #f8efda;
+  --qm-crit: #a3423a;
+  --qm-crit-soft: #f7e4e2;
+  --qm-info: #3a5d8a;
+  --qm-info-soft: #e5edf7;
+  --qm-img-a: #e6ebf1;
+  --qm-img-b: #dce2ea;
+
+  --qm-font-display: var(--font-hanken-grotesk), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --qm-font-label: var(--font-sofia-sans-condensed), "Arial Narrow", sans-serif;
+  --qm-font-body: var(--font-hanken-grotesk), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --qm-font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  --qm-display-weight: 700;
+  --qm-display-case: none;
+  --qm-display-tracking: -0.02em;
+  --qm-label-weight: 600;
+  --qm-label-tracking: 0.12em;
+  --qm-text-base: 15px;
+
+  --qm-radius: 10px;
+  --qm-radius-control: 8px;
+  --qm-shadow-card: 0 1px 2px rgb(19 32 58 / 0.05), 0 6px 20px rgb(19 32 58 / 0.05);
+  --qm-shadow-pop: 0 2px 6px rgb(19 32 58 / 0.08), 0 28px 70px rgb(19 32 58 / 0.24);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-admin-theme="naval"]:not([data-theme="light"]) {
+    --qm-canvas: #0a1322;
+    --qm-panel: #101c30;
+    --qm-panel-2: #13213a;
+    --qm-panel-3: #192943;
+    --qm-ink: #e3e8f1;
+    --qm-ink-2: #b9c3d4;
+    --qm-muted: #8693a9;
+    --qm-line: #1e2d47;
+    --qm-line-strong: #2c3e5d;
+    --qm-rail: #070e1a;
+    --qm-rail-ink: #d5dce8;
+    --qm-rail-muted: #7584a0;
+    --qm-rail-active: #1a2944;
+    --qm-rail-raised: #0f1a2d;
+    --qm-rail-line: #0f1a2d;
+    --qm-accent: #d0a55a;
+    --qm-accent-strong: #ddb673;
+    --qm-accent-soft: #29231a;
+    --qm-on-accent: #1a1406;
+    --qm-focus: #d0a55a;
+    --qm-ok: #76bfa5;
+    --qm-ok-soft: #13302a;
+    --qm-warn: #e0b355;
+    --qm-warn-soft: #33280f;
+    --qm-crit: #e68b81;
+    --qm-crit-soft: #3a1e1d;
+    --qm-info: #90b4e1;
+    --qm-info-soft: #172b48;
+    --qm-img-a: #192943;
+    --qm-img-b: #15233b;
+    --qm-shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.18);
+    --qm-shadow-pop: 0 2px 6px rgb(0 0 0 / 0.4), 0 28px 70px rgb(0 0 0 / 0.55);
+    color-scheme: dark;
+  }
+}
+
+[data-admin-theme="naval"][data-theme="dark"] {
+  --qm-canvas: #0a1322;
+  --qm-panel: #101c30;
+  --qm-panel-2: #13213a;
+  --qm-panel-3: #192943;
+  --qm-ink: #e3e8f1;
+  --qm-ink-2: #b9c3d4;
+  --qm-muted: #8693a9;
+  --qm-line: #1e2d47;
+  --qm-line-strong: #2c3e5d;
+  --qm-rail: #070e1a;
+  --qm-rail-ink: #d5dce8;
+  --qm-rail-muted: #7584a0;
+  --qm-rail-active: #1a2944;
+  --qm-rail-raised: #0f1a2d;
+  --qm-rail-line: #0f1a2d;
+  --qm-accent: #d0a55a;
+  --qm-accent-strong: #ddb673;
+  --qm-accent-soft: #29231a;
+  --qm-on-accent: #1a1406;
+  --qm-focus: #d0a55a;
+  --qm-ok: #76bfa5;
+  --qm-ok-soft: #13302a;
+  --qm-warn: #e0b355;
+  --qm-warn-soft: #33280f;
+  --qm-crit: #e68b81;
+  --qm-crit-soft: #3a1e1d;
+  --qm-info: #90b4e1;
+  --qm-info-soft: #172b48;
+  --qm-img-a: #192943;
+  --qm-img-b: #15233b;
+  --qm-shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.18);
+  --qm-shadow-pop: 0 2px 6px rgb(0 0 0 / 0.4), 0 28px 70px rgb(0 0 0 / 0.55);
+  color-scheme: dark;
+}
+
+/* ── Admin root base styles (shared by all themes) ───────────────────────── */
+[data-admin-theme] {
+  background-color: var(--qm-canvas);
+  background-image: var(--qm-canvas-image);
+  background-size: 24px 24px;
+  color: var(--qm-ink);
+  font-family: var(--qm-font-body);
+  font-size: var(--qm-text-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+[data-admin-theme] :focus-visible {
+  outline: 2px solid var(--qm-focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-admin-theme] * {
+    transition: none !important;
+    animation: none !important;
+  }
 }
