@@ -13,7 +13,10 @@ type AuditEntry = {
 };
 
 export async function audit(entry: AuditEntry) {
-  const h = await headers().catch(() => null);
+  // Outside a request (seed, worker, scripts) Next 16's headers() throws synchronously.
+  const h = await Promise.resolve()
+    .then(() => headers())
+    .catch(() => null);
   const ip = h?.get("x-forwarded-for")?.split(",")[0]?.trim() || h?.get("x-real-ip") || null;
   await db.auditLog.create({
     data: {
