@@ -7,6 +7,7 @@ import { notFound, parseInput } from "@/server/catalog/errors";
 import type { Prisma } from "@/generated/prisma/client";
 import { MenuLocation } from "@/generated/prisma/enums";
 import { safeUrlSchema } from "./blocks";
+import { sanitizeUrl } from "./url";
 import { categoryHref, contentPageHref, MENU_CHILD_LIMIT, MENU_ROOT_LIMITS, SYSTEM_ROUTE_KEYS, SYSTEM_ROUTES, type SystemRouteKey } from "./rules";
 import { isExternalUrl } from "./url";
 
@@ -281,7 +282,8 @@ export async function getPublicMenu(tenantId: string, location: MenuLocation): P
       case "route":
         return SYSTEM_ROUTES[t.route].href;
       case "url":
-        return t.url;
+        return sanitizeUrl(t.url); // re-check on read: rows may come from the ETL or older code
+
     }
   };
   const resolve = (v: MenuItemView): PublicMenuItem | null => {

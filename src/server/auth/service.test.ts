@@ -22,14 +22,16 @@ const state = vi.hoisted(() => ({
   users: [] as User[],
   recoveryCodes: [] as RecoveryCode[],
   authTokens: [] as AuthToken[],
-  hits: new Map<string, number>(),
+  hits: new Map<string, { id: number; at: number }[]>(),
   audits: [] as { action: string; actorId?: string | null; data?: unknown }[],
   session: null as null | { sessionId: string; pendingTotp: boolean; user: { id: string; tenantId: string | null; role: User["role"]; email: string; name: string | null; totpEnabled: boolean } },
   seq: 0,
 }));
 
 const matches = (row: Record<string, unknown>, where: Record<string, unknown>) =>
-  Object.entries(where).every(([k, v]) => row[k] === v);
+  Object.entries(where).every(([k, v]) =>
+    v && typeof v === "object" && "in" in v ? (v as { in: unknown[] }).in.includes(row[k]) : row[k] === v,
+  );
 
 vi.mock("@/server/db", () => {
   const id = () => `id${++state.seq}`;
@@ -44,6 +46,11 @@ vi.mock("@/server/db", () => {
         const u = state.users.find((x) => x.id === where.id)!;
         Object.assign(u, data);
         return u;
+      },
+      updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Partial<User> }) => {
+        const rows = state.users.filter((u) => matches(u, where));
+        rows.forEach((u) => Object.assign(u, data));
+        return { count: rows.length };
       },
     },
     recoveryCode: {
@@ -87,18 +94,37 @@ vi.mock("@/server/audit", () => ({
   audit: vi.fn(async (entry: { action: string }) => void state.audits.push(entry)),
 }));
 
-vi.mock("./rate-limit", async () => {
-  const RULES = {
-    loginPerIp: { limit: 20, windowMs: 1 },
-    loginPerAccount: { limit: 5, windowMs: 1 },
-    totpPerSession: { limit: 5, windowMs: 1 },
-    totpPerUser: { limit: 15, windowMs: 1 },
-    passwordResetPerEmail: { limit: 3, windowMs: 1 },
+// In-memory rate limiter with the real policies and backoff formula (atomicity is covered by
+// tests/integration/rate-limit.int.test.ts against Postgres).
+vi.mock("./rate-limit", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./rate-limit")>();
+  let seq = 0;
+  const list = (key: string) => state.hits.get(key) ?? [];
+  const inWindow = (key: string, windowMs: number) => list(key).filter((h) => h.at >= Date.now() - windowMs);
+  const record = (key: string) => {
+    const h = { id: ++seq, at: Date.now() };
+    state.hits.set(key, [...list(key), h]);
+    return { allowed: true as const, hitId: BigInt(h.id) };
   };
   return {
-    RULES,
-    isLimited: async (key: string, rule: { limit: number }) => (state.hits.get(key) ?? 0) >= rule.limit,
-    hit: async (key: string) => void state.hits.set(key, (state.hits.get(key) ?? 0) + 1),
+    RULES: real.RULES,
+    BACKOFF: real.BACKOFF,
+    backoffDelayMs: real.backoffDelayMs,
+    consume: async (key: string, rule: { limit: number; windowMs: number }) =>
+      inWindow(key, rule.windowMs).length >= rule.limit ? { allowed: false, retryAfterMs: 1000 } : record(key),
+    take: async (key: string, rule: { limit: number; windowMs: number }) =>
+      inWindow(key, rule.windowMs).length >= rule.limit ? false : (record(key), true),
+    attempt: async (key: string, policy: Parameters<typeof real.backoffDelayMs>[1]) => {
+      const hits = inWindow(key, policy.windowMs);
+      const delay = real.backoffDelayMs(hits.length, policy);
+      const last = hits.at(-1)?.at;
+      if (delay > 0 && last !== undefined && Date.now() - last < delay) return { allowed: false, retryAfterMs: delay - (Date.now() - last) };
+      return record(key);
+    },
+    release: async (d: { allowed: boolean; hitId?: bigint } | null | undefined) => {
+      if (!d?.allowed) return;
+      for (const [k, v] of state.hits) state.hits.set(k, v.filter((h) => BigInt(h.id) !== d.hitId));
+    },
     clear: async (key: string) => void state.hits.delete(key),
   };
 });
@@ -209,20 +235,55 @@ describe("login", () => {
     expect(await service.login({ email: "owner@example.nl", password: PASSWORD, tenantId: "t1", ip: null })).toEqual({ ok: false, error: "invalid_credentials" });
   });
 
-  it("rate limits per account after 5 failures and clears the counter on success", async () => {
+  it("backs off per account after 5 failures — no hard lock-out — and clears the counter on success", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(1_800_000_000_000);
     addUser();
     for (let i = 0; i < 4; i++) await service.login({ email: "owner@example.nl", password: "wrong password", tenantId: "t1", ip: `10.0.0.${i}` });
     expect((await service.login({ email: "owner@example.nl", password: PASSWORD, tenantId: "t1", ip: "10.0.1.1" })).ok).toBe(true);
     expect(state.hits.get("login:email:t1:owner@example.nl")).toBeUndefined();
 
     for (let i = 0; i < 5; i++) await service.login({ email: "owner@example.nl", password: "wrong password", tenantId: "t1", ip: `10.0.0.${i}` });
+    // 6th attempt right away: must wait (1 s after 5 failures) — even with the right password.
     expect(await service.login({ email: "owner@example.nl", password: PASSWORD, tenantId: "t1", ip: "10.0.2.1" })).toEqual({ ok: false, error: "rate_limited" });
+    // A refused attempt is not counted, and after the delay the real owner gets in.
+    expect(state.hits.get("login:email:t1:owner@example.nl")).toHaveLength(5);
+    vi.setSystemTime(1_800_000_001_001);
+    expect(await service.login({ email: "owner@example.nl", password: PASSWORD, tenantId: "t1", ip: "10.0.2.1" })).toEqual({ ok: true, next: "done" });
   });
 
-  it("rate limits per IP", async () => {
-    state.hits.set("login:ip:9.9.9.9", 20);
+  it("delays grow exponentially and are capped", async () => {
+    const { BACKOFF, backoffDelayMs } = await import("./rate-limit");
+    const p = BACKOFF.loginPerAccount;
+    expect([4, 5, 6, 7].map((n) => backoffDelayMs(n, p))).toEqual([0, 1000, 2000, 4000]);
+    expect(backoffDelayMs(50, p)).toBe(p.maxMs);
+  });
+
+  it("backs off unknown accounts exactly like real ones (no enumeration)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(1_800_000_000_000);
+    addUser();
+    const run = async (email: string) => {
+      const out = [];
+      for (let i = 0; i < 6; i++) out.push(await service.login({ email, password: "wrong password", tenantId: "t1", ip: null }));
+      return out;
+    };
+    expect(await run("ghost@example.nl")).toEqual(await run("owner@example.nl"));
+  });
+
+  it("rate limits per IP and does not count the refused attempt against the account", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(1_800_000_000_000);
+    state.hits.set("login:ip:9.9.9.9", Array.from({ length: 21 }, (_, i) => ({ id: 1000 + i, at: Date.now() - 10 })));
     addUser();
     expect(await service.login({ email: "owner@example.nl", password: PASSWORD, tenantId: "t1", ip: "9.9.9.9" })).toEqual({ ok: false, error: "rate_limited" });
+    expect(state.hits.get("login:email:t1:owner@example.nl") ?? []).toHaveLength(0);
+  });
+
+  it("does not count successful logins against the IP", async () => {
+    addUser();
+    await service.login({ email: "owner@example.nl", password: PASSWORD, tenantId: "t1", ip: "9.9.9.8" });
+    expect(state.hits.get("login:ip:9.9.9.8") ?? []).toHaveLength(0);
   });
 
   it("rejects disabled users only after a correct password", async () => {
@@ -247,6 +308,25 @@ describe("login", () => {
     await service.login({ email: "owner@example.nl", password: PASSWORD, tenantId: "t1", ip: null });
     expect(u.passwordHash!.startsWith("scrypt$32768$")).toBe(true);
     expect(await verifyPassword(PASSWORD, u.passwordHash!)).toBe(true);
+  });
+
+  // PHP 8.4.16: crypt("hunter2-legacy", '$2y$04$abcdefghijklmnopqrstuu') — see legacy-bcrypt.test.ts.
+  const LEGACY = "bcrypt$$2y$04$abcdefghijklmnopqrstuuYQzyYpuBlD9anKNO5exwCD0BATGyB9S";
+
+  it("accepts a legacy bcrypt hash once and replaces it with scrypt", async () => {
+    const u = addUser({ passwordHash: LEGACY });
+    expect(await service.login({ email: "owner@example.nl", password: "hunter2-legacy!", tenantId: "t1", ip: null })).toEqual({ ok: false, error: "invalid_credentials" });
+    expect(u.passwordHash).toBe(LEGACY);
+    expect(await service.login({ email: "owner@example.nl", password: "hunter2-legacy", tenantId: "t1", ip: null })).toEqual({ ok: true, next: "done" });
+    expect(u.passwordHash!.startsWith("scrypt$32768$")).toBe(true);
+    expect(await verifyPassword("hunter2-legacy", u.passwordHash!)).toBe(true);
+    expect(state.audits.map((a) => a.action)).toContain("auth.password_rehashed");
+  });
+
+  it("rehashes a legacy hash on re-authentication too", async () => {
+    const u = addUser({ passwordHash: LEGACY });
+    expect(await service.verifyCurrentPassword(u.id, "hunter2-legacy")).toBe("ok");
+    expect(u.passwordHash!.startsWith("scrypt$")).toBe(true);
   });
 });
 
@@ -278,7 +358,9 @@ describe("TOTP enrollment and login", () => {
     expect(u.totpSecretEnc).not.toContain(secret);
     expect(recoveryCodes).toHaveLength(10);
     expect(state.recoveryCodes).toHaveLength(10);
-    expect(state.recoveryCodes.map((r) => r.codeHash)).not.toContain(recoveryCodes[0]);
+    expect(recoveryCodes[0]).toMatch(/^[a-z2-9]{6}-[a-z2-9]{6}-[a-z2-9]{6}$/);
+    expect(state.recoveryCodes.every((r) => /^h1:[0-9a-f]{64}$/.test(r.codeHash))).toBe(true);
+    expect(state.recoveryCodes.map((r) => r.codeHash).join()).not.toContain(recoveryCodes[0]);
   });
 
   it("refuses to enroll twice", async () => {
@@ -299,7 +381,7 @@ describe("TOTP enrollment and login", () => {
     const replay = await service.verifyLoginTotp(totp(secret));
     expect(replay).toEqual({ ok: false, error: "invalid_code" });
 
-    state.hits.clear(); // pretend 30 s passed: drop replay markers for the step
+    for (const k of [...state.hits.keys()]) if (k.startsWith("totp:used:")) state.hits.delete(k); // pretend 30 s passed
     expect(await service.verifyLoginTotp(totp(secret))).toEqual({ ok: true, usedRecoveryCode: false });
     expect(session.promoteSession).toHaveBeenCalled();
     expect(state.session?.pendingTotp).toBe(false);
@@ -313,6 +395,16 @@ describe("TOTP enrollment and login", () => {
 
     await service.login({ email: "owner@example.nl", password: PASSWORD, tenantId: "t1", ip: null });
     expect(await service.verifyLoginTotp(recoveryCodes[0])).toEqual({ ok: false, error: "invalid_code" });
+  });
+
+  it("still accepts a legacy (SHA-256, 10-char) recovery code once", async () => {
+    const { u } = await enroll();
+    const { hashToken } = await import("./tokens");
+    state.recoveryCodes.push({ id: "legacy", userId: u.id, codeHash: hashToken("abcde-fghjk"), usedAt: null });
+    await service.login({ email: "owner@example.nl", password: PASSWORD, tenantId: "t1", ip: null });
+    expect(await service.verifyLoginTotp("ABCDE FGHJK")).toEqual({ ok: true, usedRecoveryCode: true });
+    await service.login({ email: "owner@example.nl", password: PASSWORD, tenantId: "t1", ip: null });
+    expect(await service.verifyLoginTotp("abcde-fghjk")).toEqual({ ok: false, error: "invalid_code" });
   });
 
   it("kills the pending session after too many wrong codes", async () => {
@@ -332,6 +424,7 @@ describe("TOTP enrollment and login", () => {
     expect(await service.disableTotp(su, "wrong password")).toEqual({ ok: false, error: "invalid_password" });
     expect(u.totpEnabledAt).not.toBeNull();
     expect(await service.disableTotp(su, PASSWORD)).toEqual({ ok: true });
+    expect(session.destroyAllSessions).toHaveBeenCalledWith(u.id, undefined); // other devices signed out
     expect(u.totpEnabledAt).toBeNull();
     expect(u.totpSecretEnc).toBeNull();
     expect(state.recoveryCodes).toHaveLength(0);

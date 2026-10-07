@@ -144,6 +144,7 @@ export async function processImage(input: Uint8Array): Promise<ProcessedImage> {
     };
   } catch (error) {
     if (error instanceof ImageProcessingError) throw error;
-    throw new ImageProcessingError("CORRUPT", `Image could not be decoded: ${(error as Error).message}`);
+    console.warn("[media] image decode failed:", (error as Error).message);
+    throw new ImageProcessingError("CORRUPT", "Image could not be decoded");
   }
 }

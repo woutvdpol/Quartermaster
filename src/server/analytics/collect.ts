@@ -1,4 +1,5 @@
 import { createHash, createHmac } from "node:crypto";
+import { clientIpFromHeaders } from "@/server/request-meta";
 
 /*
  * Cookieless page-view collection helpers (pure; no DB, no Next APIs — unit-tested).
@@ -143,10 +144,9 @@ export function countryFromHeaders(headers: Headers): string | null {
   return code;
 }
 
-/** First hop of X-Forwarded-For, else X-Real-IP. Only meaningful behind a trusted proxy. */
+/** Client IP per the trusted proxy chain (TRUSTED_PROXY_HOPS) — see src/server/request-meta.ts. */
 export function clientIp(headers: Headers): string | null {
-  const ip = headers.get("x-forwarded-for")?.split(",")[0]?.trim() || headers.get("x-real-ip")?.trim() || null;
-  return ip ? ip.slice(0, 100) : null;
+  return clientIpFromHeaders(headers);
 }
 
 // ─── In-memory rate limit ───────────────────────────────────────────────────

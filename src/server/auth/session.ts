@@ -1,6 +1,7 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
 import { db } from "@/server/db";
+import { clientIpFromHeaders } from "@/server/request-meta";
 import type { Role } from "@/generated/prisma/enums";
 import { generateToken, hashToken } from "./tokens";
 
@@ -32,7 +33,7 @@ export type ValidSession = { sessionId: string; pendingTotp: boolean; user: Sess
 async function requestMeta() {
   const h = await headers();
   return {
-    ip: h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || null,
+    ip: clientIpFromHeaders(h),
     userAgent: h.get("user-agent")?.slice(0, 500) ?? null,
   };
 }

@@ -4,7 +4,7 @@ import type { LeadStatus } from "@/generated/prisma/enums";
 import { db } from "@/server/db";
 import { audit } from "@/server/audit";
 import { ServiceError, type ServiceContext } from "@/server/context";
-import { hit, isLimited, type RateLimitRule } from "@/server/auth/rate-limit";
+import { hit, isLimited, take, type RateLimitRule } from "@/server/auth/rate-limit";
 import { queueMail } from "@/server/mail";
 import { getStorage } from "@/server/media/storage";
 import { verifyTurnstile } from "@/server/turnstile";
@@ -47,12 +47,12 @@ export async function uploadLeadPhoto(input: { tenantId: string; draftToken: unk
   if (!leadId) return { ok: false, error: "expired" };
   const ipKey = `lead-photo:ip:${input.ip ?? "unknown"}`;
   const draftKey = `lead-photo:draft:${leadId}`;
-  if ((await isLimited(ipKey, LEAD_RULES.photoPerIp)) || (await isLimited(draftKey, LEAD_RULES.photoPerDraft))) {
-    return { ok: false, error: "rate_limited" };
-  }
   // Never add files to a lead that was already submitted.
   if (await db.lead.findUnique({ where: { id: leadId }, select: { id: true } })) return { ok: false, error: "expired" };
-  await Promise.all([hit(ipKey), hit(draftKey)]);
+  // Atomic check-and-count (auth/rate-limit.ts).
+  if (!(await take(ipKey, LEAD_RULES.photoPerIp)) || !(await take(draftKey, LEAD_RULES.photoPerDraft))) {
+    return { ok: false, error: "rate_limited" };
+  }
 
   let processed;
   try {

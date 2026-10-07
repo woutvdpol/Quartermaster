@@ -17,7 +17,8 @@ export async function deliverMailJob(job: MailJob, ctx: Pick<JobRunContext, "isF
   const identity = await loadMailIdentity(job.tenantId);
   const builder = MAIL_BUILDERS[template] as (input: unknown) => ReturnType<(typeof MAIL_BUILDERS)[MailTemplateName]>;
   const built = await builder({ tenantId: job.tenantId, to: job.to, props, identity });
-  if (!built) {
+  // RFC 2606 ".invalid" never delivers: anonymized customers and unverified accounts' placeholders.
+  if (!built || /\.invalid$/i.test(String(built.to).trim().replace(/>$/, ""))) {
     if (campaignId) await recordCampaignDelivery(campaignId, { skipped: 1 });
     return { status: "skipped" };
   }

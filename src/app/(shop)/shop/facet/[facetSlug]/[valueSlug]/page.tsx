@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import { requireShop } from "@/server/storefront/context";
+import { redirectOrNotFound } from "@/server/redirects/runtime";
 import { CatalogView, defaultSortFor } from "@/components/shop/catalog/CatalogView";
 import { catalogCopy as copy } from "@/components/shop/catalog/_copy";
 import { catalogMetadata } from "@/components/shop/catalog/metadata";
@@ -15,12 +15,13 @@ const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 async function loadValue(tenantId: string, rawFacet: string, rawValue: string) {
   const facetSlug = decodeURIComponent(rawFacet).toLowerCase();
   const valueSlug = decodeURIComponent(rawValue).toLowerCase();
-  if (!SLUG.test(facetSlug) || !SLUG.test(valueSlug)) notFound();
+  const gone = () => redirectOrNotFound(`/shop/facet/${rawFacet}/${rawValue}`);
+  if (!SLUG.test(facetSlug) || !SLUG.test(valueSlug)) return gone();
   const tax = await getTaxonomy(tenantId);
   const facet = tax.facets.find((f) => f.slug === facetSlug && f.isFilterable);
   const own = facet ? tax.values.filter((v) => v.facetId === facet.id) : [];
   const value = own.find((v) => v.slug === valueSlug);
-  if (!facet || !value) notFound();
+  if (!facet || !value) return gone();
   const path = valuePaths(own).get(value.id) ?? [value.name];
   return { facet, value, path, token: facetToken(facet.slug, value.slug) };
 }

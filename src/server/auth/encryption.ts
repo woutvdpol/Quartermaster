@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
 
 // AES-256-GCM for small secrets at rest (e.g. TOTP secrets).
 // Format: v1.<iv b64url>.<tag b64url>.<ciphertext b64url>
@@ -12,6 +12,14 @@ function key(): Buffer {
   const buf = Buffer.from(raw, "base64");
   if (buf.length !== 32) throw new Error("APP_ENCRYPTION_KEY must be 32 bytes (base64)");
   return buf;
+}
+
+/**
+ * A 32-byte subkey of APP_ENCRYPTION_KEY for one purpose (HKDF-SHA256, info = "quartermaster:<purpose>").
+ * Lets other features (e.g. recovery-code HMACs) reuse the one server secret without key reuse.
+ */
+export function deriveKey(purpose: string): Buffer {
+  return Buffer.from(hkdfSync("sha256", key(), Buffer.alloc(0), `quartermaster:${purpose}`, 32));
 }
 
 export function encrypt(plaintext: string): string {

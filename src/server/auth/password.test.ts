@@ -60,3 +60,18 @@ describe("password hashing", () => {
     expect(await verifyPassword("anything", a)).toBe(false);
   });
 });
+
+describe("legacy bcrypt dispatch", () => {
+  // Laravel UserFactory hash of "password" (see legacy-bcrypt.test.ts for sources), as stored by the ETL.
+  const LEGACY = "bcrypt$$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi";
+
+  it("verifies bcrypt$ hashes without NFKC normalization", async () => {
+    expect(await verifyPassword("password", LEGACY)).toBe(true);
+    expect(await verifyPassword("passwor", LEGACY)).toBe(false);
+    expect(await verifyPassword("password", "bcrypt$garbage")).toBe(false);
+  });
+
+  it("always needs a rehash", () => {
+    expect(needsRehash(LEGACY)).toBe(true);
+  });
+});

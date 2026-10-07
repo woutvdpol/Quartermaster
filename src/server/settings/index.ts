@@ -58,6 +58,11 @@ export async function updateSettings<G extends SettingsGroup>(
     const current = parseStoredSettings(group, row?.data).value;
     const next = SETTINGS_SCHEMAS[group].parse(mergeSettings(current, patch)) as Settings<G>;
     const changed = changedKeys(current, next);
+    // The Matomo API token is the platform's: an OWNER choosing another site id (or server) would
+    // read another shop's statistics. Only a SUPERADMIN may set those two fields.
+    if (group === "analytics" && actor.role !== "SUPERADMIN" && changed.some((k) => k === "matomoSiteId" || k === "matomoUrl")) {
+      throw new AuthError("FORBIDDEN");
+    }
     if (changed.length) {
       const data = next as Prisma.InputJsonValue;
       await tx.setting.upsert({

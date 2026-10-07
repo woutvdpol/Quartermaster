@@ -11,6 +11,11 @@ describe("shopTagsForAction", () => {
     expect(shopTagsForAction("t1", "content.menu.update")).toEqual(["tenant:t1:content"]);
     expect(shopTagsForAction("t1", "settings.update")).toEqual(["tenant:t1"]);
   });
+  it("maps redirect changes to the redirects tag", () => {
+    for (const a of ["redirect.create", "redirect.update", "redirect.delete", "redirect.import"]) {
+      expect(shopTagsForAction("t1", a)).toEqual(["tenant:t1:redirects"]);
+    }
+  });
   it("ignores actions that don't change the shop", () => {
     expect(shopTagsForAction("t1", "order.note")).toEqual([]);
     expect(shopTagsForAction("t1", "auth.login")).toEqual([]);

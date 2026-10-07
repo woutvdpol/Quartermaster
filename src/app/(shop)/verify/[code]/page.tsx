@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Container } from "@/components/shop/ui";
 import { VerifyForm } from "@/components/shop/provenance/VerifyForm";
@@ -8,6 +7,7 @@ import { provenanceShopCopy } from "@/components/shop/provenance/_copy";
 import { normalizeCertificateCode } from "@/server/provenance/code";
 import { verifyCertificateForVisitor } from "@/server/provenance/certificates";
 import { requireShop } from "@/server/storefront/context";
+import { requestClientIp } from "@/server/request-meta";
 
 const t = provenanceShopCopy.verify;
 
@@ -24,8 +24,7 @@ export default async function VerifyCodePage({ params }: PageProps<"/verify/[cod
   const code = normalizeCertificateCode(raw);
   if (code && code !== raw) redirect(`/verify/${code}`);
 
-  const h = await headers();
-  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip")?.trim() || null;
+  const ip = await requestClientIp();
   const result = code ? await verifyCertificateForVisitor(shop.tenant.id, code, ip) : ({ status: "unknown", code: null } as const);
 
   return (

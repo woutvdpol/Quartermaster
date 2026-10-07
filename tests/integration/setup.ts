@@ -4,6 +4,8 @@ import { inject, vi } from "vitest";
 // Point the app's db client at the test database before any module imports it.
 process.env.DATABASE_URL = inject("databaseUrl");
 process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32, 7).toString("base64");
+// Tests send X-Forwarded-For as if behind one trusted proxy (ingress-nginx); see src/server/request-meta.ts.
+process.env.TRUSTED_PROXY_HOPS ??= "1";
 
 // Services may read request headers/cookies (audit IP, tenant cookie); outside Next there is no request.
 const cookieJar = new Map<string, string>();

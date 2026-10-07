@@ -1,0 +1,13 @@
+# Nightly pg_dump files (backup CronJob). Only used by one pod at a time → ReadWriteOnce is fine.
+# This is the *local* copy; configure the offsite (S3-compatible) target for real disaster recovery.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: quartermaster-backups
+  labels:
+    app.kubernetes.io/component: backup
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 20Gi

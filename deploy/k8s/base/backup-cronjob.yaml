@@ -1,0 +1,151 @@
+# Nightly Postgres backup.
+#   1. init container `pg-dump`: pg_dump --format=custom → PVC quartermaster-backups (/backups/db),
+#      verified with pg_restore --list, older than BACKUP_RETENTION_DAYS deleted.
+#   2. container `offsite`: when Secret quartermaster-backup-offsite exists, rclone copies the
+#      dumps AND the uploads volume to an S3-compatible bucket (copy, never delete — enable bucket
+#      versioning/lifecycle there). Without that Secret it logs a warning and exits 0.
+# Restore procedure: docs/deploy.md ("Backups & restore").
+# DATABASE_URL must be libpq-compatible (postgresql://…?sslmode=require; no Prisma-only params).
+# The pg_dump major version must be >= the server's (postgres:18 image ↔ Postgres 18).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: quartermaster-backup
+  labels:
+    app.kubernetes.io/component: backup
+spec:
+  schedule: "15 2 * * *"
+  timeZone: Europe/Amsterdam
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 7200
+      ttlSecondsAfterFinished: 604800
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: quartermaster
+            app.kubernetes.io/component: backup
+        spec:
+          restartPolicy: Never
+          serviceAccountName: quartermaster
+          automountServiceAccountToken: false
+          enableServiceLinks: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            fsGroup: 1001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          initContainers:
+            - name: pg-dump
+              image: postgres:18-alpine
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  mkdir -p /backups/db
+                  ts="$(date -u +%Y%m%dT%H%M%SZ)"
+                  out="/backups/db/quartermaster-${ts}.dump"
+                  echo "[backup] pg_dump → ${out}"
+                  pg_dump --format=custom --compress=6 --no-owner --no-privileges \
+                    --dbname="${DATABASE_URL}" --file="${out}.partial"
+                  pg_restore --list "${out}.partial" > /dev/null
+                  mv "${out}.partial" "${out}"
+                  find /backups/db -name 'quartermaster-*.dump' -mtime "+${BACKUP_RETENTION_DAYS:-14}" -print -delete
+                  find /backups/db -name '*.partial' -mmin +60 -delete
+                  ls -lh /backups/db | tail -n 5
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: quartermaster-secrets
+                      key: DATABASE_URL
+                - name: BACKUP_RETENTION_DAYS
+                  valueFrom:
+                    configMapKeyRef:
+                      name: quartermaster-config
+                      key: BACKUP_RETENTION_DAYS
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: "1"
+                  memory: 512Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+                - name: tmp
+                  mountPath: /tmp
+          containers:
+            - name: offsite
+              image: rclone/rclone:1.71
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  if [ -z "${RCLONE_CONFIG_OFFSITE_TYPE:-}" ] || [ -z "${BACKUP_BUCKET:-}" ]; then
+                    echo "[backup] WARNING: no offsite target configured (Secret quartermaster-backup-offsite) — dumps stay on the PVC only"
+                    exit 0
+                  fi
+                  echo "[backup] copy dumps → offsite:${BACKUP_BUCKET}/db"
+                  rclone copy /backups/db "offsite:${BACKUP_BUCKET}/db" --include 'quartermaster-*.dump' --stats-one-line -v
+                  echo "[backup] copy uploads → offsite:${BACKUP_BUCKET}/uploads"
+                  rclone copy /uploads "offsite:${BACKUP_BUCKET}/uploads" --stats-one-line -v
+              envFrom:
+                # RCLONE_CONFIG_OFFSITE_* + BACKUP_BUCKET, see deploy/k8s/secrets/secret.example.yaml
+                - secretRef:
+                    name: quartermaster-backup-offsite
+                    optional: true
+              env:
+                - name: HOME
+                  value: /tmp
+                - name: RCLONE_CONFIG
+                  value: /tmp/rclone.conf
+                - name: RCLONE_CACHE_DIR
+                  value: /tmp/rclone-cache
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: "1"
+                  memory: 512Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+                  readOnly: true
+                - name: uploads
+                  mountPath: /uploads
+                  readOnly: true
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: quartermaster-backups
+            - name: uploads
+              persistentVolumeClaim:
+                claimName: quartermaster-uploads
+            - name: tmp
+              emptyDir:
+                sizeLimit: 256Mi

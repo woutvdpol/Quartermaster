@@ -1,0 +1,81 @@
+# EXAMPLE — Concept500 → Quartermaster import (scripts/etl, `npm run etl`) as a one-off Job.
+# Not part of any kustomization; edit the args, then:
+#   kubectl -n quartermaster create -f deploy/k8s/jobs/etl.job.example.yaml
+#   kubectl -n quartermaster logs -f job/quartermaster-etl
+# Runs the `migrate` image (has tsx + scripts/) with the uploads PVC mounted, so imported photos
+# land where web and worker serve them. Needs Secret quartermaster-etl with LEGACY_DATABASE_URL
+# (mysql://… of the old shop, read-only user) and LEGACY_CF_ACCOUNT_HASH (Cloudflare Images).
+# Uses its own app name label so the egress NetworkPolicy (5432/443 only) does not block MySQL.
+# Run with --dry-run first. See docs/deploy.md ("Cutover vanaf Concept500").
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: quartermaster-etl
+  labels:
+    app.kubernetes.io/name: quartermaster-etl
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 14400
+  ttlSecondsAfterFinished: 604800
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: quartermaster-etl
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: etl
+          image: ghcr.io/CHANGE-ME/quartermaster-migrate:CHANGE-ME   # same tag as the running release
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              npm run etl -- --tenant concept-militaria --report /tmp/etl-report.md --legacy-host www.concept500.example
+              echo "──── report ────"; cat /tmp/etl-report.md
+          envFrom:
+            - secretRef:
+                name: quartermaster-secrets       # DATABASE_URL, APP_ENCRYPTION_KEY
+            - secretRef:
+                name: quartermaster-etl           # LEGACY_DATABASE_URL, LEGACY_CF_ACCOUNT_HASH
+          env:
+            - name: UPLOADS_DIR
+              value: /app/uploads
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: uploads
+              mountPath: /app/uploads
+            - name: tmp
+              mountPath: /tmp
+            - name: home        # npm writes logs/cache under $HOME
+              mountPath: /home/nextjs
+            - name: local       # default report/cache dir of the ETL
+              mountPath: /app/.local
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: quartermaster-uploads
+        - name: tmp
+          emptyDir: {}
+        - name: home
+          emptyDir: {}
+        - name: local
+          emptyDir: {}

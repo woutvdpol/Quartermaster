@@ -85,8 +85,7 @@ export async function subscribe(
   if (existing && subscriberStatus(existing) === "active") return { status: "already_subscribed" };
 
   const limitKey = `newsletter.subscribe:${tenantId}:${address}`;
-  if (await rateLimit.isLimited(limitKey, SUBSCRIBE_RULE)) return { status: "rate_limited" };
-  await rateLimit.hit(limitKey);
+  if (!(await rateLimit.take(limitKey, SUBSCRIBE_RULE))) return { status: "rate_limited" };
 
   // Link to the shop's customer record with the same email (or the given one, if it is in this tenant).
   const customer = await db.customer.findFirst({

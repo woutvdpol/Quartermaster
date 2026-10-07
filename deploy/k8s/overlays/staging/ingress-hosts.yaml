@@ -1,0 +1,26 @@
+# Staging hosts. Tenant shops on staging use sub-domains of the staging zone, e.g.
+# concept.staging.quartermaster.example (register them as TenantDomain in the staging admin).
+# A wildcard (*.staging.quartermaster.example) needs a DNS-01 ClusterIssuer — see docs/deploy.md.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: quartermaster
+spec:
+  tls:
+    - hosts: ["platform.staging.quartermaster.example"]
+      secretName: tls-platform
+    - hosts: ["concept.staging.quartermaster.example"]
+      secretName: tls-concept
+  rules:
+    - host: platform.staging.quartermaster.example
+      http: &backend
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: quartermaster-web
+                port:
+                  name: http
+    - host: concept.staging.quartermaster.example
+      http: *backend

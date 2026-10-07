@@ -2,7 +2,7 @@
 
 Multi-tenant webshop platform for militaria dealers. Successor of **Concept500** (Laravel 12 · Backpack · Livewire), rebuilt on **Next.js** and **Prisma**.
 
-> **Status:** phases 0–3 and 5 done — admin, storefront and extras (facets, per-country compliance, saved searches & alerts, provenance & certificates, offers, coupons, invoices, shipping board, ⌘K, exchange rates, leads). Next: phase 4 — migration from Concept500 (see `docs/etl/`) and go-live.
+> **Status:** phases 0–5 built — admin, storefront (Gallery theme) and extras, plus phase 4 tooling: Concept500 ETL (`npm run etl`, see `docs/etl/README.md`), legacy redirects, Kubernetes manifests + deploy guide (`docs/deploy.md`), security review (`docs/04-security-review.md`). Next: owner decisions on the open ETL/deploy points, staging, real-data dry runs and cutover.
 
 ## Goals
 
@@ -52,6 +52,7 @@ Work in progress (modelled, not yet built): shipment tracking, invoices.
 | [`docs/analysis/03-shop-and-integrations.md`](docs/analysis/03-shop-and-integrations.md) | Shop flows, integrations, hosting, SEO, feature ideas |
 | [`docs/analysis/04-testdump-bevindingen.md`](docs/analysis/04-testdump-bevindingen.md) | Findings from the Concept500 test-shop dump |
 | [`docs/design/`](docs/design) | Admin & shop design mockups (variants A, B, C) |
+| [`docs/deploy.md`](docs/deploy.md) | Kubernetes deployment, backups, DNS/TLS, cut-over and go-live checklists |
 
 Docs are written in Dutch; code and code comments will be in English.
 
@@ -87,6 +88,7 @@ The `Dockerfile` is multi-stage and builds on `node:24-bookworm-slim` (glibc —
 |---|---|
 | `runner` (default) | Next.js standalone server, non-root user `nextjs` (UID 1001), port `3000`, uploads at `/app/uploads` |
 | `migrate` | One-shot `prisma migrate deploy` (full dependency tree, so it can also run `npx prisma db seed`) |
+| `worker` | pg-boss background worker (`tsx scripts/worker.ts`), same contents as `migrate` |
 
 ```bash
 docker build -t quartermaster:dev .
@@ -107,17 +109,15 @@ Startup order: `postgres` (healthy) → `migrate` (completes) → `app`. Uploads
 
 Seed inside Compose (optional): `docker compose --profile app run --rm migrate npx prisma db seed`.
 
-## Kubernetes notes
+## Kubernetes
 
-Not deployed yet; the image is prepared for it:
+Manifests live in `deploy/k8s/` (Kustomize: `base/`, `overlays/staging`, `overlays/production`, optional
+`components/`); roll out with `deploy/k8s/rollout.sh overlays/<env> <image-tag>` (migrations first, then the
+app). Full guide — architecture, configuration, proxy/IP contract, backups & restore, DNS/TLS per tenant,
+cut-over and go-live checklists — in [`docs/deploy.md`](docs/deploy.md) (Dutch).
 
-- **Stateless app.** All state lives in Postgres and the uploads volume. Mount a PersistentVolumeClaim at `/app/uploads` (needs `ReadWriteMany` once running more than one replica — or move to object storage behind the `StorageDriver` interface).
-- **Probes.** `livenessProbe` → `GET /api/health` (no DB access, so a DB outage never restarts pods); `readinessProbe` → `GET /api/ready` (runs `SELECT 1`, returns 503 when the database is unreachable).
-- **Migrations.** Run the `migrate` image as a Job (e.g. Helm pre-upgrade hook / Argo sync wave) or as an `initContainer`, before the new `runner` pods roll out. `prisma migrate deploy` is idempotent and uses an advisory lock, so concurrent runs are safe.
-- **Configuration.** Everything is runtime env: `DATABASE_URL`, `APP_ENCRYPTION_KEY`, `PLATFORM_HOST` from a Secret/ConfigMap — one image is promoted across environments. Never bake `.env` into the image (it is excluded by `.dockerignore`).
-- **Multiple replicas.** Set the same `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` at build time for all instances, and consider `deploymentId` for version-skew protection (see the Next.js self-hosting guide). The Next.js cache is per pod by default.
-- **Security context.** `runAsNonRoot: true`, `runAsUser: 1001`, `fsGroup: 1001`; the root filesystem can be read-only apart from `/app/uploads` and `/app/.next/cache` (mount an `emptyDir` there).
-- **Ingress.** Terminate TLS at the ingress/reverse proxy; disable response buffering there so streaming works.
+End-to-end smoke tests: `npm run e2e:install` once, then `npm run e2e` (default `http://concept.localhost:3000`,
+override with `E2E_BASE_URL`).
 
 ## Background jobs
 

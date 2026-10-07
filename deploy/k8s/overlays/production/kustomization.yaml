@@ -1,0 +1,52 @@
+# Production: managed Postgres (recommended), ReadWriteMany uploads, 2+ web replicas.
+#   deploy/k8s/rollout.sh overlays/production <image-tag>
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: quartermaster
+
+resources:
+  - namespace.yaml
+  - ../../base
+
+# components:
+#   - ../../components/hpa            # CPU autoscaling (needs RWX uploads + metrics-server)
+#   - ../../components/external-cron  # cron via Kubernetes CronJobs instead of the worker
+
+labels:
+  - pairs:
+      app.kubernetes.io/instance: quartermaster-production
+    includeSelectors: false
+    includeTemplates: true
+
+images:
+  - name: quartermaster
+    newName: ghcr.io/CHANGE-ME/quartermaster
+    newTag: "0.0.0"
+  - name: quartermaster-worker
+    newName: ghcr.io/CHANGE-ME/quartermaster-worker
+    newTag: "0.0.0"
+  - name: quartermaster-migrate
+    newName: ghcr.io/CHANGE-ME/quartermaster-migrate
+    newTag: "0.0.0"
+
+configMapGenerator:
+  - name: quartermaster-config
+    behavior: merge
+    literals:
+      - PLATFORM_HOST=platform.quartermaster.example
+      - APP_URL=https://platform.quartermaster.example
+      - MAIL_FROM_FALLBACK=no-reply@quartermaster.example
+      # Behind exactly one proxy that overwrites X-Forwarded-For (ingress-nginx, see
+      # deploy/k8s/ingress-nginx/values.yaml). Never raise this without changing the controller config.
+      - TRUSTED_PROXY_HOPS=1
+      - TURNSTILE_SITE_KEY=  # public Cloudflare Turnstile site key (runtime)
+      - BACKUP_RETENTION_DAYS=14
+
+patches:
+  - path: ingress-hosts.yaml
+  # Pick the RWX storage class of your provider for the uploads volume:
+  # - target: {kind: PersistentVolumeClaim, name: quartermaster-uploads}
+  #   patch: |-
+  #     - op: add
+  #       path: /spec/storageClassName
+  #       value: CHANGE-ME-rwx-class

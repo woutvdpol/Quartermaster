@@ -47,6 +47,7 @@ export async function processLeadPhoto(input: Uint8Array): Promise<ProcessedLead
     const file = `p${randomAlnum(24)}_${info.width}x${info.height}.jpg`;
     return { file, full, thumb, width: info.width, height: info.height };
   } catch (error) {
-    throw new LeadPhotoError("CORRUPT", `The photo could not be read: ${(error as Error).message}`);
+    console.warn("[leads] photo decode failed:", (error as Error).message);
+    throw new LeadPhotoError("CORRUPT", "The photo could not be read");
   }
 }

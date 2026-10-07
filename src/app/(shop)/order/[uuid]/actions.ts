@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getRequestTenant } from "@/server/tenant";
 import { clientIp } from "@/server/customer-auth/current";
-import { hit, isLimited } from "@/server/auth/rate-limit";
+import { take } from "@/server/auth/rate-limit";
 import { retryOrderPayment, simulateDevPayment, startOrderPayment, isDevSimulationAllowed } from "@/server/checkout";
 import { DEV_OUTCOMES, type DevOutcome } from "@/server/checkout/payment";
 import { orderStatusPath } from "@/server/checkout/urls";
@@ -34,8 +34,7 @@ export async function payOrderAction(_prev: PayOrderState, form: FormData): Prom
   if (typeof uuid !== "string" || !uuidSchema.safeParse(uuid).success) return { message: "Order not found" };
   const tid = await tenantId();
   const key = `order.retry:${tid}:${(await clientIp()) ?? "unknown"}`;
-  if (await isLimited(key, RETRY_RULE)) return { message: "Too many attempts. Please wait a few minutes and try again." };
-  await hit(key);
+  if (!(await take(key, RETRY_RULE))) return { message: "Too many attempts. Please wait a few minutes and try again." };
 
   const retry = await retryOrderPayment(tid, uuid);
   if (!retry.ok) {

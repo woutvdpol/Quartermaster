@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getRequestTenant } from "@/server/tenant";
 import { clientIp } from "@/server/customer-auth/current";
-import { hit, isLimited } from "@/server/auth/rate-limit";
+import { take } from "@/server/auth/rate-limit";
 import { readCartToken, writeCartToken } from "@/server/cart/cookie";
 import {
   addToCart,
@@ -42,8 +42,7 @@ export async function addToCartAction(productId: unknown): Promise<AddToCartStat
   if (typeof productId !== "string" || productId.length > 64) return { ok: false, code: "NOT_FOUND", message: "This item could not be found" };
   const tenantId = await requireTenantId();
   const limitKey = `cart.add:${tenantId}:${(await clientIp()) ?? "unknown"}`;
-  if (await isLimited(limitKey, ADD_RULE)) return { ok: false, code: "RATE_LIMITED", message: "Too many attempts. Please wait a moment." };
-  await hit(limitKey);
+  if (!(await take(limitKey, ADD_RULE))) return { ok: false, code: "RATE_LIMITED", message: "Too many attempts. Please wait a moment." };
 
   const viewer = await getShopViewer(tenantId);
   const token = await readCartToken();
@@ -144,8 +143,7 @@ export async function applyCouponAction(_prev: CouponFormState, form: FormData):
   if (typeof code !== "string" || !code.trim()) return { ok: false, message: "Enter a code" };
   const tenantId = await requireTenantId();
   const key = `cart.coupon:${tenantId}:${(await clientIp()) ?? "unknown"}`;
-  if (await isLimited(key, COUPON_RULE)) return { ok: false, message: "Too many attempts. Please wait a few minutes." };
-  await hit(key);
+  if (!(await take(key, COUPON_RULE))) return { ok: false, message: "Too many attempts. Please wait a few minutes." };
   const res = await applyCartCoupon(tenantId, await readCartToken(), code);
   revalidatePath("/cart");
   revalidatePath("/checkout");
@@ -166,8 +164,7 @@ export async function removeCouponAction(): Promise<void> {
 export async function saveCheckoutContactAction(input: { email?: unknown; reminderConsent?: unknown }): Promise<void> {
   const tenantId = await requireTenantId();
   const key = `cart.contact:${tenantId}:${(await clientIp()) ?? "unknown"}`;
-  if (await isLimited(key, CONTACT_RULE)) return;
-  await hit(key);
+  if (!(await take(key, CONTACT_RULE))) return;
   const viewer = await getShopViewer(tenantId);
   await setCartContact(tenantId, await readCartToken(), {
     email: viewer ? viewer.email : typeof input?.email === "string" ? input.email.slice(0, 254) : undefined,
@@ -179,8 +176,7 @@ export async function saveCheckoutContactAction(input: { email?: unknown; remind
 export async function restoreCartAction(restoreToken: unknown): Promise<{ ok: boolean }> {
   const tenantId = await requireTenantId();
   const key = `cart.restore:${tenantId}:${(await clientIp()) ?? "unknown"}`;
-  if (await isLimited(key, COUPON_RULE)) return { ok: false };
-  await hit(key);
+  if (!(await take(key, COUPON_RULE))) return { ok: false };
   const restored = await restoreCart(tenantId, restoreToken);
   if (!restored) return { ok: false };
   await writeCartToken(restored.token);

@@ -1,7 +1,6 @@
 import {
   Archivo,
   Bebas_Neue,
-  Big_Shoulders,
   Cormorant_Garamond,
   EB_Garamond,
   Hanken_Grotesk,
@@ -58,7 +57,6 @@ const hankenGrotesk = Hanken_Grotesk({ subsets: ["latin", "latin-ext"], display:
 const instrumentSerif = Instrument_Serif({ subsets: ["latin", "latin-ext"], display: "swap", preload: false, weight: "400", style: ["normal", "italic"] });
 const newsreader = Newsreader({ subsets: ["latin", "latin-ext"], display: "swap", preload: false, style: ["normal", "italic"] });
 const archivo = Archivo({ subsets: ["latin", "latin-ext"], display: "swap", preload: false });
-const bigShoulders = Big_Shoulders({ subsets: ["latin", "latin-ext"], display: "swap", preload: false, adjustFontFallback: false });
 const workSans = Work_Sans({ subsets: ["latin", "latin-ext"], display: "swap", preload: false });
 const libreCaslonDisplay = Libre_Caslon_Display({ subsets: ["latin", "latin-ext"], display: "swap", preload: false, weight: "400" });
 
@@ -87,7 +85,6 @@ const FONTS: Record<FontName, { style: { fontFamily: string } }> = {
   "Instrument Serif": instrumentSerif,
   Newsreader: newsreader,
   Archivo: archivo,
-  "Big Shoulders": bigShoulders,
   "Work Sans": workSans,
   "Libre Caslon Display": libreCaslonDisplay,
 };

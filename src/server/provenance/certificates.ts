@@ -7,7 +7,7 @@ import { audit } from "@/server/audit";
 import { ServiceError, type ServiceContext } from "@/server/context";
 import { canAccessTenant } from "@/server/auth/guards";
 import type { SessionUser } from "@/server/auth/session";
-import { hit, isLimited, type RateLimitRule } from "@/server/auth/rate-limit";
+import { take, type RateLimitRule } from "@/server/auth/rate-limit";
 import { getSettings } from "@/server/settings";
 import { getTenantDisplay } from "@/server/tenant-display";
 import { originForHost } from "@/server/storefront/context";
@@ -371,7 +371,6 @@ export async function verifyCertificate(tenantId: string, input: string): Promis
 /** Rate-limited lookup for the public /verify page (per client IP, every lookup counts). */
 export async function verifyCertificateForVisitor(tenantId: string, input: string, ip: string | null): Promise<VerifyResult> {
   const key = `certificate-verify:${ip ?? "unknown"}`;
-  if (await isLimited(key, VERIFY_RATE_LIMIT)) return { status: "rate_limited" };
-  await hit(key);
+  if (!(await take(key, VERIFY_RATE_LIMIT))) return { status: "rate_limited" };
   return verifyCertificate(tenantId, input);
 }

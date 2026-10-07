@@ -1,0 +1,15 @@
+# Optional: autoscale the web Deployment on CPU. Requires ReadWriteMany uploads (do NOT combine
+# with components/uploads-rwo) and the metrics-server. Note: the Next.js data cache is per pod —
+# shop changes reach other pods within the cache TTL (60 s), see docs/deploy.md ("Schalen").
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - hpa.yaml
+patches:
+  # Let the HPA own the replica count (otherwise every apply resets it).
+  - target:
+      kind: Deployment
+      name: quartermaster-web
+    patch: |-
+      - op: remove
+        path: /spec/replicas

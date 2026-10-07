@@ -75,6 +75,39 @@ jobs:
       - name: Build
         run: npm run build
 
+      # End-to-end smoke tests against the production build (`next start`) and a seeded database.
+      # Uses http://localhost:3001 — seeded as a secondary domain of the demo tenant (prisma/seed.ts).
+      - name: Seed demo data for e2e
+        env:
+          SEED_SUPERADMIN_EMAIL: admin@e2e.test
+          SEED_SUPERADMIN_PASSWORD: e2e-only-password-not-secret
+          SEED_OWNER_EMAIL: owner@e2e.test
+          SEED_OWNER_PASSWORD: e2e-only-password-not-secret
+          UPLOADS_DIR: ${{ github.workspace }}/uploads
+        run: |
+          npm run db:seed
+          npm run db:seed:demo
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E smoke tests
+        env:
+          E2E_WEB_SERVER: "1"
+          E2E_BASE_URL: http://localhost:3001
+          UPLOADS_DIR: ${{ github.workspace }}/uploads
+        run: npm run e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
   docker:
     name: Docker image
     runs-on: ubuntu-latest
@@ -102,3 +135,31 @@ jobs:
           push: false
           tags: quartermaster-migrate:ci
           cache-from: type=gha
+
+      - name: Build worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: worker
+          push: false
+          tags: quartermaster-worker:ci
+          cache-from: type=gha
+
+  k8s:
+    name: Kubernetes manifests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Render overlays (kustomize)
+        run: |
+          mkdir -p rendered
+          for o in staging production; do
+            kubectl kustomize "deploy/k8s/overlays/$o" > "rendered/$o.yaml"
+          done
+
+      - name: Validate against the Kubernetes schema (kubeconform)
+        run: |
+          docker run --rm -v "$PWD/rendered:/w:ro" ghcr.io/yannh/kubeconform:v0.7.0 \
+            -strict -summary -kubernetes-version 1.33.0 /w/staging.yaml /w/production.yaml

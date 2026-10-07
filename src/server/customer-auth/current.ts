@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { headers } from "next/headers";
+import { requestClientIp } from "@/server/request-meta";
 import { redirect } from "next/navigation";
 import { currentSession } from "@/server/auth/guards";
 import { getRequestTenant } from "@/server/tenant";
@@ -40,8 +40,7 @@ export async function hasPendingCustomerTotp(): Promise<boolean> {
   return !!tenant && !!session?.pendingTotp && session.user.role === "CUSTOMER" && session.user.tenantId === tenant.id;
 }
 
-/** Best-effort client IP of the current request (for rate limits). */
+/** Client IP of the current request (for rate limits); null when unknown — see src/server/request-meta.ts. */
 export async function clientIp(): Promise<string | null> {
-  const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || null;
+  return requestClientIp();
 }

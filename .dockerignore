@@ -45,3 +45,10 @@ src/**/*.test.ts
 src/**/*.test.tsx
 vitest.config.ts
 vitest.integration.config.ts
+# Deployment manifests & end-to-end tests
+deploy
+e2e
+playwright.config.ts
+playwright-report
+test-results
+blob-report

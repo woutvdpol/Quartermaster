@@ -1,0 +1,73 @@
+# Single-node uploads: for clusters without a ReadWriteMany storage class.
+#
+# A ReadWriteOnce volume can be mounted by several pods *on the same node*. This component:
+#   - switches the uploads PVC to ReadWriteOnce,
+#   - runs ONE web replica (rolling updates still work: the surge pod lands on the same node),
+#   - pins web (incl. its surge pod), worker and the backup job to the node that runs web,
+#   - relaxes the web PDB so node drains are not blocked.
+# Trade-off: no horizontal scaling, and a node failure means downtime until the volume re-attaches
+# elsewhere. Move to RWX storage or object storage (STORAGE_DRIVER=s3, not built yet) to scale out.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+patches:
+  - target:
+      kind: PersistentVolumeClaim
+      name: quartermaster-uploads
+    patch: |-
+      - op: replace
+        path: /spec/accessModes
+        value: ["ReadWriteOnce"]
+  - target:
+      kind: Deployment
+      name: quartermaster-web
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+      - op: add
+        path: /spec/template/spec/affinity
+        value:
+          podAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: quartermaster
+                    app.kubernetes.io/component: web
+  - target:
+      kind: Deployment
+      name: quartermaster-worker
+    patch: |-
+      - op: add
+        path: /spec/template/spec/affinity
+        value:
+          podAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: quartermaster
+                    app.kubernetes.io/component: web
+  - target:
+      kind: CronJob
+      name: quartermaster-backup
+    patch: |-
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/affinity
+        value:
+          podAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: quartermaster
+                    app.kubernetes.io/component: web
+  - target:
+      kind: PodDisruptionBudget
+      name: quartermaster-web
+    patch: |-
+      - op: remove
+        path: /spec/minAvailable
+      - op: add
+        path: /spec/maxUnavailable
+        value: 1

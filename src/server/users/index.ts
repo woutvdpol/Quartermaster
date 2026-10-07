@@ -5,9 +5,8 @@ import { audit } from "@/server/audit";
 import { ServiceError, type ServiceContext } from "@/server/context";
 import { AuthError, canAccessTenant } from "@/server/auth/guards";
 import type { SessionUser } from "@/server/auth/session";
-import { getDummyHash, verifyPassword, MAX_PASSWORD_LENGTH } from "@/server/auth/password";
-import * as rateLimit from "@/server/auth/rate-limit";
-import { RULES } from "@/server/auth/rate-limit";
+import { MAX_PASSWORD_LENGTH } from "@/server/auth/password";
+import { verifyCurrentPassword } from "@/server/auth/service";
 import { generateToken, hashToken } from "@/server/auth/tokens";
 import { isUniqueViolation, parseInput } from "@/server/catalog/errors";
 import type { Prisma } from "@/generated/prisma/client";
@@ -374,14 +373,9 @@ export async function updateOwnProfile(
   if (!emailChanged && !nameChanged) return { ok: true, profile: { id: current.id, email: current.email, name: current.name } };
 
   if (emailChanged) {
-    const key = `reauth:user:${user.id}`; // same key as auth/service re-auth
-    if (await rateLimit.isLimited(key, RULES.loginPerAccount)) return { ok: false, error: "rate_limited" };
-    const ok = await verifyPassword(data.currentPassword ?? "", current.passwordHash ?? (await getDummyHash()));
-    if (!ok || !current.passwordHash || !data.currentPassword) {
-      await rateLimit.hit(key);
-      return { ok: false, error: "invalid_password" };
-    }
-    await rateLimit.clear(key);
+    // Shared re-auth: backoff per user + rehash of legacy (bcrypt) hashes.
+    const check = await verifyCurrentPassword(user.id, data.currentPassword ?? "");
+    if (check !== "ok") return { ok: false, error: check === "rate_limited" ? "rate_limited" : "invalid_password" };
     const taken = await db.user.findFirst({
       where: { tenantId: current.tenantId, email: data.email, id: { not: current.id } },
       select: { id: true },

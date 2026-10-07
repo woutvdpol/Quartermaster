@@ -26,6 +26,8 @@ async function findTenantByHost(host: string) {
 /**
  * Who serves this request: the platform host (SUPERADMIN), a shop's own domain, or an unknown host.
  * Unknown hosts must never fall back to the platform — that would expose the superadmin login anywhere.
+ * Resolution uses the `Host` header only — never X-Forwarded-Host, which Next passes through from the
+ * client unchanged (see src/server/request-meta.ts). ingress-nginx forwards the original Host.
  */
 export const getRequestScope = cache(async (): Promise<RequestScope> => {
   const host = normalizeHost((await headers()).get("host"));

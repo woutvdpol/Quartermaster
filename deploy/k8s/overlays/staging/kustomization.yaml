@@ -1,0 +1,63 @@
+# Staging: everything in-cluster and cheap — in-cluster Postgres, single-node RWO uploads,
+# one web replica. Same images as production (promote by tag).
+#   deploy/k8s/rollout.sh overlays/staging <image-tag>
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: quartermaster-staging
+
+resources:
+  - namespace.yaml
+  - ../../base
+
+components:
+  - ../../components/uploads-rwo
+  - ../../components/postgres-in-cluster
+
+labels:
+  - pairs:
+      app.kubernetes.io/instance: quartermaster-staging
+    includeSelectors: false
+    includeTemplates: true
+
+images:
+  - name: quartermaster
+    newName: ghcr.io/CHANGE-ME/quartermaster
+    newTag: "0.0.0"
+  - name: quartermaster-worker
+    newName: ghcr.io/CHANGE-ME/quartermaster-worker
+    newTag: "0.0.0"
+  - name: quartermaster-migrate
+    newName: ghcr.io/CHANGE-ME/quartermaster-migrate
+    newTag: "0.0.0"
+
+configMapGenerator:
+  - name: quartermaster-config
+    behavior: merge
+    literals:
+      - PLATFORM_HOST=platform.staging.quartermaster.example
+      - APP_URL=https://platform.staging.quartermaster.example
+      - MAIL_FROM_FALLBACK=no-reply@staging.quartermaster.example
+      - TRUSTED_PROXY_HOPS=1
+      - TURNSTILE_SITE_KEY=  # public Cloudflare Turnstile site key (runtime)
+      - BACKUP_RETENTION_DAYS=3
+      - JOBS_LOG_CRON=1
+
+patches:
+  - path: ingress-hosts.yaml
+  # Staging uses Let's Encrypt staging certs until the setup is proven (avoid rate limits).
+  - target: {kind: Ingress, name: quartermaster}
+    patch: |-
+      - op: replace
+        path: /metadata/annotations/cert-manager.io~1cluster-issuer
+        value: letsencrypt-staging
+  # Smaller volumes.
+  - target: {kind: PersistentVolumeClaim, name: quartermaster-uploads}
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 5Gi
+  - target: {kind: PersistentVolumeClaim, name: quartermaster-backups}
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 5Gi

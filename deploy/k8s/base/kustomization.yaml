@@ -1,0 +1,56 @@
+# Quartermaster — environment-agnostic base. Do not apply directly; use an overlay:
+#   deploy/k8s/rollout.sh overlays/production        (migrations first, then the app)
+# See docs/deploy.md for the full procedure.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: quartermaster
+      app.kubernetes.io/part-of: quartermaster
+    includeSelectors: false
+    includeTemplates: true
+
+resources:
+  - serviceaccount.yaml
+  - uploads-pvc.yaml
+  - backups-pvc.yaml
+  - web-deployment.yaml
+  - web-service.yaml
+  - web-pdb.yaml
+  - worker-deployment.yaml
+  - migrate-job.yaml
+  - ingress.yaml
+  - backup-cronjob.yaml
+  - networkpolicy.yaml
+
+# Non-secret runtime configuration (every env var the app reads is listed in docs/deploy.md and in
+# deploy/k8s/secrets/secret.example.yaml). Overlays merge their own values (behavior: merge). The
+# name gets a content hash, so a config change rolls the web and worker pods automatically.
+configMapGenerator:
+  - name: quartermaster-config
+    literals:
+      - NODE_ENV=production
+      # Overlays MUST override these two.
+      - PLATFORM_HOST=platform.example.invalid
+      - APP_URL=https://platform.example.invalid
+      - MAIL_FROM_FALLBACK=no-reply@example.invalid
+      # 0 = ignore X-Forwarded-For (default, safe without a proxy). Overlays behind ingress-nginx set 1.
+      - TRUSTED_PROXY_HOPS=0
+      - STORAGE_DRIVER=local
+      - UPLOADS_DIR=/app/uploads
+      # Worker: run the pg-boss cron schedules (set 0 when components/external-cron is used).
+      - WORKER_CRON=1
+      # Worker: drain time on SIGTERM; keep terminationGracePeriodSeconds (40 s) above this + 5 s.
+      - WORKER_SHUTDOWN_TIMEOUT_MS=25000
+      - JOBS_LOG_CRON=0
+      # Optional (add in an overlay only when needed; unset = default behaviour):
+      #   MOLLIE_WEBHOOK_BASE_URL — webhook base for Mollie (default: APP_URL)
+      #   MATOMO_URL              — Matomo analytics base URL (token lives in the Secret)
+      # Backup retention on the backups PVC (days).
+      - BACKUP_RETENTION_DAYS=14
+
+# Logical image names; overlays pin registry + tag with `images:`.
+#   quartermaster          → Dockerfile target `runner`
+#   quartermaster-worker   → Dockerfile target `worker`
+#   quartermaster-migrate  → Dockerfile target `migrate`

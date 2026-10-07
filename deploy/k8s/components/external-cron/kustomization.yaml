@@ -1,0 +1,22 @@
+# Optional: trigger the cron tasks from Kubernetes CronJobs (POST /api/cron/<task> with
+# Authorization: Bearer $CRON_SECRET) instead of the worker's pg-boss schedules.
+#
+# NOT needed by default — the worker already runs every schedule (WORKER_CRON=1) and pg-boss
+# de-duplicates them across worker replicas. Use this component only when you want schedules
+# visible/controllable as Kubernetes objects. It sets WORKER_CRON=0 so tasks don't run twice
+# (running twice would be harmless — every task is idempotent — just wasteful).
+# Requires CRON_SECRET (≥16 chars) in Secret quartermaster-secrets.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - cronjobs.yaml
+configMapGenerator:
+  - name: quartermaster-config
+    behavior: merge
+    literals:
+      - WORKER_CRON=0
+patches:
+  - path: cron-common.yaml
+    target:
+      kind: CronJob
+      labelSelector: app.kubernetes.io/component=cron

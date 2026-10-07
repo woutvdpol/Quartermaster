@@ -55,7 +55,7 @@ export async function getAlertDialogStateAction(source: unknown): Promise<AlertD
   const summary = query ? summarizeDescription(await describeQuery(tenant.id, query)) : "";
   return {
     loggedIn: !!customer,
-    email: customer?.customer.email ?? null,
+    email: customer?.user.email ?? null, // the login address (Customer.email may be a placeholder until verified)
     defaultName: summary.slice(0, 120),
     summary,
   };

@@ -1,0 +1,15 @@
+# Product images, documents, invoice/certificate PDFs, lead photos (STORAGE_DRIVER=local).
+# Mounted by web (all replicas), worker and the backup CronJob, so it needs ReadWriteMany unless
+# everything runs on one node — see components/uploads-rwo and docs/deploy.md ("Uploads-opslag").
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: quartermaster-uploads
+  labels:
+    app.kubernetes.io/component: storage
+spec:
+  accessModes: ["ReadWriteMany"]
+  # storageClassName: <an RWX class, e.g. nfs-csi, efs-sc, azurefile-csi, longhorn, cephfs>
+  resources:
+    requests:
+      storage: 20Gi

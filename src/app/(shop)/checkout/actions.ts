@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getRequestTenant } from "@/server/tenant";
 import { clientIp } from "@/server/customer-auth/current";
-import { hit, isLimited } from "@/server/auth/rate-limit";
+import { take } from "@/server/auth/rate-limit";
 import { getShopViewer } from "@/server/cart";
 import { readCartToken } from "@/server/cart/cookie";
 import { placeOrder, quoteCheckout, startOrderPayment, type CheckoutQuote, type FieldErrors } from "@/server/checkout";
@@ -40,10 +40,9 @@ export async function placeOrderAction(_prev: CheckoutFormState, form: FormData)
   const tid = await tenantId();
   const raw = formDataToObject(form);
   const ipKey = `checkout.place:${tid}:${(await clientIp()) ?? "unknown"}`;
-  if (await isLimited(ipKey, PLACE_RULE)) {
+  if (!(await take(ipKey, PLACE_RULE))) {
     return { status: "error", code: "RATE_LIMITED", message: "Too many attempts. Please wait a few minutes and try again.", values: raw };
   }
-  await hit(ipKey);
 
   let destination: string;
   try {

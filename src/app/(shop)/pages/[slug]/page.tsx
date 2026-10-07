@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import { notFound, permanentRedirect } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 import { requireShop, getShopContext } from "@/server/storefront/context";
 import { getStorefrontPage } from "@/server/storefront/content";
 import { getShopViewer } from "@/server/storefront/viewer";
 import { markdownToPlainText } from "@/server/content/markdown";
+import { redirectOrNotFound } from "@/server/redirects/runtime";
 import { BlockRenderer } from "@/components/shop/blocks/BlockRenderer";
 import { blockContext } from "@/components/shop/blocks/context";
 import { Breadcrumbs } from "@/components/shop/ui/Breadcrumbs";
@@ -41,11 +42,12 @@ export async function generateMetadata({ params }: PageProps<"/pages/[slug]">): 
   };
 }
 
-export default async function CmsPage({ params }: PageProps<"/pages/[slug]">) {
+export default async function CmsPage({ params, searchParams }: PageProps<"/pages/[slug]">) {
   const { slug } = await params;
   const shop = await requireShop();
   const { page } = await load(slug);
-  if (!page) notFound();
+  // Unknown slug: `/{slug}` reaches this page through the fallback rewrite, so it may be an old URL.
+  if (!page) return redirectOrNotFound(`/${slug}`, await searchParams);
   if (page.systemKey === "HOME") permanentRedirect("/");
 
   const viewer = await getShopViewer(shop.tenant.id);

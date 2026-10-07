@@ -7,9 +7,21 @@ import { requireShop } from "@/server/storefront/context";
 import { getShopViewer } from "@/server/storefront/viewer";
 import { getVisitorDisplayCurrency } from "@/server/rates/display";
 import { markdownToPlainText } from "@/server/content/markdown";
-import { getProduct, liveReservedIds, parseStockCode } from "@/server/storefront-catalog";
-import type { PublicProduct, PublicStatus } from "@/server/storefront-catalog/types";
-import { ProductDetail, type ProductGeo } from "@/components/shop/catalog/product/ProductDetail";
+import { redirectOrNotFound } from "@/server/redirects/runtime";
+import {
+  getProduct,
+  liveReservedIds,
+  ownReservedIds,
+  parseStockCode,
+} from "@/server/storefront-catalog";
+import type {
+  PublicProduct,
+  PublicStatus,
+} from "@/server/storefront-catalog/types";
+import {
+  ProductDetail,
+  type ProductGeo,
+} from "@/components/shop/catalog/product/ProductDetail";
 import { productJsonLd } from "@/components/shop/catalog/product/json-ld";
 
 type Props = PageProps<"/product/[stockCode]/[[...slug]]">;
@@ -18,16 +30,28 @@ type Props = PageProps<"/product/[stockCode]/[[...slug]]">;
  * Resolves the product or 404s. DRAFT / ARCHIVED / STOLEN products are never found, nor products a
  * compliance rule hides in the visitor's country (unknown country → no geo rules).
  */
-async function load(raw: string) {
+async function load(raw: string, slug: string[] | undefined) {
   const shop = await requireShop();
   const code = parseStockCode(raw);
-  if (code === null) notFound();
-  const product = await getProduct(shop.tenant.id, code);
-  if (!product) notFound();
+  const product = code === null ? null : await getProduct(shop.tenant.id, code);
+  // Unknown / unpublished stock code: an owner or legacy redirect may cover the old URL.
+  if (!product)
+    return redirectOrNotFound([
+      `/product/${raw}${slug?.length ? `/${slug.join("/")}` : ""}`,
+      `/product/${raw}`,
+    ]);
   const country = visitorCountry(await headers());
-  const verdict = country ? (await resolveCompliance(shop.tenant.id, [product.id], country))[product.id] : undefined;
+  const verdict = country
+    ? (await resolveCompliance(shop.tenant.id, [product.id], country))[
+        product.id
+      ]
+    : undefined;
   if (verdict?.hidden) notFound();
-  const geo: ProductGeo = { country, blurred: verdict?.blurred ?? false, noShipping: verdict?.noShipping ?? false };
+  const geo: ProductGeo = {
+    country,
+    blurred: verdict?.blurred ?? false,
+    noShipping: verdict?.noShipping ?? false,
+  };
   return { shop, product, geo };
 }
 
@@ -45,22 +69,38 @@ function safeDecode(s: string) {
   }
 }
 
-async function isLocked(shopId: string, product: PublicProduct, blurForGuests: boolean) {
+async function isLocked(
+  shopId: string,
+  product: PublicProduct,
+  blurForGuests: boolean,
+) {
   if (!product.blurred || !blurForGuests) return false;
   return !(await getShopViewer(shopId));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { stockCode, slug } = await params;
-  const { shop, product, geo } = await load(stockCode);
+  const { shop, product, geo } = await load(stockCode, slug);
   ensureCanonical(product, slug);
-  const locked = await isLocked(shop.tenant.id, product, shop.settings.legal.blurSensitiveForGuests);
+  const locked = await isLocked(
+    shop.tenant.id,
+    product,
+    shop.settings.legal.blurSensitiveForGuests,
+  );
   const title = product.seoTitle || product.title;
   if (locked) {
     // Sensitive item for a guest: no description, no image, not indexable.
-    return { title, alternates: { canonical: product.href }, robots: { index: false, follow: false } };
+    return {
+      title,
+      alternates: { canonical: product.href },
+      robots: { index: false, follow: false },
+    };
   }
-  const description = product.seoDescription || (product.description ? markdownToPlainText(product.description).slice(0, 160) : undefined);
+  const description =
+    product.seoDescription ||
+    (product.description
+      ? markdownToPlainText(product.description).slice(0, 160)
+      : undefined);
   // No preview image where a compliance rule blurs the photos.
   const image = geo.blurred ? undefined : product.images[0];
   return {
@@ -73,7 +113,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title,
       description,
       url: product.href,
-      ...(image ? { images: [{ url: image.large, width: image.width ?? undefined, height: image.height ?? undefined, alt: image.alt ?? product.title }] } : {}),
+      ...(image
+        ? {
+            images: [
+              {
+                url: image.large,
+                width: image.width ?? undefined,
+                height: image.height ?? undefined,
+                alt: image.alt ?? product.title,
+              },
+            ],
+          }
+        : {}),
     },
     twitter: { card: image ? "summary_large_image" : "summary" },
   };
@@ -81,21 +132,51 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProductPage({ params }: Props) {
   const { stockCode, slug } = await params;
-  const { shop, product, geo } = await load(stockCode);
+  const { shop, product, geo } = await load(stockCode, slug);
   ensureCanonical(product, slug);
 
-  const [locked, reserved, display] = await Promise.all([
-    isLocked(shop.tenant.id, product, shop.settings.legal.blurSensitiveForGuests),
-    product.status === "available" ? liveReservedIds(shop.tenant.id, [product.id]) : Promise.resolve(new Set<string>()),
+  const live = product.status === "available";
+  const [locked, reserved, own, display] = await Promise.all([
+    isLocked(
+      shop.tenant.id,
+      product,
+      shop.settings.legal.blurSensitiveForGuests,
+    ),
+    live
+      ? liveReservedIds(shop.tenant.id, [product.id])
+      : Promise.resolve(new Set<string>()),
+    live
+      ? ownReservedIds(shop.tenant.id, [product.id])
+      : Promise.resolve(new Set<string>()),
     getVisitorDisplayCurrency(shop.tenant.id),
   ]);
-  const status: PublicStatus = product.status === "available" && reserved.has(product.id) ? "reserved" : product.status;
+  // Held by this visitor's own cart: shown as for sale, with "In your cart" in the buy box.
+  const inCart = own.has(product.id);
+  const status: PublicStatus =
+    product.status === "available" && reserved.has(product.id)
+      ? "reserved"
+      : product.status;
 
   return (
     <>
-      {!locked ? <JsonLd data={productJsonLd(shop, geo.blurred ? { ...product, images: [] } : product, status)} /> : null}
-      <ProductDetail shop={shop} product={product} status={status} locked={locked} geo={geo} display={display} />
+      {!locked ? (
+        <JsonLd
+          data={productJsonLd(
+            shop,
+            geo.blurred ? { ...product, images: [] } : product,
+            status,
+          )}
+        />
+      ) : null}
+      <ProductDetail
+        shop={shop}
+        product={product}
+        status={status}
+        inCart={inCart}
+        locked={locked}
+        geo={geo}
+        display={display}
+      />
     </>
   );
 }
-

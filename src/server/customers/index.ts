@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { db } from "@/server/db";
+import { tenantDb } from "@/server/tenant-scope";
 import { audit } from "@/server/audit";
 import { ServiceError, type ServiceContext } from "@/server/context";
 import { Prisma } from "@/generated/prisma/client";
@@ -111,7 +112,7 @@ async function countCustomers(tenantId: string, term: string | null) {
 
 export async function getCustomer(ctx: ServiceContext, customerId: string) {
   const id = idSchema.parse(customerId);
-  const customer = await db.customer.findFirst({
+  const customer = await tenantDb(ctx.tenantId).customer.findFirst({
     where: { id, tenantId: ctx.tenantId },
     include: {
       addresses: { orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }] },
@@ -173,6 +174,8 @@ export async function findOrCreateGuestCustomer(
   input: { email: string; name?: string | null; phone?: string | null },
 ) {
   const data = guestSchema.parse(input);
+  // Reserved (RFC 2606) addresses are internal placeholders (anonymized / unverified accounts).
+  if (data.email.endsWith(".invalid")) throw new ServiceError("INVALID", "Enter a valid email address");
   const { firstName, lastName } = splitName(data.name);
   await tx.customer.createMany({
     data: [{ tenantId, email: data.email, firstName, lastName, phone: data.phone || null }],
@@ -205,7 +208,8 @@ export type UpdateCustomerInput = z.input<typeof updateSchema>;
 export async function updateCustomer(ctx: ServiceContext, customerId: string, input: UpdateCustomerInput) {
   const id = idSchema.parse(customerId);
   const data = updateSchema.parse(input);
-  const existing = await db.customer.findFirst({ where: { id, tenantId: ctx.tenantId } });
+  const tdb = tenantDb(ctx.tenantId);
+  const existing = await tdb.customer.findFirst({ where: { id, tenantId: ctx.tenantId } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Customer not found");
   if (data.email && data.email !== existing.email && existing.userId) {
     throw new ServiceError("INVALID", "Email of a registered customer can't be changed here");
@@ -215,7 +219,7 @@ export async function updateCustomer(ctx: ServiceContext, customerId: string, in
     if (data[k] !== undefined) (patch as Record<string, unknown>)[k] = data[k] === "" ? null : data[k];
   }
   try {
-    const updated = await db.customer.update({ where: { id }, data: patch });
+    const updated = await tdb.customer.update({ where: { id }, data: patch });
     await audit({
       action: "customer.update",
       tenantId: ctx.tenantId,
@@ -251,7 +255,7 @@ export async function updateCustomer(ctx: ServiceContext, customerId: string, in
  */
 export async function anonymizeCustomer(ctx: ServiceContext, customerId: string) {
   const id = idSchema.parse(customerId);
-  const result = await db.$transaction(async (tx) => {
+  const result = await tenantDb(ctx.tenantId).$transaction(async (tx) => {
     const rows = await tx.$queryRaw<{ id: string }[]>`
       SELECT id FROM customers WHERE id = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
     if (rows.length === 0) throw new ServiceError("NOT_FOUND", "Customer not found");

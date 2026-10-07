@@ -1,5 +1,6 @@
 import { deleteDraftPhoto, uploadLeadPhoto, LEAD_PHOTO_MAX_BYTES } from "@/server/leads";
 import { getRequestTenant } from "@/server/tenant";
+import { clientIpFromHeaders, isSameOrigin } from "@/server/request-meta";
 import { leadsCopy } from "@/components/shop/leads/_copy";
 import type { LeadUploadResponse } from "@/components/shop/leads/types";
 
@@ -18,27 +19,15 @@ function json(body: LeadUploadResponse, status: number) {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 }
 
-function sameOrigin(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  if (!origin) return false;
-  const host = (request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "").split(",")[0].trim().toLowerCase();
-  try {
-    return new URL(origin).host.toLowerCase() === host;
-  } catch {
-    return false;
-  }
-}
-
-function clientIp(request: Request): string | null {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || null;
-}
-
 export async function POST(request: Request) {
-  if (!sameOrigin(request)) return json({ ok: false, message: t.unexpected }, 403);
+  if (!isSameOrigin(request)) return json({ ok: false, message: t.unexpected }, 403);
   const tenant = await getRequestTenant();
   if (!tenant) return json({ ok: false, message: t.unexpected }, 404);
 
-  const length = Number(request.headers.get("content-length") ?? 0);
+  // Public route: without a Content-Length (chunked) the body would be buffered unbounded by formData().
+  const lengthHeader = request.headers.get("content-length");
+  const length = Number(lengthHeader);
+  if (!lengthHeader || !Number.isFinite(length) || length < 0) return json({ ok: false, message: t.unexpected }, 411);
   if (length > LEAD_PHOTO_MAX_BYTES + 64 * 1024) return json({ ok: false, message: t.tooLarge("The photo", MB) }, 413);
 
   let form: FormData;
@@ -57,7 +46,7 @@ export async function POST(request: Request) {
       tenantId: tenant.id,
       draftToken: form.get("draft"),
       bytes: new Uint8Array(await file.arrayBuffer()),
-      ip: clientIp(request),
+      ip: clientIpFromHeaders(request.headers),
     });
     if (res.ok) return json({ ok: true, photo: res.photo }, 201);
     if (res.error === "expired") return json({ ok: false, message: t.expired }, 410);
@@ -70,7 +59,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!sameOrigin(request)) return new Response(null, { status: 403 });
+  if (!isSameOrigin(request)) return new Response(null, { status: 403 });
   const tenant = await getRequestTenant();
   if (!tenant) return new Response(null, { status: 404 });
   let body: { draft?: unknown; file?: unknown };

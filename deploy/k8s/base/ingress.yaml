@@ -1,0 +1,38 @@
+# ingress-nginx + cert-manager. One Ingress for the platform host and every tenant domain; tenants
+# are resolved from the Host header by the app (src/server/tenant.ts), so ingress-nginx must pass
+# Host through unchanged (its default — never set `upstream-vhost` here).
+# Overlays replace `tls` and `rules` with their real hosts (see overlays/*/ingress-hosts.yaml).
+# Forwarded headers / client IP: configured on the controller, see deploy/k8s/ingress-nginx/.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: quartermaster
+  labels:
+    app.kubernetes.io/component: web
+  annotations:
+    # HTTP-01 per host. Wildcard hosts need a DNS-01 issuer (see docs/deploy.md).
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Must match next.config.ts serverActions.bodySizeLimit / proxyClientMaxBodySize (26mb).
+    nginx.ingress.kubernetes.io/proxy-body-size: 26m
+    # Stream RSC/Suspense responses instead of buffering them in nginx.
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: ["platform.example.invalid"]
+      secretName: quartermaster-platform-tls
+  rules:
+    - host: platform.example.invalid
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: quartermaster-web
+                port:
+                  name: http

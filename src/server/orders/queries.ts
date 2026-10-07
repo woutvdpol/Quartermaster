@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { db } from "@/server/db";
+import { tenantDb, type TenantDb } from "@/server/tenant-scope";
 import { ServiceError, type ServiceContext } from "@/server/context";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -70,6 +70,7 @@ export async function listOrders(ctx: ServiceContext, query: ListOrdersQuery = {
   const q = listSchema.parse(query);
   const base = filterWhere(ctx.tenantId, q);
   const where: Prisma.OrderWhereInput = { AND: [base, viewWhere(q.view)] };
+  const db = tenantDb(ctx.tenantId); // defence in depth: every query below is forced into this tenant
 
   const [rows, counts] = await Promise.all([
     db.order.findMany({
@@ -100,7 +101,7 @@ export async function listOrders(ctx: ServiceContext, query: ListOrdersQuery = {
         addresses: { where: { type: "SHIPPING" }, select: { countryCode: true, city: true } },
       },
     }),
-    viewCounts(base),
+    viewCounts(db, base),
   ]);
   const total = counts[q.view];
 
@@ -126,7 +127,7 @@ const FAILED = new Set(["FAILED", "CANCELED", "EXPIRED"]);
  * Per-view counts in 2 queries instead of one COUNT per view: group the non-archived orders by
  * (paymentStatus, fulfillmentStatus) and derive every view from those buckets (mirrors viewWhere()).
  */
-async function viewCounts(base: Prisma.OrderWhereInput): Promise<Record<OrderView, number>> {
+async function viewCounts(db: TenantDb, base: Prisma.OrderWhereInput): Promise<Record<OrderView, number>> {
   const [groups, archived] = await Promise.all([
     db.order.groupBy({
       by: ["paymentStatus", "fulfillmentStatus"],
@@ -155,6 +156,7 @@ export async function getOrder(ctx: ServiceContext, ref: string | { number: numb
     typeof ref === "string"
       ? { tenantId: ctx.tenantId, id: z.string().min(1).max(64).parse(ref) }
       : { tenantId: ctx.tenantId, number: z.number().int().positive().parse(ref.number) };
+  const db = tenantDb(ctx.tenantId); // defence in depth: every query below is forced into this tenant
 
   const order = await db.order.findFirst({
     where,

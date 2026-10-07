@@ -1,0 +1,58 @@
+# Helm values for the ingress-nginx controller (chart `ingress-nginx/ingress-nginx`), installed
+# once per cluster in namespace `ingress-nginx` (the NetworkPolicy in base/ expects that name):
+#
+#   helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+#     -n ingress-nginx --create-namespace -f deploy/k8s/ingress-nginx/values.yaml
+#
+# Without Helm, put the `controller.config` keys into the controller's ConfigMap
+# (`ingress-nginx-controller`) — they are global, not per Ingress.
+#
+# ── Proxy trust contract with the app (TRUSTED_PROXY_HOPS=1) ────────────────────────────────
+# The app trusts exactly ONE proxy hop: it takes the client IP from the LAST X-Forwarded-For
+# entry, so that entry must be written by ingress-nginx and never be client-controlled.
+#   * use-forwarded-headers=false   nginx ignores client-supplied X-Forwarded-* and sets them itself:
+#                                   X-Forwarded-For = $remote_addr, X-Real-IP = $remote_addr,
+#                                   X-Forwarded-Proto/-Host/-Port from the actual connection.
+#                                   (true would also trust client X-Forwarded-Host and send it
+#                                   upstream as Host → tenant spoofing. Only enable behind a trusted
+#                                   L7 proxy/CDN, together with proxy-real-ip-cidr, see docs/deploy.md.)
+#   * compute-full-forwarded-for=false  X-Forwarded-For is OVERWRITTEN with one address instead of
+#                                   appending to the client's header.
+#   * forwarded-for-header          only read when use-forwarded-headers/enable-real-ip is on.
+#   * $remote_addr must be the real client: keep the source IP at the cloud load balancer with
+#     externalTrafficPolicy: Local (below) or PROXY protocol (use-proxy-protocol=true + the
+#     provider's LB annotation — both sides or nothing works).
+# Host: ingress-nginx forwards the client's Host header unchanged (tenant resolution needs it).
+controller:
+  config:
+    use-forwarded-headers: "false"
+    compute-full-forwarded-for: "false"
+    use-proxy-protocol: "false"
+    # HSTS on, but NOT for sub-domains: tenant domains may have other (non-HTTPS) sub-domains.
+    hsts: "true"
+    hsts-max-age: "31536000"
+    hsts-include-subdomains: "false"
+    hsts-preload: "false"
+    # Never allow configuration snippets from Ingress annotations.
+    allow-snippet-annotations: "false"
+    # Large uploads are spooled to disk by nginx before reaching the app (26 MB, see Ingress).
+    client-body-buffer-size: "1m"
+    # Log the real client and host for troubleshooting.
+    log-format-escape-json: "true"
+    log-format-upstream: '{"time":"$time_iso8601","remote_addr":"$remote_addr","host":"$host","method":"$request_method","uri":"$uri","status":$status,"bytes":$bytes_sent,"duration":$request_time,"upstream_status":"$upstream_status","request_id":"$req_id","user_agent":"$http_user_agent"}'
+  service:
+    # Preserve the client source IP (otherwise kube-proxy SNATs it to a node IP).
+    externalTrafficPolicy: Local
+  # Two controller replicas spread over nodes; a PDB keeps one during drains.
+  replicaCount: 2
+  minAvailable: 1
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: ingress-nginx
+          app.kubernetes.io/component: controller
+  metrics:
+    enabled: true

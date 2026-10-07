@@ -1,5 +1,5 @@
 import "server-only";
-import { headers } from "next/headers";
+import { requestClientIp } from "@/server/request-meta";
 import { db } from "@/server/db";
 import { invalidateShopForAction } from "@/server/storefront/cache";
 import type { Prisma } from "@/generated/prisma/client";
@@ -14,11 +14,8 @@ type AuditEntry = {
 };
 
 export async function audit(entry: AuditEntry) {
-  // Outside a request (seed, worker, scripts) Next 16's headers() throws synchronously.
-  const h = await Promise.resolve()
-    .then(() => headers())
-    .catch(() => null);
-  const ip = h?.get("x-forwarded-for")?.split(",")[0]?.trim() || h?.get("x-real-ip") || null;
+  // Null outside a request (seed, worker, scripts) and when no trusted proxy is configured.
+  const ip = await requestClientIp();
   await db.auditLog.create({
     data: {
       action: entry.action,

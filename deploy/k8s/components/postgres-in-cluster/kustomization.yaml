@@ -1,0 +1,9 @@
+# Optional, deliberately simple in-cluster Postgres 18 (single instance, no replication, no
+# automatic failover). Fine for staging / small installs; for production prefer managed Postgres
+# (automatic backups, PITR, failover, upgrades) — see docs/deploy.md ("Postgres").
+# Needs Secret quartermaster-postgres (POSTGRES_PASSWORD) and
+# DATABASE_URL=postgresql://quartermaster:<password>@quartermaster-postgres:5432/quartermaster
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - statefulset.yaml

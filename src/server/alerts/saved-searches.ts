@@ -126,7 +126,8 @@ export async function createSavedSearch(
     }
     if (same.confirmedAt) return { status: "pending" }; // neutral
   }
-  if (!same && live.length >= MAX_ACTIVE_PER_EMAIL) return { status: "limit" };
+  // Guests get the neutral answer: "limit" would confirm that this address already has alerts.
+  if (!same && live.length >= MAX_ACTIVE_PER_EMAIL) return customerId ? { status: "limit" } : { status: "pending" };
 
   const name = nameParsed.data || summarizeDescription(await describeQuery(tenantId, query));
   const now = new Date();

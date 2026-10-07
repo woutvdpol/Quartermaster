@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { VERIFY_EMAIL_PATH } from "@/server/email-verification";
+import { VERIFY_EMAIL_PATH, verifyCustomerEmail } from "@/server/email-verification";
+import { generateToken, hashToken } from "@/server/auth/tokens";
 import { db } from "@/server/db";
 import { hashPassword } from "@/server/auth/password";
 import { login, requestPasswordReset, resetPassword } from "@/server/auth/service";
@@ -37,6 +38,13 @@ vi.mock("react", async (orig) => ({ ...(await orig<typeof import("react")>()), c
 
 const PASSWORD = "correct horse battery";
 
+/** A fresh, valid verification token for the user's current address (as the mail would carry). */
+async function verificationToken(userId: string) {
+  const raw = generateToken();
+  await db.authToken.create({ data: { userId, type: "EMAIL_VERIFICATION", tokenHash: hashToken(raw), expiresAt: new Date(Date.now() + 3600_000) } });
+  return raw;
+}
+
 async function shop(slug?: string) {
   const ctx = await createTenantContext(slug ? { slug } : {});
   const tenant = await db.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId } });
@@ -66,7 +74,7 @@ beforeEach(async () => {
 });
 
 describe("registration", () => {
-  it("creates a CUSTOMER account, signs it in and links the guest customer + guest orders", async () => {
+  it("creates a CUSTOMER account and signs it in; guest data is linked only after email verification (R1)", async () => {
     const { tenant } = await shop();
     const p = await makeProduct(tenant.id);
     // A previous guest checkout: linked guest Customer + one order without customerId (e.g. legacy import).
@@ -76,18 +84,31 @@ describe("registration", () => {
     const other = await makeOrder(tenant.id, { lines: [{ product: p }], email: "someone@example.test" });
 
     const res = await registerCustomer({ tenantId: tenant.id, email: " Jan@Example.TEST ", name: "Jan Jansen", password: PASSWORD, ip: "10.0.0.1" });
-    expect(res).toMatchObject({ ok: true, customerId: guest.id, linkedOrders: 1 });
+    expect(res).toMatchObject({ ok: true, linkedOrders: 0 });
+    const own = (res as { customerId: string }).customerId;
+    expect(own).not.toBe(guest.id);
     const user = await db.user.findUniqueOrThrow({ where: { tenantId_email: { tenantId: tenant.id, email: "jan@example.test" } } });
     expect(user).toMatchObject({ role: "CUSTOMER", tenantId: tenant.id, emailVerifiedAt: null, name: "Jan Jansen" });
-    expect((await db.customer.findUniqueOrThrow({ where: { id: guest.id } })).userId).toBe(user.id);
+    // Unverified: the guest Customer and its orders stay untouched; the account has its own row.
+    expect((await db.customer.findUniqueOrThrow({ where: { id: guest.id } })).userId).toBeNull();
+    expect((await db.order.findUniqueOrThrow({ where: { id: o2.id } })).customerId).toBeNull();
+    expect((await db.customer.findUniqueOrThrow({ where: { id: own } })).email).toMatch(/@unverified\.invalid$/);
 
-    // Signed in right away, and the shop sees a logged-in customer.
+    // Signed in right away, and the shop sees a logged-in customer — without the guest history.
     expect((await getSession())?.user.id).toBe(user.id);
     onHost(tenant);
     const me = await getShopCustomer();
-    expect(me?.customer.id).toBe(guest.id);
+    expect(me?.customer.id).toBe(own);
+    expect(await listCustomerOrders({ tenantId: tenant.id, customerId: own, email: user.email })).toEqual([]);
+    // A later guest checkout with this address still goes to the guest Customer, not the account.
+    expect((await db.$transaction((tx) => findOrCreateGuestCustomer(tx, tenant.id, { email: "jan@example.test" }))).id).toBe(guest.id);
 
-    const orders = await listCustomerOrders({ tenantId: tenant.id, customerId: guest.id, email: user.email });
+    // Proving the address merges the guest record and attaches its orders.
+    expect(await verifyCustomerEmail(tenant.id, await verificationToken(user.id))).toEqual({ ok: true, email: "jan@example.test" });
+    expect(await db.customer.findUnique({ where: { id: guest.id } })).toBeNull();
+    expect((await db.customer.findUniqueOrThrow({ where: { id: own } })).email).toBe("jan@example.test");
+
+    const orders = await listCustomerOrders({ tenantId: tenant.id, customerId: own, email: user.email });
     expect(orders.map((o) => o.uuid).sort()).toEqual([o1.uuid, o2.uuid].sort());
     expect(orders.map((o) => o.uuid)).not.toContain(other.uuid);
     expect(Object.keys(orders[0]).sort()).toEqual(
@@ -256,7 +277,36 @@ describe("account management", () => {
     expect((await listAddresses(owner)).map((a) => [a.id, a.isDefault])).toEqual([[first.id, true]]);
   });
 
-  it("email change needs the password and merges a guest record with that email", async () => {
+  it("a password reset proves the address and links the guest data (unverified legacy accounts)", async () => {
+    const { tenant } = await shop();
+    const p = await makeProduct(tenant.id);
+    const order = await makeOrder(tenant.id, { lines: [{ product: p }], customerId: null, email: "legacy@example.test" });
+    const r = (await registerCustomer({ tenantId: tenant.id, email: "legacy@example.test", name: "L", password: PASSWORD })) as { userId: string; customerId: string };
+    expect((await db.order.findUniqueOrThrow({ where: { id: order.id } })).customerId).toBeNull();
+
+    const token = (await requestPasswordReset(tenant.id, "legacy@example.test"))!;
+    expect(await resetPassword(token, "a brand new password", { tenantId: tenant.id })).toEqual({ ok: true });
+    expect((await db.user.findUniqueOrThrow({ where: { id: r.userId } })).emailVerifiedAt).not.toBeNull();
+    expect((await db.order.findUniqueOrThrow({ where: { id: order.id } })).customerId).toBe(r.customerId);
+  });
+
+  it("verified (e.g. ETL-imported) accounts keep their linked Customer and pick up new guest orders at login", async () => {
+    const { tenant } = await shop();
+    const p = await makeProduct(tenant.id);
+    // As the ETL writes it: verified user + Customer with the real address already linked.
+    const user = await db.user.create({
+      data: { tenantId: tenant.id, role: "CUSTOMER", email: "etl@example.test", passwordHash: await hashPassword(PASSWORD), emailVerifiedAt: new Date() },
+    });
+    const customer = await db.customer.create({ data: { tenantId: tenant.id, userId: user.id, email: "etl@example.test" } });
+    const guestOrder = await makeOrder(tenant.id, { lines: [{ product: p }], customerId: null, email: "etl@example.test" });
+
+    expect(await customerLogin({ tenantId: tenant.id, email: "etl@example.test", password: PASSWORD, ip: null })).toEqual({ ok: true, next: "done" });
+    expect((await db.order.findUniqueOrThrow({ where: { id: guestOrder.id } })).customerId).toBe(customer.id);
+    onHost(tenant);
+    expect((await getShopCustomer())?.customer.id).toBe(customer.id);
+  });
+
+  it("email change needs the password; the new address's guest record is merged only after verification", async () => {
     const { tenant } = await shop();
     const p = await makeProduct(tenant.id);
     const r = (await registerCustomer({ tenantId: tenant.id, email: "old@example.test", name: "O", password: PASSWORD })) as { userId: string; customerId: string };
@@ -265,10 +315,15 @@ describe("account management", () => {
     const user = { id: r.userId, tenantId: tenant.id, email: "old@example.test", role: "CUSTOMER" as const };
 
     expect(await changeCustomerEmail(user, "new@example.test", "wrong password")).toEqual({ ok: false, error: "invalid_password" });
-    expect(await changeCustomerEmail(user, "new@example.test", PASSWORD)).toMatchObject({ ok: true });
+    expect(await changeCustomerEmail(user, "new@example.test", PASSWORD)).toMatchObject({ ok: true, linkedOrders: 0 });
+    expect(await db.user.findUniqueOrThrow({ where: { id: r.userId } })).toMatchObject({ email: "new@example.test", emailVerifiedAt: null });
+    // Not yet: the guest record and its order stay with the guest.
+    expect((await db.order.findUniqueOrThrow({ where: { id: order.id } })).customerId).toBe(guest.id);
+    expect(await listCustomerOrders({ tenantId: tenant.id, customerId: r.customerId, email: "new@example.test" })).toEqual([]);
+
+    expect((await verifyCustomerEmail(tenant.id, await verificationToken(r.userId))).ok).toBe(true);
     expect(await db.customer.findUnique({ where: { id: guest.id } })).toBeNull();
     expect((await db.order.findUniqueOrThrow({ where: { id: order.id } })).customerId).toBe(r.customerId);
-    expect(await db.user.findUniqueOrThrow({ where: { id: r.userId } })).toMatchObject({ email: "new@example.test", emailVerifiedAt: null });
 
     await registerCustomer({ tenantId: tenant.id, email: "taken@example.test", name: "T", password: PASSWORD });
     expect(await changeCustomerEmail({ ...user, email: "new@example.test" }, "taken@example.test", PASSWORD)).toEqual({ ok: false, error: "email_taken" });

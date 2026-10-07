@@ -1,5 +1,5 @@
 import "server-only";
-import { headers } from "next/headers";
+import { requestClientIp } from "@/server/request-meta";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { audit } from "@/server/audit";
@@ -13,8 +13,10 @@ import {
   needsRehash,
   verifyPassword,
 } from "./password";
+import { claimVerifiedEmailAndAudit } from "@/server/customer-auth/link";
+import { isLegacyBcrypt } from "./legacy-bcrypt";
 import * as rateLimit from "./rate-limit";
-import { RULES } from "./rate-limit";
+import { BACKOFF, RULES } from "./rate-limit";
 import {
   createSession,
   destroyAllSessions,
@@ -23,7 +25,7 @@ import {
   promoteSession,
   type SessionUser,
 } from "./session";
-import { generateRecoveryCode, generateToken, hashToken, normalizeRecoveryCode } from "./tokens";
+import { generateRecoveryCode, generateToken, hashRecoveryCode, hashToken, recoveryCodeLookupHashes } from "./tokens";
 import { generateTotpSecret, totpUri, verifyTotp } from "./totp";
 
 /*
@@ -34,6 +36,13 @@ import { generateTotpSecret, totpUri, verifyTotp } from "./totp";
  * - Login never reveals whether an account exists: unknown users still pay for a scrypt
  *   verification (dummy hash) and get the same "invalid_credentials" error. "disabled" is only
  *   returned after the correct password was given.
+ * - Brute force: exponential backoff per account key and per IP (rate-limit.ts BACKOFF), no hard
+ *   lock-out. The account key is derived from the submitted email, so unknown emails back off
+ *   exactly like real ones. Attempts are recorded atomically BEFORE the password is checked.
+ * - Legacy hashes (`bcrypt$…` from the Concept500 import) and scrypt hashes with old parameters are
+ *   replaced by a current scrypt hash after every successful password check: login (admin + shop,
+ *   which delegates here) and re-authentication (`verifyCurrentPassword`, used by TOTP disable,
+ *   password/email change, account deletion and the staff profile). Password reset writes a new hash.
  * - TOTP enrollment stores nothing until confirmed: `startTotpEnrollment` returns a fresh secret
  *   that the caller round-trips (e.g. hidden form field) to `confirmTotpEnrollment`. The secret is
  *   already shown to the user as a QR code, so round-tripping it adds no exposure, and an abandoned
@@ -71,16 +80,6 @@ const totpSecretSchema = z.string().regex(/^[A-Z2-7]{32}$/, "Invalid TOTP secret
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-/** Best-effort client IP from the request; null outside a request scope. */
-async function requestIp(): Promise<string | null> {
-  try {
-    const h = await headers();
-    return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Finds the account an email signs in to on a given host:
  * the platform host (tenantId null) only knows SUPERADMINs, a tenant host only its OWNER/CUSTOMERs.
@@ -107,16 +106,18 @@ const keys = {
 async function acceptTotp(userId: string, secretBase32: string, code: string): Promise<boolean> {
   const step = verifyTotp(secretBase32, code);
   if (step === null) return false;
-  const key = keys.totpUsed(userId, step);
-  if (await rateLimit.isLimited(key, TOTP_REPLAY_RULE)) return false;
-  await rateLimit.hit(key);
-  return true;
+  // Atomic "first use wins": two concurrent submissions of one code can't both pass.
+  return rateLimit.take(keys.totpUsed(userId, step), TOTP_REPLAY_RULE);
 }
 
-/** Consumes an unused recovery code. The conditional update makes concurrent use of one code fail. */
+/**
+ * Consumes an unused recovery code. Looks up the HMAC form and, for codes issued before the HMAC
+ * switch, the legacy SHA-256 form. The conditional update makes concurrent use of one code fail.
+ */
 async function consumeRecoveryCode(userId: string, input: string): Promise<boolean> {
-  const codeHash = hashToken(normalizeRecoveryCode(input));
-  const row = await db.recoveryCode.findFirst({ where: { userId, codeHash, usedAt: null } });
+  const hashes = recoveryCodeLookupHashes(input);
+  if (hashes.length === 0) return false;
+  const row = await db.recoveryCode.findFirst({ where: { userId, codeHash: { in: hashes }, usedAt: null } });
   if (!row) return false;
   const { count } = await db.recoveryCode.updateMany({
     where: { id: row.id, usedAt: null },
@@ -125,17 +126,36 @@ async function consumeRecoveryCode(userId: string, input: string): Promise<boole
   return count === 1;
 }
 
-/** Re-authentication with the current password for sensitive changes. Rate limited per user. */
-async function verifyCurrentPassword(userId: string, password: string): Promise<"ok" | "invalid" | "rate_limited"> {
-  const key = keys.reauth(userId);
-  if (await rateLimit.isLimited(key, RULES.loginPerAccount)) return "rate_limited";
-  const user = await db.user.findUnique({ where: { id: userId }, select: { passwordHash: true } });
-  const ok = await verifyPassword(password, user?.passwordHash ?? (await getDummyHash()));
-  if (!ok || !user?.passwordHash) {
-    await rateLimit.hit(key);
-    return "invalid";
+/**
+ * After a successful password check: replace a legacy (bcrypt) or outdated scrypt hash with a
+ * current scrypt hash. Conditional on the stored hash being unchanged, so it never overwrites a
+ * password that was reset/changed concurrently.
+ */
+async function upgradePasswordHash(user: { id: string; tenantId: string | null }, password: string, stored: string) {
+  if (!needsRehash(stored)) return;
+  const { count } = await db.user.updateMany({
+    where: { id: user.id, passwordHash: stored },
+    data: { passwordHash: await hashPassword(password) },
+  });
+  if (count === 1 && isLegacyBcrypt(stored)) {
+    await audit({ action: "auth.password_rehashed", tenantId: user.tenantId, actorId: user.id, data: { from: "bcrypt" } });
   }
+}
+
+/**
+ * Re-authentication with the current password for sensitive changes (TOTP disable, password/email
+ * change, account deletion, staff profile). Backoff per user; rehashes legacy hashes on success.
+ */
+export async function verifyCurrentPassword(userId: string, password: unknown): Promise<"ok" | "invalid" | "rate_limited"> {
+  const parsed = submittedPasswordSchema.safeParse(password);
+  const key = keys.reauth(userId);
+  const allowed = await rateLimit.attempt(key, BACKOFF.reauth);
+  if (!allowed.allowed) return "rate_limited";
+  const user = await db.user.findUnique({ where: { id: userId }, select: { passwordHash: true, tenantId: true } });
+  const ok = await verifyPassword(parsed.success ? parsed.data : "", user?.passwordHash ?? (await getDummyHash()));
+  if (!ok || !user?.passwordHash || !parsed.success) return "invalid"; // the attempt stays counted
   await rateLimit.clear(key);
+  await upgradePasswordHash({ id: userId, tenantId: user.tenantId }, parsed.data, user.passwordHash);
   return "ok";
 }
 
@@ -155,15 +175,15 @@ export async function login(input: {
   const parsed = loginSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "invalid_credentials" };
   const { email, password, tenantId } = parsed.data;
-  const ip = parsed.data.ip !== undefined ? parsed.data.ip : await requestIp();
+  const ip = parsed.data.ip !== undefined ? parsed.data.ip : await requestClientIp();
 
-  const ipKey = ip ? keys.loginIp(ip) : null;
+  // Record the attempt atomically before checking anything (see rate-limit.ts). The account key
+  // depends only on the submitted email, so it behaves the same for unknown accounts.
   const accountKey = keys.loginAccount(tenantId, email);
-  const [ipLimited, accountLimited] = await Promise.all([
-    ipKey ? rateLimit.isLimited(ipKey, RULES.loginPerIp) : false,
-    rateLimit.isLimited(accountKey, RULES.loginPerAccount),
-  ]);
-  if (ipLimited || accountLimited) {
+  const accountTry = await rateLimit.attempt(accountKey, BACKOFF.loginPerAccount);
+  const ipTry = accountTry.allowed && ip ? await rateLimit.attempt(keys.loginIp(ip), BACKOFF.loginPerIp) : null;
+  if (!accountTry.allowed || (ipTry && !ipTry.allowed)) {
+    await rateLimit.release(accountTry); // never checked, so don't count it
     await audit({ action: "auth.login_failed", tenantId, data: { email, reason: "rate_limited" } });
     return { ok: false, error: "rate_limited" };
   }
@@ -173,7 +193,7 @@ export async function login(input: {
   const valid = await verifyPassword(password, user?.passwordHash ?? (await getDummyHash()));
 
   if (!user || !user.passwordHash || !valid) {
-    await Promise.all([ipKey && rateLimit.hit(ipKey), rateLimit.hit(accountKey)]);
+    // Both attempts stay recorded as failures.
     await audit({
       action: "auth.login_failed",
       tenantId,
@@ -189,10 +209,9 @@ export async function login(input: {
   }
 
   await rateLimit.clear(accountKey);
+  await rateLimit.release(ipTry); // successful sign-ins don't count against the IP
 
-  if (needsRehash(user.passwordHash)) {
-    await db.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(password) } });
-  }
+  await upgradePasswordHash(user, password, user.passwordHash);
 
   // Drop any session this browser already had, so a new one never inherits an old token.
   await destroySession();
@@ -226,11 +245,11 @@ export async function verifyLoginTotp(code: string): Promise<VerifyTotpResult> {
   // The per-user limit stops an attacker who knows the password from getting fresh guesses
   // by starting a new pending session after each per-session lock-out.
   const userKey = keys.totpUser(user.id);
-  const [sessionLimited, userLimited] = await Promise.all([
-    rateLimit.isLimited(key, RULES.totpPerSession),
-    rateLimit.isLimited(userKey, RULES.totpPerUser),
-  ]);
-  if (sessionLimited || userLimited) {
+  // Every guess is recorded atomically up front (cleared on success).
+  const sessionTry = await rateLimit.consume(key, RULES.totpPerSession);
+  const userTry = sessionTry.allowed ? await rateLimit.consume(userKey, RULES.totpPerUser) : null;
+  if (!sessionTry.allowed || !userTry?.allowed) {
+    await rateLimit.release(sessionTry);
     // Too many guesses: kill the pending session so the attacker must pass the password step again
     // (which is itself rate limited per account).
     await destroySession();
@@ -252,7 +271,6 @@ export async function verifyLoginTotp(code: string): Promise<VerifyTotpResult> {
   }
 
   if (!ok) {
-    await Promise.all([rateLimit.hit(key), rateLimit.hit(userKey)]);
     await audit({ action: "auth.totp_failed", tenantId: user.tenantId, actorId: user.id, data: { reason: "invalid_code" } });
     return { ok: false, error: "invalid_code" };
   }
@@ -305,7 +323,7 @@ export async function confirmTotpEnrollment(user: AuthUser, secret: string, code
   await db.$transaction([
     db.recoveryCode.deleteMany({ where: { userId: user.id } }),
     db.recoveryCode.createMany({
-      data: recoveryCodes.map((c) => ({ userId: user.id, codeHash: hashToken(normalizeRecoveryCode(c)) })),
+      data: recoveryCodes.map((c) => ({ userId: user.id, codeHash: hashRecoveryCode(c) })),
     }),
     db.user.update({
       where: { id: user.id },
@@ -328,6 +346,9 @@ export async function disableTotp(user: AuthUser, password: string): Promise<Dis
     db.recoveryCode.deleteMany({ where: { userId: user.id } }),
     db.user.update({ where: { id: user.id }, data: { totpSecretEnc: null, totpEnabledAt: null } }),
   ]);
+  // The account just got weaker: end every other session (keep this device signed in).
+  const current = await getSession();
+  await destroyAllSessions(user.id, current?.user.id === user.id ? current.sessionId : undefined);
   await audit({ action: "auth.totp_disabled", tenantId: user.tenantId, actorId: user.id });
   return { ok: true };
 }
@@ -344,9 +365,7 @@ export async function requestPasswordReset(tenantId: string | null, email: strin
   if (!parsed.success) return null;
   const { tenantId: tid, email: normalized } = parsed.data;
 
-  const key = keys.reset(tid, normalized);
-  if (await rateLimit.isLimited(key, RULES.passwordResetPerEmail)) return null;
-  await rateLimit.hit(key);
+  if (!(await rateLimit.take(keys.reset(tid, normalized), RULES.passwordResetPerEmail))) return null;
 
   const user = await findAccount(tid, normalized);
   if (!user || user.disabledAt) return null;
@@ -400,7 +419,14 @@ export async function resetPassword(
   if (count !== 1) return { ok: false, error: "invalid_token" };
 
   const passwordHash = await hashPassword(pw.data);
-  await db.user.update({ where: { id: row.userId }, data: { passwordHash } });
+  // The reset link went to this mailbox, so a successful reset also proves the address.
+  await db.user.update({
+    where: { id: row.userId },
+    data: { passwordHash, ...(row.user.emailVerifiedAt ? {} : { emailVerifiedAt: new Date() }) },
+  });
+  if (row.user.role === "CUSTOMER" && row.user.tenantId) {
+    await claimVerifiedEmailAndAudit(row.user.tenantId, row.userId).catch((e) => console.error("resetPassword: claim failed", e));
+  }
   await destroyAllSessions(row.userId);
   // A successful reset proves mailbox ownership; lift any lock-out on the account.
   await rateLimit.clear(keys.loginAccount(row.user.tenantId, row.user.email));

@@ -1,0 +1,15 @@
+# Keep at least one web pod during voluntary disruptions (node drains, cluster upgrades).
+# With a single replica this would block drains — components/uploads-rwo switches it to
+# maxUnavailable: 1.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: quartermaster-web
+  labels:
+    app.kubernetes.io/component: web
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: quartermaster
+      app.kubernetes.io/component: web

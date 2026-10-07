@@ -1,0 +1,92 @@
+# NetworkPolicies (only enforced by a CNI that supports them: Cilium, Calico, …).
+#
+# Ingress: everything in the namespace is denied, except web:3000 from the ingress-nginx
+#          controller (namespace `ingress-nginx`) and from cron trigger pods in this namespace.
+# Egress:  quartermaster pods may reach DNS, Postgres (5432), HTTPS (Mollie, Turnstile, ECB rates,
+#          Matomo, S3 backups) and SMTP submission (465/587). Adjust the ports when your managed
+#          Postgres or SMTP provider uses non-standard ones (e.g. 25060 on DigitalOcean).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quartermaster-default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quartermaster-web-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: quartermaster
+      app.kubernetes.io/component: web
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: quartermaster
+              app.kubernetes.io/component: cron
+      ports:
+        - port: 3000
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quartermaster-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: quartermaster
+  policyTypes: ["Egress"]
+  egress:
+    # DNS (kube-dns / CoreDNS, any namespace).
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # In-cluster Postgres (components/postgres-in-cluster) — pod IPs are not reliably matched by ipBlock.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: quartermaster
+              app.kubernetes.io/component: database
+      ports:
+        - port: 5432
+          protocol: TCP
+    # Cron trigger pods → web service.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: quartermaster
+              app.kubernetes.io/component: web
+      ports:
+        - port: 3000
+          protocol: TCP
+    # Managed Postgres, HTTPS APIs, SMTP.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+        - ipBlock:
+            cidr: ::/0
+      ports:
+        - port: 5432
+          protocol: TCP
+        - port: 443
+          protocol: TCP
+        - port: 465
+          protocol: TCP
+        - port: 587
+          protocol: TCP

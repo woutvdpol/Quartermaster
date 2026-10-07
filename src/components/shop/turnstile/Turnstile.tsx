@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useTurnstileSiteKey } from "./TurnstileSiteKey";
 
 /*
  * Cloudflare Turnstile widget (explicit rendering).
@@ -14,7 +15,7 @@ import { useEffect, useRef } from "react";
  * actions receive the token automatically; read it server-side with `turnstileTokenFrom(formData)`
  * and check it with `verifyTurnstile(token, ip)` (src/server/turnstile).
  *
- * Renders nothing when no site key is configured (NEXT_PUBLIC_TURNSTILE_SITE_KEY unset): the server
+ * Renders nothing when no site key is configured (TURNSTILE_SITE_KEY unset, see TurnstileSiteKey.tsx): the server
  * then allows submissions in development and denies them in production.
  * Tokens are single use: change `resetKey` (e.g. pass the action state) after every submit so the
  * widget issues a fresh token.
@@ -54,7 +55,7 @@ function loadTurnstile(): Promise<TurnstileApi> {
 }
 
 export type TurnstileProps = {
-  /** Defaults to NEXT_PUBLIC_TURNSTILE_SITE_KEY. */
+  /** Defaults to the runtime TURNSTILE_SITE_KEY provided by the shop layout. */
   siteKey?: string;
   /** Called with a fresh token, or null when it expired / errored. */
   onToken?: (token: string | null) => void;
@@ -66,7 +67,9 @@ export type TurnstileProps = {
   className?: string;
 };
 
-export function Turnstile({ siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY, onToken, action, resetKey, theme = "auto", className }: TurnstileProps) {
+export function Turnstile({ siteKey: siteKeyProp, onToken, action, resetKey, theme = "auto", className }: TurnstileProps) {
+  const contextKey = useTurnstileSiteKey();
+  const siteKey = siteKeyProp ?? contextKey;
   const ref = useRef<HTMLDivElement>(null);
   const widgetId = useRef<string | null>(null);
   const onTokenRef = useRef(onToken);

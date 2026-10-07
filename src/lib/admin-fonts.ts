@@ -48,6 +48,8 @@ const bigShouldersStencil = Big_Shoulders_Stencil({
   variable: "--font-big-shoulders-stencil",
   display: "swap",
   preload: false,
+  // next/font has no fallback metrics for this family (it warns on every build).
+  adjustFontFallback: false,
 });
 const publicSans = Public_Sans({
   subsets: ["latin", "latin-ext"],

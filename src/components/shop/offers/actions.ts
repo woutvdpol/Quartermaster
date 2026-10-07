@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getRequestTenant } from "@/server/tenant";
 import { clientIp } from "@/server/customer-auth/current";
-import { hit, isLimited } from "@/server/auth/rate-limit";
+import { take } from "@/server/auth/rate-limit";
 import { getShopViewer } from "@/server/cart";
 import { readCartToken, writeCartToken } from "@/server/cart/cookie";
 import { buyOffer, respondToCounter, submitOffer, OFFER_PATHS } from "@/server/offers";
@@ -80,8 +80,7 @@ export async function buyOfferAction(token: unknown): Promise<{ ok: true; redire
   if (typeof token !== "string" || token.length > 120) return { ok: false, message: "This offer link is no longer valid" };
   const tenantId = await requireTenantId();
   const key = `offer.buy:${tenantId}:${(await clientIp()) ?? "unknown"}`;
-  if (await isLimited(key, BUY_RULE)) return { ok: false, message: "Too many attempts. Please wait a moment." };
-  await hit(key);
+  if (!(await take(key, BUY_RULE))) return { ok: false, message: "Too many attempts. Please wait a moment." };
   const viewer = await getShopViewer(tenantId);
   const { token: newCartToken, result } = await buyOffer(tenantId, token, await readCartToken(), viewer);
   if (newCartToken) await writeCartToken(newCartToken);
@@ -95,8 +94,7 @@ export async function respondToCounterAction(token: unknown, decision: unknown):
   if (typeof token !== "string" || token.length > 120 || (decision !== "accept" && decision !== "decline")) return { ok: false, message: "This link is no longer valid" };
   const tenantId = await requireTenantId();
   const key = `offer.counter:${tenantId}:${(await clientIp()) ?? "unknown"}`;
-  if (await isLimited(key, BUY_RULE)) return { ok: false, message: "Too many attempts. Please wait a moment." };
-  await hit(key);
+  if (!(await take(key, BUY_RULE))) return { ok: false, message: "Too many attempts. Please wait a moment." };
   const res = await respondToCounter(tenantId, token, decision);
   if (!res.ok) return res;
   revalidatePath(OFFER_PATHS.counter(token));

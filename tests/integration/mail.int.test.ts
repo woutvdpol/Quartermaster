@@ -95,7 +95,11 @@ describe("password reset mail", () => {
     const ctx = await createTenantContext();
     await db.tenantDomain.create({ data: { tenantId: ctx.tenantId, host: "shop.localhost:3000", isPrimary: true } });
     await requestPasswordResetEmail(ctx.tenantId, ctx.actor.email, "admin");
-    expect(h.jobs).toHaveLength(1);
+    // The request only queues the lookup job (same for unknown addresses, see below).
+    expect(h.jobs.map((j) => j.name)).toEqual(["auth.password-reset.request"]);
+    expect(await db.authToken.count()).toBe(0);
+    await h.drain((j) => j.name === "auth.password-reset.request");
+    expect(h.jobs.map((j) => j.name)).toEqual(["mail.send"]);
     const payload = JSON.stringify(h.jobs[0].data);
 
     await h.drain();
@@ -109,10 +113,17 @@ describe("password reset mail", () => {
     expect(row.tokenHash).toBe(hashToken(token));
   });
 
-  it("queues nothing for unknown accounts", async () => {
+  it("does the same request-side work for unknown accounts, but the worker sends nothing", async () => {
     const ctx = await createTenantContext();
     await requestPasswordResetEmail(ctx.tenantId, "nobody@example.test", "customer");
-    expect(h.jobs).toHaveLength(0);
+    await requestPasswordResetEmail(ctx.tenantId, ctx.actor.email, "customer");
+    // Identical job shape for unknown and known addresses: nothing to distinguish at request time.
+    expect(h.jobs.map((j) => [j.name, Object.keys(j.data as object).sort()])).toEqual([
+      ["auth.password-reset.request", ["audience", "email", "tenantId"]],
+      ["auth.password-reset.request", ["audience", "email", "tenantId"]],
+    ]);
+    await h.drain();
+    expect(h.mails.map((m) => m.to)).toEqual([ctx.actor.email]);
   });
 
   it("platform (superadmin) mail uses Quartermaster branding", async () => {

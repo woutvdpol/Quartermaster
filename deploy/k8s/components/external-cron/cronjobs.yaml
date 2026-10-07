@@ -1,0 +1,162 @@
+# Generated list — keep in sync with CRON_TASKS in src/server/jobs/cron.ts (schedules in UTC).
+# Each CronJob only sets its task name; image, command and env come from cron-common.yaml.
+---
+# Flip expired cart reservations to EXPIRED
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: quartermaster-cron-reservations-expire
+  labels:
+    app.kubernetes.io/component: cron
+spec:
+  schedule: "* * * * *"
+  timeZone: Etc/UTC
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: trigger
+              env:
+                - name: CRON_TASK
+                  value: reservations.expire
+---
+# Saved-search alert scan
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: quartermaster-cron-alerts-scan
+  labels:
+    app.kubernetes.io/component: cron
+spec:
+  schedule: "*/5 * * * *"
+  timeZone: Etc/UTC
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: trigger
+              env:
+                - name: CRON_TASK
+                  value: alerts.scan
+---
+# Alert digest mails
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: quartermaster-cron-alerts-digest
+  labels:
+    app.kubernetes.io/component: cron
+spec:
+  schedule: "5 * * * *"
+  timeZone: Etc/UTC
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: trigger
+              env:
+                - name: CRON_TASK
+                  value: alerts.digest
+---
+# Expire open offers
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: quartermaster-cron-offers-expire
+  labels:
+    app.kubernetes.io/component: cron
+spec:
+  schedule: "7 * * * *"
+  timeZone: Etc/UTC
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: trigger
+              env:
+                - name: CRON_TASK
+                  value: offers.expire
+---
+# Delete rate-limit hits older than 24 h
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: quartermaster-cron-rate-limit-prune
+  labels:
+    app.kubernetes.io/component: cron
+spec:
+  schedule: "17 * * * *"
+  timeZone: Etc/UTC
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: trigger
+              env:
+                - name: CRON_TASK
+                  value: rate-limit.prune
+---
+# Abandoned-cart reminders
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: quartermaster-cron-cart-abandoned
+  labels:
+    app.kubernetes.io/component: cron
+spec:
+  schedule: "37 * * * *"
+  timeZone: Etc/UTC
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: trigger
+              env:
+                - name: CRON_TASK
+                  value: cart.abandoned
+---
+# Delete orphan lead photo folders
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: quartermaster-cron-leads-photos-cleanup
+  labels:
+    app.kubernetes.io/component: cron
+spec:
+  schedule: "43 3 * * *"
+  timeZone: Etc/UTC
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: trigger
+              env:
+                - name: CRON_TASK
+                  value: leads.photos.cleanup
+---
+# Fetch ECB exchange rates
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: quartermaster-cron-rates-refresh
+  labels:
+    app.kubernetes.io/component: cron
+spec:
+  schedule: "30 15 * * *"
+  timeZone: Etc/UTC
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: trigger
+              env:
+                - name: CRON_TASK
+                  value: rates.refresh

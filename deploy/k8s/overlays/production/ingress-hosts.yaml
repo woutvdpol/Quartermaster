@@ -1,0 +1,29 @@
+# All hosts served by this installation: the platform host (PLATFORM_HOST, superadmin + Mollie
+# webhooks) and every tenant domain (also registered as TenantDomain in the admin).
+# One TLS entry (= one cert-manager Certificate) per tenant, so a failing domain never blocks others.
+# Adding a tenant domain = add a tls entry + rule here, roll out, then point DNS (docs/deploy.md).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: quartermaster
+spec:
+  tls:
+    - hosts: ["platform.quartermaster.example"]
+      secretName: tls-platform
+    - hosts: ["shop.example.com", "www.shop.example.com"]
+      secretName: tls-shop-example-com
+  rules:
+    - host: platform.quartermaster.example
+      http: &backend
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: quartermaster-web
+                port:
+                  name: http
+    - host: shop.example.com
+      http: *backend
+    - host: www.shop.example.com
+      http: *backend

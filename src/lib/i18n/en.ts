@@ -41,6 +41,7 @@ export const en = {
       alerts: "Alerts",
       pages: "Pages",
       menus: "Menus",
+      redirects: "Redirects",
       newsletter: "Newsletter",
       shipping: "Shipping",
       paymentMethods: "Payment methods",

@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { AuthError } from "@/server/auth/guards";
 import { requireStaffContext } from "@/server/context";
+import { isSameOrigin } from "@/server/request-meta";
 import { addProductImages, MAX_FILES_PER_UPLOAD, type UploadFile } from "@/server/media/product-images";
 import { MAX_UPLOAD_BYTES } from "@/server/media/images";
 import { messageFromError } from "../_lib/errors";
@@ -24,20 +25,8 @@ function json(body: UploadResponse, status: number) {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 }
 
-/** Origin must match the host the request was made to (x-forwarded-host behind a proxy). */
-function sameOrigin(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  if (!origin) return false;
-  const host = (request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "").split(",")[0].trim().toLowerCase();
-  try {
-    return new URL(origin).host.toLowerCase() === host;
-  } catch {
-    return false;
-  }
-}
-
 export async function POST(request: Request, ctx: RouteContext<"/admin/inventory/[id]/images">) {
-  if (!sameOrigin(request)) return json({ ok: false, message: copy.errors.forbidden }, 403);
+  if (!isSameOrigin(request)) return json({ ok: false, message: copy.errors.forbidden }, 403);
 
   let staff;
   try {

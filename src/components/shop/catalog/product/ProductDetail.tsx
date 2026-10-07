@@ -35,6 +35,7 @@ export function ProductDetail({
   shop,
   product,
   status,
+  inCart = false,
   locked,
   geo = null,
   display = null,
@@ -42,6 +43,8 @@ export function ProductDetail({
   shop: ShopContext;
   product: PublicProduct;
   status: PublicStatus;
+  /** The visitor's own cart holds this item (buy box shows "In your cart"). */
+  inCart?: boolean;
   locked: boolean;
   geo?: ProductGeo | null;
   display?: DisplayCurrency | null;
@@ -125,8 +128,8 @@ export function ProductDetail({
 
               {status !== "sold" ? (
                 <div className="mt-7 flex flex-col gap-3">
-                  <ProductBuyBox product={product} available={status === "available"} />
-                  {status === "available" ? (
+                  <ProductBuyBox product={product} available={status === "available" && !inCart} />
+                  {status === "available" && !inCart ? (
                     <Suspense fallback={null}>
                       <OfferButton productId={product.id} />
                     </Suspense>

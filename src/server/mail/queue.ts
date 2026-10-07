@@ -2,6 +2,8 @@ import "server-only";
 import { db } from "@/server/db";
 import { encrypt } from "@/server/auth/encryption";
 import { requestPasswordReset } from "@/server/auth/service";
+import { RULES, take } from "@/server/auth/rate-limit";
+import { requestClientIp } from "@/server/request-meta";
 import { enqueue, type EnqueueOptions } from "@/server/jobs/queue";
 import type { MailTemplateName, MailTemplateProps } from "./contracts";
 
@@ -63,10 +65,21 @@ export async function queuePasswordResetMail(input: {
 }
 
 /**
- * `requestPasswordReset()` + mail. Always resolves the same way (no account enumeration): the mail is
- * only queued when a token was issued. Use this from the "forgot password" actions.
+ * "Forgot password" entry point for the admin and shop actions. Always does the same work — an
+ * optional per-IP limit and ONE job insert — whether or not the address has an account, so the
+ * response and its timing reveal nothing (security backlog #8). The lookup, token and mail happen
+ * in the `auth.password-reset.request` job (`processPasswordResetRequest`).
  */
 export async function requestPasswordResetEmail(tenantId: string | null, email: string, audience: "admin" | "customer"): Promise<void> {
+  const normalized = email.trim().toLowerCase().slice(0, 254);
+  if (!normalized) return;
+  const ip = await requestClientIp();
+  if (ip && !(await take(`reset:ip:${ip}`, RULES.passwordResetPerIp))) return;
+  await enqueue("auth.password-reset.request", { tenantId, email: normalized, audience });
+}
+
+/** Worker side of `requestPasswordResetEmail`: `requestPasswordReset()` + mail when a token was issued. */
+export async function processPasswordResetRequest(tenantId: string | null, email: string, audience: "admin" | "customer"): Promise<void> {
   const token = await requestPasswordReset(tenantId, email);
   if (!token) return;
   await queuePasswordResetMail({ tenantId, email: email.trim().toLowerCase(), token, audience });

@@ -6,7 +6,7 @@ import { ServiceError, type ServiceContext } from "@/server/context";
 import { getSettings } from "@/server/settings";
 import { encrypt } from "@/server/auth/encryption";
 import { generateToken, hashToken } from "@/server/auth/tokens";
-import { hit, isLimited } from "@/server/auth/rate-limit";
+import { take } from "@/server/auth/rate-limit";
 import { activeReservation } from "@/server/stock/reservations";
 import { imageUrl } from "@/server/media/product-images";
 import { queueMail } from "@/server/mail/queue";
@@ -109,11 +109,10 @@ export async function submitOffer(tenantId: string, raw: SubmitOfferInput, meta:
 
   const ipKey = `offer.submit:${tenantId}:${meta.ip ?? "unknown"}`;
   const emailKey = `offer.submit.email:${tenantId}:${input.email}`;
-  if ((await isLimited(ipKey, SUBMIT_PER_IP)) || (await isLimited(emailKey, SUBMIT_PER_EMAIL))) {
+  // Atomic check-and-count per key (see auth/rate-limit.ts).
+  if (!(await take(ipKey, SUBMIT_PER_IP)) || !(await take(emailKey, SUBMIT_PER_EMAIL))) {
     return { ok: false, code: "RATE_LIMITED", message: "You have made several offers recently. Please try again later." };
   }
-  await hit(ipKey);
-  await hit(emailKey);
 
   const [product, catalog, tenant] = await Promise.all([
     db.product.findFirst({ where: { id: input.productId, tenantId }, select: { id: true, price: true, status: true, quantity: true, acceptsOffers: true } }),

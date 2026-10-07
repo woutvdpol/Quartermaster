@@ -46,6 +46,7 @@ export const ADMIN_NAV: { group: NavGroupKey; items: NavItem[] }[] = [
     items: [
       { key: "pages", slug: "pages", built: true },
       { key: "menus", slug: "menus", built: true },
+      { key: "redirects", slug: "redirects", built: true },
       { key: "newsletter", slug: "newsletter", built: true },
     ],
   },

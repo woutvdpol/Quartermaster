@@ -3,13 +3,13 @@ import { z } from "zod";
 import { db } from "@/server/db";
 import { audit } from "@/server/audit";
 import { Prisma } from "@/generated/prisma/client";
-import { anonymizeCustomer, ANONYMIZED_EMAIL_DOMAIN, findOrCreateGuestCustomer } from "@/server/customers";
+import { anonymizeCustomer, ANONYMIZED_EMAIL_DOMAIN } from "@/server/customers";
+import { claimVerifiedEmail, ensureAccountCustomer, isPendingCustomerEmail, pendingCustomerEmail } from "./link";
 import { subscribe } from "@/server/newsletter";
-import { changePassword, login, newPasswordSchema, type LoginResult } from "@/server/auth/service";
-import { getDummyHash, hashPassword, MAX_PASSWORD_LENGTH, verifyPassword } from "@/server/auth/password";
+import { changePassword, login, newPasswordSchema, verifyCurrentPassword, type LoginResult } from "@/server/auth/service";
+import { getDummyHash, hashPassword, verifyPassword } from "@/server/auth/password";
 import { createSession, destroyAllSessions, destroySession, type SessionUser } from "@/server/auth/session";
 import * as rateLimit from "@/server/auth/rate-limit";
-import { RULES } from "@/server/auth/rate-limit";
 import { sendCustomerVerification } from "@/server/email-verification";
 
 /*
@@ -17,24 +17,31 @@ import { sendCustomerVerification } from "@/server/email-verification";
  *
  * - A customer account is a `User` with role CUSTOMER bound to ONE tenant; the same email in two
  *   shops is two independent accounts (User is unique on (tenantId, email)).
- * - Every CUSTOMER user has exactly one `Customer` row in its tenant, linked by email. Registering
- *   with an email that already placed guest orders links that guest Customer (and its orders).
+ * - Every CUSTOMER user has exactly one `Customer` row in its tenant. Guest data of the account's
+ *   address (guest Customer, its orders, addresses, …) is linked ONLY after the address is proven:
+ *   email verification, password reset, or a verified ETL import — see ./link.ts (review R1).
+ *   Unverified accounts have their own Customer with a placeholder address until then.
  * - Staff (OWNER) accounts live on the same host but may NOT sign in through the shop login; they
  *   get the same generic error as a wrong password, without their password ever being checked.
  * - Email verification: registration signs the customer in immediately (`emailVerifiedAt` null)
  *   and queues a verification mail; an email change does the same for the new address.
  */
 
-const emailSchema = z.string().trim().toLowerCase().max(254).pipe(z.email("Enter a valid email address"));
+const emailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(254)
+  .pipe(z.email("Enter a valid email address"))
+  // RFC 2606 ".invalid" is used for internal placeholders (anonymized / unverified accounts).
+  .refine((e) => !e.endsWith(".invalid"), "Enter a valid email address");
 const nameSchema = z.string().trim().min(1, "Enter your name").max(200, "Name is too long");
-const submittedPasswordSchema = z.string().min(1).max(MAX_PASSWORD_LENGTH);
 
 /** Per IP: at most 10 registrations per hour. */
 export const REGISTER_RULE = { limit: 10, windowMs: 60 * 60 * 1000 };
 
 const keys = {
   registerIp: (ip: string) => `register:ip:${ip}`,
-  reauth: (userId: string) => `reauth:user:${userId}`,
 };
 
 export type CustomerUser = Pick<SessionUser, "id" | "tenantId" | "email" | "role">;
@@ -48,21 +55,6 @@ function splitName(name: string | null | undefined) {
 
 function isUniqueViolation(e: unknown) {
   return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
-}
-
-/**
- * Links a Customer row to the user (creating it if needed) and attaches the tenant's guest orders
- * placed with this email. Throws "EMAIL_TAKEN" when the Customer is linked to another user.
- */
-async function linkCustomer(tx: Prisma.TransactionClient, tenantId: string, user: { id: string; email: string; name: string | null }) {
-  const customer = await findOrCreateGuestCustomer(tx, tenantId, { email: user.email, name: user.name });
-  if (customer.userId && customer.userId !== user.id) throw new Error("EMAIL_TAKEN");
-  if (!customer.userId) await tx.customer.update({ where: { id: customer.id }, data: { userId: user.id } });
-  const linked = await tx.order.updateMany({
-    where: { tenantId, email: user.email, customerId: null },
-    data: { customerId: customer.id },
-  });
-  return { customerId: customer.id, linkedOrders: linked.count };
 }
 
 // ─── Register ───────────────────────────────────────────────────────────────
@@ -101,10 +93,7 @@ export async function registerCustomer(input: RegisterInput): Promise<RegisterRe
   const { tenantId, email, name, password, newsletter } = parsed.data;
 
   const ipKey = input.ip ? keys.registerIp(input.ip) : null;
-  if (ipKey) {
-    if (await rateLimit.isLimited(ipKey, REGISTER_RULE)) return { ok: false, error: "rate_limited" };
-    await rateLimit.hit(ipKey);
-  }
+  if (ipKey && !(await rateLimit.take(ipKey, REGISTER_RULE))) return { ok: false, error: "rate_limited" };
 
   const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { status: true } });
   if (!tenant || tenant.status !== "ACTIVE") return { ok: false, error: "invalid" };
@@ -121,11 +110,15 @@ export async function registerCustomer(input: RegisterInput): Promise<RegisterRe
       const user = await tx.user.create({
         data: { tenantId, role: "CUSTOMER", email, name, passwordHash, emailVerifiedAt: null },
       });
-      const link = await linkCustomer(tx, tenantId, user);
-      return { userId: user.id, ...link };
+      // Own Customer with a placeholder address: guest orders of `email` are NOT linked until the
+      // address is verified (verifyCustomerEmail → claimVerifiedEmail).
+      const customer = await tx.customer.create({
+        data: { tenantId, userId: user.id, email: pendingCustomerEmail(user.id), ...splitName(name) },
+      });
+      return { userId: user.id, customerId: customer.id, linkedOrders: 0 };
     });
   } catch (e) {
-    if (isUniqueViolation(e) || (e instanceof Error && e.message === "EMAIL_TAKEN")) return { ok: false, error: "email_taken" };
+    if (isUniqueViolation(e)) return { ok: false, error: "email_taken" };
     throw e;
   }
 
@@ -178,11 +171,13 @@ export async function customerLogin(input: {
   const result = await login({ email: input.email, password: input.password, tenantId: input.tenantId, ip: input.ip });
   if (result.ok && email.success) {
     // Make sure the account has its Customer row (accounts created by import/admin may lack one).
+    // Verified accounts also pick up guest orders placed with their address since the last login.
     const user = await db.user.findUnique({ where: { tenantId_email: { tenantId: input.tenantId, email: email.data } } });
     if (user && user.role === "CUSTOMER") {
-      await db.$transaction((tx) => linkCustomer(tx, input.tenantId, user)).catch((e) => {
-        console.error("customerLogin: could not link customer", e);
-      });
+      const sync = user.emailVerifiedAt
+        ? db.$transaction((tx) => claimVerifiedEmail(tx, input.tenantId, user.id))
+        : ensureAccountCustomer({ id: user.id, tenantId: input.tenantId });
+      await sync.catch((e) => console.error("customerLogin: could not link customer", e));
     }
   }
   return result;
@@ -190,34 +185,16 @@ export async function customerLogin(input: {
 
 // ─── Current customer ───────────────────────────────────────────────────────
 
-/** The Customer row of a CUSTOMER user, created (and guest orders linked) if missing. */
+/**
+ * The Customer row of a CUSTOMER user, created if missing (linked to the guest data of its address
+ * only when the address is verified — see ./link.ts).
+ */
 export async function ensureCustomer(user: CustomerUser & { name?: string | null }) {
   if (user.role !== "CUSTOMER" || !user.tenantId) throw new Error("Not a customer account");
-  const existing = await db.customer.findUnique({ where: { userId: user.id } });
-  if (existing) return existing;
-  const tenantId = user.tenantId;
-  const { customerId } = await db.$transaction((tx) =>
-    linkCustomer(tx, tenantId, { id: user.id, email: user.email, name: user.name ?? null }),
-  );
-  return db.customer.findUniqueOrThrow({ where: { id: customerId } });
+  return ensureAccountCustomer({ id: user.id, tenantId: user.tenantId });
 }
 
 // ─── Profile ────────────────────────────────────────────────────────────────
-
-/** Re-authentication with the current password; rate limited per user (shared key with the auth service). */
-async function verifyCurrentPassword(userId: string, password: string): Promise<"ok" | "invalid" | "rate_limited"> {
-  const key = keys.reauth(userId);
-  if (await rateLimit.isLimited(key, RULES.loginPerAccount)) return "rate_limited";
-  const parsed = submittedPasswordSchema.safeParse(password);
-  const user = await db.user.findUnique({ where: { id: userId }, select: { passwordHash: true } });
-  const ok = await verifyPassword(parsed.success ? parsed.data : "", user?.passwordHash ?? (await getDummyHash()));
-  if (!ok || !user?.passwordHash || !parsed.success) {
-    await rateLimit.hit(key);
-    return "invalid";
-  }
-  await rateLimit.clear(key);
-  return "ok";
-}
 
 const profileSchema = z.object({
   name: nameSchema,
@@ -263,38 +240,23 @@ export async function changeCustomerEmail(user: CustomerUser, newEmail: string, 
   if (!parsed.success) return { ok: false, error: "invalid_email" };
   const email = parsed.data;
   if (email === user.email) return { ok: false, error: "unchanged" };
-  if (email.endsWith(`@${ANONYMIZED_EMAIL_DOMAIN}`)) return { ok: false, error: "invalid_email" };
+  if (email.endsWith(`@${ANONYMIZED_EMAIL_DOMAIN}`) || isPendingCustomerEmail(email)) return { ok: false, error: "invalid_email" };
   const check = await verifyCurrentPassword(user.id, password);
   if (check !== "ok") return { ok: false, error: check === "rate_limited" ? "rate_limited" : "invalid_password" };
 
   const tenantId = user.tenantId!;
   const customer = await ensureCustomer(user);
   try {
-    const linkedOrders = await db.$transaction(async (tx) => {
+    await db.$transaction(async (tx) => {
       if (await tx.user.findUnique({ where: { tenantId_email: { tenantId, email } }, select: { id: true } })) {
         throw new Error("EMAIL_TAKEN");
       }
-      const other = await tx.customer.findUnique({ where: { tenantId_email: { tenantId, email } } });
-      if (other) {
-        if (other.userId) throw new Error("EMAIL_TAKEN");
-        // Merge the guest record into this account.
-        await tx.order.updateMany({ where: { tenantId, customerId: other.id }, data: { customerId: customer.id } });
-        await tx.address.updateMany({ where: { tenantId, customerId: other.id }, data: { customerId: customer.id, isDefault: false } });
-        const wished = await tx.wishlistItem.findMany({ where: { customerId: other.id }, select: { productId: true } });
-        if (wished.length) {
-          await tx.wishlistItem.createMany({
-            data: wished.map((w) => ({ tenantId, customerId: customer.id, productId: w.productId })),
-            skipDuplicates: true,
-          });
-        }
-        await tx.newsletterSubscriber.updateMany({ where: { tenantId, customerId: other.id }, data: { customerId: customer.id } });
-        await tx.cart.updateMany({ where: { tenantId, customerId: other.id }, data: { customerId: customer.id } });
-        await tx.customer.delete({ where: { id: other.id } });
-      }
+      const other = await tx.customer.findUnique({ where: { tenantId_email: { tenantId, email } }, select: { userId: true } });
+      if (other?.userId) throw new Error("EMAIL_TAKEN");
       await tx.user.update({ where: { id: user.id }, data: { email, emailVerifiedAt: null } });
-      await tx.customer.update({ where: { id: customer.id }, data: { email } });
-      const linked = await tx.order.updateMany({ where: { tenantId, email, customerId: null }, data: { customerId: customer.id } });
-      return linked.count;
+      // The new address is unproven: the account's Customer gets the placeholder address and NOTHING
+      // of the new address's guest data is merged until it is verified (claimVerifiedEmail, review R1).
+      await tx.customer.update({ where: { id: customer.id }, data: { email: pendingCustomerEmail(user.id) } });
     });
     await audit({
       action: "customer.email_changed",
@@ -302,10 +264,10 @@ export async function changeCustomerEmail(user: CustomerUser, newEmail: string, 
       actorId: user.id,
       entity: "Customer",
       entityId: customer.id,
-      data: { linkedOrders },
+      data: { linkedOrders: 0 },
     });
     await sendCustomerVerification(tenantId, user.id).catch(() => null);
-    return { ok: true, linkedOrders };
+    return { ok: true, linkedOrders: 0 };
   } catch (e) {
     if (isUniqueViolation(e) || (e instanceof Error && e.message === "EMAIL_TAKEN")) return { ok: false, error: "email_taken" };
     throw e;

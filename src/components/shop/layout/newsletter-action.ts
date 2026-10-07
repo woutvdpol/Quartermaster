@@ -36,8 +36,7 @@ export async function subscribeNewsletter(_prev: NewsletterState, form: FormData
 
   const ip = clientIp(await headers()) ?? "unknown";
   const key = `shop.newsletter.ip:${shop.tenant.id}:${ip}`;
-  if (await rateLimit.isLimited(key, PER_IP)) return { status: "too_many", email };
-  await rateLimit.hit(key);
+  if (!(await rateLimit.take(key, PER_IP))) return { status: "too_many", email };
 
   const captcha = await verifyTurnstile(turnstileTokenFrom(form), ip === "unknown" ? null : ip, { action: "newsletter" });
   if (!captcha.ok) return { status: "captcha", email };

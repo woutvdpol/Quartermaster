@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import { Markdown } from "@/components/shop/ui";
 import { requireShop } from "@/server/storefront/context";
+import { redirectOrNotFound } from "@/server/redirects/runtime";
 import { CatalogView, defaultSortFor } from "@/components/shop/catalog/CatalogView";
 import { catalogCopy as copy } from "@/components/shop/catalog/_copy";
 import { catalogMetadata } from "@/components/shop/catalog/metadata";
@@ -19,11 +19,13 @@ import {
 /** The category plus its root→leaf path in the public tree; 404 when hidden (inactive itself or an ancestor). */
 async function loadCategory(tenantId: string, rawSlug: string) {
   const slug = decodeURIComponent(rawSlug).toLowerCase();
-  if (!/^[a-z0-9-]{1,120}$/.test(slug)) notFound();
+  // Unknown (e.g. renamed) category: an owner or legacy redirect may cover the old URL.
+  const gone = () => redirectOrNotFound(`/shop/category/${rawSlug}`);
+  if (!/^[a-z0-9-]{1,120}$/.test(slug)) return gone();
   const [category, tree] = await Promise.all([getCategoryBySlug(tenantId, slug), getCategoryTree(tenantId)]);
-  if (!category) notFound();
+  if (!category) return gone();
   const path = categoryPath(tree, category.id);
-  if (!path.length) notFound();
+  if (!path.length) return gone();
   return { category, path };
 }
 

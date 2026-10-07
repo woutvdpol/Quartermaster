@@ -20,7 +20,12 @@ const nextConfig: NextConfig = {
     return {
       beforeFiles: [],
       afterFiles: [],
-      fallback: [{ source: "/:slug([a-z0-9]+(?:-[a-z0-9]+)*)", destination: "/pages/:slug" }],
+      fallback: [
+        { source: "/:slug([a-z0-9]+(?:-[a-z0-9]+)*)", destination: "/pages/:slug" },
+        // Anything else nothing matched: look up a redirect (old Concept500 URLs, owner-managed) or
+        // render the shop 404 — src/app/(shop)/qm-unmatched, src/server/redirects/runtime.ts.
+        { source: "/:path+", destination: "/qm-unmatched/:path+" },
+      ],
     };
   },
   turbopack: {

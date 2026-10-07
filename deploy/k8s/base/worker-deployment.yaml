@@ -1,0 +1,73 @@
+# pg-boss worker (Dockerfile target `worker`): mail, invoice/certificate PDFs, newsletter fan-out,
+# alerts and the cron schedules (WORKER_CRON=1). Jobs are claimed with SKIP LOCKED and cron
+# schedules are de-duplicated by pg-boss, so more replicas are safe — one is enough to start.
+# No HTTP endpoint → no probes; a crash exits the process and Kubernetes restarts it.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quartermaster-worker
+  labels:
+    app.kubernetes.io/component: worker
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: quartermaster
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: quartermaster
+        app.kubernetes.io/component: worker
+    spec:
+      serviceAccountName: quartermaster
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      # SIGTERM → stop fetching, wait WORKER_SHUTDOWN_TIMEOUT_MS (25 s) for running jobs, hard exit +5 s.
+      terminationGracePeriodSeconds: 40
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: quartermaster-worker
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: quartermaster-config
+            - secretRef:
+                name: quartermaster-secrets
+          env:
+            - name: NODE_OPTIONS
+              value: "--max-old-space-size=512"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: uploads
+              mountPath: /app/uploads
+            # tsx compile cache + temp files.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: quartermaster-uploads
+        - name: tmp
+          emptyDir:
+            sizeLimit: 512Mi

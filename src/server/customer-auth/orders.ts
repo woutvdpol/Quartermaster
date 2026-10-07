@@ -3,9 +3,10 @@ import { db } from "@/server/db";
 import type { FulfillmentStatus, PaymentStatus } from "@/generated/prisma/enums";
 
 /*
- * Order history for the account pages. Covers orders linked to the Customer and (defensively) guest
- * orders with the same email that weren't linked yet. Only customer-facing fields are selected —
- * never purchase prices, internal notes or legacyData.
+ * Order history for the account pages: only orders LINKED to the account's Customer. Guest orders
+ * with the same email are linked when the address is proven (customer-auth/link.ts) — never shown
+ * by email match, which an unverified account could abuse (security review R1). Only
+ * customer-facing fields are selected — never purchase prices, internal notes or legacyData.
  */
 
 export type CustomerOrderRow = {
@@ -28,7 +29,7 @@ export async function listCustomerOrders(
   const rows = await db.order.findMany({
     where: {
       tenantId: owner.tenantId,
-      OR: [{ customerId: owner.customerId }, { customerId: null, email: owner.email }],
+      customerId: owner.customerId,
     },
     orderBy: { placedAt: "desc" },
     take: Math.min(opts.take ?? 100, 200),

@@ -34,7 +34,6 @@ export const FONT_ALLOWLIST = [
   "Instrument Serif",
   "Newsreader",
   "Archivo",
-  "Big Shoulders",
   "Work Sans",
   "Libre Caslon Display",
 ] as const;
@@ -43,7 +42,8 @@ export const FONT_ALLOWLIST = [
  * Storefront theme presets. A preset sets the layout character (radii, button shape, neutrals, accent
  * and mono fonts) on top of the tenant's colours and fonts — see `.shop-root[data-shop-theme]` in
  * src/app/(shop)/shop.css. Only "gallery" ships now; "archive", "fieldkit" and "vault" are designed
- * (docs/design/shop-options) and are meant for the later theme builder.
+ * (docs/design/shop-options) and are meant for the later theme builder. Field Kit's display face
+ * (Big Shoulders) is not declared yet: next/font has no fallback metrics for it, add it with that theme.
  */
 export const SHOP_THEMES = ["gallery"] as const;
 

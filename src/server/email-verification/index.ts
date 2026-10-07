@@ -5,6 +5,7 @@ import { encrypt } from "@/server/auth/encryption";
 import { generateToken, hashToken } from "@/server/auth/tokens";
 import * as rateLimit from "@/server/auth/rate-limit";
 import { queueMail } from "@/server/mail";
+import { claimVerifiedEmailAndAudit } from "@/server/customer-auth/link";
 import { EMAIL_VERIFICATION_TTL_HOURS } from "./config";
 
 export { EMAIL_VERIFICATION_TTL_HOURS, VERIFY_EMAIL_PATH } from "./config";
@@ -16,7 +17,8 @@ export { EMAIL_VERIFICATION_TTL_HOURS, VERIFY_EMAIL_PATH } from "./config";
  *    only the newest link works) and queues the CustomerEmailVerification mail. Call it after
  *    registration and after an e-mail change (`registerCustomer` / `changeCustomerEmail`).
  *  - `verifyCustomerEmail(tenantId, token)` redeems a token on the shop that issued it: sets
- *    `User.emailVerifiedAt`. Tokens are bound to the address they were sent to, so changing the
+ *    `User.emailVerifiedAt` and then links the guest data of the address to the account
+ *    (customer-auth/link.ts `claimVerifiedEmail`). Tokens are bound to the address they were sent to, so changing the
  *    e-mail afterwards invalidates older links.
  */
 
@@ -35,8 +37,7 @@ export async function sendCustomerVerification(tenantId: string, userId: string)
   if (user.emailVerifiedAt) return { sent: false, reason: "already_verified" };
 
   const key = `verify-email:user:${user.id}`;
-  if (await rateLimit.isLimited(key, VERIFICATION_RULE)) return { sent: false, reason: "rate_limited" };
-  await rateLimit.hit(key);
+  if (!(await rateLimit.take(key, VERIFICATION_RULE))) return { sent: false, reason: "rate_limited" };
 
   const token = generateToken();
   const now = new Date();
@@ -80,6 +81,9 @@ export async function verifyCustomerEmail(tenantId: string, token: string): Prom
     await db.user.update({ where: { id: row.user.id }, data: { emailVerifiedAt: new Date() } });
     await audit({ action: "customer.email_verified", tenantId, actorId: row.user.id, entity: "User", entityId: row.user.id });
   }
+  // The address is proven now: only now may the guest data of this address join the account
+  // (guest Customer, its orders, addresses, …) — security review R1. Never fail the verification over it.
+  await claimVerifiedEmailAndAudit(tenantId, row.user.id).catch((e) => console.error("verifyCustomerEmail: claim failed", e));
   return { ok: true, email: row.user.email };
 }
 

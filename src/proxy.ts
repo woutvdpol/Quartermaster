@@ -43,7 +43,8 @@ export function proxy(request: NextRequest) {
   }
 
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) response.headers.set(name, value);
-  if (isAdmin) response.headers.set("X-Frame-Options", "DENY");
+  // Admin: never framed. Shop (checkout, account forms): same-origin only (clickjacking).
+  response.headers.set("X-Frame-Options", isAdmin ? "DENY" : "SAMEORIGIN");
   return response;
 }
 

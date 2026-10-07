@@ -1,7 +1,10 @@
 import { randomBytes, scrypt, timingSafeEqual, type ScryptOptions } from "node:crypto";
+import { isLegacyBcrypt, verifyLegacyBcrypt } from "./legacy-bcrypt";
 
 // Format: scrypt$<N>$<r>$<p>$<salt b64>$<hash b64>
 // Parameters are stored per hash so they can be raised later without breaking old hashes.
+// Legacy: `bcrypt$<$2y$… hash>` (Concept500/Laravel import) is verify-only; needsRehash() is always
+// true for it, so every login path replaces it with scrypt after the first successful sign-in.
 const DEFAULTS = { N: 2 ** 15, r: 8, p: 1 } as const;
 const KEY_LENGTH = 64;
 const SALT_LENGTH = 16;
@@ -28,6 +31,8 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   if (password.length > MAX_PASSWORD_LENGTH) return false;
+  // Legacy hashes: raw UTF-8 bytes, no NFKC (Laravel hashed exactly what the user typed).
+  if (isLegacyBcrypt(stored)) return verifyLegacyBcrypt(password, stored);
   const parts = stored.split("$");
   if (parts.length !== 6 || parts[0] !== "scrypt") return false;
   const [, n, r, p, saltB64, hashB64] = parts;

@@ -1,0 +1,41 @@
+# cert-manager ClusterIssuers (cluster-wide, install once — cert-manager itself via its Helm chart).
+#   kubectl apply -f deploy/k8s/ingress-nginx/cluster-issuers.yaml
+# HTTP-01 works for every explicit host in the Ingress. Wildcards (*.example.com) need DNS-01 with
+# your DNS provider's solver — see the commented example and docs/deploy.md.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: CHANGE-ME@example.com
+    privateKeySecretRef:
+      name: letsencrypt-prod-account
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx
+      # Wildcard example (Cloudflare DNS; other providers: see cert-manager docs):
+      # - selector:
+      #     dnsZones: ["quartermaster.example"]
+      #   dns01:
+      #     cloudflare:
+      #       apiTokenSecretRef:
+      #         name: cloudflare-api-token   # in the cert-manager namespace
+      #         key: api-token
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: CHANGE-ME@example.com
+    privateKeySecretRef:
+      name: letsencrypt-staging-account
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx

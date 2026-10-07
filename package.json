@@ -19,7 +19,10 @@
     "db:seed:demo": "tsx --import ./scripts/server-only-shim.mjs scripts/seed-demo.ts",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "e2e": "playwright test",
+    "e2e:install": "playwright install --with-deps chromium",
+    "etl": "tsx --import ./scripts/server-only-shim.mjs scripts/etl/index.ts"
   },
   "dependencies": {
     "@mollie/api-client": "^4.6.0",
@@ -28,6 +31,7 @@
     "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.1.0",
     "@react-pdf/renderer": "^4.9.0",
+    "mysql2": "^3.24.5",
     "next": "16.4.0",
     "nodemailer": "^10.0.15",
     "pg": "^8.23.1",
@@ -40,6 +44,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^24.19.1",
     "@types/nodemailer": "^8.0.2",

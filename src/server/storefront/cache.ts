@@ -16,7 +16,7 @@ import { revalidateTag, unstable_cache } from "next/cache";
 
 export const SHOP_CACHE_SECONDS = 60;
 
-export type ShopCacheArea = "settings" | "content" | "catalog";
+export type ShopCacheArea = "settings" | "content" | "catalog" | "redirects";
 
 /** Tag for one area of one tenant, e.g. `tenant:abc:content`. */
 export function shopTag(tenantId: string, area: ShopCacheArea): string {
@@ -80,6 +80,8 @@ export function shopTagsForAction(tenantId: string, action: string): string[] {
       return action === "order.mark_paid" || action === "order.cancel" ? [shopTag(tenantId, "catalog")] : [];
     case "content":
       return [shopTag(tenantId, "content")];
+    case "redirect": // owner-managed + legacy redirects (src/server/redirects)
+      return [shopTag(tenantId, "redirects")];
     case "settings":
     case "shipping":
     case "payments":
