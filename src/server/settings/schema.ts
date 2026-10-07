@@ -29,7 +29,23 @@ export const FONT_ALLOWLIST = [
   "Cormorant Garamond",
   "Source Serif 4",
   "Special Elite",
+  // Added with the storefront redesign (theme "gallery" + the planned theme-builder presets).
+  "Hanken Grotesk",
+  "Instrument Serif",
+  "Newsreader",
+  "Archivo",
+  "Big Shoulders",
+  "Work Sans",
+  "Libre Caslon Display",
 ] as const;
+
+/**
+ * Storefront theme presets. A preset sets the layout character (radii, button shape, neutrals, accent
+ * and mono fonts) on top of the tenant's colours and fonts — see `.shop-root[data-shop-theme]` in
+ * src/app/(shop)/shop.css. Only "gallery" ships now; "archive", "fieldkit" and "vault" are designed
+ * (docs/design/shop-options) and are meant for the later theme builder.
+ */
+export const SHOP_THEMES = ["gallery"] as const;
 
 export const hexColor = z
   .string()
@@ -117,7 +133,7 @@ export const catalogSchema = z.object({
   showPriceWhenSold: z.boolean().default(false),
   priceFilter: z.boolean().default(false),
   showTags: z.boolean().default(true),
-  showStockCode: z.boolean().default(false),
+  showStockCode: z.boolean().default(true),
   publicArchive: z.boolean().default(false),
   relatedProducts: z.boolean().default(false),
   allowOffersDefault: z.boolean().default(false),
@@ -152,13 +168,14 @@ export const checkoutSchema = z.object({
 export const appearanceSchema = z.object({
   colors: z
     .object({
-      primary: hexColor.default("#3f4a2c"),
-      secondary: hexColor.default("#c2b280"),
-      accent: hexColor.default("#8b1e1e"),
+      primary: hexColor.default("#1f4d3a"),
+      secondary: hexColor.default("#d9d6ce"),
+      accent: hexColor.default("#7a2420"),
     })
     .prefault({}),
-  headingFont: font.default("Oswald"),
-  textFont: font.default("Inter"),
+  theme: z.enum(SHOP_THEMES).default("gallery"),
+  headingFont: font.default("Hanken Grotesk"),
+  textFont: font.default("Hanken Grotesk"),
   logoPath: storedPath.default(null),
   bannerPath: storedPath.default(null),
   ctaImagePath: storedPath.default(null),

@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Vault — storefront home</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Display&amp;family=Work+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#121311}
+a{color:#ECE6D8;text-decoration:none}a:hover{color:#D2B07A}
+</style>
+</helmet>
+<div style="background: #121311; color: #ECE6D8; font-family: 'Work Sans', system-ui, sans-serif; font-size: 16px; line-height: 1.55; min-height: 100vh">
+
+  <header style="border-bottom: 1px solid #2B2C27">
+    <div style="max-width: 1320px; margin: 0 auto; padding: 22px 32px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center; gap: 16px">
+      <nav aria-label="Categories" style="display: flex; flex-wrap: wrap; gap: 4px 22px; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #B7B0A0">
+        <a href="#" style="color: #B7B0A0">Collection</a><a href="#" style="color: #B7B0A0">Periods</a><a href="#" style="color: #B7B0A0">Sold</a>
+      </nav>
+      <a href="#" style="justify-self: center; font-family: 'Libre Caslon Display', Georgia, serif; font-size: 30px; letter-spacing: 0.06em; text-align: center; line-height: 1.1">CONCEPT MILITARIA</a>
+      <div style="justify-self: end; display: flex; align-items: center; gap: 6px">
+        <a href="#" aria-label="Search" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg></a>
+        <a href="#" aria-label="Wishlist" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"></path></svg></a>
+        <a href="#" aria-label="Account" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"></path></svg></a>
+        <a href="#" style="border: 1px solid #D2B07A; color: #D2B07A; padding: 9px 16px; font-size: 13px; letter-spacing: 0.1em">CART · 1</a>
+      </div>
+    </div>
+  </header>
+
+  <section style="max-width: 1320px; margin: 0 auto; padding: 64px 32px 80px; display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 56px; align-items: center">
+    <div style="aspect-ratio: 4 / 5; background: #1D1E1A; border: 1px solid #2B2C27; display: flex; align-items: flex-end; justify-content: center; padding: 20px; box-sizing: border-box">
+      <span style="font-size: 12px; color: #8D877A">[Spotlit photo — Waffenrock M10 on black]</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 22px">
+      <span style="font-size: 13px; letter-spacing: 0.2em; color: #D2B07A">PIECE OF THE WEEK</span>
+      <h1 style="margin: 0; font-family: 'Libre Caslon Display', Georgia, serif; font-weight: 400; font-size: clamp(44px, 5vw, 72px); line-height: 1.05">Waffenrock M10,<br>feldgrau</h1>
+      <p style="margin: 0; color: #B7B0A0; font-size: 18px; max-width: 480px">Imperial German field tunic in remarkable condition. Measured, photographed in daylight and issued with a verifiable certificate.</p>
+      <dl style="margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: #2B2C27; border: 1px solid #2B2C27">
+        <div style="background: #121311; padding: 14px 16px"><dt style="font-size: 12px; letter-spacing: 0.12em; color: #8D877A">PERIOD</dt><dd style="margin: 4px 0 0">WW1</dd></div>
+        <div style="background: #121311; padding: 14px 16px"><dt style="font-size: 12px; letter-spacing: 0.12em; color: #8D877A">STOCK NO.</dt><dd style="margin: 4px 0 0">50185</dd></div>
+        <div style="background: #121311; padding: 14px 16px"><dt style="font-size: 12px; letter-spacing: 0.12em; color: #8D877A">PRICE</dt><dd style="margin: 4px 0 0">€1,350</dd></div>
+      </dl>
+      <div style="display: flex; flex-wrap: wrap; gap: 12px">
+        <a href="#" style="background: #D2B07A; color: #121311; padding: 15px 28px; font-weight: 600; letter-spacing: 0.06em; font-size: 14px">VIEW THE PIECE</a>
+        <a href="#" style="border: 1px solid #4A4A42; padding: 14px 28px; letter-spacing: 0.06em; font-size: 14px">MAKE AN OFFER</a>
+      </div>
+    </div>
+  </section>
+
+  <section style="border-top: 1px solid #2B2C27">
+    <div style="max-width: 1320px; margin: 0 auto; padding: 72px 32px">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 40px; text-align: center">
+        <span style="font-size: 13px; letter-spacing: 0.2em; color: #D2B07A">RECENTLY ACQUIRED</span>
+        <h2 style="margin: 0; font-family: 'Libre Caslon Display', Georgia, serif; font-weight: 400; font-size: 44px">New to the collection</h2>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 48px 24px">
+        <sc-for list="{{products}}" as="p" hint-placeholder-count="8">
+          <a href="#" style="display: flex; flex-direction: column; gap: 14px; text-align: center">
+            <div style="aspect-ratio: 3 / 4; background: #1D1E1A; border: 1px solid #2B2C27; position: relative">
+              <sc-if value="{{p.sold}}" hint-placeholder-val="{{false}}">
+                <span style="position: absolute; top: 14px; left: 50%; transform: translateX(-50%); font-size: 11px; letter-spacing: 0.2em; color: #121311; background: #B7B0A0; padding: 4px 10px">SOLD</span>
+              </sc-if>
+            </div>
+            <span style="font-size: 12px; letter-spacing: 0.16em; color: #8D877A">{{p.cat}}</span>
+            <span style="font-family: 'Libre Caslon Display', Georgia, serif; font-size: 22px; line-height: 1.2">{{p.title}}</span>
+            <span style="color: #D2B07A">{{p.price}}</span>
+          </a>
+        </sc-for>
+      </div>
+      <div style="display: flex; justify-content: center; margin-top: 48px">
+        <a href="#" style="border: 1px solid #D2B07A; color: #D2B07A; padding: 15px 32px; letter-spacing: 0.1em; font-size: 14px">VIEW THE FULL COLLECTION</a>
+      </div>
+    </div>
+  </section>
+
+  <section style="background: #1A1B18; border-top: 1px solid #2B2C27; border-bottom: 1px solid #2B2C27">
+    <div style="max-width: 1320px; margin: 0 auto; padding: 72px 32px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 48px; align-items: center">
+      <div style="display: flex; flex-direction: column; gap: 16px">
+        <span style="font-size: 13px; letter-spacing: 0.2em; color: #D2B07A">AUTHENTICITY</span>
+        <h2 style="margin: 0; font-family: 'Libre Caslon Display', Georgia, serif; font-weight: 400; font-size: 40px; line-height: 1.1">Verify any certificate we have issued.</h2>
+        <p style="margin: 0; color: #B7B0A0; max-width: 460px">Enter the certificate number or scan its QR code. You will see the original photos, measurements and provenance.</p>
+      </div>
+      <form style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end">
+        <label style="flex: 1 1 240px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; letter-spacing: 0.08em; color: #B7B0A0">CERTIFICATE NUMBER
+          <input type="text" placeholder="e.g. CM-2026-0042" style="font: inherit; font-size: 16px; letter-spacing: 0; padding: 0 14px; height: 50px; background: #121311; color: #ECE6D8; border: 1px solid #4A4A42">
+        </label>
+        <button type="button" style="font: inherit; font-weight: 600; letter-spacing: 0.06em; font-size: 14px; background: #D2B07A; color: #121311; border: 0; height: 50px; padding: 0 26px; cursor: pointer">VERIFY</button>
+      </form>
+    </div>
+  </section>
+
+  <section style="max-width: 1320px; margin: 0 auto; padding: 72px 32px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px">
+    <a href="#" style="border: 1px solid #2B2C27; padding: 28px; display: flex; flex-direction: column; gap: 8px"><span style="font-family: 'Libre Caslon Display', Georgia, serif; font-size: 26px">First World War</span><span style="color: #8D877A; font-size: 14px">1914 – 1918 →</span></a>
+    <a href="#" style="border: 1px solid #2B2C27; padding: 28px; display: flex; flex-direction: column; gap: 8px"><span style="font-family: 'Libre Caslon Display', Georgia, serif; font-size: 26px">Second World War</span><span style="color: #8D877A; font-size: 14px">1939 – 1945 →</span></a>
+    <a href="#" style="border: 1px solid #2B2C27; padding: 28px; display: flex; flex-direction: column; gap: 8px"><span style="font-family: 'Libre Caslon Display', Georgia, serif; font-size: 26px">Cold War</span><span style="color: #8D877A; font-size: 14px">1946 – 1991 →</span></a>
+    <a href="#" style="border: 1px solid #D2B07A; padding: 28px; display: flex; flex-direction: column; gap: 8px"><span style="font-family: 'Libre Caslon Display', Georgia, serif; font-size: 26px; color: #D2B07A">Sell to us</span><span style="color: #8D877A; font-size: 14px">Discreet valuation →</span></a>
+  </section>
+
+  <footer style="border-top: 1px solid #2B2C27">
+    <div style="max-width: 1320px; margin: 0 auto; padding: 40px 32px 56px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 28px; font-size: 14px; color: #8D877A">
+      <div style="display: flex; flex-direction: column; gap: 8px"><span style="font-family: 'Libre Caslon Display', Georgia, serif; font-size: 22px; color: #ECE6D8; letter-spacing: 0.06em">CONCEPT MILITARIA</span><span>[Address] · KvK [no] · VAT [no]</span></div>
+      <div style="display: flex; flex-direction: column; gap: 8px"><a href="#" style="color: #B7B0A0">Collection</a><a href="#" style="color: #B7B0A0">Sold archive</a><a href="#" style="color: #B7B0A0">Newsletter</a></div>
+      <div style="display: flex; flex-direction: column; gap: 8px"><a href="#" style="color: #B7B0A0">Shipping</a><a href="#" style="color: #B7B0A0">Returns</a><a href="#" style="color: #B7B0A0">Contact</a></div>
+      <div style="display: flex; flex-direction: column; gap: 8px"><a href="#" style="color: #B7B0A0">Terms</a><a href="#" style="color: #B7B0A0">Privacy</a></div>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2700}}'>
+class Component extends DCLogic {
+renderVals() {
+return {
+products: [
+{ cat: 'BADGES & AWARDS', title: 'Iron Cross 2nd class 1914', price: '€145', sold: false },
+{ cat: 'PHOTOGRAPHS', title: 'Studio portrait US paratrooper, 1944', price: '€35', sold: false },
+{ cat: 'STEEL HELMETS', title: 'Bundeswehr M56 Stahlhelm', price: '€45', sold: false },
+{ cat: 'FIELD GEAR', title: 'Leather belt with cartridge pouches, 1941', price: '€145', sold: false },
+{ cat: 'CLOTH INSIGNIA', title: '1st Airborne Division Pegasus patch', price: '€125', sold: false },
+{ cat: 'CLOTH INSIGNIA', title: 'Sleeve eagle Heer, BeVo', price: '€65', sold: false },
+{ cat: 'BUCKLES', title: 'Kriegsmarine belt buckle, brass', price: '€160', sold: true },
+{ cat: 'FIELD GEAR', title: 'Tornister M34 with cowhide flap', price: '€280', sold: true }
+]
+};
+}
+}
+</script>
+</body>
+</html>

@@ -6,20 +6,20 @@ export type ButtonVariant = "primary" | "accent" | "secondary" | "outline" | "gh
 export type ButtonSize = "sm" | "md" | "lg";
 
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-shop-sm font-medium whitespace-nowrap transition-colors " +
+  "inline-flex items-center justify-center gap-2 rounded-shop-control font-semibold whitespace-nowrap transition-colors " +
   "disabled:cursor-not-allowed disabled:opacity-55 aria-disabled:cursor-not-allowed aria-disabled:opacity-55 select-none";
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary: "bg-shop-primary text-shop-on-primary hover:bg-shop-primary-strong",
   accent: "bg-shop-accent text-shop-on-accent hover:brightness-95",
-  secondary: "bg-shop-secondary text-shop-on-secondary hover:brightness-95",
-  outline: "border border-shop-line-strong bg-shop-surface text-shop-ink hover:border-shop-ink hover:bg-shop-sunken",
+  secondary: "bg-shop-sunken text-shop-ink hover:bg-shop-line",
+  outline: "border border-shop-line-strong bg-shop-surface text-shop-ink hover:border-shop-ink",
   ghost: "text-shop-ink hover:bg-shop-sunken",
   link: "text-shop-primary underline underline-offset-4 hover:text-shop-primary-strong px-0! h-auto!",
 };
 
 const SIZES: Record<ButtonSize, string> = {
-  sm: "h-9 px-3 text-sm",
+  sm: "h-9 px-4 text-sm",
   md: "h-11 px-5 text-[0.95rem]",
   lg: "h-13 px-7 text-base",
 };

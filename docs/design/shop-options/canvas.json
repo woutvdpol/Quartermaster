@@ -1,0 +1,18 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-10-07T10:00:00Z" },
+  "title": "Shop design options",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1440, "h": 2700, "title": "1 · Archive — auction catalogue", "expand": "fill" },
+    "FieldKit.dc.html": { "x": 1520, "y": 0, "w": 1440, "h": 2700, "title": "2 · Field Kit — utilitarian spec sheet", "expand": "fill" },
+    "Gallery.dc.html": { "x": 3040, "y": 0, "w": 1440, "h": 2700, "title": "3 · Gallery — modern minimal", "expand": "fill" },
+    "Vault.dc.html": { "x": 4560, "y": 0, "w": 1440, "h": 2700, "title": "4 · Vault — dark premium", "expand": "fill" }
+  },
+  "order": ["Main.dc.html", "FieldKit.dc.html", "Gallery.dc.html", "Vault.dc.html"],
+  "notes": {
+    "heading": { "x": 0, "y": -320, "text": "Concept Militaria storefront — four directions", "kind": "title1", "maxW": 6000 }
+  },
+  "designSystems": []
+}

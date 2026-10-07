@@ -17,7 +17,8 @@
  *
  * Usage: bg-shop-bg, bg-shop-surface, text-shop-ink, text-shop-muted, border-shop-line,
  * bg-shop-primary text-shop-on-primary, bg-shop-primary-soft, text-shop-primary, bg-shop-accent …,
- * font-shop-heading, font-shop-body, rounded-shop, shadow-shop. Plus `shop-prose` for Markdown.
+ * font-shop-heading, font-shop-body, font-shop-accent, font-shop-mono, rounded-shop, rounded-shop-control (buttons,
+ * inputs, chips: pill in theme gallery), shadow-shop. Plus `shop-prose` for Markdown.
  */
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities) source(none);
@@ -55,64 +56,85 @@
 
   --font-shop-heading: var(--shop-font-heading);
   --font-shop-body: var(--shop-font-body);
+  --font-shop-accent: var(--shop-font-accent);
+  --font-shop-mono: var(--shop-font-mono);
 
   --radius-shop: var(--shop-radius);
   --radius-shop-sm: var(--shop-radius-sm);
+  --radius-shop-control: var(--shop-radius-control);
   --shadow-shop: var(--shop-shadow);
   --shadow-shop-pop: var(--shop-shadow-pop);
 }
 
 .shop-root {
   /* Fallbacks (the layout always sets these inline). */
-  --shop-primary: #3f4a2c;
-  --shop-secondary: #c2b280;
-  --shop-accent: #8b1e1e;
+  --shop-primary: #1f4d3a;
+  --shop-secondary: #d9d6ce;
+  --shop-accent: #7a2420;
   --shop-on-primary: #ffffff;
   --shop-on-secondary: #1c1a16;
   --shop-on-accent: #ffffff;
-  --shop-font-heading: Georgia, serif;
+  --shop-font-heading: system-ui, -apple-system, "Segoe UI", sans-serif;
   --shop-font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --shop-font-accent: Georgia, serif;
+  --shop-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  /* Derived neutrals: warm paper tinted by the secondary colour, ink tinted by the primary. */
-  --shop-bg: color-mix(in oklab, var(--shop-secondary) 9%, #fffdf8);
+  /*
+   * Theme "gallery" (the default and, for now, only preset): white ground, quiet warm-grey surfaces
+   * tinted by the secondary colour, near-black ink, 6px image radius and pill-shaped controls.
+   * Future presets (archive, fieldkit, vault — docs/design/shop-options) override this block under
+   * `.shop-root[data-shop-theme="…"]`; components only ever use the tokens below.
+   */
+  --shop-bg: #ffffff;
   --shop-surface: #ffffff;
-  --shop-sunken: color-mix(in oklab, var(--shop-secondary) 18%, #fffdf8);
-  --shop-ink: color-mix(in oklab, var(--shop-primary) 22%, #191712);
-  --shop-ink-2: color-mix(in oklab, var(--shop-ink) 82%, var(--shop-bg));
-  --shop-muted: color-mix(in oklab, var(--shop-ink) 62%, var(--shop-bg));
-  --shop-line: color-mix(in oklab, var(--shop-secondary) 32%, #fbf8f1);
-  --shop-line-strong: color-mix(in oklab, var(--shop-secondary) 60%, #8a8270);
+  --shop-sunken: color-mix(in oklab, var(--shop-secondary) 28%, #ffffff);
+  --shop-ink: color-mix(in oklab, var(--shop-primary) 6%, #141414);
+  --shop-ink-2: color-mix(in oklab, var(--shop-ink) 80%, #ffffff);
+  --shop-muted: color-mix(in oklab, var(--shop-ink) 64%, #ffffff);
+  --shop-line: color-mix(in oklab, var(--shop-secondary) 42%, #ffffff);
+  --shop-line-strong: color-mix(in oklab, var(--shop-secondary) 30%, #6f6c64);
 
   --shop-primary-strong: color-mix(in oklab, var(--shop-primary) 82%, #000);
-  --shop-primary-soft: color-mix(in oklab, var(--shop-primary) 11%, #fff);
-  --shop-secondary-soft: color-mix(in oklab, var(--shop-secondary) 22%, #fff);
-  --shop-accent-soft: color-mix(in oklab, var(--shop-accent) 10%, #fff);
+  --shop-primary-soft: color-mix(in oklab, var(--shop-primary) 9%, #fff);
+  --shop-secondary-soft: color-mix(in oklab, var(--shop-secondary) 35%, #fff);
+  --shop-accent-soft: color-mix(in oklab, var(--shop-accent) 9%, #fff);
 
   --shop-ok: #2f6b3a;
-  --shop-ok-soft: #e1eedd;
+  --shop-ok-soft: #e4f0e2;
   --shop-warn: #8a5b00;
-  --shop-warn-soft: #f7ebcd;
+  --shop-warn-soft: #f8eed6;
   --shop-crit: #a2342a;
-  --shop-crit-soft: #f6dfdb;
+  --shop-crit-soft: #f8e3df;
 
   --shop-radius: 6px;
-  --shop-radius-sm: 4px;
-  --shop-shadow: 0 1px 2px rgb(28 26 22 / 0.06), 0 4px 14px rgb(28 26 22 / 0.06);
-  --shop-shadow-pop: 0 10px 40px rgb(28 26 22 / 0.22);
+  --shop-radius-sm: 6px;
+  --shop-radius-control: 999px;
+  --shop-shadow: 0 1px 2px rgb(20 20 20 / 0.05), 0 6px 20px rgb(20 20 20 / 0.06);
+  --shop-shadow-pop: 0 16px 48px rgb(20 20 20 / 0.18);
 
   background-color: var(--shop-bg);
   color: var(--shop-ink);
   font-family: var(--shop-font-body);
   font-size: 16px;
-  line-height: 1.55;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   color-scheme: light;
 }
 
 .shop-root :where(h1, h2, h3, h4) {
   font-family: var(--shop-font-heading);
-  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
   text-wrap: balance;
+}
+
+/* Emphasis inside headings switches to the theme's accent serif ("Original militaria, *honestly* described"). */
+.shop-root :where(h1, h2, h3) em {
+  font-family: var(--shop-font-accent);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0;
 }
 
 .shop-root :focus-visible {

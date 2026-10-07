@@ -6,7 +6,7 @@ import { getShopContext } from "@/server/storefront/context";
 import { getLegalLinks, getPublicMenus } from "@/server/storefront/content";
 import { hasConfirmedAge } from "@/server/storefront/age";
 import { shopThemeVars } from "@/server/storefront/theme";
-import { shopFontFamily } from "@/components/shop/layout/fonts";
+import { shopFontFamily, shopThemeFontFamilies } from "@/components/shop/layout/fonts";
 import { Header } from "@/components/shop/layout/Header";
 import { Footer } from "@/components/shop/layout/Footer";
 import { HeaderCountsProvider } from "@/components/shop/layout/HeaderCounts";
@@ -57,15 +57,18 @@ export default async function ShopLayout({ children }: LayoutProps<"/">) {
     legal.ageVerification === "popup" ? hasConfirmedAge(legal.minimumAge) : Promise.resolve(true),
   ]);
 
+  const themeFonts = shopThemeFontFamilies(appearance.theme);
   const style = shopThemeVars({
     colors: appearance.colors,
     headingFontFamily: shopFontFamily(appearance.headingFont),
     textFontFamily: shopFontFamily(appearance.textFont),
+    accentFontFamily: themeFonts.accent,
+    monoFontFamily: themeFonts.mono,
   }) as CSSProperties;
 
   return (
     <HeaderCountsProvider>
-      <div className="shop-root flex min-h-dvh flex-col" style={style}>
+      <div className="shop-root flex min-h-dvh flex-col" data-shop-theme={appearance.theme} style={style}>
         <a
           href="#main"
           className="sr-only z-50 rounded-shop-sm bg-shop-surface px-4 py-2 text-shop-ink shadow-shop-pop focus:not-sr-only focus:fixed focus:top-2 focus:left-2"

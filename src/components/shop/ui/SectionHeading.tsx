@@ -26,12 +26,12 @@ export function SectionHeading({
   return (
     <div className={cn("mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-2 sm:mb-8", align === "center" && "flex-col items-center text-center", className)}>
       <div className={cn("min-w-0", align === "center" && "mx-auto max-w-2xl")}>
-        {eyebrow ? <p className="mb-1.5 text-xs font-semibold tracking-[0.14em] text-shop-muted uppercase">{eyebrow}</p> : null}
-        <Tag className={cn("text-shop-ink", Tag === "h1" ? "text-3xl sm:text-4xl" : "text-2xl sm:text-3xl")}>{title}</Tag>
+        {eyebrow ? <p className="mb-2 text-sm font-semibold text-shop-primary">{eyebrow}</p> : null}
+        <Tag className={cn("text-shop-ink", Tag === "h1" ? "text-3xl sm:text-[2.6rem]" : "text-2xl sm:text-[2rem]")}>{title}</Tag>
         {intro ? <div className="mt-2 text-shop-muted">{intro}</div> : null}
       </div>
       {action ? (
-        <Link href={action.href} className="shrink-0 text-sm font-medium text-shop-primary underline-offset-4 hover:underline">
+        <Link href={action.href} className="shrink-0 text-[0.95rem] font-semibold text-shop-ink underline-offset-4 hover:underline">
           {action.label} <span aria-hidden="true">→</span>
         </Link>
       ) : null}

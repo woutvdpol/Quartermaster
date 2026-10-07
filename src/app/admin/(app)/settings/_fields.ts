@@ -150,8 +150,13 @@ export const SETTINGS_FORMS: Record<SettingsGroup, GroupMeta> = {
     description: "Shop colours, fonts and images.",
     sections: [
       {
+        title: "Theme",
+        description: "The overall look of the storefront. More themes follow with the theme builder.",
+        fields: [{ kind: "radio", path: "theme", label: "Theme", options: [{ value: "gallery", label: "Gallery — clean and modern, large photos" }] }],
+      },
+      {
         title: "Colours",
-        description: "Become the shop's theme tokens.",
+        description: "Primary: buttons and links. Secondary: tints the light backgrounds. Accent: stock numbers and highlights.",
         fields: [
           { kind: "color", path: "colors.primary", label: "Primary colour" },
           { kind: "color", path: "colors.secondary", label: "Secondary colour" },

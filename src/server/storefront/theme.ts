@@ -33,6 +33,9 @@ export type ThemeInput = {
   colors: { primary: string; secondary: string; accent: string };
   headingFontFamily: string;
   textFontFamily: string;
+  /** Theme-owned roles (emphasis serif, stock numbers); optional so callers/tests can omit them. */
+  accentFontFamily?: string;
+  monoFontFamily?: string;
 };
 
 /** The inline style object for the shop root element. */
@@ -47,5 +50,7 @@ export function shopThemeVars(input: ThemeInput): Record<`--${string}`, string> 
     "--shop-on-accent": readableOn(accent),
     "--shop-font-heading": input.headingFontFamily,
     "--shop-font-body": input.textFontFamily,
+    ...(input.accentFontFamily ? { "--shop-font-accent": input.accentFontFamily } : {}),
+    ...(input.monoFontFamily ? { "--shop-font-mono": input.monoFontFamily } : {}),
   };
 }

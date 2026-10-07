@@ -38,7 +38,7 @@ export function TextInput({ className, invalid, ...rest }: ComponentPropsWithout
     <input
       aria-invalid={invalid || undefined}
       className={cn(
-        "h-11 w-full rounded-shop-sm border border-shop-line-strong bg-shop-surface px-3 text-[0.95rem] text-shop-ink placeholder:text-shop-muted/80",
+        "h-11 w-full rounded-shop-control border border-shop-line-strong bg-shop-surface px-4 text-[0.95rem] text-shop-ink placeholder:text-shop-muted",
         "focus:border-shop-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-shop-primary",
         "aria-invalid:border-shop-crit",
         className,

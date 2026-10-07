@@ -3,11 +3,11 @@ import { cn } from "./cn";
 
 type Props<T extends ElementType> = {
   as?: T;
-  /** "default" 1200px, "narrow" 760px (text pages), "wide" 1440px. */
+  /** "default" 1360px, "narrow" 760px (text pages), "wide" 1520px. */
   size?: "default" | "narrow" | "wide";
 } & Omit<ComponentPropsWithoutRef<T>, "as">;
 
-const SIZES = { default: "max-w-[1200px]", narrow: "max-w-[760px]", wide: "max-w-[1440px]" } as const;
+const SIZES = { default: "max-w-[1360px]", narrow: "max-w-[760px]", wide: "max-w-[1520px]" } as const;
 
 /** Centered page column with responsive side padding. */
 export function Container<T extends ElementType = "div">({ as, size = "default", className, ...rest }: Props<T>) {
