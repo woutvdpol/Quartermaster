@@ -57,7 +57,7 @@ async function subscribeAndGetToken(tenantId: string, email: string) {
   expect(res.status).toBe("pending");
   await h.drain();
   const mail = h.mails.at(-1)!;
-  return { res, mail, token: linkIn(mail, "/api/newsletter/confirm").searchParams.get("token")! };
+  return { res, mail, token: linkIn(mail, "/newsletter/confirm").searchParams.get("token")! };
 }
 
 describe("double opt-in", () => {
@@ -82,8 +82,10 @@ describe("double opt-in", () => {
     const mail = h.mails[0];
     expect(mail.to).toBe("jan@example.test");
     expect(mail.subject).toMatch(/confirm your subscription/i);
-    const link = linkIn(mail, "/api/newsletter/confirm");
+    const link = linkIn(mail, "/newsletter/confirm");
     expect(link.origin).toBe("http://shop-a.localhost:3000");
+    // Links to the confirm page (button → POST), never to a GET endpoint that confirms.
+    expect(link.pathname).toBe("/newsletter/confirm");
 
     const confirmed = await confirmSubscription(link.searchParams.get("token")!);
     expect(confirmed).toEqual({ ok: true, tenantId: ctx.tenantId, subscriberId: row.id });
@@ -122,7 +124,7 @@ describe("double opt-in", () => {
     expect(h.mails.length).toBe(sentBefore + 1);
     expect(await subscribe(ctx.tenantId, "x@example.test")).toEqual({ status: "rate_limited" });
 
-    const token = linkIn(h.mails.at(-1)!, "/api/newsletter/confirm").searchParams.get("token")!;
+    const token = linkIn(h.mails.at(-1)!, "/newsletter/confirm").searchParams.get("token")!;
     await db.newsletterSubscriber.updateMany({ where: { tenantId: ctx.tenantId }, data: { confirmSentAt: new Date(Date.now() - 8 * 86400_000) } });
     expect(await confirmSubscription(token)).toEqual({ ok: false, error: "expired", tenantId: ctx.tenantId });
     expect(await confirmSubscription("short")).toEqual({ ok: false, error: "invalid" });
@@ -152,17 +154,19 @@ describe("double opt-in", () => {
 });
 
 describe("public routes", () => {
-  it("GET /api/newsletter/confirm redirects with the outcome", async () => {
+  it("GET /api/newsletter/confirm (old mail links) only forwards to the confirm page, without confirming", async () => {
     const { GET } = await import("@/app/api/newsletter/confirm/route");
     const ctx = await createTenantContext();
     await enableNewsletter(ctx.tenantId);
-    const { token } = await subscribeAndGetToken(ctx.tenantId, "r@example.test");
+    const { token, res } = await subscribeAndGetToken(ctx.tenantId, "r@example.test");
 
-    const ok = await GET(new Request(`http://shop.localhost/api/newsletter/confirm?token=${token}`));
-    expect(ok.status).toBe(303);
-    expect(ok.headers.get("location")).toBe("http://shop.localhost/newsletter?status=confirmed");
-    const bad = await GET(new Request(`http://shop.localhost/api/newsletter/confirm?token=${token}`));
-    expect(bad.headers.get("location")).toBe("http://shop.localhost/newsletter?status=invalid");
+    const fwd = GET(new Request(`http://shop.localhost/api/newsletter/confirm?token=${token}`));
+    expect(fwd.status).toBe(303);
+    expect(fwd.headers.get("location")).toBe(`/newsletter/confirm?token=${token}`);
+    const id = (res as { subscriberId: string }).subscriberId;
+    expect((await db.newsletterSubscriber.findUniqueOrThrow({ where: { id } })).confirmedAt).toBeNull();
+    // The token still works for the real (POST) confirmation.
+    expect(await confirmSubscription(token)).toMatchObject({ ok: true });
   });
 
   it("unsubscribe: GET shows a page without changing state, POST (RFC 8058 one-click) unsubscribes", async () => {

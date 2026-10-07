@@ -13,7 +13,8 @@ export const MAIL_PATHS = {
   customerPasswordReset: "/account/reset-password",
   orderStatus: (uuid: string) => `/order/${uuid}`,
   adminOrder: (orderId: string) => `/admin/orders/${orderId}`,
-  newsletterConfirm: "/api/newsletter/confirm",
+  /** Storefront page with a "Confirm subscription" button (POST). GET must never confirm: mail scanners follow links. */
+  newsletterConfirm: "/newsletter/confirm",
   newsletterUnsubscribe: "/api/newsletter/unsubscribe",
   /** Storefront page that shows the outcome (`?status=confirmed|invalid|expired|unsubscribed`). */
   newsletterStatusPage: "/newsletter",

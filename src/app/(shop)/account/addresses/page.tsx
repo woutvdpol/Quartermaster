@@ -1,0 +1,74 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { Suspense } from "react";
+import { accountCopy } from "@/components/shop/account/_copy";
+import { AccountShell } from "@/components/shop/account/AccountShell";
+import { AddressLines } from "@/components/shop/account/AddressCard";
+import { ConfirmSubmit } from "@/components/shop/account/ConfirmSubmit";
+import { Badge } from "@/components/shop/ui/Badge";
+import { ButtonLink } from "@/components/shop/ui/Button";
+import { EmptyState } from "@/components/shop/ui/EmptyState";
+import { Skeleton } from "@/components/shop/ui/Skeleton";
+import { listAddresses, MAX_ADDRESSES, requireShopCustomer } from "@/server/customer-auth";
+import { deleteAddressAction, setDefaultAddressAction } from "../actions";
+
+const t = accountCopy.addresses;
+
+export const metadata: Metadata = { title: t.title, robots: { index: false, follow: false } };
+
+export default function AddressesPage() {
+  return (
+    <AccountShell active="addresses" title={t.title}>
+      <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+        <Addresses />
+      </Suspense>
+    </AccountShell>
+  );
+}
+
+async function Addresses() {
+  const c = await requireShopCustomer("/account/addresses");
+  const addresses = await listAddresses({ tenantId: c.tenant.id, customerId: c.customer.id });
+  const add = (
+    <ButtonLink href="/account/addresses/new" variant="primary">
+      {t.add}
+    </ButtonLink>
+  );
+  if (!addresses.length) return <EmptyState title={t.empty} action={add} />;
+  const small = "text-sm font-medium text-shop-primary underline-offset-4 hover:underline";
+  return (
+    <div className="grid gap-6">
+      <ul className="grid gap-4 sm:grid-cols-2">
+        {addresses.map((a) => (
+          <li key={a.id} className="flex flex-col rounded-shop border border-shop-line bg-shop-surface p-5">
+            <div className="mb-3 flex flex-wrap gap-2">
+              <Badge tone="neutral">{a.type === "SHIPPING" ? t.shipping : t.billing}</Badge>
+              {a.isDefault ? <Badge tone="primary">{t.default}</Badge> : null}
+            </div>
+            <AddressLines a={a} />
+            <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 pt-4">
+              <Link href={`/account/addresses/${a.id}`} className={small}>
+                {t.edit}
+              </Link>
+              {!a.isDefault ? (
+                <form action={setDefaultAddressAction}>
+                  <input type="hidden" name="id" value={a.id} />
+                  <button type="submit" className={small}>
+                    {t.makeDefault}
+                  </button>
+                </form>
+              ) : null}
+              <form action={deleteAddressAction}>
+                <input type="hidden" name="id" value={a.id} />
+                <ConfirmSubmit message={t.removeConfirm} className="text-sm font-medium text-shop-crit underline-offset-4 hover:underline">
+                  {t.remove}
+                </ConfirmSubmit>
+              </form>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {addresses.length < MAX_ADDRESSES ? <div>{add}</div> : <p className="text-sm text-shop-muted">{t.limit}</p>}
+    </div>
+  );
+}

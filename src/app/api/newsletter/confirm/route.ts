@@ -1,23 +1,18 @@
-import { connection } from "next/server";
-import { getRequestTenant } from "@/server/tenant";
-import { confirmSubscription } from "@/server/newsletter";
 import { MAIL_PATHS } from "@/server/mail/urls";
 
 /**
- * Double opt-in link target: `GET /api/newsletter/confirm?token=…` confirms and redirects to the
- * storefront status page `/newsletter?status=confirmed|expired|invalid`.
+ * Legacy double opt-in link target (mails sent before the confirm page existed).
+ * `GET /api/newsletter/confirm?token=…` changes NOTHING — mail scanners and link previews fetch GET
+ * links — it only forwards to the storefront page `/newsletter/confirm?token=…`, where the visitor
+ * confirms with a button (POST → server action → confirmSubscription).
  */
-export async function GET(request: Request) {
-  await connection();
-  const url = new URL(request.url);
-  const token = url.searchParams.get("token") ?? "";
-  const tenant = await getRequestTenant().catch(() => null);
-  const result = await confirmSubscription(token, { tenantId: tenant?.id ?? null });
-  const status = result.ok ? "confirmed" : result.error;
-  const target = new URL(MAIL_PATHS.newsletterStatusPage, url);
-  target.searchParams.set("status", status);
+export function GET(request: Request) {
+  const token = new URL(request.url).searchParams.get("token");
+  const query = token ? `?${new URLSearchParams({ token: token.slice(0, 200) })}` : "";
+  // Relative Location: resolved by the browser against the shop host it requested (request.url may
+  // carry an internal host behind a proxy / in dev).
   return new Response(null, {
     status: 303,
-    headers: { Location: target.toString(), "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" },
+    headers: { Location: `${MAIL_PATHS.newsletterConfirm}${query}`, "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" },
   });
 }
