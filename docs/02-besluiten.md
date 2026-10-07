@@ -74,3 +74,8 @@ Kan, en is voor deze scope goed te doen. Alles met Node's ingebouwde `crypto`:
 Kanttekeningen:
 - Security-verantwoordelijkheid ligt dan bij ons → tests op elk onderdeel + een review vóór livegang.
 - **Oude Laravel-wachtwoorden** zijn bcrypt (`$2y$`). Node heeft geen ingebouwde bcrypt. Bij latere migratie (punt 23): óf één kleine dependency alleen om oude hashes te verifiëren en direct te herhashen naar scrypt, óf iedereen een reset-mail. Beslissen bij de ETL.
+
+## Design (07-10-2026)
+- **Ontwerp A ("Depot")** is de standaard voor de admin.
+- **B ("Field Ledger") en C ("Naval Quiet") blijven altijd beschikbaar.** De admin-UI wordt volledig via design-tokens gebouwd (`data-admin-theme="depot|ledger|naval"`), zodat B en C als thema toegevoegd/gekozen kunnen worden zonder componenten te herschrijven. C wordt als moderne kandidaat gezien.
+- Mockups: `docs/design/quartermaster-design{,-b,-c}.html`.

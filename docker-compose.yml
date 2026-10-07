@@ -1,4 +1,6 @@
-# Local development services. The Next.js app runs on the host (`npm run dev`).
+# Local development services.
+#   docker compose up -d postgres            -> database only; run the app on the host (`npm run dev`)
+#   docker compose --profile app up -d --build -> database + migrations + containerised app
 services:
   postgres:
     image: postgres:18-alpine
@@ -17,5 +19,48 @@ services:
       timeout: 3s
       retries: 10
 
+  # One-shot: applies pending Prisma migrations, then exits.
+  migrate:
+    profiles: ["app"]
+    build:
+      context: .
+      target: migrate
+    image: quartermaster-migrate:dev
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://quartermaster:quartermaster@postgres:5432/quartermaster
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    profiles: ["app"]
+    build:
+      context: .
+      target: runner
+    image: quartermaster:dev
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Inside the Compose network Postgres is reachable as `postgres:5432`.
+      DATABASE_URL: postgresql://quartermaster:quartermaster@postgres:5432/quartermaster
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
 volumes:
   postgres-data:
+  uploads:

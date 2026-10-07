@@ -57,8 +57,62 @@ Docs are written in Dutch; code and code comments will be in English.
 
 ## Getting started
 
-Not yet available — setup instructions will be added in phase 0 (`docker compose up`, `pnpm dev`, `pnpm prisma migrate dev`, seed data).
+Requirements: Node.js 24, npm, Docker (for Postgres).
+
+```bash
+cp .env.example .env
+# Generate APP_ENCRYPTION_KEY and paste it into .env
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+
+npm install          # also runs `prisma generate`
+npm run db:up        # Postgres 18 on 127.0.0.1:54329
+npm run db:migrate   # prisma migrate dev
+npm run db:seed      # local superadmin + demo tenant (credentials from .env)
+npm run dev          # http://localhost:3000
+```
+
+Useful checks: `npm run lint`, `npx next typegen && npm run typecheck`, `npm test`, `npm run build`.
 
 ## Local data
 
 `.local/` holds private material such as database dumps. It is git-ignored and must never be committed.
+
+## Running with Docker
+
+The `Dockerfile` is multi-stage and builds on `node:24-bookworm-slim` (glibc — the best-supported platform for `sharp` and Prisma tooling):
+
+| Target | Purpose |
+|---|---|
+| `runner` (default) | Next.js standalone server, non-root user `nextjs` (UID 1001), port `3000`, uploads at `/app/uploads` |
+| `migrate` | One-shot `prisma migrate deploy` (full dependency tree, so it can also run `npx prisma db seed`) |
+
+```bash
+docker build -t quartermaster:dev .
+docker build --target migrate -t quartermaster-migrate:dev .
+```
+
+Full stack with Compose (the `app` and `migrate` services sit behind the `app` profile, so `npm run db:up` still starts only Postgres):
+
+```bash
+cp .env.example .env   # set APP_ENCRYPTION_KEY; DATABASE_URL is overridden to postgres:5432
+docker compose --profile app up -d --build
+curl localhost:3000/api/health   # liveness
+curl localhost:3000/api/ready    # readiness (checks the database)
+docker compose --profile app down
+```
+
+Startup order: `postgres` (healthy) → `migrate` (completes) → `app`. Uploads persist in the `uploads` named volume. Stop `npm run dev` first if it already uses port 3000.
+
+Seed inside Compose (optional): `docker compose --profile app run --rm migrate npx prisma db seed`.
+
+## Kubernetes notes
+
+Not deployed yet; the image is prepared for it:
+
+- **Stateless app.** All state lives in Postgres and the uploads volume. Mount a PersistentVolumeClaim at `/app/uploads` (needs `ReadWriteMany` once running more than one replica — or move to object storage behind the `StorageDriver` interface).
+- **Probes.** `livenessProbe` → `GET /api/health` (no DB access, so a DB outage never restarts pods); `readinessProbe` → `GET /api/ready` (runs `SELECT 1`, returns 503 when the database is unreachable).
+- **Migrations.** Run the `migrate` image as a Job (e.g. Helm pre-upgrade hook / Argo sync wave) or as an `initContainer`, before the new `runner` pods roll out. `prisma migrate deploy` is idempotent and uses an advisory lock, so concurrent runs are safe.
+- **Configuration.** Everything is runtime env: `DATABASE_URL`, `APP_ENCRYPTION_KEY`, `PLATFORM_HOST` from a Secret/ConfigMap — one image is promoted across environments. Never bake `.env` into the image (it is excluded by `.dockerignore`).
+- **Multiple replicas.** Set the same `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` at build time for all instances, and consider `deploymentId` for version-skew protection (see the Next.js self-hosting guide). The Next.js cache is per pod by default.
+- **Security context.** `runAsNonRoot: true`, `runAsUser: 1001`, `fsGroup: 1001`; the root filesystem can be read-only apart from `/app/uploads` and `/app/.next/cache` (mount an `emptyDir` there).
+- **Ingress.** Terminate TLS at the ingress/reverse proxy; disable response buffering there so streaming works.

@@ -1,0 +1,42 @@
+# Dependencies & build output (rebuilt inside the image)
+node_modules
+.next
+out
+dist
+coverage
+.turbo
+src/generated
+*.tsbuildinfo
+next-env.d.ts
+
+# VCS, CI, editor
+.git
+.gitignore
+.github
+.idea
+.vscode
+.DS_Store
+*.log
+
+# Secrets & private data — never bake into an image
+.env
+.env.*
+!.env.example
+.local
+*.sql
+*.sql.gz
+
+# Runtime data
+uploads
+public/uploads
+
+# Docs, tests & tooling not needed in the image
+docs
+tests
+README.md
+AGENTS.md
+CLAUDE.md
+.claude
+Dockerfile
+.dockerignore
+docker-compose.yml
