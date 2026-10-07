@@ -1,0 +1,59 @@
+"use client";
+
+import { useId, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { setDisplayCurrencyAction } from "./actions";
+
+/*
+ * Tiny "Show prices also in" switcher for the shop header. Display only — checkout is always in
+ * the shop currency (decision 17). Render it through <CurrencySwitcherSlot/> (server), which hides
+ * it when the shop offers no display currencies or no rates are stored yet.
+ */
+export function CurrencySwitcher({
+  shopCurrency,
+  options,
+  current,
+  label = "Show prices also in",
+  className,
+}: {
+  shopCurrency: string;
+  options: string[];
+  /** The visitor's choice, or null = shop currency only. */
+  current: string | null;
+  label?: string;
+  className?: string;
+}) {
+  const id = useId();
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  if (options.length === 0) return null;
+  return (
+    <span className={className}>
+      <label htmlFor={id} className="sr-only">
+        {label}
+      </label>
+      <select
+        id={id}
+        value={current ?? "off"}
+        disabled={pending}
+        aria-busy={pending || undefined}
+        title={`${label} (indicative — you pay in ${shopCurrency})`}
+        onChange={(e) => {
+          const value = e.target.value;
+          startTransition(async () => {
+            await setDisplayCurrencyAction(value);
+            router.refresh();
+          });
+        }}
+        className="cursor-pointer rounded-shop-sm border border-shop-line bg-transparent px-1.5 py-1 text-xs text-shop-ink-2 hover:text-shop-ink"
+      >
+        <option value="off">{shopCurrency}</option>
+        {options.map((c) => (
+          <option key={c} value={c}>
+            {shopCurrency} + ≈{c}
+          </option>
+        ))}
+      </select>
+    </span>
+  );
+}
