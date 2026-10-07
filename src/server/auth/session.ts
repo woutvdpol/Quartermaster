@@ -37,7 +37,13 @@ async function requestMeta() {
   };
 }
 
-async function setCookie(token: string, expiresAt: Date) {
+// The cookie outlives the session on purpose: page renders cannot re-set cookies, so a sliding
+// session would otherwise be cut off by the browser at its first expiry. The DB row's expiresAt
+// (sliding, per role) is authoritative; an expired session is rejected regardless of the cookie.
+const COOKIE_LIFETIME = 30 * 24 * HOUR;
+
+async function setCookie(token: string) {
+  const expiresAt = new Date(Date.now() + COOKIE_LIFETIME);
   (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -55,7 +61,7 @@ export async function createSession(userId: string, role: Role, opts: { pendingT
   const session = await db.session.create({
     data: { userId, tokenHash: hashToken(token), expiresAt, pendingTotp, ...meta },
   });
-  await setCookie(token, expiresAt);
+  await setCookie(token);
   return session;
 }
 
@@ -85,7 +91,7 @@ export async function getSession(): Promise<ValidSession | null> {
     const expiresAt = new Date(now + LIFETIME[session.user.role]);
     await db.session.update({ where: { id: session.id }, data: { lastSeenAt: new Date(now), expiresAt } });
     // Cookies can only be written in Server Actions / Route Handlers; ignore elsewhere.
-    await setCookie(token, expiresAt).catch(() => {});
+    await setCookie(token).catch(() => {});
   }
 
   const { user } = session;
@@ -111,7 +117,7 @@ export async function promoteSession(sessionId: string, role: Role) {
     where: { id: sessionId },
     data: { tokenHash: hashToken(token), pendingTotp: false, expiresAt, lastSeenAt: new Date() },
   });
-  await setCookie(token, expiresAt);
+  await setCookie(token);
 }
 
 export async function destroySession() {
