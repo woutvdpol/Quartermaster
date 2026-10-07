@@ -6,7 +6,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const SESSION_COOKIE = "qm_session";
 
 /** Admin paths reachable without a session cookie (prefix match on a path segment boundary). */
-const PUBLIC_ADMIN_PATHS = ["/admin/login"];
+const PUBLIC_ADMIN_PATHS = ["/admin/login", "/admin/forgot-password", "/admin/reset-password"];
 
 const SECURITY_HEADERS: Record<string, string> = {
   "Referrer-Policy": "strict-origin-when-cross-origin",

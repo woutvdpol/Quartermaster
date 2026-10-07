@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { Button } from "@/components/admin/Button";
 import { getDictionary } from "@/lib/i18n";
@@ -51,6 +52,12 @@ export function LoginForm({ next }: { next: string }) {
       <Button type="submit" variant="primary" size="lg" disabled={pending} aria-busy={pending}>
         {pending ? t.submitting : t.submit}
       </Button>
+      <Link
+        href="/admin/forgot-password"
+        className="justify-self-center text-[13px] text-muted underline-offset-2 hover:text-ink hover:underline"
+      >
+        Forgot password?
+      </Link>
     </form>
   );
 }

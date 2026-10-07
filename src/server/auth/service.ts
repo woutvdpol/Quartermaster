@@ -376,7 +376,15 @@ export type ResetPasswordResult =
   | { ok: true }
   | { ok: false; error: "invalid_token" | "invalid_password"; message?: string };
 
-export async function resetPassword(token: string, newPassword: string): Promise<ResetPasswordResult> {
+/**
+ * `scope` binds the token to the host it is redeemed on: `{ tenantId: null }` = platform host
+ * (SUPERADMIN accounts), a tenant id = that shop's accounts. Omit only in trusted server code.
+ */
+export async function resetPassword(
+  token: string,
+  newPassword: string,
+  scope?: { tenantId: string | null },
+): Promise<ResetPasswordResult> {
   const pw = newPasswordSchema.safeParse(newPassword);
   if (!pw.success) return { ok: false, error: "invalid_password", message: pw.error.issues[0]?.message };
   if (typeof token !== "string" || token.length === 0 || token.length > 200) return { ok: false, error: "invalid_token" };
@@ -385,6 +393,7 @@ export async function resetPassword(token: string, newPassword: string): Promise
   if (!row || row.type !== "PASSWORD_RESET" || row.usedAt || row.expiresAt.getTime() <= Date.now() || row.user.disabledAt) {
     return { ok: false, error: "invalid_token" };
   }
+  if (scope && row.user.tenantId !== scope.tenantId) return { ok: false, error: "invalid_token" };
 
   // Claim the token atomically so two concurrent submissions cannot both succeed.
   const { count } = await db.authToken.updateMany({ where: { id: row.id, usedAt: null }, data: { usedAt: new Date() } });
