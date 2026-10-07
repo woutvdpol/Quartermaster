@@ -120,6 +120,8 @@ export const checkoutSchema = z.object({
     .default("terms"),
   // In minor units of the shop currency; 0 = no minimum.
   minimumOrderCents: z.int().min(0).max(100_000_00).default(0),
+  // Free shipping from this subtotal (minor units); 0 = off. Pickup prices are unaffected.
+  freeShippingThresholdCents: z.int().min(0).max(100_000_00).default(0),
   packingSlipPrices: z.boolean().default(true),
 });
 
