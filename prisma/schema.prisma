@@ -76,6 +76,7 @@ model Tenant {
   offers                Offer[]
   coupons               Coupon[]
   couponRedemptions     CouponRedemption[]
+  leads                 Lead[]
 
   @@map("tenants")
 }
@@ -1481,4 +1482,35 @@ model ExchangeRate {
   @@unique([base, quote, rateDate])
   @@index([base, quote, rateDate(sort: Desc)])
   @@map("exchange_rates")
+}
+
+// ─── Leads: "Sell your collection" ──────────────────────────────────────────
+// ETL: Concept500 contact/feedback form submissions were not stored — none to migrate.
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  BOUGHT
+  DECLINED
+}
+
+model Lead {
+  id               String     @id @default(cuid())
+  tenantId         String
+  name             String
+  email            String
+  phone            String?
+  itemsDescription String
+  message          String?
+  photos           Json       @default("[]") // [{ key, width, height, bytes }] storage keys under {tenantId}/leads/{id}/
+  status           LeadStatus @default(NEW)
+  note             String? // internal
+  handledById      String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, status, createdAt(sort: Desc)])
+  @@map("leads")
 }
