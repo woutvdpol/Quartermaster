@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
   experimental: {
     // Image uploads go through server actions; images may be up to 25 MB (src/server/media/images.ts).
     serverActions: { bodySizeLimit: "26mb" },
+    // src/proxy.ts runs on /admin/**; request bodies above this are truncated when a proxy runs.
+    proxyClientMaxBodySize: "26mb",
   },
   turbopack: {
     rules: {
