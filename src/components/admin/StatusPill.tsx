@@ -33,7 +33,7 @@ export function WipBadge({ onRail = false }: { onRail?: boolean }) {
         "inline-flex items-center rounded-[3px] border border-dashed px-1.5 py-px font-mono text-[10px] leading-tight font-semibold tracking-[0.12em] " +
         (onRail
           ? "border-rail-muted text-rail-muted"
-          : "border-warn text-warn [background:repeating-linear-gradient(135deg,var(--color-warn-soft)_0_5px,var(--color-panel)_5px_10px)]")
+          : "border-warn text-warn [background:repeating-linear-gradient(135deg,var(--qm-warn-soft)_0_5px,var(--qm-panel)_5px_10px)]")
       }
     >
       {t.wip}

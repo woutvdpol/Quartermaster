@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { Sidebar } from "@/components/admin/Sidebar";
+import { Toaster } from "@/components/admin/ui";
 import { ADMIN_THEME_COOKIE, parseAdminThemeCookie } from "@/lib/admin-theme";
 import { getAdminTenantContext } from "@/lib/admin-tenant";
 import { requireAdminPage } from "@/server/auth/guards";
@@ -14,6 +15,7 @@ export default async function AdminAppLayout({ children }: LayoutProps<"/admin">
   return (
     <AdminShell sidebar={<Sidebar user={user} tenants={tenants} theme={theme} />}>
       <main className="flex min-w-0 flex-1 flex-col">{children}</main>
+      <Toaster />
     </AdminShell>
   );
 }

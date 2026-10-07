@@ -27,7 +27,7 @@ export function SidebarNav() {
                     className={
                       "flex items-center justify-between gap-2 rounded-[4px] px-2 py-1.5 text-[13px] text-rail-ink " +
                       (active
-                        ? "bg-rail-active shadow-[inset_2px_0_0_var(--color-accent)]"
+                        ? "bg-rail-active shadow-[inset_2px_0_0_var(--qm-accent)]"
                         : "hover:bg-rail-raised")
                     }
                   >
