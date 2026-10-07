@@ -25,7 +25,7 @@ import { requireStaffContext, ServiceError } from "@/server/context";
 import { getOrder, type OrderDetail } from "@/server/orders/queries";
 import { imageUrl } from "@/server/media/product-images";
 import { orderCopy as t } from "../_copy";
-import { addressLines, describeEvent, orderSteps, paymentMethodLabel } from "../_lib/labels";
+import { addressLines, describeEvent, orderSteps, paymentMethodLabel, surchargeRowLabel } from "../_lib/labels";
 import { requireTenantDisplay } from "@/server/tenant-display";
 import { archiveOrderAction, cancelOrderAction, issueInvoiceAction, markPaidAction, unarchiveOrderAction } from "./actions";
 import { formatInvoiceNumber } from "@/server/invoices/format";
@@ -433,7 +433,7 @@ export default async function OrderPage({ params }: PageProps<"/admin/orders/[id
                         ...(order.surchargeTotal
                           ? [
                               {
-                                label: t.totals.surcharge,
+                                label: surchargeRowLabel(order, t.totals.surcharge),
                                 value: <Money amount={order.surchargeTotal} currency={cur} mono />,
                               },
                             ]

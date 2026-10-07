@@ -15,6 +15,7 @@ import {
   type MollieMode,
   type PaymentsSettings,
 } from "./settings";
+import { isActiveRule, surchargeRulesSchema, type SurchargeRules } from "./surcharge";
 
 /*
  * Per-tenant Mollie configuration (decision 16: Mollie is the only live provider).
@@ -200,4 +201,52 @@ export async function setEnabledMethods(ctx: ServiceContext, methods: string[]):
     });
   }
   return getMollieStatus(ctx);
+}
+
+// ─── Payment-method surcharges ──────────────────────────────────────────────
+
+/**
+ * Storefront read path: ONLY the surcharge rules of a tenant (no key, mode or other settings).
+ * Used by checkout quotes and order placement; the server always recomputes from these.
+ */
+export async function getSurchargeRules(tenantId: string): Promise<SurchargeRules> {
+  return (await readPaymentsSettings(tenantId)).surcharges;
+}
+
+/** Admin: the configured surcharge rules. */
+export async function getPaymentSurcharges(ctx: ServiceContext): Promise<SurchargeRules> {
+  return getSurchargeRules(ctx.tenantId);
+}
+
+/**
+ * Replaces the surcharge rules. Every method must be a known Mollie method id (it need not be active
+ * on the Mollie account: the rule simply never applies then). Rules that can't produce a surcharge
+ * (0% and no fixed amount) are dropped. Audited with before/after.
+ */
+export async function setPaymentSurcharges(ctx: ServiceContext, rules: unknown): Promise<SurchargeRules> {
+  const parsed = surchargeRulesSchema.safeParse(rules);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    throw new ServiceError("INVALID", issue?.message ?? "Invalid surcharge", { path: issue?.path.map(String).join(".") });
+  }
+  const unknown = Object.keys(parsed.data).filter((m) => !KNOWN_METHODS.has(m));
+  if (unknown.length) throw new ServiceError("INVALID", `Unknown Mollie method: ${unknown.join(", ")}`, { unknown });
+  const next: SurchargeRules = Object.fromEntries(Object.entries(parsed.data).filter(([, r]) => isActiveRule(r)));
+
+  let before: SurchargeRules = {};
+  await updatePaymentsSettings(ctx.tenantId, (s) => {
+    before = s.surcharges;
+    return { ...s, surcharges: next };
+  });
+  if (JSON.stringify(before) !== JSON.stringify(next)) {
+    await audit({
+      action: "payments.surcharges_update",
+      tenantId: ctx.tenantId,
+      actorId: ctx.actor.id,
+      entity: "Setting",
+      entityId: PAYMENTS_SETTINGS_GROUP,
+      data: { before, after: next } as unknown as Prisma.InputJsonValue,
+    });
+  }
+  return next;
 }

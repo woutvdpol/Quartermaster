@@ -5,16 +5,21 @@ import { db } from "@/server/db";
 import { ServiceError } from "@/server/context";
 import type { Prisma } from "@/generated/prisma/client";
 import { applyMolliePaymentStatus, type ApplyMollieResult } from "@/server/orders/commands";
-import { isMollieStatus, mollieToAttemptStatus } from "@/server/orders/mollie-status";
+import { isFinalAttemptStatus, isMollieStatus, mollieToAttemptStatus } from "@/server/orders/mollie-status";
+import { audit } from "@/server/audit";
+import { take } from "@/server/auth/rate-limit";
 import { getMollieCredentials, mapMollieError, mollieClient } from "./mollie-config";
 import { toMollieAmount } from "./settings";
+import { verifyMolliePayment, type Mismatch, type MismatchReason } from "./verify";
 
 /*
  * Mollie payments: start a payment for an order, and process webhooks.
  *
  * Webhook contract (Mollie posts only `id`): we NEVER trust anything but the id; the status is always
- * re-fetched from Mollie with the tenant's own key, and status → order mapping is delegated to
- * orders/commands.applyMolliePaymentStatus (idempotent, row-locked).
+ * re-fetched from Mollie with the tenant's own key, verified against our Payment/Order rows (amount,
+ * currency, mode, metadata — security review R3) and only then mapped onto the order by
+ * orders/commands.applyMolliePaymentStatus (idempotent, row-locked). Mollie calls are limited per
+ * tenant (R4, see WEBHOOK_RULES).
  */
 
 const urlSchema = z.url({ protocol: /^https?$/ }).max(2000);
@@ -140,7 +145,11 @@ export async function createMolliePayment(
 
 export type MollieWebhookOutcome =
   | { outcome: "processed"; result: ApplyMollieResult }
-  | { outcome: "ignored"; reason: "INVALID_ID" | "NOT_CONFIGURED" | "UNKNOWN_PAYMENT" | "UNKNOWN_STATUS" };
+  /** The fetched payment doesn't match our records (R3): nothing applied, `payment.mismatch` recorded. */
+  | { outcome: "mismatch"; reasons: MismatchReason[] }
+  /** Per-tenant webhook budget exhausted (R4): nothing fetched; the route answers 503 so Mollie retries later. */
+  | { outcome: "throttled" }
+  | { outcome: "ignored"; reason: "INVALID_ID" | "NOT_CONFIGURED" | "UNKNOWN_PAYMENT" | "UNKNOWN_STATUS" | "FINAL" };
 
 /** Thrown for failures Mollie should retry (route answers 500). */
 export class MollieWebhookRetryableError extends Error {
@@ -152,9 +161,26 @@ export class MollieWebhookRetryableError extends Error {
 
 const PAYMENT_ID_RE = /^tr_[A-Za-z0-9]{4,40}$/;
 
+/*
+ * R4 — the webhook is unauthenticated, and every Mollie call uses (and counts against) the tenant's own
+ * API key. Before calling Mollie:
+ *  - the id must belong to a Payment row of THIS tenant whose attempt is not final yet (final attempts
+ *    can't change any more → answered without a Mollie call);
+ *  - ids we don't know (normally only the tiny race where Mollie calls before our Payment insert has
+ *    committed) get a small per-tenant budget;
+ *  - known ids share a generous per-tenant budget (a few webhooks per payment is normal).
+ * Over budget → "throttled" (503): a genuine Mollie webhook is retried later, an attacker burns nothing.
+ */
+export const WEBHOOK_RULES = {
+  knownPerTenant: { limit: 600, windowMs: 10 * 60 * 1000 },
+  unknownPerTenant: { limit: 30, windowMs: 10 * 60 * 1000 },
+} as const;
+
 /**
- * Processes a Mollie webhook for a tenant. Returns "ignored" for ids we don't know (→ 200, no retries);
- * throws MollieWebhookRetryableError for transient problems (Mollie/DB unavailable → 500, Mollie retries).
+ * Processes a Mollie webhook for a tenant. Returns "ignored" for ids we don't know or can't use (→ 200, no
+ * retries), "mismatch" when Mollie's payment doesn't match our records (→ 200, see recordMismatch),
+ * "throttled" over the per-tenant budget (→ 503), and throws MollieWebhookRetryableError for transient
+ * problems (Mollie/DB unavailable → 500, Mollie retries).
  */
 export async function handleMollieWebhook(tenantId: string, providerPaymentId: string): Promise<MollieWebhookOutcome> {
   const id = typeof providerPaymentId === "string" ? providerPaymentId.trim() : "";
@@ -162,6 +188,20 @@ export async function handleMollieWebhook(tenantId: string, providerPaymentId: s
 
   const creds = await getMollieCredentials(tenantId);
   if (!creds) return { outcome: "ignored", reason: "NOT_CONFIGURED" };
+
+  const row = await db.payment.findFirst({
+    where: { tenantId, providerPaymentId: id, provider: "MOLLIE" },
+    select: { id: true, orderId: true, status: true, amount: true, currency: true, order: { select: { total: true, currency: true } } },
+  });
+  if (row && isFinalAttemptStatus(row.status)) return { outcome: "ignored", reason: "FINAL" };
+
+  const allowed = row
+    ? await take(`mollie.webhook:${tenantId}`, WEBHOOK_RULES.knownPerTenant)
+    : await take(`mollie.webhook.unknown:${tenantId}`, WEBHOOK_RULES.unknownPerTenant);
+  if (!allowed) {
+    console.warn(`[mollie] ${tenantId}: webhook budget exhausted (${row ? "known" : "unknown"} ids) — not calling Mollie for ${id}`);
+    return { outcome: "throttled" };
+  }
 
   let mp: MolliePayment;
   try {
@@ -173,9 +213,26 @@ export async function handleMollieWebhook(tenantId: string, providerPaymentId: s
     throw new MollieWebhookRetryableError(`Fetching Mollie payment failed (${err instanceof MollieApiError ? (err.statusCode ?? "network") : "error"})`, { cause: err });
   }
 
+  if (!row) return unknownPayment(tenantId, mp);
+
   if (!isMollieStatus(mp.status)) {
     console.warn(`[mollie] ${tenantId}: payment ${id} has unsupported status "${mp.status}"`);
     return { outcome: "ignored", reason: "UNKNOWN_STATUS" };
+  }
+
+  const mismatches = verifyMolliePayment(mp, {
+    providerPaymentId: id,
+    amount: row.amount,
+    currency: row.currency,
+    orderTotal: row.order.total,
+    orderCurrency: row.order.currency,
+    mode: creds.mode,
+    tenantId,
+    orderId: row.orderId,
+  });
+  if (mismatches.length) {
+    await recordMismatch(tenantId, row.orderId, id, mp.status, mismatches);
+    return { outcome: "mismatch", reasons: mismatches.map((m) => m.reason) };
   }
 
   try {
@@ -187,18 +244,50 @@ export async function handleMollieWebhook(tenantId: string, providerPaymentId: s
     });
     return { outcome: "processed", result };
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") {
-      // Mollie knows the payment but we have no row. If it was created for one of this tenant's orders,
-      // our Payment insert hasn't committed yet (webhook raced createMolliePayment) → let Mollie retry.
-      const meta = (mp.metadata ?? {}) as { tenantId?: unknown; orderId?: unknown };
-      if (meta.tenantId === tenantId && typeof meta.orderId === "string") {
-        const order = await db.order.findFirst({ where: { id: meta.orderId, tenantId }, select: { id: true } });
-        if (order) throw new MollieWebhookRetryableError("Payment row not stored yet", { cause: err });
-      }
-      return { outcome: "ignored", reason: "UNKNOWN_PAYMENT" };
-    }
+    if (err instanceof ServiceError && err.code === "NOT_FOUND") return { outcome: "ignored", reason: "UNKNOWN_PAYMENT" };
     if (err instanceof ServiceError && err.code === "INVALID") return { outcome: "ignored", reason: "UNKNOWN_STATUS" };
     throw new MollieWebhookRetryableError("Applying payment status failed", { cause: err });
+  }
+}
+
+/**
+ * Mollie knows the payment but we have no row for this tenant. If it was created for one of this
+ * tenant's orders, our Payment insert hasn't committed yet (webhook raced createMolliePayment) → let
+ * Mollie retry. Anything else (another shop's payment, a guessed id) is ignored.
+ */
+async function unknownPayment(tenantId: string, mp: MolliePayment): Promise<MollieWebhookOutcome> {
+  const meta = (mp.metadata ?? {}) as { tenantId?: unknown; orderId?: unknown };
+  if (meta.tenantId === tenantId && typeof meta.orderId === "string") {
+    const order = await db.order.findFirst({ where: { id: meta.orderId, tenantId }, select: { id: true } });
+    if (order) throw new MollieWebhookRetryableError("Payment row not stored yet");
+  }
+  return { outcome: "ignored", reason: "UNKNOWN_PAYMENT" };
+}
+
+/**
+ * R3: Mollie returned a payment that doesn't match what we created (amount/currency, test vs live mode,
+ * metadata, id). The order is NOT changed. We record it once per payment (order timeline event
+ * `payment.mismatch` + audit entry) and log it; the webhook still answers 200 because re-fetching gives
+ * the same answer — retries would only burn the tenant's Mollie quota. Staff resolve it by hand (check
+ * the payment in the Mollie dashboard, then "mark as paid" or refund).
+ */
+async function recordMismatch(tenantId: string, orderId: string, paymentId: string, mollieStatus: string, mismatches: Mismatch[]) {
+  const reasons = mismatches.map((m) => m.reason);
+  console.error(`[mollie] ${tenantId}: payment ${paymentId} does not match order ${orderId} (${reasons.join(", ")}) — not applied`);
+  const created = await db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`qm:paymismatch:${paymentId}`}))`;
+    const existing = await tx.orderEvent.findFirst({
+      where: { tenantId, orderId, type: "payment.mismatch", data: { path: ["paymentId"], equals: paymentId } },
+      select: { id: true },
+    });
+    if (existing) return false;
+    await tx.orderEvent.create({
+      data: { tenantId, orderId, type: "payment.mismatch", data: { provider: "MOLLIE", paymentId, mollieStatus, reasons, details: mismatches } },
+    });
+    return true;
+  });
+  if (created) {
+    await audit({ action: "payment.mismatch", tenantId, entity: "Order", entityId: orderId, data: { provider: "MOLLIE", paymentId, mollieStatus, reasons } });
   }
 }
 
@@ -225,8 +314,9 @@ export async function syncLocalMolliePayment(tenantId: string, orderId: string):
   let changed = false;
   for (const p of open) {
     if (!p.providerPaymentId) continue;
+    // Same path as the webhook, so the same R3 verification (amount/currency/mode/metadata) and R4 budget apply.
     const outcome = await handleMollieWebhook(tenantId, p.providerPaymentId).catch(() => null);
-    if (outcome && outcome.outcome !== "ignored") changed = true;
+    if (outcome?.outcome === "processed" && outcome.result.changed) changed = true;
   }
   return changed;
 }

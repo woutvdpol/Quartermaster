@@ -506,6 +506,7 @@ export async function packingSlipData(ctx: ServiceContext, orderId: string) {
           couponCode: order.couponCode,
           shipping: order.shippingTotal,
           surcharge: order.surchargeTotal,
+          surchargeLabel: order.surchargeLabel,
           total: order.total,
         }
       : null,

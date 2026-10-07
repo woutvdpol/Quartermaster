@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getDictionary } from "@/lib/i18n";
+import { ZodJitless } from "@/components/ZodJitless";
 import "./globals.css";
 
 const t = getDictionary();
@@ -12,7 +13,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className="h-full">
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        <ZodJitless />
+        {children}
+      </body>
     </html>
   );
 }

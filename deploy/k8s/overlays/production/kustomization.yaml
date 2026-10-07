@@ -40,6 +40,8 @@ configMapGenerator:
       # deploy/k8s/ingress-nginx/values.yaml). Never raise this without changing the controller config.
       - TRUSTED_PROXY_HOPS=1
       - TURNSTILE_SITE_KEY=  # public Cloudflare Turnstile site key (runtime)
+      # Content-Security-Policy: report-only | enforce | off (docs/04-security-review.md R2).
+      - CSP_MODE=report-only
       - BACKUP_RETENTION_DAYS=14
 
 patches:

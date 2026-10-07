@@ -15,7 +15,7 @@ Concept500 heeft **geen** verzendstatus, vervoerder of track & trace (geen kolom
 
 | Legacy situatie | `fulfillmentStatus` | Overig |
 |---|---|---|
-| Betaald (`payment_status = paid`, of `manual` mét `order_paid_on`) **en** (`archive = 1` of `order_paid_on` > 14 dagen vóór de migratiedatum) | `DELIVERED` | `shippedAt`/`deliveredAt` = `null` (onbekend); `legacyData.fulfillmentInferred = true` |
+| Betaald (`payment_status = paid`; `manual` telt nooit als betaald, ook niet mét `order_paid_on`) **en** (`archive = 1` of `order_paid_on` > 14 dagen vóór de migratiedatum) | `DELIVERED` | `shippedAt`/`deliveredAt` = `null` (onbekend); `legacyData.fulfillmentInferred = true` |
 | Betaald, niet gearchiveerd, betaald ≤ 14 dagen geleden | `UNFULFILLED` | Verschijnt op het verzendbord onder "To pack" zodat de eigenaar het zelf afvinkt |
 | Niet betaald (`failed`, `manual` zonder betaaldatum) | `UNFULFILLED` | — |
 

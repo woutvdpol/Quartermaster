@@ -39,6 +39,8 @@ export type OrderMailData = {
   subtotal: number;
   shippingTotal: number;
   surchargeTotal: number;
+  /** Customer-facing label of the payment surcharge ("PayPal fee"); null → generic "Payment surcharge". */
+  surchargeLabel?: string | null;
   /** Coupon discount (phase 5); optional so older callers/fixtures keep working. */
   discountTotal?: number;
   couponCode?: string | null;

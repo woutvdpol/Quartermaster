@@ -5,7 +5,7 @@ import { ServiceError } from "@/server/context";
 import { createTenantContext, resetDb } from "../../../tests/integration/helpers";
 import { makeOrder, makeProduct } from "@/server/orders/test-fixtures";
 import { getMollieCredentials, getMollieStatus, listMollieMethods, removeMollieKey, saveMollieKey, setEnabledMethods } from "./mollie-config";
-import { createMolliePayment, handleMollieWebhook, MollieWebhookRetryableError } from "./mollie";
+import { createMolliePayment, handleMollieWebhook, MollieWebhookRetryableError, syncLocalMolliePayment, WEBHOOK_RULES } from "./mollie";
 import { POST } from "@/app/api/webhooks/mollie/[tenant]/route";
 
 const mollie = vi.hoisted(() => ({
@@ -187,7 +187,9 @@ describe("Mollie payments + webhook", () => {
     const { ctx, order } = await setup();
     await db.payment.create({ data: { tenantId: ctx.tenantId, orderId: order.id, provider: "MOLLIE", providerPaymentId: "tr_paid0001", amount: order.total, currency: "EUR" } });
     const paidAt = new Date("2026-10-07T12:00:00Z");
-    mollie.payments.get.mockResolvedValue(molliePayment({ id: "tr_paid0001", status: "paid", method: "ideal", paidAt: paidAt.toISOString() }));
+    mollie.payments.get.mockResolvedValue(
+      molliePayment({ id: "tr_paid0001", status: "paid", method: "ideal", paidAt: paidAt.toISOString(), metadata: { tenantId: ctx.tenantId, orderId: order.id } }),
+    );
 
     const out = await handleMollieWebhook(ctx.tenantId, "tr_paid0001");
     expect(mollie.payments.get).toHaveBeenCalledWith("tr_paid0001");
@@ -198,7 +200,101 @@ describe("Mollie payments + webhook", () => {
     expect(p).toMatchObject({ status: "PAID", method: "ideal" });
     expect(JSON.stringify(p.raw)).not.toContain("NL00BANK");
 
-    expect(await handleMollieWebhook(ctx.tenantId, "tr_paid0001")).toMatchObject({ outcome: "processed", result: { changed: false } });
+    // Final attempt: answered from our DB, Mollie isn't called again (R4).
+    expect(await handleMollieWebhook(ctx.tenantId, "tr_paid0001")).toEqual({ outcome: "ignored", reason: "FINAL" });
+    expect(mollie.payments.get).toHaveBeenCalledTimes(1);
+  });
+
+  describe("verification against our records (R3)", () => {
+    async function withPayment(over: Record<string, unknown>, id = "tr_mism0001") {
+      const s = await setup();
+      await db.payment.create({ data: { tenantId: s.ctx.tenantId, orderId: s.order.id, provider: "MOLLIE", providerPaymentId: id, amount: s.order.total, currency: "EUR" } });
+      mollie.payments.get.mockResolvedValue(molliePayment({ id, status: "paid", metadata: { tenantId: s.ctx.tenantId, orderId: s.order.id }, ...over }));
+      return s;
+    }
+    const events = (orderId: string) => db.orderEvent.findMany({ where: { orderId }, orderBy: { id: "asc" } });
+
+    it.each([
+      ["amount", { amount: { value: "0.01", currency: "EUR" } }, ["AMOUNT"]],
+      ["currency", { amount: { value: "106.95", currency: "USD" } }, ["CURRENCY"]],
+      ["mode (live payment on a test key)", { mode: "live" }, ["MODE"]],
+      ["metadata (other order)", { metadata: { tenantId: "x", orderId: "y" } }, ["TENANT", "ORDER"]],
+    ])("does not mark paid on a %s mismatch; records it once", async (_name, over, reasons) => {
+      const { ctx, order } = await withPayment(over);
+      expect(await handleMollieWebhook(ctx.tenantId, "tr_mism0001")).toEqual({ outcome: "mismatch", reasons });
+      expect(await handleMollieWebhook(ctx.tenantId, "tr_mism0001")).toEqual({ outcome: "mismatch", reasons });
+
+      expect((await db.order.findUniqueOrThrow({ where: { id: order.id } })).paymentStatus).toBe("PENDING");
+      expect((await db.payment.findFirstOrThrow({ where: { providerPaymentId: "tr_mism0001" } })).status).toBe("OPEN");
+      const mismatch = (await events(order.id)).filter((e) => e.type === "payment.mismatch");
+      expect(mismatch).toHaveLength(1);
+      expect(mismatch[0].data).toMatchObject({ provider: "MOLLIE", paymentId: "tr_mism0001", mollieStatus: "paid", reasons });
+      const audits = await db.auditLog.findMany({ where: { tenantId: ctx.tenantId, action: "payment.mismatch" } });
+      expect(audits).toHaveLength(1);
+      expect(audits[0]).toMatchObject({ entity: "Order", entityId: order.id });
+    });
+
+    it("the route answers 200 for a mismatch (no retries) and the order stays unpaid", async () => {
+      const { ctx, order } = await withPayment({ amount: { value: "1.00", currency: "EUR" } }, "tr_mism0002");
+      const res = await POST(
+        new Request(`http://localhost/api/webhooks/mollie/${ctx.tenantId}`, { method: "POST", body: "id=tr_mism0002", headers: { "content-type": "application/x-www-form-urlencoded" } }),
+        { params: Promise.resolve({ tenant: ctx.tenantId }) } as RouteContext<"/api/webhooks/mollie/[tenant]">,
+      );
+      expect(res.status).toBe(200);
+      expect((await db.order.findUniqueOrThrow({ where: { id: order.id } })).paymentStatus).toBe("PENDING");
+    });
+
+    it("the dev sync path applies the same checks", async () => {
+      const { ctx, order } = await withPayment({ mode: "live" }, "tr_mism0003");
+      expect(await syncLocalMolliePayment(ctx.tenantId, order.id)).toBe(false);
+      expect((await db.order.findUniqueOrThrow({ where: { id: order.id } })).paymentStatus).toBe("PENDING");
+      expect((await events(order.id)).some((e) => e.type === "payment.mismatch")).toBe(true);
+
+      // A matching payment is applied by the same path.
+      const ok = await withPayment({}, "tr_sync0001");
+      expect(await syncLocalMolliePayment(ok.ctx.tenantId, ok.order.id)).toBe(true);
+      expect((await db.order.findUniqueOrThrow({ where: { id: ok.order.id } })).paymentStatus).toBe("PAID");
+    });
+  });
+
+  describe("quota protection (R4)", () => {
+    it("throttles unknown ids per tenant without calling Mollie; other tenants unaffected", async () => {
+      const a = await setup();
+      const b = await setup();
+      const now = new Date();
+      await db.rateLimitHit.createMany({
+        data: Array.from({ length: WEBHOOK_RULES.unknownPerTenant.limit }, () => ({ key: `mollie.webhook.unknown:${a.ctx.tenantId}`, createdAt: now })),
+      });
+      expect(await handleMollieWebhook(a.ctx.tenantId, "tr_guess0001")).toEqual({ outcome: "throttled" });
+      expect(mollie.payments.get).not.toHaveBeenCalled();
+
+      mollie.payments.get.mockRejectedValueOnce(new MollieApiError("Not found", { statusCode: 404 }));
+      expect(await handleMollieWebhook(b.ctx.tenantId, "tr_guess0001")).toEqual({ outcome: "ignored", reason: "UNKNOWN_PAYMENT" });
+      expect(mollie.payments.get).toHaveBeenCalledTimes(1);
+    });
+
+    it("known open payments use their own budget; over budget the route answers 503", async () => {
+      const { ctx, order } = await setup();
+      await db.payment.create({ data: { tenantId: ctx.tenantId, orderId: order.id, provider: "MOLLIE", providerPaymentId: "tr_known001", amount: order.total, currency: "EUR" } });
+      const now = new Date();
+      // The unknown-id budget being exhausted doesn't block known payments.
+      await db.rateLimitHit.createMany({
+        data: Array.from({ length: WEBHOOK_RULES.unknownPerTenant.limit }, () => ({ key: `mollie.webhook.unknown:${ctx.tenantId}`, createdAt: now })),
+      });
+      mollie.payments.get.mockResolvedValueOnce(molliePayment({ id: "tr_known001", status: "open", metadata: { tenantId: ctx.tenantId, orderId: order.id } }));
+      expect(await handleMollieWebhook(ctx.tenantId, "tr_known001")).toMatchObject({ outcome: "processed" });
+
+      await db.rateLimitHit.createMany({
+        data: Array.from({ length: WEBHOOK_RULES.knownPerTenant.limit }, () => ({ key: `mollie.webhook:${ctx.tenantId}`, createdAt: now })),
+      });
+      const res = await POST(
+        new Request(`http://localhost/api/webhooks/mollie/${ctx.tenantId}`, { method: "POST", body: "id=tr_known001", headers: { "content-type": "application/x-www-form-urlencoded" } }),
+        { params: Promise.resolve({ tenant: ctx.tenantId }) } as RouteContext<"/api/webhooks/mollie/[tenant]">,
+      );
+      expect(res.status).toBe(503);
+      expect(res.headers.get("Retry-After")).toBe("300");
+      expect(mollie.payments.get).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("ignores unknown, malformed and foreign ids; retries on transient errors", async () => {
@@ -242,7 +338,7 @@ describe("Mollie payments + webhook", () => {
 
       await db.payment.create({ data: { tenantId: ctx.tenantId, orderId: order.id, provider: "MOLLIE", providerPaymentId: "tr_route001", amount: order.total, currency: "EUR" } });
       // Body status is ignored: only the id is read, Mollie says "paid".
-      mollie.payments.get.mockResolvedValueOnce(molliePayment({ id: "tr_route001", status: "paid" }));
+      mollie.payments.get.mockResolvedValueOnce(molliePayment({ id: "tr_route001", status: "paid", metadata: { tenantId: ctx.tenantId, orderId: order.id } }));
       const res = await post(tenant.id, "id=tr_route001&status=failed");
       expect(res.status).toBe(200);
       expect((await db.order.findUniqueOrThrow({ where: { id: order.id } })).paymentStatus).toBe("PAID");

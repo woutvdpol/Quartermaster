@@ -196,6 +196,12 @@ async function OrderContent({ params }: { params: PageProps<"/order/[uuid]">["pa
             </dt>
             <dd className="font-medium tabular-nums">{fmt(view.shippingTotal)}</dd>
           </div>
+          {view.surchargeTotal > 0 ? (
+            <div className="flex justify-between">
+              <dt className="text-shop-ink-2">{view.surchargeLabel}</dt>
+              <dd className="font-medium tabular-nums">{fmt(view.surchargeTotal)}</dd>
+            </div>
+          ) : null}
           <div className="flex items-baseline justify-between border-t border-shop-line-strong/40 pt-3">
             <dt className="font-semibold">{t.total}</dt>
             <dd className="font-shop-heading text-2xl font-semibold tracking-tight tabular-nums">{fmt(view.total)}</dd>

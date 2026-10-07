@@ -20,6 +20,8 @@ import { getPaymentSetup, validatePaymentMethod, type PaymentSetup } from "./pay
 import { applyCouponToTotals, evaluateCoupon, evaluateCouponForOrderTx, type CouponOutcome, type DiscountedTotals } from "@/server/coupons";
 import { convertOffersTx, lockApplicableOffersTx } from "@/server/offers";
 import { formatMoney } from "@/components/shop/ui/money";
+import { getSurchargeRules } from "@/server/payments/mollie-config";
+import { applySurcharge, type SurchargedTotals, type SurchargeRules } from "@/server/payments/surcharge";
 
 export { getPaymentSetup, methodLabel, isDevSimulationAllowed, type PaymentSetup, type PaymentMethodOption } from "./payment-methods";
 export { startOrderPayment, retryOrderPayment, simulateDevPayment, type StartPaymentResult, type RetryResult } from "./payment";
@@ -125,8 +127,8 @@ export type QuoteOptionView = {
   insurance: { price: number; maxInsuredValue: number | null } | null;
 };
 
-/** Totals incl. the coupon: total = subtotal − discount + shipping (+ insurance). */
-export type CheckoutTotals = DiscountedTotals<Totals>;
+/** Totals incl. coupon and payment surcharge: total = subtotal − discount + shipping (+ insurance) + surcharge. */
+export type CheckoutTotals = SurchargedTotals<DiscountedTotals<Totals>>;
 
 /** The cart's coupon as evaluated for this quote (null = no code entered). */
 export type CouponQuote = { code: string; ok: true; discount: number; freeShipping: boolean } | { code: string; ok: false; message: string };
@@ -150,12 +152,16 @@ export type CheckoutQuote = {
   freeShipping: FreeShippingProgress;
   minimumShortfall: number;
   currency: string;
+  /** The payment method the surcharge was computed for (null = none chosen / no surcharge). */
+  paymentMethod: string | null;
 };
 
 const quoteInputSchema = z.object({
   countryCode: z.string().trim().toUpperCase().max(2),
   shippingOptionId: z.string().trim().max(64).nullish(),
   insurance: z.boolean().optional(),
+  /** Chosen Mollie method: only selects a surcharge rule; the amount is computed here. */
+  paymentMethod: z.string().trim().toLowerCase().max(40).nullish(),
 });
 
 function optionView(o: ShippingOption): QuoteOptionView {
@@ -201,6 +207,7 @@ function buildQuote(
   currency: string,
   coupon: CouponOutcome | null = null,
   restrictedItems: RestrictedItem[] = [],
+  surcharge: { method: string | null; rules: SurchargeRules } = { method: null, rules: {} },
 ): { quote: CheckoutQuote; option: ShippingOption | null } {
   const subtotal = prices.reduce((s, p) => s + p, 0);
   const result = calculateShippingQuote(zones, {
@@ -216,6 +223,7 @@ function buildQuote(
   const picked = selectOption(result, input.shippingOptionId);
   const option = picked ? (allowed.includes(picked) ? picked : null) : input.shippingOptionId ? null : (allowed[0] ?? null);
   const insurance = Boolean(input.insurance && option?.insurance);
+  const totals = applySurcharge(applyCouponToTotals(computeTotals(prices, option, insurance), coupon), surcharge.method, surcharge.rules);
   return {
     option,
     quote: {
@@ -226,19 +234,21 @@ function buildQuote(
       options: allowed.map(optionView),
       selectedOptionId: option?.zoneId ?? null,
       insurance,
-      totals: applyCouponToTotals(computeTotals(prices, option, insurance), coupon),
+      totals,
       coupon: coupon ? (coupon.ok ? { code: coupon.code, ok: true, discount: coupon.discount, freeShipping: coupon.freeShipping } : { code: coupon.code, ok: false, message: coupon.message }) : null,
       itemCount: prices.length,
       freeShipping: freeShippingProgress(subtotal, settings.freeShippingThresholdCents),
       minimumShortfall: minimumOrderShortfall(subtotal, settings.minimumOrderCents),
       currency,
+      paymentMethod: totals.surcharge > 0 ? surcharge.method : null,
     },
   };
 }
 
 /**
  * Server-side quote for the cart page estimate and the checkout summary. Uses the live prices of the
- * buyable cart lines (held or lapsed-but-free) and the zone of `countryCode`.
+ * buyable cart lines (held or lapsed-but-free), the zone of `countryCode` and the surcharge rule of
+ * `paymentMethod` (when given). Informational: placeOrder recomputes everything.
  */
 export async function quoteCheckout(
   tenantId: string,
@@ -246,7 +256,12 @@ export async function quoteCheckout(
   input: z.input<typeof quoteInputSchema>,
 ): Promise<CheckoutQuote> {
   const data = quoteInputSchema.parse(input);
-  const [cart, checkout, zones] = await Promise.all([getCart(tenantId, token), getSettings(tenantId, "checkout"), loadQuoteZones(tenantId)]);
+  const [cart, checkout, zones, rules] = await Promise.all([
+    getCart(tenantId, token),
+    getSettings(tenantId, "checkout"),
+    loadQuoteZones(tenantId),
+    data.paymentMethod ? getSurchargeRules(tenantId) : Promise.resolve({} as SurchargeRules),
+  ]);
   const buyable = (cart?.lines ?? []).filter((l) => l.state === "held" || l.state === "lapsed");
   const currency = cart?.currency ?? (await db.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { currency: true } })).currency;
   const [coupon, restricted] = await Promise.all([
@@ -264,6 +279,7 @@ export async function quoteCheckout(
     currency,
     coupon,
     restricted,
+    { method: data.paymentMethod ?? null, rules },
   ).quote;
 }
 
@@ -314,12 +330,13 @@ export async function placeOrder(
   if (!parsed.ok) return { ok: false, code: "INVALID", message: "Please check the highlighted fields", errors: parsed.errors };
   const input = parsed.data;
 
-  const [checkout, legal, payment, zones, tenant] = await Promise.all([
+  const [checkout, legal, payment, zones, tenant, surchargeRules] = await Promise.all([
     getSettings(tenantId, "checkout"),
     getSettings(tenantId, "legal"),
     getPaymentSetup(tenantId),
     loadQuoteZones(tenantId),
     db.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { currency: true } }),
+    getSurchargeRules(tenantId),
   ]);
   if (!payment.configured && !payment.devSimulation) {
     return { ok: false, code: "NOT_CONFIGURED", message: "Payments are not configured for this shop yet. Please contact us." };
@@ -437,6 +454,10 @@ export async function placeOrder(
           tenant.currency,
           coupon,
           restricted,
+          // Surcharge of the validated method only. The Mollie payment is then restricted to exactly this
+          // method (startOrderPayment passes order.paymentMethod), so the customer can't switch to
+          // another method on Mollie's page and skip — or wrongly pay — the surcharge.
+          { method: method.method, rules: surchargeRules },
         );
         if (restricted.length && !option?.isPickup) {
           const msg = restrictedMessage(input.shipping.countryCode, restricted);
@@ -504,7 +525,9 @@ export async function placeOrder(
             currency: tenant.currency,
             subtotal: totals.subtotal,
             shippingTotal: totals.shippingTotal,
-            surchargeTotal: 0,
+            surchargeTotal: totals.surcharge,
+            surchargeLabel: totals.surchargeLabel,
+            surchargeDetail: totals.surchargeSnapshot ?? undefined,
             discountTotal: totals.discount,
             couponCode: coupon?.ok ? coupon.code : null,
             offerId: ordered.find((p) => p.offerId)?.offerId ?? null,
@@ -574,6 +597,7 @@ export async function placeOrder(
               guest: !viewer,
               couponCode: coupon?.ok ? coupon.code : null,
               offerIds: usedOffers,
+              surcharge: totals.surchargeSnapshot,
             },
           },
         });

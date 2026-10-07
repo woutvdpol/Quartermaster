@@ -205,6 +205,7 @@ export async function loadInvoiceDocument(tenantId: string, invoiceId: string) {
       discount: order.discountTotal,
       shipping: order.shippingTotal,
       surcharge: order.surchargeTotal,
+      surchargeLabel: order.surchargeLabel,
       total: invoice.total,
     },
     timeZone: tenant.timezone,

@@ -1,6 +1,7 @@
 // Next 16 proxy (formerly middleware). Optimistic checks only — no DB access here.
 // Real authorization happens in server code (src/server/auth/guards.ts).
 import { NextResponse, type NextRequest } from "next/server";
+import { buildCsp, createNonce, cspHeaderName, parseCspMode, reportingEndpointsHeader } from "@/lib/csp";
 
 // Keep in sync with SESSION_COOKIE in src/server/auth/session.ts (that module is server-only).
 const SESSION_COOKIE = "qm_session";
@@ -22,9 +23,18 @@ function isUnder(pathname: string, base: string): boolean {
   return pathname === base || pathname.startsWith(`${base}/`);
 }
 
+const CSP_REQUEST_HEADERS = ["content-security-policy", "content-security-policy-report-only", "x-nonce"];
+
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const isAdmin = isUnder(pathname, "/admin");
+
+  // CSP (review R2, src/lib/csp.ts). CSP_MODE is read per request: report-only (default) | enforce | off.
+  const cspMode = parseCspMode(process.env.CSP_MODE);
+  const nonce = cspMode === "off" ? null : createNonce();
+  const csp = nonce
+    ? buildCsp({ nonce, area: isAdmin ? "admin" : "shop", dev: process.env.NODE_ENV === "development" })
+    : null;
 
   let response: NextResponse;
   if (
@@ -39,12 +49,22 @@ export function proxy(request: NextRequest) {
     // Overwrite (never trust) any client-supplied x-qm-host.
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-qm-host", normalizeHost(request.headers.get("host")));
+    // Next takes the script nonce from the request's CSP header; never let the client supply one.
+    for (const name of CSP_REQUEST_HEADERS) requestHeaders.delete(name);
+    if (csp && nonce && cspMode !== "off") {
+      requestHeaders.set(cspHeaderName(cspMode), csp);
+      requestHeaders.set("x-nonce", nonce);
+    }
     response = NextResponse.next({ request: { headers: requestHeaders } });
   }
 
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) response.headers.set(name, value);
   // Admin: never framed. Shop (checkout, account forms): same-origin only (clickjacking).
   response.headers.set("X-Frame-Options", isAdmin ? "DENY" : "SAMEORIGIN");
+  if (csp && cspMode !== "off") {
+    response.headers.set(cspHeaderName(cspMode), csp);
+    response.headers.set("Reporting-Endpoints", reportingEndpointsHeader());
+  }
   return response;
 }
 

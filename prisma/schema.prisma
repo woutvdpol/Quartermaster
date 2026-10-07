@@ -755,6 +755,8 @@ model Order {
   subtotal            Int
   shippingTotal       Int               @default(0)
   surchargeTotal      Int               @default(0)
+  surchargeLabel      String? // snapshot of the payment-method surcharge label shown to the customer ("PayPal fee")
+  surchargeDetail     Json? // snapshot of the surcharge rule at checkout { method, percentBps, fixed, cap, base, amount, rounding }
   discountTotal       Int               @default(0) // coupon discount (phase 5); total = subtotal - discount + shipping + surcharge
   couponCode          String? // snapshot of the applied code
   offerId             String? // set when the order came from an accepted offer

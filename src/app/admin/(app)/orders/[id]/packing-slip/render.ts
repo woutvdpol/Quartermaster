@@ -49,7 +49,7 @@ function renderSheet(data: PackingSlipData, timeZone: string) {
         <tr><th>Subtotal</th><td class="mono">${money(totals.subtotal)}</td></tr>
         ${totals.discount ? `<tr><th>Discount${totals.couponCode ? ` · ${esc(totals.couponCode)}` : ""}</th><td class="mono">−${money(totals.discount)}</td></tr>` : ""}
         <tr><th>Shipping${order.shippingZoneName ? ` · ${esc(order.shippingZoneName)}` : ""}</th><td class="mono">${money(totals.shipping)}</td></tr>
-        ${totals.surcharge ? `<tr><th>Payment surcharge</th><td class="mono">${money(totals.surcharge)}</td></tr>` : ""}
+        ${totals.surcharge ? `<tr><th>${esc(totals.surchargeLabel?.trim() || "Payment surcharge")}</th><td class="mono">${money(totals.surcharge)}</td></tr>` : ""}
         <tr class="grand"><th>Total</th><td class="mono">${money(totals.total)}</td></tr>
       </tbody></table>`
     : "";

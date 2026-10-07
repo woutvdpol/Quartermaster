@@ -9,6 +9,7 @@ import { RETRY_WINDOW_MS } from "./payment";
 import { orderDisplayState, type OrderDisplayState } from "./status";
 import { syncLocalMolliePayment } from "@/server/payments/mollie";
 import { revalidateCatalog } from "@/server/storefront-catalog/cache";
+import { surchargeLabelFor } from "@/server/payments/surcharge";
 
 export { orderDisplayState, type OrderDisplayState } from "./status";
 
@@ -31,6 +32,9 @@ export type OrderStatusView = {
   discountTotal: number;
   couponCode: string | null;
   shippingTotal: number;
+  /** Payment-method surcharge (0 without) and its label snapshot ("PayPal fee"). */
+  surchargeTotal: number;
+  surchargeLabel: string;
   total: number;
   shipping: { method: "SHIP" | "PICKUP"; option: string | null; name: string; city: string; country: string } | null;
   /** Open Mollie checkout to continue (state "waiting"). */
@@ -77,6 +81,8 @@ export async function getOrderStatusView(tenantId: string, uuid: string): Promis
       discountTotal: true,
       couponCode: true,
       shippingTotal: true,
+      surchargeTotal: true,
+      surchargeLabel: true,
       total: true,
       shippingMethod: true,
       shippingZoneName: true,
@@ -135,6 +141,8 @@ export async function getOrderStatusView(tenantId: string, uuid: string): Promis
     discountTotal: order.discountTotal,
     couponCode: order.couponCode,
     shippingTotal: order.shippingTotal,
+    surchargeTotal: order.surchargeTotal,
+    surchargeLabel: surchargeLabelFor(order),
     total: order.total,
     shipping: ship
       ? {

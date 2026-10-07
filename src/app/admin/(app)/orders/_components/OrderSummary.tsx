@@ -10,7 +10,7 @@ import {
 } from "@/components/admin/ui";
 import type { OrderDetail } from "@/server/orders/queries";
 import { ordersCopy, orderCopy } from "../_copy";
-import { addressLines, describeEvent, paymentMethodLabel } from "../_lib/labels";
+import { addressLines, describeEvent, paymentMethodLabel, surchargeRowLabel } from "../_lib/labels";
 
 const t = ordersCopy.drawer;
 
@@ -87,7 +87,7 @@ export function OrderSummary({ order, timeZone }: { order: OrderDetail; timeZone
             ...(order.surchargeTotal
               ? [
                   {
-                    label: orderCopy.totals.surcharge,
+                    label: surchargeRowLabel(order, orderCopy.totals.surcharge),
                     value: <Money amount={order.surchargeTotal} currency={order.currency} mono />,
                   },
                 ]

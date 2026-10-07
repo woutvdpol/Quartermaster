@@ -254,10 +254,10 @@ describe("people, text, orders, users, args", () => {
     expect(htmlToMarkdown("<p>All <strong>prices</strong> in EUR<br></p><ul><li>One</li></ul>")).toBe("All **prices** in EUR\n\n- One");
     expect(cleanMarkdown("test ![x](https://imagedelivery.net/a/b/public)")).toBe("test [x](https://imagedelivery.net/a/b/public)");
   });
-  it("maps payment status (manual = unpaid unless order_paid_on)", () => {
+  it("maps payment status (manual = always unpaid, also with order_paid_on)", () => {
     expect(mapPaymentStatus({ payment_status: "paid", order_paid_on: null }).status).toBe("PAID");
     expect(mapPaymentStatus({ payment_status: "manual", order_paid_on: null }).status).toBe("PENDING");
-    expect(mapPaymentStatus({ payment_status: "manual", order_paid_on: new Date() })).toEqual({ status: "PAID", inferred: true });
+    expect(mapPaymentStatus({ payment_status: "manual", order_paid_on: new Date() })).toEqual({ status: "PENDING", inferred: false });
     expect(mapPaymentStatus({ payment_status: "failed", order_paid_on: null }).status).toBe("FAILED");
     const now = new Date("2026-10-07T00:00:00Z");
     expect(inferFulfillment(true, false, new Date("2026-09-01T00:00:00Z"), now)).toBe("DELIVERED");

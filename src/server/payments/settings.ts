@@ -1,4 +1,5 @@
 // Pure helpers for the per-tenant "payments" Setting row (no server-only, no DB) — unit-testable.
+// The row holds the Mollie configuration and the payment-method surcharges.
 //
 // Storage decision: Mollie credentials live in a dedicated `Setting` row with group "payments"
 // (unique per tenant). The group is deliberately NOT part of SETTINGS_SCHEMAS (src/server/settings),
@@ -7,6 +8,7 @@
 // The API key is stored AES-256-GCM encrypted (src/server/auth/encryption.ts); plaintext never
 // leaves the server and is never logged or audited.
 import { z } from "zod";
+import { surchargeRulesSchema } from "./surcharge";
 
 export const PAYMENTS_SETTINGS_GROUP = "payments";
 
@@ -26,6 +28,12 @@ export const paymentsSettingsSchema = z.object({
       enabledMethods: z.array(z.string().min(1).max(40)).max(50).default([]),
     })
     .prefault({}),
+  /**
+   * Payment-method surcharges (./surcharge.ts), keyed by Mollie method id. Not secret, but the storefront
+   * reads them only through mollie-config.getSurchargeRules (never the whole row). An invalid value
+   * falls back to "no surcharges" without invalidating the Mollie configuration next to it.
+   */
+  surcharges: surchargeRulesSchema.default({}).catch({}),
 });
 
 export type PaymentsSettings = z.output<typeof paymentsSettingsSchema>;

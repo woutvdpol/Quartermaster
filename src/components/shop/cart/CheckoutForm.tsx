@@ -10,6 +10,7 @@ import { checkClasses, inputClasses, Select, textareaClasses } from "@/component
 import { formatMoney } from "@/components/shop/ui/money";
 import type { CheckoutQuote, PaymentMethodOption } from "@/server/checkout";
 import { loginHref } from "@/server/customer-auth/redirect";
+import { describeSurchargeRule } from "@/server/payments/surcharge";
 import { checkoutQuoteAction, placeOrderAction, type CheckoutFormState } from "@/app/(shop)/checkout/actions";
 import { saveCheckoutContactAction } from "./actions";
 import { CartLineItem, type CartLineData } from "./CartLineItem";
@@ -240,6 +241,7 @@ export function CheckoutForm(props: CheckoutFormProps) {
   const [quote, setQuote] = useState<CheckoutQuote | null>(props.initialQuote);
   const [optionId, setOptionId] = useState<string>(props.initialQuote?.selectedOptionId ?? "");
   const [insurance, setInsurance] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<string>(payment.methods[0]?.id ?? "");
   const [billingSame, setBillingSame] = useState(true);
   const [quoting, startQuote] = useTransition();
   const seq = useRef(0);
@@ -255,17 +257,18 @@ export function CheckoutForm(props: CheckoutFormProps) {
     if (state.status === "placed" && state.redirectTo) router.push(state.redirectTo);
   }, [state, router]);
 
-  function requote(next: { country?: string; optionId?: string; insurance?: boolean }) {
+  function requote(next: { country?: string; optionId?: string; insurance?: boolean; paymentMethod?: string }) {
     const c = next.country ?? country;
     const o = next.optionId ?? optionId;
     const ins = next.insurance ?? insurance;
+    const pm = next.paymentMethod ?? paymentMethod;
     if (!c) {
       setQuote(null);
       return;
     }
     const mine = ++seq.current;
     startQuote(async () => {
-      const q = await checkoutQuoteAction({ countryCode: c, shippingOptionId: o || null, insurance: ins });
+      const q = await checkoutQuoteAction({ countryCode: c, shippingOptionId: o || null, insurance: ins, paymentMethod: pm || null });
       if (mine !== seq.current) return;
       setQuote(q);
       const selected = q?.selectedOptionId ?? q?.options[0]?.id ?? "";
@@ -495,10 +498,20 @@ export function CheckoutForm(props: CheckoutFormProps) {
                       type="radio"
                       name="paymentMethod"
                       value={m.id}
-                      defaultChecked={(getPath(values, "paymentMethod") ?? payment.methods[0]?.id) === m.id}
+                      checked={paymentMethod === m.id}
+                      onChange={() => {
+                        // The surcharge (if any) is re-quoted by the server; the hint below is display only.
+                        setPaymentMethod(m.id);
+                        requote({ paymentMethod: m.id });
+                      }}
                       className={checkClasses}
                     />
-                    <span className="font-medium">{m.label}</span>
+                    <span className="flex min-w-0 flex-col">
+                      <span className="font-medium">{m.label}</span>
+                      {m.surcharge ? (
+                        <span className="text-xs text-shop-muted">{t.methodSurcharge(m.surcharge.label, describeSurchargeRule(m.surcharge, fmt))}</span>
+                      ) : null}
+                    </span>
                   </label>
                 ))}
               </div>
@@ -576,6 +589,7 @@ export function CheckoutForm(props: CheckoutFormProps) {
           ) : null}
           <Row label={t.shipping} value={quote && selected ? (quote.totals.shipping === 0 ? cartCopy.cart.free : fmt(quote.totals.shipping)) : "—"} />
           {quote && quote.totals.insurance > 0 ? <Row label={t.insuranceLine} value={fmt(quote.totals.insurance)} /> : null}
+          {quote && quote.totals.surcharge > 0 ? <Row label={quote.totals.surchargeLabel ?? t.surchargeLine} value={fmt(quote.totals.surcharge)} /> : null}
           <div className="flex items-baseline justify-between gap-4 border-t border-shop-line-strong/40 pt-4">
             <dt className="font-semibold">{t.total}</dt>
             <dd className="font-shop-heading text-2xl font-semibold tracking-tight tabular-nums">{quote && selected ? fmt(quote.totals.total) : "—"}</dd>

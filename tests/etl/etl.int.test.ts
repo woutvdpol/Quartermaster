@@ -114,7 +114,7 @@ describe("Concept500 ETL", () => {
       [2, 4462, 8924],
       [1, 175, 175],
     ]);
-    expect(byNo.get(3)!.paymentStatus).toBe("PAID");
+    expect(byNo.get(3)!.paymentStatus).toBe("PENDING"); // manual + order_paid_on: never inferred as paid
     expect(byNo.get(4)!.paymentStatus).toBe("FAILED");
     expect(byNo.get(5)!.archivedAt).not.toBeNull();
     expect((byNo.get(5)!.legacyData as Record<string, unknown>).legacyNoLines).toBe(true);
@@ -124,7 +124,7 @@ describe("Concept500 ETL", () => {
       expect(o.lines.every((l) => l.priceReconstructed)).toBe(true);
     }
     expect(byNo.get(1)!.payments).toMatchObject([{ provider: "MANUAL", status: "PAID", amount: 9462 }]);
-    expect(first.report.revenue).toMatchObject({ legacyPaidTotal: 14837, newPaidTotal: 14837 + 9462, newPaidOrders: 4 });
+    expect(first.report.revenue).toMatchObject({ legacyPaidTotal: 14837, newPaidTotal: 14837, newPaidOrders: 3 });
 
     // Users: bcrypt hash kept with prefix; customer linked to user; order 6 linked to that customer.
     const owner = await db.user.findFirstOrThrow({ where: { tenantId, role: "OWNER" } });
@@ -157,6 +157,10 @@ describe("Concept500 ETL", () => {
     expect(redirects.map((r) => r.fromPath)).toEqual(expect.arrayContaining(["/pages/shop", "/shop/category/head gear", "/home"]));
     expect(redirects.some((r) => r.fromPath.startsWith("/product/") || r.fromPath.startsWith("/shop.php?"))).toBe(false);
 
+    // Payment surcharges: legacy "Paypal" 5% → Mollie `paypal` rule (500 bp).
+    const paymentsRow = await db.setting.findUniqueOrThrow({ where: { tenantId_group: { tenantId, group: "payments" } } });
+    expect((paymentsRow.data as { surcharges: unknown }).surcharges).toEqual({ paypal: { percentBps: 500, fixed: 0, cap: null, label: "PayPal fee" } });
+
     // ── second run: same result, nothing new ──
     const second = await run({}, downloader);
     expect(second.ok, second.error).toBe(true);
@@ -168,6 +172,7 @@ describe("Concept500 ETL", () => {
     expect(second.report.entity("orders").unchanged).toBe(6);
     expect(downloader.calls).toHaveLength(3); // no re-download
     expect(second.report.revenue?.newPaidTotal).toBe(first.report.revenue?.newPaidTotal);
+    expect(second.report.entity("payment surcharges")).toMatchObject({ created: 0, unchanged: 1 });
   });
 
   it("does not overwrite a password that was rehashed after migration", async () => {

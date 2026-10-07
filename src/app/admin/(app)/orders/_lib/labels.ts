@@ -1,4 +1,6 @@
 import type { FulfillmentStatus, PaymentStatus } from "@/generated/prisma/enums";
+import { formatMoney } from "@/components/admin/ui/money-utils";
+import { describeSurchargeRule } from "@/server/payments/surcharge";
 
 /* Display helpers shared by the order, customer and shipping-board screens. */
 
@@ -114,6 +116,15 @@ export function describeEvent(e: EventLike): {
 } {
   const d = dataOf(e);
   const str = (k: string) => (typeof d[k] === "string" && d[k] ? (d[k] as string) : null);
+  if (e.type === "payment.mismatch") {
+    // Webhook verification (security review R3): Mollie's payment didn't match this order.
+    const words: Record<string, string> = { AMOUNT: "amount", CURRENCY: "currency", MODE: "test/live mode", TENANT: "shop", ORDER: "order", ID: "payment id" };
+    const reasons = Array.isArray(d.reasons) ? d.reasons.map((r) => words[String(r)] ?? String(r)) : [];
+    const detail = [reasons.length ? `differs in: ${reasons.join(", ")}` : null, str("paymentId"), str("mollieStatus") && `Mollie status “${str("mollieStatus")}”`]
+      .filter(Boolean)
+      .join(" · ");
+    return { title: "Mollie payment does not match this order — not marked as paid", detail: detail || undefined, tone: "crit", highlight: true };
+  }
   if (e.type.startsWith("payment.")) {
     const status = e.type.slice("payment.".length);
     const provider = str("provider");
@@ -193,4 +204,24 @@ export function describeEvent(e: EventLike): {
     default:
       return { title: e.type };
   }
+}
+
+/**
+ * Admin label of the payment-surcharge row: "Payment surcharge · PayPal fee (5% of €120.00, paypal)".
+ * Uses the snapshot stored at checkout (Order.surchargeLabel / surchargeDetail); imported orders have none.
+ */
+export function surchargeRowLabel(
+  order: { surchargeLabel: string | null; surchargeDetail: unknown; currency: string },
+  base: string,
+): string {
+  const d = order.surchargeDetail && typeof order.surchargeDetail === "object" ? (order.surchargeDetail as Record<string, unknown>) : null;
+  const num = (k: string) => (d && typeof d[k] === "number" ? (d[k] as number) : null);
+  const money = (n: number) => formatMoney(n, order.currency);
+  const rule =
+    d && typeof d.label === "string"
+      ? describeSurchargeRule({ percentBps: num("percentBps") ?? 0, fixed: num("fixed") ?? 0, cap: num("cap"), label: d.label }, money)
+      : "";
+  const parts = [rule && num("base") !== null && (num("percentBps") ?? 0) > 0 ? `${rule} of ${money(num("base")!)}` : rule, typeof d?.method === "string" ? d.method : ""].filter(Boolean);
+  const label = order.surchargeLabel ? ` · ${order.surchargeLabel}` : "";
+  return `${base}${label}${parts.length ? ` (${parts.join(", ")})` : ""}`;
 }

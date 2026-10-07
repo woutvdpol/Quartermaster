@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Card, ConfirmDialog, DateTime, EmptyState, InlineAlert, KeyValue, PageHeader, StatusPill } from "@/components/admin/ui";
 import { requireStaffContext } from "@/server/context";
-import { getMollieStatus, listMollieMethods, type MollieMethodInfo } from "@/server/payments/mollie-config";
+import { getMollieStatus, getPaymentSurcharges, listMollieMethods, type MollieMethodInfo } from "@/server/payments/mollie-config";
+import { methodLabel } from "@/server/payments/method-labels";
 import { loadErrorMessage } from "../_system/errors";
 import { requireTenantDisplay } from "@/server/tenant-display";
 import { removeMollieKeyAction } from "./actions";
 import { MethodsForm, type MethodRow } from "./_components/MethodsForm";
 import { MollieKeyForm } from "./_components/MollieKeyForm";
+import { SurchargesForm, type SurchargeRow } from "./_components/SurchargesForm";
 
 export const metadata: Metadata = { title: "Payment methods" };
 
@@ -22,7 +24,7 @@ function limits(m: MollieMethodInfo): string | null {
 
 export default async function PaymentMethodsPage() {
   const ctx = await requireStaffContext();
-  const [status, tenant] = await Promise.all([getMollieStatus(ctx), requireTenantDisplay(ctx.tenantId)]);
+  const [status, tenant, surcharges] = await Promise.all([getMollieStatus(ctx), requireTenantDisplay(ctx.tenantId), getPaymentSurcharges(ctx)]);
 
   let methods: MollieMethodInfo[] | null = null;
   let methodsError: string | null = null;
@@ -35,6 +37,15 @@ export default async function PaymentMethodsPage() {
   }
 
   const rows: MethodRow[] = (methods ?? []).map((m) => ({ id: m.id, description: m.description, enabled: m.enabled, limits: limits(m) }));
+  // Surcharge rows: methods offered at checkout, plus methods that already have a rule (e.g. imported
+  // from Concept500 before the method was activated in Mollie).
+  const offered = (methods ?? []).filter((m) => m.enabled);
+  const surchargeRows: SurchargeRow[] = [
+    ...offered.map((m) => ({ id: m.id, description: m.description, rule: surcharges[m.id] ?? null })),
+    ...Object.entries(surcharges)
+      .filter(([id]) => !offered.some((m) => m.id === id))
+      .map(([id, rule]) => ({ id, description: `${methodLabel(id)} (not offered at checkout)`, rule })),
+  ];
 
   return (
     <>
@@ -110,6 +121,14 @@ export default async function PaymentMethodsPage() {
               />
             ) : (
               <MethodsForm methods={rows} allEnabled={status.enabledMethods.length === 0} />
+            )}
+          </Card>
+
+          <Card title="Payment surcharges" aside={Object.keys(surcharges).length ? `${Object.keys(surcharges).length} active` : undefined}>
+            {surchargeRows.length === 0 ? (
+              <EmptyState compact title="No methods yet" body="Connect Mollie and choose the methods offered at checkout to set a surcharge per method." />
+            ) : (
+              <SurchargesForm rows={surchargeRows} currency={tenant.currency} />
             )}
           </Card>
 

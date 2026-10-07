@@ -94,7 +94,7 @@ export function legacyFixture(): Partial<{ [K in LegacyTable]: LegacyRows[K][] }
     orders: [
       order(1, {}), // paid, 1 line (rounded 45 → 4462)
       order(2, { payment_status: "manual", order_paid_on: null, total: 14099 }), // unpaid bank transfer, 2× + 1×
-      order(3, { payment_status: "manual" }), // manual + order_paid_on → PAID (inferred)
+      order(3, { payment_status: "manual" }), // manual + order_paid_on → still PENDING (owner decision)
       order(4, { payment_status: "failed", payment_method: "MOLLIE", order_paid_on: null, is_order_placed_event_fired: 0, archive: 1 }),
       order(5, { total: 200, delivery: 100, order_paid_on: d("2026-02-02T00:00:00") }), // no lines
       order(6, { customer_id: 2, email: "Customer@Example.test", total: 5175, payment_status: "paid", country: "Atlantis" }),

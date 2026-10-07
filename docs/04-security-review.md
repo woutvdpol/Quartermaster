@@ -13,9 +13,9 @@ Gerichte review vóór livegang (backlog #12): auth, sessies/cookies, CSRF, uplo
 | # | Ernst | Bevinding | Voorstel | Status |
 |---|---|---|---|---|
 | R1 | **Hoog** | Registratie en e-mailwijziging koppelden direct de gast-`Customer` (orders, adressen, verlanglijst, nieuwsbrief) van het opgegeven adres, terwijl `emailVerifiedAt` nog `null` was; de orderlijst toonde ook ongekoppelde orders op e-mail. | Opgelost, zie "R1 — koppelen pas na bewezen e-mailadres" hieronder. | ✅ |
-| R2 | Middel | Geen Content-Security-Policy op HTML-pagina's (alleen op `/uploads`, documenten en unsubscribe). Geen XSS gevonden; CSP is extra verdediging. | Via `src/proxy.ts`, eerst als `Content-Security-Policy-Report-Only`: `default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'`. `'unsafe-inline'` is nodig zolang er geen nonces zijn (nonces dwingen dynamisch renderen af — apart besluit). Let op: Mollie-checkout is een top-level navigatie, dus `form-action` blokkeert die niet. | ⏳ |
-| R3 | Laag | Mollie-webhook vergelijkt bedrag/valuta/mode van de opgehaalde betaling niet met de `Payment`-rij vóór "PAID" (`src/server/orders/commands.ts` ~297). Nu niet uitbuitbaar (bedrag komt altijd uit de order). | Bij afwijking loggen en niet op PAID zetten; mode (test/live) op `Payment` vastleggen. | ⏳ |
-| R4 | Laag | Ongeauthenticeerde Mollie-webhook doet voor elk geldig `tr_…`-id een API-call met de sleutel van de tenant (quota-uitputting). | Eerst `Payment` (tenant-scoped) opzoeken; onbekende id's per tenant rate-limiten. | ⏳ |
+| R2 | Middel | Geen Content-Security-Policy op HTML-pagina's (alleen op `/uploads`, documenten en unsubscribe). Geen XSS gevonden; CSP is extra verdediging. | Geïmplementeerd: nonce + `'strict-dynamic'` via `src/proxy.ts`, env `CSP_MODE` (standaard `report-only`), rapporten naar `/api/csp-report`. Zie "R2 — Content-Security-Policy" hieronder. Open: na een rustige report-only-periode `CSP_MODE=enforce` zetten. | 🟡 report-only |
+| R3 | Laag | Mollie-webhook vergeleek bedrag/valuta/mode van de opgehaalde betaling niet met de `Payment`-rij vóór "PAID". | Opgelost, zie "R3/R4 — Mollie-webhook" hieronder. | ✅ |
+| R4 | Laag | Ongeauthenticeerde Mollie-webhook deed voor elk geldig `tr_…`-id een API-call met de sleutel van de tenant (quota-uitputting). | Opgelost, zie "R3/R4 — Mollie-webhook" hieronder. | ✅ |
 | R5 | Laag | Niet-geblurde productfoto's krijgen `max-age=1 jaar, immutable`; later blurren werkt niet voor caches (`src/app/uploads/[...path]/route.ts`). | Kortere max-age of sleutel roteren bij blur-wijziging. | ⏳ |
 | R6 | Laag | SUPERADMIN-tenantswitcher toont zonder cookie `tenants[0]` (kan SUSPENDED zijn) terwijl `requireStaffContext` de eerste ACTIVE tenant gebruikt (`src/lib/admin-tenant.ts` vs `src/server/context.ts`). | Dezelfde regel in beide. | ⏳ |
 | R7 | Laag | Admin-upload en `/api/collect` lezen de body zonder harde limiet als `Content-Length` ontbreekt (staff-only resp. kleine JSON). | `proxy-body-size` op ingress (k8s) + 411 zoals bij `/sell/upload`. | ⏳ |
@@ -39,6 +39,80 @@ Gerichte review vóór livegang (backlog #12): auth, sessies/cookies, CSRF, uplo
 | Laag | Alerts gaven gasten `"limit"` terug → bevestigt dat een adres al 5 alerts heeft. | Gasten krijgen het neutrale `"pending"`. |
 | Info | Foutmeldingen van `sharp` gingen naar de client. | Generieke melding, details in de serverlog. |
 | Info | Menu-items met type `url` werden bij lezen niet opnieuw gecontroleerd (ETL-rijen). | `sanitizeUrl` in `getPublicMenu`. |
+
+## R2 — Content-Security-Policy (`src/lib/csp.ts`, `src/proxy.ts`)
+
+**Mechanisme.** `src/proxy.ts` maakt per request een nonce (16 random bytes, base64) en zet de policy op de response én op de *request*-headers. Next leest de nonce uit de request-header `Content-Security-Policy` (of `-Report-Only`) en zet hem zelf op zijn bootstrap-/inline-scripts en chunks. Dezelfde proxy zet nog steeds `X-Frame-Options` (admin `DENY`, shop `SAMEORIGIN`). Client-meegestuurde `Content-Security-Policy*`/`x-nonce`-requestheaders worden altijd verwijderd.
+
+**Modus** — env `CSP_MODE` (per request gelezen, geen rebuild nodig, wel pod-herstart voor een ConfigMap-wijziging):
+- `report-only` (standaard, ook bij onbekende waarde): `Content-Security-Policy-Report-Only`; niets wordt geblokkeerd.
+- `enforce`: `Content-Security-Policy`.
+- `off`: geen CSP-header (noodknop).
+
+**Policy** (shop en platform-host; admin wijkt af waar vermeld):
+
+```
+default-src 'self';
+script-src 'self' 'nonce-…' 'strict-dynamic' https://challenges.cloudflare.com;   (+ 'unsafe-eval' alleen in next dev)
+style-src 'self' 'unsafe-inline';
+img-src 'self' data: blob:;                                (admin: + https:)
+font-src 'self'; connect-src 'self';
+frame-src 'self' https://challenges.cloudflare.com;
+object-src 'none'; base-uri 'self';
+form-action 'self' https://www.mollie.com;
+frame-ancestors 'self';                                    (admin: 'none')
+report-uri /api/csp-report; report-to csp-endpoint
+```
+plus `Reporting-Endpoints: csp-endpoint="/api/csp-report"`.
+
+Keuzes:
+- **Scripts**: alleen scripts met de nonce draaien; wat die zelf invoegen (route-chunks, de Turnstile-loader in `Turnstile.tsx`) is via `'strict-dynamic'` vertrouwd. `'self'` en de Turnstile-origin zijn fallback voor browsers zonder `'strict-dynamic'`. JSON-LD (`type="application/ld+json"`) is een datablok en valt niet onder `script-src`. Geen `'unsafe-inline'`/`'unsafe-eval'` in productie.
+- **Styles** blijven `'unsafe-inline'`: React-`style={…}` wordt een style-attribuut (thema-variabelen op de shop-root, voortgangsbalken), en de nieuwsbrief-preview (sandbox-`srcdoc`-iframe, erft de CSP) heeft een inline `<style>`. Een style-nonce zou `'unsafe-inline'` uitschakelen en dat breken. Restrisico: CSS-injectie, niet script-executie.
+- **Afbeeldingen**: alles uit `/uploads` (same-origin); `data:` voor blur-placeholders, `blob:` voor upload-previews (verkoopformulier, admin-dropzone). Admin ook `https:` omdat de nieuwsbrief-preview externe afbeeldingen uit de markdown toont (R11).
+- **Mollie**: de betaalpagina is een top-level navigatie (niet geraakt door CSP). Zonder JavaScript beantwoordt de server action de checkout-POST met een 303 naar `www.mollie.com`; `form-action` geldt ook voor redirects na een formulier, daarom staat Mollie in `form-action`.
+- **Matomo** wordt alleen server-side gebruikt (reporting-API in het dashboard); er is geen browser-script of -beacon, dus de per-tenant Matomo-URL hoeft niet in de policy. Komt er ooit een Matomo-tracker in de shop, dan moet de proxy de tenant-URL kennen (geen DB in de proxy) — dan een vaste lijst of `connect-src`/`img-src` via env.
+- `frame-ancestors` spiegelt `X-Frame-Options`; browsers negeren `frame-ancestors` in een report-only-policy, `X-Frame-Options` blijft daarom staan.
+- Geen `upgrade-insecure-requests`: TLS eindigt op de ingress (HSTS daar, R8) en het breekt lokaal `next start` over http.
+
+**Renderimpact.** Een nonce werkt alleen bij per-request renderen. Alle shop-, admin- en platformpagina's waren al dynamisch (shop-layout leest de Host-header via `getRequestScope`, admin-layout leest cookies); `cacheComponents` staat uit en `unstable_cache` cachet data, geen HTML — dus geen verandering in caching of performance. Gecontroleerd in `.next/prerender-manifest.json`: de enige geprerenderde HTML is Next's eigen `/_not-found` en `/_global-error`. Die hebben geen nonce: met `enforce` toont zo'n pagina haar HTML maar hydrateert niet. `/_not-found` is in de praktijk onbereikbaar (de fallback-rewrite `/:path+` rendert de shop-404 dynamisch); `/_global-error` verschijnt alleen als de root-layout zelf crasht.
+
+**Rapporten** — `POST /api/csp-report` (`src/server/security/csp-report.ts`): accepteert `application/csp-report` (report-uri) en `application/reports+json` (Reporting API), max. 16 KB (Content-Length én gestreamd), max. 10 rapporten per request, rate-limit 30/min per client-IP via atomaire `take()`. Logt één regel per overtreding: `[csp] <report|enforce> <directive> blocked=<origin of trefwoord> doc=<pad zonder query>` — geen volledige URL's, script-samples, IP of user-agent. Geen DB-tabel.
+
+**Verificatie (07-10-2026).** Dev (`concept.localhost:3000`, report-only): home, catalogus, productpagina (incl. in winkelwagen), winkelwagen, checkout, klant-login/registratie, `/admin/login` en de platform-landing — nul overtredingen (ReportingObserver, buffered). Productiebuild (`next start`, `CSP_MODE=enforce`, `localhost:3001`): dezelfde pagina's renderen en hydrateren, client-navigatie en de server action "in winkelwagen" werken, Turnstile laadt (`'strict-dynamic'`) en levert een token, admin-dashboard zonder overtredingen. Eén bekende, onschuldige melding: op `/checkout` doet zod v4 (client-bundle) een JIT-detectie met `Function("")` in try/catch → `script-src eval` wordt geblokkeerd/gemeld, zod valt terug op de niet-JIT-weg; functioneel geen effect. Ruis wegnemen: `z.config({ jitless: true })` in de client-module die zod laadt. `report-uri`-aflevering is in de browser bevestigd; `report-to` (Reporting API) kon in de embedded testbrowser niet worden bevestigd — Chrome gebruikt `report-to` als die er is, dus na uitrol op staging controleren dat er `[csp]`-regels binnenkomen (bijv. met een testpagina-overtreding).
+
+**Uitrol.** 1) `report-only` op staging en productie (k8s-ConfigMap staat zo). 2) Logs een paar weken volgen op `[csp]`; browserextensies veroorzaken ruis (`blocked=chrome-extension` e.d.) die genegeerd kan worden. 3) Geen echte overtredingen → `CSP_MODE=enforce`. 4) Bij problemen na enforce: `CSP_MODE=report-only` of `off` + pod-herstart.
+
+## R3/R4 — Mollie-webhook (`src/server/payments/mollie.ts`, `verify.ts`)
+
+**R3 — verificatie vóór toepassen.** Na het ophalen bij Mollie (met de sleutel van de tenant) vergelijkt
+`verifyMolliePayment` (puur, unit-getest) de betaling met onze gegevens; pas daarna gaat de status naar
+`applyMolliePaymentStatus`:
+- `id` is het opgevraagde id en hoort bij onze `Payment`-rij van deze tenant;
+- bedrag + valuta (via `toMollieAmount` op minor units) zijn gelijk aan `Payment.amount/currency` **én** aan `Order.total/currency`;
+- `mode` (test/live) is gelijk aan de modus van de geconfigureerde sleutel (een testbetaling betaalt nooit een live-order);
+- `metadata.tenantId` / `metadata.orderId` (gezet door `createMolliePayment`) wijzen naar deze tenant en order.
+
+Bij een afwijking: niets toepassen (order blijft PENDING, poging blijft OPEN), één `OrderEvent` `payment.mismatch`
+per betaling (met redenen; zichtbaar in de admin-tijdlijn als "Mollie payment does not match this order — not
+marked as paid"), één auditregel `payment.mismatch`, en een serverlog. De webhook antwoordt **200**: opnieuw
+ophalen geeft hetzelfde antwoord, retries zouden alleen het Mollie-quotum van de tenant opmaken. Staff lost het op
+via het Mollie-dashboard en "markeer als betaald"/refund. Idempotent: de mismatch-event wordt onder een
+advisory lock maar één keer geschreven; een correcte betaling blijft idempotent via `applyMolliePaymentStatus`.
+De dev-only `syncLocalMolliePayment` gebruikt hetzelfde pad (zelfde checks). De modus staat al per poging in
+`Payment.raw.mode`; een aparte kolom is niet nodig.
+
+**R4 — quotum.** Vóór een Mollie-call:
+- id onbekend formaat → 200 zonder call (bestond al);
+- `Payment` van deze tenant met een **finale** poging (PAID/FAILED/CANCELED/EXPIRED) → 200 zonder call (`FINAL`);
+- bekende, niet-finale betaling → per-tenant budget `mollie.webhook:<tenant>` (600 / 10 min);
+- onbekend id (normaal alleen de race waarin Mollie belt vóór onze `Payment`-insert commit) → klein per-tenant
+  budget `mollie.webhook.unknown:<tenant>` (30 / 10 min). Daarna gelden de bestaande regels: metadata wijst naar
+  een order van deze tenant → 500 (Mollie probeert opnieuw), anders 200.
+- Budget op → **503 + `Retry-After: 300`** zonder Mollie-call: een echte Mollie-webhook komt later terug, een
+  aanvaller verbruikt niets. Beide budgetten gebruiken de atomaire `take()` (`src/server/auth/rate-limit.ts`).
+
+Tests: `src/server/payments/verify.test.ts`, `src/server/payments/mollie.int.test.ts` (mismatch per soort,
+route 200, sync-pad, budgetten + 503, finale poging zonder call).
 
 ## R1 — koppelen pas na bewezen e-mailadres (`src/server/customer-auth/link.ts`)
 

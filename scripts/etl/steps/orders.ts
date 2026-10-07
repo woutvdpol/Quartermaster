@@ -9,13 +9,13 @@ import { PICKUP_NAME } from "./shipping";
 
 const DAY = 86_400_000;
 
-/** Legacy payment_status (+ order_paid_on) → PaymentStatus. See docs/etl/README.md "Betaalstatus". */
+/** Legacy payment_status → PaymentStatus. See docs/etl/README.md "Betaalstatus". */
 export function mapPaymentStatus(o: Pick<LegacyOrder, "payment_status" | "order_paid_on">): { status: PaymentStatus; inferred: boolean } {
   const s = (o.payment_status ?? "").trim().toLowerCase();
   if (s === "paid") return { status: "PAID", inferred: false };
-  // `manual` = bank transfer / cash awaiting payment (owner: PENDING, not revenue). The legacy admin
-  // hid its "Paid" button once order_paid_on was set, so manual + order_paid_on counts as paid.
-  if (s === "manual") return o.order_paid_on ? { status: "PAID", inferred: true } : { status: "PENDING", inferred: false };
+  // `manual` = bank transfer / cash awaiting payment. Owner decision (docs/02-besluiten.md): ALWAYS
+  // PENDING (not revenue), also when order_paid_on is set — paid revenue matches legacy `paid` exactly.
+  if (s === "manual") return { status: "PENDING", inferred: false };
   if (s === "pending" || s === "open") return { status: "PENDING", inferred: false };
   if (s === "canceled" || s === "cancelled") return { status: "CANCELED", inferred: false };
   if (s === "expired") return { status: "EXPIRED", inferred: false };
@@ -82,7 +82,7 @@ export async function ordersStep(ctx: EtlContext) {
     (await tx.order.findMany({ where: { tenantId, number: { in: [...orderIds] } } })).map((o) => [o.number, o]),
   );
 
-  const stats = { reconstructed: 0, byMethod: new Map<string, number>(), noLines: 0, inferredPaid: 0, unknownCountry: [] as number[] };
+  const stats = { reconstructed: 0, byMethod: new Map<string, number>(), noLines: 0, unknownCountry: [] as number[] };
 
   for (const o of orders) {
     if (!Number.isInteger(o.id) || o.id <= 0) {
@@ -167,11 +167,6 @@ export async function ordersStep(ctx: EtlContext) {
 
     // ── Status ──
     const pay = mapPaymentStatus(o);
-    if (pay.inferred && pay.status === "PAID") {
-      stats.inferredPaid++;
-      legacyData.paidInferred = true;
-      report.note("Betaalstatus afgeleid", `#${o.id}: manual + order_paid_on → PAID`);
-    }
     const paid = pay.status === "PAID";
     const archivedRaw = !!o.archive;
     const archivedAt = archivedRaw || lines.length === 0 ? (o.updated_at ?? o.created_at ?? ctx.now) : null;
@@ -349,7 +344,4 @@ export async function ordersStep(ctx: EtlContext) {
     newPaidSubtotal: newPaid._sum.subtotal ?? 0,
     currency: ctx.currency,
   };
-  if (stats.inferredPaid) {
-    report.warn(`${stats.inferredPaid} 'manual' orders have order_paid_on and were imported as PAID (difference with legacy 'paid' revenue).`);
-  }
 }

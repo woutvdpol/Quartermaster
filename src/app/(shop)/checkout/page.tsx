@@ -99,7 +99,9 @@ async function CheckoutContent() {
   }
 
   const [quote, legalLinks] = await Promise.all([
-    ctx.defaultCountry ? quoteCheckout(tenantId, token, { countryCode: ctx.defaultCountry }) : Promise.resolve(null),
+    ctx.defaultCountry
+      ? quoteCheckout(tenantId, token, { countryCode: ctx.defaultCountry, paymentMethod: ctx.payment.methods[0]?.id ?? null })
+      : Promise.resolve(null),
     getLegalLinks(tenantId),
   ]);
   const termsHref = legalLinks.find((l) => l.key === "TERMS")?.href ?? (ctx.termsPageSlug ? `/${ctx.termsPageSlug}` : null);

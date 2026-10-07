@@ -78,7 +78,7 @@ Storefront-cache: vanuit het CLI-proces kan de Next-cache niet worden geïnvalid
 | `products.photos` | `ProductImage` | dubbel JSON gedecodeerd; volgorde = `sortOrder` (0 = hoofdfoto). Zonder download: placeholder-rij (`legacyCloudflareId`, `processedAt` null, `storageKey …/cf-<id>.pending`). |
 | `related_products` | `ProductRelation` | zelfverwijzingen overgeslagen. |
 | `regions/weights/region_weights` | `ShippingZone` + `ShippingRate` | tarief decimal € → centen; "Pickup…" → `isPickup`; landen uit `--zone-countries` of afgeleid uit orders (controleren!); zone zonder land → inactief. |
-| `payment_methods` | — | alleen Mollie (besluit 16); toeslag-% alleen gebruikt om toeslagen in oude totalen te herkennen. |
+| `payment_methods` | `Setting` "payments" → `surcharges` | alleen Mollie (besluit 16): methoden zelf worden niet gemigreerd. Een toeslag-% wordt een toeslagregel voor de Mollie-methode met dezelfde naam (dump: `Paypal` 5,00 → `paypal` 500 bp, label "PayPal fee"); bestaande regels (door de eigenaar ingesteld) worden nooit overschreven. Het % wordt ook gebruikt om toeslagen in oude totalen te herkennen (`Order.surchargeTotal`). |
 | `users` + spatie-rollen | `User` (OWNER of CUSTOMER) + `Customer` + `Address` + `WishlistItem` | `admin`/`owner` → OWNER; wachtwoord als `bcrypt$<originele hash>` (verificatie + herhash bij login in `src/server/auth`). `birth_date` niet (AVG). |
 | `orders` + `order_details` | `Order`, `OrderLine`, `OrderAddress` (SHIPPING + kopie BILLING), `Payment`, `OrderEvent` | zie hieronder. Klant per lower-case e-mail ("virtuele klant"), gekoppeld aan de user-klant via `customer_id`. |
 | `content_pages` + `content_blocks` | `ContentPage` + `ContentBlock` | per type naar `data`-JSON, gevalideerd met `parseBlock`; `EMAILER` → `NEWSLETTER_SIGNUP`; `home` → systeempagina HOME; gereserveerde slugs krijgen suffix. |
@@ -99,9 +99,9 @@ qty 0 + `RESERVED` → RESERVED (legacy toonde uitverkochte items als "Reserved"
 anders ACTIVE. De tijdelijke mandreservering (`product_reserved_on`) wordt genegeerd (staat in `legacyData`).
 
 ### Orders
-- **Betaalstatus:** `paid` → PAID; `manual` → PENDING (onbetaalde overschrijving, geen omzet), **behalve** als
-  `order_paid_on` gezet is → PAID (`legacyData.paidInferred`; de oude admin verborg dan de "Paid"-knop);
-  `failed` → FAILED.
+- **Betaalstatus:** `paid` → PAID; `manual` → **altijd** PENDING (onbetaalde overschrijving/contant, geen omzet),
+  ook als `order_paid_on` gezet is (eigenaarsbesluit, `02-besluiten.md`); `failed` → FAILED. Betaalde omzet
+  sluit daardoor exact aan op legacy `paid`.
 - **Regelprijzen:** `order_details.price` is een afgerond regeltotaal in hele euro's. Reconstructie uit
   `orders.total − delivery`: (1) huidige productprijzen als die exact optellen, (2) idem plus toeslag-% van de
   betaalmethode, (3) anders naar verhouding van de afgeronde bedragen (largest remainder, centen exact).
@@ -131,7 +131,7 @@ aantallen en id's** — geen namen, e-mailadressen of adressen. Na een echte run
 ## Bekende data-issues (testdump, 07-10-2026)
 - 49 van 86 orders hebben geen regels (doc 04 noemde 44) → gearchiveerd.
 - Alle 37 orders met regels zijn exact via productprijzen te reconstrueren (afrondingsverschillen −38…+20 ct).
-- 2 `manual`-orders hebben `order_paid_on` → als PAID geïmporteerd: betaalde omzet nieuw = legacy + € 235,61.
+- 2 `manual`-orders hebben `order_paid_on` → toch PENDING geïmporteerd (besluit); betaalde omzet nieuw = legacy.
 - 964 van 970 producten zonder foto's (testrommel, vrijwel allemaal INACTIVE → DRAFT); 6 producten met samen 73
   foto's (placeholders, nog te downloaden). Slug-botsingen: `dhdhdh` ×3, `test` ×3.
 - Regio "Freeyo" heeft geen landen → afgeleid NL, BE uit orders (controleren). "Pickup in store" → afhaalzone.

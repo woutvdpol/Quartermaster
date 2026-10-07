@@ -61,7 +61,7 @@ export function OrderSummary({ order }: { order: OrderMailData }) {
           label={order.shippingMethod === "PICKUP" ? "Pickup" : `Shipping${order.shippingZoneName ? ` (${order.shippingZoneName})` : ""}`}
           value={money(order.shippingTotal)}
         />
-        {order.surchargeTotal ? <Amount label="Surcharge" value={money(order.surchargeTotal)} /> : null}
+        {order.surchargeTotal ? <Amount label={order.surchargeLabel?.trim() || "Payment surcharge"} value={money(order.surchargeTotal)} /> : null}
         <Amount label="Total" value={money(order.total)} bold />
       </Section>
     </Section>

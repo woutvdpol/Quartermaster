@@ -7,6 +7,9 @@ import { revalidateCatalog } from "@/server/storefront-catalog/cache";
  *
  * - The body is only used for the payment id; the status is always re-fetched from Mollie.
  * - Unknown tenant / unknown or malformed id → 200 (Mollie stops retrying; nothing leaks).
+ * - Payment that doesn't match our records (amount/currency/mode/metadata, R3) → 200: nothing is applied,
+ *   the mismatch is on the order timeline; retrying would only fetch the same payment again.
+ * - Per-tenant webhook budget exhausted (R4) → 503 + Retry-After; Mollie retries later.
  * - Transient failures (Mollie or DB unreachable, payment row not committed yet) → 500 so Mollie retries.
  * - Tenants that are SUSPENDED/ARCHIVED still get their payments recorded (money already moved).
  */
@@ -29,7 +32,12 @@ export async function POST(request: Request, ctx: RouteContext<"/api/webhooks/mo
     const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { id: true } });
     if (!tenant) return ok();
     const outcome = await handleMollieWebhook(tenant.id, id);
+    if (outcome.outcome === "throttled") {
+      return new Response("busy", { status: 503, headers: { ...headers, "Retry-After": "300" } });
+    }
     if (outcome.outcome === "ignored") console.info(`[mollie-webhook] ${tenantId}: ignored ${outcome.reason}`);
+    // Mismatch: already logged + recorded on the order; 200 because a retry re-fetches the same payment.
+    else if (outcome.outcome === "mismatch") return ok();
     // A paid order can turn products SOLD; the shop must not keep serving them as available.
     else revalidateCatalog(tenant.id);
     return ok();

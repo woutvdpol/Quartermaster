@@ -17,4 +17,4 @@ Bevindingen uit de eigen auth-implementatie en reviews. Afvinken vóór livegang
 | 11 | Tenant-isolatie alleen in service-laag | ✅ tweede laag: `tenantDb()` Prisma-extension (`src/server/tenant-scope.ts`) + isolatietests; grenzen in `04-security-review.md` |
 | 12 | Security-review vóór livegang | ✅ uitgevoerd → `04-security-review.md`; R1 opgelost; open: R2 (CSP) e.a. |
 | 13 | Gastorders/adressen koppelen bij registratie of e-mailwijziging zonder verificatie (review R1) | ✅ opgelost: koppelen pas na verificatie of reset (`customer-auth/link.ts`); ETL-aanbeveling in `04-security-review.md` |
-| 14 | Content-Security-Policy op HTML-pagina's (review R2) | ⏳ eerst Report-Only |
+| 14 | Content-Security-Policy op HTML-pagina's (review R2) | 🟡 geïmplementeerd, draait report-only: nonce + `'strict-dynamic'` via `src/proxy.ts` (`src/lib/csp.ts`), env `CSP_MODE` (`report-only`/`enforce`/`off`), rapporten via `/api/csp-report` in de log. Open: na een rustige periode `CSP_MODE=enforce` (zie `04-security-review.md` R2) |

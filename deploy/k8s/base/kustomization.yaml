@@ -37,6 +37,8 @@ configMapGenerator:
       - MAIL_FROM_FALLBACK=no-reply@example.invalid
       # 0 = ignore X-Forwarded-For (default, safe without a proxy). Overlays behind ingress-nginx set 1.
       - TRUSTED_PROXY_HOPS=0
+      # Content-Security-Policy: report-only (default) | enforce | off — docs/04-security-review.md R2.
+      - CSP_MODE=report-only
       - STORAGE_DRIVER=local
       - UPLOADS_DIR=/app/uploads
       # Worker: run the pg-boss cron schedules (set 0 when components/external-cron is used).

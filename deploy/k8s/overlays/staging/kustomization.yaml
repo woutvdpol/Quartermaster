@@ -39,6 +39,8 @@ configMapGenerator:
       - MAIL_FROM_FALLBACK=no-reply@staging.quartermaster.example
       - TRUSTED_PROXY_HOPS=1
       - TURNSTILE_SITE_KEY=  # public Cloudflare Turnstile site key (runtime)
+      # Content-Security-Policy: report-only | enforce | off (docs/04-security-review.md R2).
+      - CSP_MODE=report-only
       - BACKUP_RETENTION_DAYS=3
       - JOBS_LOG_CRON=1
 

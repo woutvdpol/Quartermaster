@@ -139,6 +139,7 @@ Alles is runtime-config (behalve de build-args hierboven); één image gaat door
 | `APP_URL` | ConfigMap | ja | `https://<platform-host>`; basis voor maillinks zonder shopdomein en voor de Mollie-webhook-URL. |
 | `MAIL_FROM_FALLBACK` | ConfigMap | ja | Afzender; moet door SPF/DKIM van de SMTP-provider gedekt zijn. |
 | `TRUSTED_PROXY_HOPS` | ConfigMap | ja (k8s: `1`) | Zie §9. |
+| `CSP_MODE` | ConfigMap | nee (default `report-only`) | Content-Security-Policy: `report-only` (alleen melden, `[csp]`-regels in de log), `enforce` (blokkeren) of `off`. Per request gelezen; wijzigen = ConfigMap + pod-herstart. Zie `04-security-review.md` R2. |
 | `NODE_ENV` | ConfigMap/image | — | `production`. |
 | `STORAGE_DRIVER` | ConfigMap | — | `local` (enige driver). |
 | `UPLOADS_DIR` | ConfigMap/image | — | `/app/uploads` (alias `UPLOAD_DIR`). |
@@ -389,6 +390,7 @@ Rollback-plan: DNS terug naar de oude server en Concept500 weer schrijfbaar zett
 - [ ] `PLATFORM_HOST`, `APP_URL` (https), `MAIL_FROM_FALLBACK`; `TRUSTED_PROXY_HOPS=1` en de ingress-nginx-config uit §9.
 - [ ] `SMTP_URL` (productie-SMTP), SPF/DKIM/DMARC voor het afzenderdomein; testmail ontvangen (geen spam).
 - [ ] **Turnstile**: `TURNSTILE_SECRET_KEY` in het Secret **en** `TURNSTILE_SITE_KEY` in de ConfigMap; alle shop-hostnamen in de widget. Test: registreren en nieuwsbrief-inschrijving werken.
+- [ ] `CSP_MODE=report-only` bij livegang; logs volgen op `[csp]`-regels en na een rustige periode `enforce` zetten (`04-security-review.md` R2).
 - [ ] `CRON_SECRET` alleen bij external-cron; `MATOMO_URL`/`MATOMO_TOKEN` indien gewenst.
 - [ ] Images gebouwd met `NEXT_DEPLOYMENT_ID`.
 

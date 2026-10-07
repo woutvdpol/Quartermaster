@@ -107,3 +107,10 @@ Kanttekeningen:
 - **Oude wachtwoorden:** eigen bcrypt-verificatie (geen package). ETL zet legacy-hashes als `bcrypt$…` in `passwordHash`; bij eerste geslaagde login wordt herhasht naar scrypt.
 - **Hosting:** generieke Kubernetes-manifests (Kustomize, ingress-nginx, cert-manager); provider later.
 - **Foto's uit Cloudflare:** nu niet downloaden. ETL krijgt een downloader-interface met `--skip-images` en een nep-downloader in tests; echte download pas bij de echte migratie.
+
+## ETL-details — akkoord eigenaar (08-10-2026)
+- Legacy `manual`-orders worden **altijd** onbetaald (PENDING) geïmporteerd, ook met `order_paid_on`; omzet sluit exact aan op legacy `paid`.
+- De legacy `admin`-accounts worden OWNER van de tenant.
+- Verzendregio "Freeyo" was testdata; geen handmatige landtoewijzing nodig.
+- Toeslag per betaalmethode (legacy PayPal 5%) wordt in de admin instelbaar en door de ETL overgenomen.
+- Hosting/provider nog onbekend; manifests blijven generiek.

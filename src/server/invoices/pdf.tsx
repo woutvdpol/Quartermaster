@@ -164,7 +164,7 @@ export function InvoicePdf({ doc }: { doc: InvoiceDocument }) {
           </View>
           {totals.surcharge ? (
             <View style={s.totalRow}>
-              <Text>Payment surcharge / Toeslag</Text>
+              <Text>{totals.surchargeLabel?.trim() ? `${totals.surchargeLabel.trim()} / Toeslag` : "Payment surcharge / Toeslag"}</Text>
               <Text>{money(totals.surcharge, cur)}</Text>
             </View>
           ) : null}

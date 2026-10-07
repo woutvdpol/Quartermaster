@@ -100,6 +100,8 @@ export const cartCopy = {
     subtotal: "Subtotal",
     shipping: "Shipping",
     insuranceLine: "Insurance",
+    surchargeLine: "Payment surcharge",
+    methodSurcharge: (label: string, rule: string) => `${label}: +${rule}`,
     total: "Total",
     placeOrder: "Place order and pay",
     placeOrderDev: "Place order",

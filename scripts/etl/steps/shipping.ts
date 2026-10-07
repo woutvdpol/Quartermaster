@@ -1,4 +1,10 @@
+import { PaymentMethod } from "@mollie/api-client";
 import { isCountryCode } from "../../../src/server/shipping/countries";
+import { PAYMENTS_SETTINGS_GROUP, parseStoredPaymentsSettings, paymentsSettingsSchema } from "../../../src/server/payments/settings";
+import { MAX_SURCHARGE_BPS } from "../../../src/server/payments/surcharge";
+import { methodLabel } from "../../../src/server/payments/method-labels";
+
+const MOLLIE_METHOD_IDS = new Set<string>(Object.values(PaymentMethod));
 import type { EtlContext } from "../context";
 import { toCountryCode } from "../transforms/people";
 
@@ -111,19 +117,55 @@ export async function shippingStep(ctx: EtlContext) {
 }
 
 /**
- * Legacy `payment_methods` are not migrated: Quartermaster takes payments through Mollie only
- * (decision 16); bank transfer/cash survive as PaymentProvider.MANUAL on imported orders. The
- * surcharge percentage is only used to recognise surcharges inside legacy order totals.
+ * Legacy `payment_methods` are not migrated as methods: Quartermaster takes payments through Mollie only
+ * (decision 16); bank transfer/cash survive as PaymentProvider.MANUAL on imported orders. A legacy
+ * surcharge % (Concept500: PayPal 5%) becomes a surcharge rule for the matching Mollie method id in the
+ * "payments" setting (src/server/payments/surcharge.ts). Rules the owner already configured are never
+ * overwritten (re-runs leave them alone). The % is also used to recognise surcharges inside legacy order
+ * totals (steps/orders.ts → Order.surchargeTotal).
  */
 export async function paymentsStep(ctx: EtlContext) {
-  const { report } = ctx;
+  const { report, tx, tenantId } = ctx;
   const methods = await ctx.legacy.read("payment_methods");
   report.legacy("payment methods", methods.length);
+  const row = await tx.setting.findUnique({ where: { tenantId_group: { tenantId, group: PAYMENTS_SETTINGS_GROUP } } });
+  if (row && !paymentsSettingsSchema.safeParse(row.data).success) {
+    // Never rewrite a row we can't fully parse (it holds the encrypted Mollie key).
+    report.warn("payments-setting is ongeldig — toeslagen niet overgenomen");
+    return;
+  }
+  const current = parseStoredPaymentsSettings(row?.data);
+  const surcharges = { ...current.surcharges };
+  let changed = false;
   for (const m of methods) {
-    const reason = /mollie/i.test(m.name) ? "Mollie: configureer API-key in Admin → Payments" : "alleen Mollie (besluit 16)";
-    report.skip("payment methods", reason);
-    if (m.surcharge && Number(m.surcharge) > 0) {
-      report.note("Betaalmethoden", `"${m.name}" had een toeslag van ${Number(m.surcharge)}% — geen equivalent in Quartermaster (alleen gebruikt om toeslagen in oude ordertotalen te herkennen)`);
+    const pct = Number(m.surcharge ?? 0) || 0;
+    const methodId = m.name.trim().toLowerCase().replace(/[\s_-]+/g, "");
+    if (pct <= 0) {
+      report.skip("payment methods", /mollie/i.test(m.name) ? "Mollie: configureer API-key in Admin → Payments" : "alleen Mollie (besluit 16)");
+      continue;
     }
+    if (!MOLLIE_METHOD_IDS.has(methodId)) {
+      report.skip("payment surcharges", "geen Mollie-methode");
+      report.note("Betaalmethoden", `"${m.name}" had een toeslag van ${pct}% — geen bijbehorende Mollie-methode, niet overgenomen`);
+      continue;
+    }
+    const percentBps = Math.round(pct * 100);
+    if (surcharges[methodId]) {
+      report.unchanged("payment surcharges");
+      continue;
+    }
+    if (percentBps > MAX_SURCHARGE_BPS) {
+      report.skip("payment surcharges", "toeslag > 20%");
+      continue;
+    }
+    surcharges[methodId] = { percentBps, fixed: 0, cap: null, label: `${methodLabel(methodId)} fee` };
+    changed = true;
+    report.created("payment surcharges");
+    report.note("Betaalmethoden", `"${m.name}" toeslag ${pct}% → Mollie-methode \`${methodId}\` (${percentBps} bp, label "${methodLabel(methodId)} fee")`);
+  }
+  if (changed) {
+    const data = JSON.parse(JSON.stringify({ ...current, surcharges }));
+    if (row) await tx.setting.update({ where: { id: row.id }, data: { data } });
+    else await tx.setting.create({ data: { tenantId, group: PAYMENTS_SETTINGS_GROUP, data } });
   }
 }

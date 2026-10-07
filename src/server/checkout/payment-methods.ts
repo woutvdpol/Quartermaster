@@ -1,55 +1,26 @@
 import "server-only";
-import { getMollieCredentials, mollieClient } from "@/server/payments/mollie-config";
+import { getMollieCredentials, getSurchargeRules, mollieClient } from "@/server/payments/mollie-config";
+import { methodLabel } from "@/server/payments/method-labels";
+import { isActiveRule, type SurchargeRule } from "@/server/payments/surcharge";
 
 /*
  * Which payment methods checkout offers (decision 16: Mollie only).
  *  - Owner restricted the list (payments settings `enabledMethods`) → exactly those.
  *  - Otherwise → the methods active on the Mollie account (methods.list, cached 10 min per tenant).
  *    If Mollie can't be reached we offer no list and let the customer pick on Mollie's hosted page.
+ *  - Each method carries its surcharge rule (payments settings `surcharges`) for display.
  *  - No Mollie key → `configured: false`. In development (NODE_ENV !== "production") the order page then
  *    offers a "Simulate payment (dev)" button instead; in production checkout is blocked.
  */
 
-export const METHOD_LABELS: Record<string, string> = {
-  ideal: "iDEAL",
-  bancontact: "Bancontact",
-  creditcard: "Credit card",
-  paypal: "PayPal",
-  applepay: "Apple Pay",
-  googlepay: "Google Pay",
-  banktransfer: "Bank transfer",
-  belfius: "Belfius",
-  kbc: "KBC/CBC",
-  eps: "EPS",
-  giropay: "giropay",
-  przelewy24: "Przelewy24",
-  sofort: "SOFORT",
-  klarna: "Klarna",
-  klarnapaylater: "Klarna Pay later",
-  klarnapaynow: "Klarna Pay now",
-  klarnasliceit: "Klarna Slice it",
-  in3: "in3",
-  giftcard: "Gift card",
-  mybank: "MyBank",
-  twint: "TWINT",
-  blik: "BLIK",
-  trustly: "Trustly",
-  riverty: "Riverty",
-  billie: "Billie",
-  alma: "Alma",
-  satispay: "Satispay",
-  paybybank: "Pay by Bank",
-  bacs: "Bacs Direct Debit",
-  swish: "Swish",
-  mbway: "MB WAY",
-  multibanco: "Multibanco",
+export { METHOD_LABELS, methodLabel } from "@/server/payments/method-labels";
+
+export type PaymentMethodOption = {
+  id: string;
+  label: string;
+  /** Surcharge rule for this method (shown next to it; the amount itself always comes from the server quote). */
+  surcharge: SurchargeRule | null;
 };
-
-export function methodLabel(id: string): string {
-  return METHOD_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
-}
-
-export type PaymentMethodOption = { id: string; label: string };
 
 export type PaymentSetup = {
   configured: boolean;
@@ -86,7 +57,13 @@ export async function getPaymentSetup(tenantId: string): Promise<PaymentSetup> {
       }
     }
   }
-  return { configured: true, mode: creds.mode, methods: ids.map((id) => ({ id, label: methodLabel(id) })), devSimulation: false };
+  const rules = await getSurchargeRules(tenantId);
+  return {
+    configured: true,
+    mode: creds.mode,
+    methods: ids.map((id) => ({ id, label: methodLabel(id), surcharge: isActiveRule(rules[id]) ? rules[id] : null })),
+    devSimulation: false,
+  };
 }
 
 /** The method to store/send, or an error message. "" = Mollie chooses (only when no list is offered). */

@@ -65,8 +65,13 @@ export async function placeOrderAction(_prev: CheckoutFormState, form: FormData)
   return { status: "placed", redirectTo: destination };
 }
 
-/** Totals + shipping options for the address country (re-run on every country/option change). */
-export async function checkoutQuoteAction(input: { countryCode?: unknown; shippingOptionId?: unknown; insurance?: unknown }): Promise<CheckoutQuote | null> {
+/** Totals + shipping options for the address country (re-run on every country/option/payment-method change). */
+export async function checkoutQuoteAction(input: {
+  countryCode?: unknown;
+  shippingOptionId?: unknown;
+  insurance?: unknown;
+  paymentMethod?: unknown;
+}): Promise<CheckoutQuote | null> {
   const country = typeof input?.countryCode === "string" ? input.countryCode : "";
   if (!/^[A-Za-z]{2}$/.test(country)) return null;
   const tid = await tenantId();
@@ -74,5 +79,6 @@ export async function checkoutQuoteAction(input: { countryCode?: unknown; shippi
     countryCode: country,
     shippingOptionId: typeof input.shippingOptionId === "string" ? input.shippingOptionId.slice(0, 64) : null,
     insurance: input.insurance === true,
+    paymentMethod: typeof input.paymentMethod === "string" && /^[a-z0-9]{1,40}$/.test(input.paymentMethod) ? input.paymentMethod : null,
   });
 }
