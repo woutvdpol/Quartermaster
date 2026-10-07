@@ -229,10 +229,10 @@ function TopList({ title, rows }: { title: string; rows: { key: string; label: s
         <ol className="grid gap-1 text-[13px]">
           {rows.map((r) => (
             <li key={r.key} className="flex items-baseline justify-between gap-2">
-              <span className="truncate font-mono text-xs" title={r.label}>
+              <span className="min-w-0 truncate font-mono text-xs" title={r.label}>
                 {r.label}
               </span>
-              <span className="font-mono text-xs tabular-nums text-muted">{nf(r.value)}</span>
+              <span className="shrink-0 font-mono text-xs tabular-nums text-muted">{nf(r.value)}</span>
             </li>
           ))}
         </ol>
