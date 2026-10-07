@@ -1,0 +1,32 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { requireShop } from "@/server/storefront/context";
+import { CatalogView, defaultSortFor } from "@/components/shop/catalog/CatalogView";
+import { catalogCopy as copy } from "@/components/shop/catalog/_copy";
+import { catalogMetadata } from "@/components/shop/catalog/metadata";
+import { ARCHIVE_PATH, SHOP_PATH, parseCatalogParams } from "@/server/storefront-catalog";
+
+/** Sold-items reference archive (settings.catalog.publicArchive). Prices only with showPriceWhenSold. */
+export async function generateMetadata({ searchParams }: PageProps<"/archive">): Promise<Metadata> {
+  const shop = await requireShop();
+  if (!shop.settings.catalog.publicArchive) return {};
+  const params = parseCatalogParams(await searchParams, defaultSortFor(shop, "archive"));
+  return catalogMetadata({ path: ARCHIVE_PATH, params, title: copy.archive.title, description: copy.archive.metaDescription(shop.shopName) });
+}
+
+export default async function ArchivePage({ searchParams }: PageProps<"/archive">) {
+  const shop = await requireShop();
+  if (!shop.settings.catalog.publicArchive) notFound();
+  const sp = await searchParams;
+  return (
+    <CatalogView
+      shop={shop}
+      mode="archive"
+      basePath={ARCHIVE_PATH}
+      searchParams={sp}
+      title={copy.archive.title}
+      intro={<p>{copy.archive.intro}</p>}
+      crumbs={[{ label: copy.shop.title, href: SHOP_PATH }, { label: copy.archive.title }]}
+    />
+  );
+}
