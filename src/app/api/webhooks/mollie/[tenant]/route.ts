@@ -1,5 +1,6 @@
 import { db } from "@/server/db";
 import { handleMollieWebhook } from "@/server/payments/mollie";
+import { revalidateCatalog } from "@/server/storefront-catalog/cache";
 
 /**
  * Mollie webhook: POST /api/webhooks/mollie/<tenant-id> (id, not slug: renaming a shop must not break open payments) with form body `id=tr_…`.
@@ -29,6 +30,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/webhooks/mo
     if (!tenant) return ok();
     const outcome = await handleMollieWebhook(tenant.id, id);
     if (outcome.outcome === "ignored") console.info(`[mollie-webhook] ${tenantId}: ignored ${outcome.reason}`);
+    // A paid order can turn products SOLD; the shop must not keep serving them as available.
+    else revalidateCatalog(tenant.id);
     return ok();
   } catch (err) {
     console.error(`[mollie-webhook] ${tenantId}: retryable failure`, err instanceof Error ? err.message : err);

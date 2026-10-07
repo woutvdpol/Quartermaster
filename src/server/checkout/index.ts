@@ -1,0 +1,502 @@
+import "server-only";
+import { z } from "zod";
+import { db } from "@/server/db";
+import { ServiceError } from "@/server/context";
+import { getSettings } from "@/server/settings";
+import { nextSequenceValue } from "@/server/sequence";
+import { reserveProduct } from "@/server/stock/reservations";
+import { findOrCreateGuestCustomer } from "@/server/customers";
+import { subscribe } from "@/server/newsletter";
+import { variantKey } from "@/server/media/product-images";
+import { calculateShippingQuote, type QuoteResult, type ShippingOption } from "@/server/shipping/calc";
+import { loadQuoteZones } from "@/server/shipping/quote";
+import { isCountryCode, type CountryCode } from "@/server/shipping/countries";
+import { getCart, lockCart, loadCartLinesTx, summarize, type CartView, type ShopViewer } from "@/server/cart";
+import type { Prisma } from "@/generated/prisma/client";
+import { parseCheckoutInput, type FieldErrors } from "./schema";
+import { computeTotals, deliverableCountries, freeShippingProgress, minimumOrderShortfall, selectOption, type FreeShippingProgress, type Totals } from "./totals";
+import { getPaymentSetup, validatePaymentMethod, type PaymentSetup } from "./payment-methods";
+
+export { getPaymentSetup, methodLabel, isDevSimulationAllowed, type PaymentSetup, type PaymentMethodOption } from "./payment-methods";
+export { startOrderPayment, retryOrderPayment, simulateDevPayment, type StartPaymentResult, type RetryResult } from "./payment";
+export { getOrderStatusView, type OrderStatusView } from "./order-status";
+export type { FieldErrors } from "./schema";
+
+/*
+ * Checkout (docs/analysis/03 §2.5–2.6, with the legacy bugs fixed):
+ *  - Prices, shipping and totals are ALWAYS computed here from DB rows; nothing the browser sends
+ *    about money is read.
+ *  - The shipping zone follows the country of the SHIPPING ADDRESS (legacy let the customer pick any
+ *    cheaper "region"). The client only chooses among the options valid for that country.
+ *  - placeOrder runs in ONE transaction: cart row lock (double submits serialise), product locks,
+ *    every item re-reserved for THIS cart (fails if someone else holds it), order + lines + addresses,
+ *    reservations moved onto the order for the payment window, cart emptied.
+ *  - The order is only completed by the Mollie webhook (orders/commands.applyMolliePaymentStatus →
+ *    finalizeOrder); the /order/<uuid> page only reads.
+ */
+
+/** How long an order keeps its items while the customer pays at Mollie. */
+export const PAYMENT_HOLD_MINUTES = 30;
+/** Window in which an identical submit returns the order it already created. */
+const IDEMPOTENCY_WINDOW_MS = 24 * 60 * 60 * 1000;
+const EMPTY_CART_REUSE_WINDOW_MS = 30 * 60 * 1000;
+
+export type CheckoutRequirements = {
+  /** Guest with a sensitive (blurred) item, or guest checkout disabled. */
+  loginRequired: boolean;
+  loginReason: "sensitive" | "guest_checkout_off" | null;
+  ageConfirmation: boolean;
+  minimumAge: number;
+};
+
+export type CheckoutContext = {
+  cart: CartView | null;
+  currency: string;
+  countries: CountryCode[];
+  defaultCountry: CountryCode | null;
+  payment: PaymentSetup;
+  requirements: CheckoutRequirements;
+  termsPageSlug: string | null;
+  disclaimer: string;
+  freeShippingThreshold: number;
+  minimumOrder: number;
+  newsletterEnabled: boolean;
+  viewer: { email: string; name: string | null } | null;
+};
+
+function requirementsFor(
+  lines: { blurred: boolean; ageRestricted: boolean }[],
+  viewer: ShopViewer | null,
+  checkout: { guestCheckout: boolean },
+  legal: { blurSensitiveForGuests: boolean; ageVerification: string; minimumAge: number },
+): CheckoutRequirements {
+  const sensitive = !viewer && legal.blurSensitiveForGuests && lines.some((l) => l.blurred);
+  const guestOff = !viewer && !checkout.guestCheckout;
+  return {
+    loginRequired: sensitive || guestOff,
+    loginReason: sensitive ? "sensitive" : guestOff ? "guest_checkout_off" : null,
+    ageConfirmation: legal.ageVerification === "checkout" && lines.some((l) => l.ageRestricted),
+    minimumAge: legal.minimumAge,
+  };
+}
+
+/** Everything the checkout page needs to render (read-only). */
+export async function getCheckoutContext(tenantId: string, token: string | null | undefined, viewer: ShopViewer | null): Promise<CheckoutContext> {
+  const [cart, checkout, legal, general, platform, zones, payment, tenant] = await Promise.all([
+    getCart(tenantId, token),
+    getSettings(tenantId, "checkout"),
+    getSettings(tenantId, "legal"),
+    getSettings(tenantId, "general"),
+    getSettings(tenantId, "platform"),
+    loadQuoteZones(tenantId),
+    getPaymentSetup(tenantId),
+    db.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { currency: true } }),
+  ]);
+  const countries = deliverableCountries(zones);
+  const preferred = [cart?.countryCode, general.address.country].find((c): c is CountryCode => !!c && isCountryCode(c) && countries.includes(c));
+  const buyable = (cart?.lines ?? []).filter((l) => l.state === "held" || l.state === "lapsed");
+  return {
+    cart,
+    currency: tenant.currency,
+    countries,
+    defaultCountry: preferred ?? countries[0] ?? null,
+    payment,
+    requirements: requirementsFor(buyable, viewer, checkout, legal),
+    termsPageSlug: checkout.termsPageSlug,
+    disclaimer: legal.disclaimers.checkout,
+    freeShippingThreshold: checkout.freeShippingThresholdCents,
+    minimumOrder: checkout.minimumOrderCents,
+    newsletterEnabled: platform.newsletterEnabled,
+    viewer: viewer ? { email: viewer.email, name: viewer.name } : null,
+  };
+}
+
+export type QuoteOptionView = {
+  id: string;
+  name: string;
+  price: number;
+  basePrice: number;
+  freeShipping: boolean;
+  isPickup: boolean;
+  insurance: { price: number; maxInsuredValue: number | null } | null;
+};
+
+export type CheckoutQuote = {
+  countryCode: string;
+  deliverable: boolean;
+  /** Why home delivery isn't possible (also when only pickup remains). */
+  unavailableReason: string | null;
+  options: QuoteOptionView[];
+  selectedOptionId: string | null;
+  insurance: boolean;
+  totals: Totals;
+  itemCount: number;
+  freeShipping: FreeShippingProgress;
+  minimumShortfall: number;
+  currency: string;
+};
+
+const quoteInputSchema = z.object({
+  countryCode: z.string().trim().toUpperCase().max(2),
+  shippingOptionId: z.string().trim().max(64).nullish(),
+  insurance: z.boolean().optional(),
+});
+
+function optionView(o: ShippingOption): QuoteOptionView {
+  return { id: o.zoneId, name: o.name, price: o.price, basePrice: o.basePrice, freeShipping: o.freeShipping, isPickup: o.isPickup, insurance: o.insurance };
+}
+
+function reasonText(q: QuoteResult): string | null {
+  const detail = q.deliverable ? q.deliveryUnavailable : q.detail;
+  switch (detail) {
+    case null:
+      return null;
+    case "INVALID_COUNTRY":
+      return "Choose a country";
+    case "OVERWEIGHT":
+      return "Your order is too heavy to ship to this country — contact us for a quote";
+    default:
+      return "We don't ship to this country";
+  }
+}
+
+function buildQuote(
+  prices: number[],
+  weightGrams: number,
+  zones: Awaited<ReturnType<typeof loadQuoteZones>>,
+  input: { countryCode: string; shippingOptionId?: string | null; insurance?: boolean },
+  settings: { freeShippingThresholdCents: number; minimumOrderCents: number },
+  currency: string,
+): { quote: CheckoutQuote; option: ShippingOption | null } {
+  const subtotal = prices.reduce((s, p) => s + p, 0);
+  const result = calculateShippingQuote(zones, {
+    countryCode: input.countryCode,
+    totalWeightGrams: weightGrams,
+    subtotal,
+    freeShippingThreshold: settings.freeShippingThresholdCents || null,
+  });
+  // Default to the first (delivery) option; an unknown/stale id never falls back silently at placement.
+  const option = selectOption(result, input.shippingOptionId) ?? (input.shippingOptionId ? null : result.deliverable ? result.options[0] : null);
+  const insurance = Boolean(input.insurance && option?.insurance);
+  return {
+    option,
+    quote: {
+      countryCode: input.countryCode,
+      deliverable: result.deliverable,
+      unavailableReason: reasonText(result),
+      options: result.deliverable ? result.options.map(optionView) : [],
+      selectedOptionId: option?.zoneId ?? null,
+      insurance,
+      totals: computeTotals(prices, option, insurance),
+      itemCount: prices.length,
+      freeShipping: freeShippingProgress(subtotal, settings.freeShippingThresholdCents),
+      minimumShortfall: minimumOrderShortfall(subtotal, settings.minimumOrderCents),
+      currency,
+    },
+  };
+}
+
+/**
+ * Server-side quote for the cart page estimate and the checkout summary. Uses the live prices of the
+ * buyable cart lines (held or lapsed-but-free) and the zone of `countryCode`.
+ */
+export async function quoteCheckout(
+  tenantId: string,
+  token: string | null | undefined,
+  input: z.input<typeof quoteInputSchema>,
+): Promise<CheckoutQuote> {
+  const data = quoteInputSchema.parse(input);
+  const [cart, checkout, zones] = await Promise.all([getCart(tenantId, token), getSettings(tenantId, "checkout"), loadQuoteZones(tenantId)]);
+  const buyable = (cart?.lines ?? []).filter((l) => l.state === "held" || l.state === "lapsed");
+  const currency = cart?.currency ?? (await db.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { currency: true } })).currency;
+  return buildQuote(
+    buyable.map((l) => l.price),
+    buyable.reduce((s, l) => s + l.weightGrams, 0),
+    zones,
+    data,
+    checkout,
+    currency,
+  ).quote;
+}
+
+// ─── Place order ────────────────────────────────────────────────────────────
+
+export type PlaceOrderResult =
+  | { ok: true; orderId: string; uuid: string; number: number; reused: boolean }
+  | {
+      ok: false;
+      code: "INVALID" | "EMPTY" | "UNAVAILABLE" | "LOGIN_REQUIRED" | "NOT_CONFIGURED" | "MINIMUM" | "SHIPPING";
+      message: string;
+      errors?: FieldErrors;
+      /** Product ids that block the order (taken by someone else / no longer for sale). */
+      blockedProductIds?: string[];
+    };
+
+class Refusal extends Error {
+  constructor(public readonly result: Extract<PlaceOrderResult, { ok: false }>) {
+    super(result.message);
+  }
+}
+const refuse = (r: Extract<PlaceOrderResult, { ok: false }>): never => {
+  throw new Refusal(r);
+};
+
+async function findOrderByEvent(tx: Prisma.TransactionClient, tenantId: string, path: "idempotencyKey" | "cartId", value: string, sinceMs: number) {
+  const ev = await tx.orderEvent.findFirst({
+    where: { tenantId, type: "created", createdAt: { gte: new Date(Date.now() - sinceMs) }, data: { path: [path], equals: value } },
+    orderBy: { createdAt: "desc" },
+    select: { order: { select: { id: true, uuid: true, number: true, paymentStatus: true } } },
+  });
+  return ev?.order ?? null;
+}
+
+/**
+ * Places the order for the cart behind `token`. Never trusts client prices/zone. Returns refusals as
+ * `{ ok: false }` with field errors where applicable. Idempotent: a repeated submit (same
+ * idempotencyKey, or an already emptied cart within 30 min) returns the existing order (`reused`).
+ * The caller starts the Mollie payment afterwards (startOrderPayment) — outside this transaction.
+ */
+export async function placeOrder(
+  tenantId: string,
+  token: string | null | undefined,
+  rawInput: unknown,
+  viewer: ShopViewer | null,
+): Promise<PlaceOrderResult> {
+  const parsed = parseCheckoutInput(rawInput);
+  if (!parsed.ok) return { ok: false, code: "INVALID", message: "Please check the highlighted fields", errors: parsed.errors };
+  const input = parsed.data;
+
+  const [checkout, legal, payment, zones, tenant] = await Promise.all([
+    getSettings(tenantId, "checkout"),
+    getSettings(tenantId, "legal"),
+    getPaymentSetup(tenantId),
+    loadQuoteZones(tenantId),
+    db.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { currency: true } }),
+  ]);
+  if (!payment.configured && !payment.devSimulation) {
+    return { ok: false, code: "NOT_CONFIGURED", message: "Payments are not configured for this shop yet. Please contact us." };
+  }
+  const method = validatePaymentMethod(payment, input.paymentMethod);
+  if (!method.ok) return { ok: false, code: "INVALID", message: method.message, errors: { paymentMethod: method.message } };
+  if (!deliverableCountries(zones).includes(input.shipping.countryCode as CountryCode)) {
+    return { ok: false, code: "SHIPPING", message: "We don't ship to this country", errors: { "shipping.countryCode": "We don't ship to this country" } };
+  }
+  const holdMinutes = Math.max(PAYMENT_HOLD_MINUTES, checkout.reservationMinutes);
+
+  let result: PlaceOrderResult;
+  try {
+    result = await db.$transaction(
+      async (tx) => {
+        const cart = await lockCart(tx, tenantId, token);
+        if (!cart) return refuse({ ok: false, code: "EMPTY", message: "Your cart is empty" });
+
+        if (input.idempotencyKey) {
+          const prev = await findOrderByEvent(tx, tenantId, "idempotencyKey", input.idempotencyKey, IDEMPOTENCY_WINDOW_MS);
+          if (prev) return { ok: true as const, orderId: prev.id, uuid: prev.uuid, number: prev.number, reused: true };
+        }
+        const lines = await loadCartLinesTx(tenantId, cart.id, tx);
+        if (lines.length === 0) {
+          const prev = await findOrderByEvent(tx, tenantId, "cartId", cart.id, EMPTY_CART_REUSE_WINDOW_MS);
+          if (prev && prev.paymentStatus === "PENDING") return { ok: true as const, orderId: prev.id, uuid: prev.uuid, number: prev.number, reused: true };
+          return refuse({ ok: false, code: "EMPTY", message: "Your cart is empty" });
+        }
+
+        const req = requirementsFor(lines, viewer, checkout, legal);
+        if (req.loginRequired) {
+          refuse({
+            ok: false,
+            code: "LOGIN_REQUIRED",
+            message: req.loginReason === "sensitive" ? "Your cart contains items that require an account. Please log in." : "Please log in to check out.",
+          });
+        }
+        if (req.ageConfirmation && !input.ageConfirmed) {
+          const msg = `Please confirm you are at least ${legal.minimumAge} years old`;
+          refuse({ ok: false, code: "INVALID", message: msg, errors: { ageConfirmed: msg } });
+        }
+
+        // Lock the products (sorted → no deadlocks with other checkouts / finalizations), then make sure
+        // THIS cart holds each one. reserveProduct returns our live hold, re-creates a lapsed one if the
+        // product is still free, and throws CONFLICT when someone else holds it.
+        const productIds = [...new Set(lines.map((l) => l.productId))].sort();
+        const blocked: string[] = [];
+        const products = new Map<string, { id: string; title: string; stockCode: number; sku: string | null; price: number; purchasePrice: number | null; weightGrams: number }>();
+        for (const pid of productIds) {
+          const rows = await tx.$queryRaw<{ id: string }[]>`
+            SELECT id FROM products WHERE id = ${pid} AND "tenantId" = ${tenantId} AND status = 'ACTIVE' AND quantity > 0 FOR UPDATE`;
+          if (rows.length === 0) {
+            blocked.push(pid);
+            continue;
+          }
+          try {
+            await reserveProduct({ tenantId, productId: pid, cartId: cart.id, minutes: checkout.reservationMinutes }, tx);
+          } catch (err) {
+            if (err instanceof ServiceError && (err.code === "CONFLICT" || err.code === "NOT_FOUND")) {
+              blocked.push(pid);
+              continue;
+            }
+            throw err;
+          }
+          const p = await tx.product.findUniqueOrThrow({
+            where: { id: pid },
+            select: { id: true, title: true, stockCode: true, sku: true, price: true, purchasePrice: true, weightGrams: true },
+          });
+          products.set(pid, p);
+        }
+        if (blocked.length) {
+          const titles = lines.filter((l) => blocked.includes(l.productId)).map((l) => l.title);
+          refuse({
+            ok: false,
+            code: "UNAVAILABLE",
+            message: `No longer available: ${titles.join(", ")}. Remove ${titles.length > 1 ? "them" : "it"} from your cart to continue.`,
+            blockedProductIds: blocked,
+          });
+        }
+
+        // Money: from the locked rows only.
+        const ordered = lines.map((l) => products.get(l.productId)!);
+        const prices = ordered.map((p) => p.price);
+        const weight = ordered.reduce((s, p) => s + p.weightGrams, 0);
+        const { option, quote } = buildQuote(
+          prices,
+          weight,
+          zones,
+          { countryCode: input.shipping.countryCode, shippingOptionId: input.shippingOptionId, insurance: input.insurance },
+          checkout,
+          tenant.currency,
+        );
+        if (!option) {
+          const msg = quote.deliverable ? "Choose one of the shipping options for your country" : (quote.unavailableReason ?? "We don't ship to this country");
+          refuse({ ok: false, code: "SHIPPING", message: msg, errors: { shippingOptionId: msg } });
+        }
+        if (quote.minimumShortfall > 0) {
+          refuse({ ok: false, code: "MINIMUM", message: `The minimum order amount is not reached yet` });
+        }
+        const totals = quote.totals;
+        if (totals.total <= 0) refuse({ ok: false, code: "INVALID", message: "Your order total must be more than zero" });
+
+        // Customer
+        const email = viewer ? viewer.email.toLowerCase() : input.email;
+        const name = `${input.shipping.firstName} ${input.shipping.lastName}`.trim();
+        let customer = viewer?.customerId ? await tx.customer.findFirst({ where: { id: viewer.customerId, tenantId } }) : null;
+        if (!customer) {
+          customer = await findOrCreateGuestCustomer(tx, tenantId, { email, name, phone: input.phone });
+          if (viewer && !customer.userId) {
+            customer = await tx.customer.update({ where: { id: customer.id }, data: { userId: viewer.userId } });
+          }
+        }
+
+        const number = await nextSequenceValue(tx, tenantId, "order.number");
+        const covers = await tx.productImage.findMany({
+          where: { tenantId, productId: { in: productIds } },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          select: { productId: true, storageKey: true },
+        });
+        const coverOf = new Map<string, string>();
+        for (const c of covers) if (!coverOf.has(c.productId)) coverOf.set(c.productId, variantKey(c.storageKey, "thumb"));
+
+        const addr = (type: "SHIPPING" | "BILLING", a: typeof input.shipping) => ({
+          tenantId,
+          type,
+          firstName: a.firstName,
+          lastName: a.lastName,
+          company: a.company,
+          street: a.street,
+          houseNumber: a.houseNumber,
+          line2: a.line2,
+          postalCode: a.postalCode,
+          city: a.city,
+          region: a.region,
+          countryCode: a.countryCode,
+          phone: input.phone,
+        });
+
+        const order = await tx.order.create({
+          data: {
+            tenantId,
+            number,
+            customerId: customer.id,
+            email,
+            customerName: name,
+            phone: input.phone,
+            currency: tenant.currency,
+            subtotal: totals.subtotal,
+            shippingTotal: totals.shippingTotal,
+            surchargeTotal: 0,
+            total: totals.total,
+            paymentStatus: "PENDING",
+            paymentMethod: method.method,
+            shippingMethod: option!.isPickup ? "PICKUP" : "SHIP",
+            shippingZoneId: option!.zoneId,
+            shippingZoneName: option!.name,
+            shippingWeightGrams: weight,
+            customerNote: input.customerNote,
+            lines: {
+              create: ordered.map((p, i) => ({
+                tenantId,
+                productId: p.id,
+                title: p.title,
+                stockCode: p.stockCode,
+                sku: p.sku,
+                imagePath: coverOf.get(p.id) ?? null,
+                unitPrice: p.price,
+                quantity: 1,
+                lineTotal: p.price,
+                purchasePriceSnapshot: p.purchasePrice,
+                sortOrder: i,
+              })),
+            },
+            addresses: { create: [addr("SHIPPING", input.shipping), addr("BILLING", input.billing)] },
+          },
+          select: { id: true, uuid: true, number: true },
+        });
+
+        // Holds move from the cart to the order for the payment window (cartId cleared, so the cart
+        // can never release them).
+        const moved = await tx.$executeRaw`
+          UPDATE reservations
+          SET "orderId" = ${order.id}, "cartId" = NULL, "updatedAt" = now(),
+              "expiresAt" = now() + make_interval(mins => ${holdMinutes}::int)
+          WHERE "tenantId" = ${tenantId} AND "cartId" = ${cart.id} AND status = 'ACTIVE' AND "productId" = ANY(${productIds}::text[])`;
+        if (moved !== productIds.length) throw new Error(`Reservation hand-over mismatch (${moved}/${productIds.length})`);
+
+        await tx.cartItem.deleteMany({ where: { tenantId, cartId: cart.id } });
+        await tx.cart.update({ where: { id: cart.id }, data: { countryCode: input.shipping.countryCode, customerId: cart.customerId ?? customer.id } });
+        await tx.orderEvent.create({
+          data: {
+            tenantId,
+            orderId: order.id,
+            type: "created",
+            data: {
+              source: "checkout",
+              cartId: cart.id,
+              idempotencyKey: input.idempotencyKey ?? null,
+              termsAcceptedAt: new Date().toISOString(),
+              ageConfirmed: req.ageConfirmation ? input.ageConfirmed : null,
+              newsletterOptIn: input.newsletter,
+              insurance: totals.insurance > 0,
+              guest: !viewer,
+            },
+          },
+        });
+        return { ok: true as const, orderId: order.id, uuid: order.uuid, number: order.number, reused: false };
+      },
+      { timeout: 20_000 },
+    );
+  } catch (err) {
+    if (err instanceof Refusal) return err.result;
+    throw err;
+  }
+
+  if (result.ok && !result.reused && input.newsletter) {
+    // Best effort; the newsletter module sends its own double-opt-in mail.
+    try {
+      await subscribe(tenantId, viewer ? viewer.email : input.email, { source: "checkout" });
+    } catch (err) {
+      if (!(err instanceof ServiceError)) console.warn("[checkout] newsletter opt-in failed", err instanceof Error ? err.message : err);
+    }
+  }
+  return result;
+}
+
+/** Re-export for the cart page (summary helper). */
+export { summarize as summarizeCartLines };
