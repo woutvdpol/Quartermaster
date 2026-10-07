@@ -72,7 +72,7 @@ export default async function ShopLayout({ children }: LayoutProps<"/">) {
         >
           {layoutCopy.skipToContent}
         </a>
-        <Header shopName={shop.shopName} logoPath={appearance.logoPath} menu={menus.header} />
+        <Header tenantId={shop.tenant.id} shopName={shop.shopName} logoPath={appearance.logoPath} menu={menus.header} />
         <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
           {children}
         </main>

@@ -4,7 +4,7 @@ import type { ServiceContext } from "@/server/context";
 import { createProduct } from "@/server/catalog/products";
 import { createCategory } from "@/server/catalog/categories";
 import { createTenantContext, resetDb } from "../../../tests/integration/helpers";
-import { listProductsForSitemap, queryCategoryTiles, queryNewItems, queryProductsByIds, toProductCardData } from "./products";
+import { listFacetValuesForSitemap, listProductsForSitemap, queryCategoryTiles, queryNewItems, queryProductsByIds, toProductCardData } from "./products";
 
 const opts = { currency: "EUR", viewerSignedIn: false, blurSensitiveForGuests: true, showPriceWhenSold: false };
 
@@ -71,5 +71,26 @@ describe("storefront product reads", () => {
     await db.product.update({ where: { id: sold.id }, data: { status: "SOLD" } });
     expect((await listProductsForSitemap(a.tenantId, false)).map((p) => p.stockCode)).toEqual([ok.stockCode]);
     expect((await listProductsForSitemap(a.tenantId, true)).length).toBe(2);
+  });
+
+  it("sitemap facet values: filterable values with a visible product in their subtree", async () => {
+    const period = await db.facet.create({ data: { tenantId: a.tenantId, kind: "PERIOD", name: "Period", slug: "period" } });
+    const hidden = await db.facet.create({ data: { tenantId: a.tenantId, kind: "CUSTOM", name: "Internal", slug: "internal", isFilterable: false } });
+    const ww2 = await db.facetValue.create({ data: { tenantId: a.tenantId, facetId: period.id, name: "WW2", slug: "ww2" } });
+    const late = await db.facetValue.create({ data: { tenantId: a.tenantId, facetId: period.id, parentId: ww2.id, name: "Late war", slug: "late-war" } });
+    const ww1 = await db.facetValue.create({ data: { tenantId: a.tenantId, facetId: period.id, name: "WW1", slug: "ww1" } });
+    const internal = await db.facetValue.create({ data: { tenantId: a.tenantId, facetId: hidden.id, name: "X", slug: "x" } });
+    const forSale = await createProduct(a, { title: "Helmet", price: 100, status: "ACTIVE" });
+    const draft = await createProduct(a, { title: "Draft", price: 100 });
+    await db.productFacetValue.createMany({
+      data: [
+        { tenantId: a.tenantId, productId: forSale.id, facetValueId: late.id },
+        { tenantId: a.tenantId, productId: forSale.id, facetValueId: internal.id },
+        { tenantId: a.tenantId, productId: draft.id, facetValueId: ww1.id },
+      ],
+    });
+    const rows = await listFacetValuesForSitemap(a.tenantId, false);
+    expect(rows.map((r) => `${r.facetSlug}/${r.valueSlug}`).sort()).toEqual(["period/late-war", "period/ww2"]);
+    expect(await listFacetValuesForSitemap(b.tenantId, false)).toEqual([]);
   });
 });

@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { clientIp, registerCustomer, safeShopRedirect } from "@/server/customer-auth";
 import { getRequestTenant } from "@/server/tenant";
+import { turnstileTokenFrom, verifyTurnstile } from "@/server/turnstile";
 import { accountCopy } from "@/components/shop/account/_copy";
 
 export type RegisterState =
@@ -35,7 +36,10 @@ export async function registerAction(_prev: RegisterState, formData: FormData): 
   try {
     const tenant = await getRequestTenant();
     if (!tenant) return { error: accountCopy.common.unexpected, values };
-    result = await registerCustomer({ tenantId: tenant.id, ...values, password, ip: await clientIp() });
+    const ip = await clientIp();
+    const captcha = await verifyTurnstile(turnstileTokenFrom(formData), ip, { action: "register" });
+    if (!captcha.ok) return { error: accountCopy.common.captcha, values };
+    result = await registerCustomer({ tenantId: tenant.id, ...values, password, ip });
   } catch (error) {
     console.error("registerAction failed", error);
     return { error: accountCopy.common.unexpected, values };

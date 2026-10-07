@@ -25,6 +25,7 @@ export const ADMIN_NAV: { group: NavGroupKey; items: NavItem[] }[] = [
     items: [
       { key: "inventory", slug: "inventory", built: true },
       { key: "categories", slug: "categories", built: true },
+      { key: "facets", slug: "facets", built: true },
       { key: "sourcing", slug: "sourcing", built: true },
     ],
   },
@@ -32,8 +33,12 @@ export const ADMIN_NAV: { group: NavGroupKey; items: NavItem[] }[] = [
     group: "sales",
     items: [
       { key: "orders", slug: "orders", built: true },
-      { key: "shippingBoard", slug: "shipping-board", built: true, wip: true },
+      { key: "shippingBoard", slug: "shipping-board", built: true },
+      { key: "offers", slug: "offers", built: true },
+      { key: "coupons", slug: "coupons", built: true },
       { key: "customers", slug: "customers", built: true },
+      { key: "leads", slug: "leads", built: true },
+      { key: "alerts", slug: "alerts", built: true },
     ],
   },
   {
@@ -52,6 +57,7 @@ export const ADMIN_NAV: { group: NavGroupKey; items: NavItem[] }[] = [
       { key: "settings", slug: "settings", built: true },
       { key: "users", slug: "users", built: true },
       { key: "auditLog", slug: "audit-log", built: true },
+      { key: "compliance", slug: "compliance", built: true },
       { key: "platform", slug: "platform", built: true, superadminOnly: true },
     ],
   },

@@ -10,6 +10,7 @@ import { getDummyHash, hashPassword, MAX_PASSWORD_LENGTH, verifyPassword } from 
 import { createSession, destroyAllSessions, destroySession, type SessionUser } from "@/server/auth/session";
 import * as rateLimit from "@/server/auth/rate-limit";
 import { RULES } from "@/server/auth/rate-limit";
+import { sendCustomerVerification } from "@/server/email-verification";
 
 /*
  * Shop customer accounts — thin wrappers around the shared auth service (src/server/auth/service.ts).
@@ -20,8 +21,8 @@ import { RULES } from "@/server/auth/rate-limit";
  *   with an email that already placed guest orders links that guest Customer (and its orders).
  * - Staff (OWNER) accounts live on the same host but may NOT sign in through the shop login; they
  *   get the same generic error as a wrong password, without their password ever being checked.
- * - Email verification: there is no verification mail template yet, so registration signs the
- *   customer in immediately and leaves `emailVerifiedAt` null.
+ * - Email verification: registration signs the customer in immediately (`emailVerifiedAt` null)
+ *   and queues a verification mail; an email change does the same for the new address.
  */
 
 const emailSchema = z.string().trim().toLowerCase().max(254).pipe(z.email("Enter a valid email address"));
@@ -145,6 +146,8 @@ export async function registerCustomer(input: RegisterInput): Promise<RegisterRe
   await destroySession();
   await createSession(created.userId, "CUSTOMER");
   await db.user.update({ where: { id: created.userId }, data: { lastLoginAt: new Date() } });
+  // Never fail the registration over the verification mail (rate limit / mail problems).
+  await sendCustomerVerification(tenantId, created.userId).catch(() => null);
   return { ok: true, ...created };
 }
 
@@ -301,6 +304,7 @@ export async function changeCustomerEmail(user: CustomerUser, newEmail: string, 
       entityId: customer.id,
       data: { linkedOrders },
     });
+    await sendCustomerVerification(tenantId, user.id).catch(() => null);
     return { ok: true, linkedOrders };
   } catch (e) {
     if (isUniqueViolation(e) || (e instanceof Error && e.message === "EMAIL_TAKEN")) return { ok: false, error: "email_taken" };

@@ -39,6 +39,9 @@ export type OrderMailData = {
   subtotal: number;
   shippingTotal: number;
   surchargeTotal: number;
+  /** Coupon discount (phase 5); optional so older callers/fixtures keep working. */
+  discountTotal?: number;
+  couponCode?: string | null;
   total: number;
   paymentStatus: string;
   paymentMethod: string | null;

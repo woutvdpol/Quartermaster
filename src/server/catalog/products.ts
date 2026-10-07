@@ -5,6 +5,8 @@ import { audit } from "@/server/audit";
 import { nextSequenceValue } from "@/server/sequence";
 import { ServiceError, type ServiceContext } from "@/server/context";
 import { recordMovement } from "@/server/stock/ledger";
+import { onPriceChanged, onProductPublished, onProductsPublished } from "@/server/alerts/hooks";
+import { deactivationCertBlockers } from "@/server/compliance/guard";
 import { Prisma } from "@/generated/prisma/client";
 import type { ProductStatus } from "@/generated/prisma/enums";
 import { isUniqueViolation, notFound, parseInput } from "./errors";
@@ -16,6 +18,8 @@ import { nextFreeSlug, slugify } from "./slug";
  *
  * Status rules (decision 11 leaves semantics to this service):
  *  - ACTIVE   requires price > 0 and quantity > 0; sets publishedAt when null; clears soldAt.
+ *             Products flagged `requiresDeactivationCert` also need a DEACTIVATION_CERT document
+ *             (compliance guard) — so they can never be created ACTIVE.
  *  - SOLD     sets soldAt when null. Does NOT move stock — order finalisation (orders module)
  *             writes the SALE movement; a manual "mark sold" is a status flag only.
  *  - DRAFT    clears soldAt.
@@ -62,6 +66,8 @@ const editableFields = {
   blurred: z.boolean(),
   acceptsOffers: z.boolean(),
   restrictedSymbols: z.boolean(),
+  /** Deactivated weapon (EU 2018/337): may only go ACTIVE with a deactivation certificate on file. */
+  requiresDeactivationCert: z.boolean(),
   onSale: z.boolean(),
   notes: optionalText(20_000),
   seoTitle: optionalText(200),
@@ -80,6 +86,7 @@ const createSchema = z.object({
   blurred: z.boolean().default(false),
   acceptsOffers: z.boolean().default(false),
   restrictedSymbols: z.boolean().default(false),
+  requiresDeactivationCert: z.boolean().default(false),
   onSale: z.boolean().default(false),
   tagIds: editableFields.tagIds.default([]),
   slug: z.string().trim().max(120).optional(),
@@ -432,6 +439,10 @@ async function createInTx(tx: Tx, ctx: ServiceContext, data: CreateData, note: s
   if (data.status === "ACTIVE" && (data.price <= 0 || data.quantity <= 0)) {
     throw new ServiceError("INVALID", "An active product needs a price and stock");
   }
+  if (data.status === "ACTIVE" && data.requiresDeactivationCert) {
+    // A new product has no documents yet, so the deactivation certificate can't be on file.
+    throw new ServiceError("INVALID", "Upload the deactivation certificate before activating this product");
+  }
   const stockCode = await nextSequenceValue(tx, ctx.tenantId, "product.stockCode");
   const slug = await uniqueProductSlug(tx, ctx.tenantId, data.slug || data.title);
   const product = await tx.product.create({
@@ -451,6 +462,7 @@ async function createInTx(tx: Tx, ctx: ServiceContext, data: CreateData, note: s
       blurred: data.blurred,
       acceptsOffers: data.acceptsOffers,
       restrictedSymbols: data.restrictedSymbols,
+      requiresDeactivationCert: data.requiresDeactivationCert,
       onSale: data.onSale,
       notes: data.notes,
       seoTitle: data.seoTitle,
@@ -460,7 +472,7 @@ async function createInTx(tx: Tx, ctx: ServiceContext, data: CreateData, note: s
       status: data.status,
       publishedAt: data.status === "ACTIVE" ? new Date() : null,
     },
-    select: { id: true, stockCode: true, slug: true },
+    select: { id: true, stockCode: true, slug: true, status: true },
   });
   if (data.tagIds.length) {
     await tx.productTag.createMany({
@@ -502,7 +514,8 @@ export async function createProduct(ctx: ServiceContext, input: CreateProductInp
   const data = parseInput(createSchema, input);
   const product = await withSlugRetry(() => db.$transaction((tx) => createInTx(tx, ctx, data, "Opening stock")));
   await auditProducts(ctx, "product.create", [product.id], { stockCode: product.stockCode, title: data.title });
-  return product;
+  if (product.status === "ACTIVE") await onProductPublished(ctx.tenantId, product.id);
+  return { id: product.id, stockCode: product.stockCode, slug: product.slug };
 }
 
 /**
@@ -527,6 +540,7 @@ export async function duplicateProduct(ctx: ServiceContext, id: string, opts: { 
     blurred: src.blurred,
     acceptsOffers: src.acceptsOffers,
     restrictedSymbols: src.restrictedSymbols,
+    requiresDeactivationCert: src.requiresDeactivationCert,
     onSale: src.onSale,
     notes: src.notes,
     seoTitle: src.seoTitle,
@@ -539,7 +553,9 @@ export async function duplicateProduct(ctx: ServiceContext, id: string, opts: { 
   } satisfies CreateProductInput);
   const product = await withSlugRetry(() => db.$transaction((tx) => createInTx(tx, ctx, data, `Opening stock (duplicate of #${src.stockCode})`)));
   await auditProducts(ctx, "product.duplicate", [product.id], { from: src.id, fromStockCode: src.stockCode, stockCode: product.stockCode });
-  return product;
+  // Duplicates are created as DRAFT today; kept generic in case that changes.
+  if (product.status === "ACTIVE") await onProductPublished(ctx.tenantId, product.id);
+  return { id: product.id, stockCode: product.stockCode, slug: product.slug };
 }
 
 // ─── Update ─────────────────────────────────────────────────────────────────
@@ -551,9 +567,9 @@ export async function duplicateProduct(ctx: ServiceContext, id: string, opts: { 
  */
 export async function updateProduct(ctx: ServiceContext, id: string, patch: UpdateProductInput) {
   const data = parseInput(updateSchema, patch);
-  await db
+  const oldPrice = await db
     .$transaction(async (tx) => {
-      const current = await tx.product.findFirst({ where: { id, tenantId: ctx.tenantId }, select: { status: true, title: true } });
+      const current = await tx.product.findFirst({ where: { id, tenantId: ctx.tenantId }, select: { status: true, title: true, price: true } });
       if (!current) throw notFound("Product");
       await assertRefs(tx, ctx.tenantId, data);
       if (data.price === 0 && current.status === "ACTIVE") throw new ServiceError("INVALID", "An active product needs a price above 0");
@@ -575,9 +591,12 @@ export async function updateProduct(ctx: ServiceContext, id: string, patch: Upda
           await tx.productTag.createMany({ data: [...new Set(tagIds)].map((tagId) => ({ tenantId: ctx.tenantId, productId: id, tagId })) });
         }
       }
+      return current.price;
     })
     .catch(mapProductConflict);
   await auditProducts(ctx, "product.update", [id], { fields: Object.keys(data) });
+  // Only decreases enqueue a price-drop alert (onPriceChanged filters).
+  if (data.price !== undefined && data.price < oldPrice) await onPriceChanged(ctx.tenantId, id, oldPrice, data.price);
   return getProduct(ctx, id);
 }
 
@@ -606,6 +625,9 @@ export async function setStatus(ctx: ServiceContext, ids: string[], status: Prod
       const reason = p.status === data.status ? null : statusBlocker(p, data.status);
       return reason ? [{ id: p.id, stockCode: p.stockCode, reason }] : [];
     });
+    if (data.status === "ACTIVE") {
+      failures.push(...(await deactivationCertBlockers(tx, ctx.tenantId, rows.filter((p) => p.status !== "ACTIVE").map((p) => p.id))));
+    }
     if (failures.length) {
       throw new ServiceError("INVALID", failures.length === 1 ? `#${failures[0].stockCode}: ${failures[0].reason}` : `${failures.length} products cannot be set to ${data.status}`, failures);
     }
@@ -630,6 +652,7 @@ export async function setStatus(ctx: ServiceContext, ids: string[], status: Prod
   for (const c of changed) {
     await audit({ action: "product.status", tenantId: ctx.tenantId, actorId: ctx.actor.id, entity: "Product", entityId: c.id, data: { from: c.from, to: data.status } });
   }
+  if (data.status === "ACTIVE" && changed.length) await onProductsPublished(ctx.tenantId, changed.map((c) => c.id));
   return { updated: changed.length };
 }
 
@@ -641,6 +664,7 @@ export async function bumpToTop(ctx: ServiceContext, ids: string[]): Promise<{ u
     return (await tx.product.updateMany({ where: { tenantId: ctx.tenantId, id: { in: data } }, data: { publishedAt: new Date() } })).count;
   });
   await auditProducts(ctx, "product.bump", data);
+  await onProductsPublished(ctx.tenantId, [...new Set(data)]);
   return { updated };
 }
 
@@ -661,6 +685,7 @@ export type BulkUpdateInput = z.input<typeof bulkSchema>;
 export async function bulkUpdate(ctx: ServiceContext, ids: string[], input: BulkUpdateInput): Promise<{ updated: number }> {
   const productIds = [...new Set(parseInput(idsSchema, ids))];
   const data = parseInput(bulkSchema, input);
+  const priceDrops: { id: string; oldPrice: number; newPrice: number }[] = [];
   await db.$transaction(async (tx) => {
     const rows = await requireProducts(tx, ctx.tenantId, productIds);
     await assertRefs(tx, ctx.tenantId, { categoryId: data.categoryId, tagIds: [...(data.tagIdsAdd ?? []), ...(data.tagIdsRemove ?? [])] });
@@ -674,7 +699,10 @@ export async function bulkUpdate(ctx: ServiceContext, ids: string[], input: Bulk
       if (failures.length) throw new ServiceError("INVALID", "Price adjustment would make active products free", failures);
       for (const p of rows) {
         const price = adjustPriceByPercent(p.price, pct);
-        if (price !== p.price) await tx.product.update({ where: { id: p.id }, data: { price } });
+        if (price !== p.price) {
+          await tx.product.update({ where: { id: p.id }, data: { price } });
+          if (price < p.price) priceDrops.push({ id: p.id, oldPrice: p.price, newPrice: price });
+        }
       }
     }
     if (data.tagIdsRemove?.length) {
@@ -689,6 +717,7 @@ export async function bulkUpdate(ctx: ServiceContext, ids: string[], input: Bulk
     }
   });
   await auditProducts(ctx, "product.bulk_update", productIds, data as Prisma.InputJsonValue);
+  for (const d of priceDrops) await onPriceChanged(ctx.tenantId, d.id, d.oldPrice, d.newPrice);
   return { updated: productIds.length };
 }
 

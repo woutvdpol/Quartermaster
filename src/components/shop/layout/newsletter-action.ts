@@ -7,8 +7,9 @@ import { subscribe } from "@/server/newsletter";
 import * as rateLimit from "@/server/auth/rate-limit";
 import { clientIp } from "@/server/analytics/collect";
 import { getShopContext } from "@/server/storefront/context";
+import { turnstileTokenFrom, verifyTurnstile } from "@/server/turnstile";
 
-export type NewsletterState = { status: "idle" | "success" | "invalid" | "unavailable" | "too_many"; email?: string };
+export type NewsletterState = { status: "idle" | "success" | "invalid" | "unavailable" | "too_many" | "captcha"; email?: string };
 
 /** Per IP and shop: sign-up attempts per hour (the service also limits per address). */
 const PER_IP = { limit: 10, windowMs: 60 * 60 * 1000 };
@@ -23,7 +24,7 @@ const input = z.object({
 /**
  * Newsletter sign-up for the storefront (double opt-in via `subscribe`). Always answers with the
  * same neutral success for valid input, so it never reveals whether an address is subscribed.
- * TODO(turnstile): add a Turnstile check here once keys are configured.
+ * Bot protection: honeypot, per-IP rate limit and a Turnstile check (action "newsletter").
  */
 export async function subscribeNewsletter(_prev: NewsletterState, form: FormData): Promise<NewsletterState> {
   const shop = await getShopContext();
@@ -37,6 +38,9 @@ export async function subscribeNewsletter(_prev: NewsletterState, form: FormData
   const key = `shop.newsletter.ip:${shop.tenant.id}:${ip}`;
   if (await rateLimit.isLimited(key, PER_IP)) return { status: "too_many", email };
   await rateLimit.hit(key);
+
+  const captcha = await verifyTurnstile(turnstileTokenFrom(form), ip === "unknown" ? null : ip, { action: "newsletter" });
+  if (!captcha.ok) return { status: "captcha", email };
 
   try {
     const result = await subscribe(shop.tenant.id, email, { source });

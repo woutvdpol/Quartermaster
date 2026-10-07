@@ -358,11 +358,15 @@ export type MarginRow = {
 
 /**
  * Margin per category / supplier / month over PAID orders paid in [from, to) (COALESCE(paidAt,
- * placedAt)), from OrderLine snapshots: revenue = lineTotal, cost = purchasePriceSnapshot × quantity.
+ * placedAt)), from OrderLine snapshots: revenue = lineTotal minus its pro-rata share of the order's
+ * coupon discount (Σ = subtotal − discountTotal), cost = purchasePriceSnapshot × quantity.
  * Shipping and surcharges are excluded by construction. Category/supplier are the product's CURRENT
  * category / purchase record supplier (not snapshotted); deleted products fall under "Unknown".
  * Months are tenant-local (Tenant.timezone).
  */
+/** Line revenue net of the order's coupon discount, spread pro rata over the lines (subtotal − discountTotal in total). */
+const NET_LINE = Prisma.sql`(ol."lineTotal" - COALESCE(o."discountTotal"::numeric * ol."lineTotal" / NULLIF(o.subtotal, 0), 0))`;
+
 export async function marginReport(ctx: ServiceContext, input: z.input<typeof marginSchema>) {
   const q = marginSchema.parse(input);
   const tenant = await requireTenantDisplay(ctx.tenantId);
@@ -379,8 +383,8 @@ export async function marginReport(ctx: ServiceContext, input: z.input<typeof ma
   >`
     SELECT ${groupSql},
       COUNT(*)::int AS lines,
-      SUM(ol."lineTotal")::bigint AS revenue,
-      COALESCE(SUM(ol."lineTotal") FILTER (WHERE ol."purchasePriceSnapshot" IS NOT NULL), 0)::bigint AS costed_revenue,
+      ROUND(SUM(${NET_LINE}))::bigint AS revenue,
+      COALESCE(ROUND(SUM(${NET_LINE}) FILTER (WHERE ol."purchasePriceSnapshot" IS NOT NULL)), 0)::bigint AS costed_revenue,
       COALESCE(SUM(ol."purchasePriceSnapshot"::bigint * ol.quantity), 0)::bigint AS cost,
       COUNT(*) FILTER (WHERE ol."purchasePriceSnapshot" IS NULL)::int AS missing
     FROM order_lines ol
@@ -394,7 +398,7 @@ export async function marginReport(ctx: ServiceContext, input: z.input<typeof ma
       AND COALESCE(o."paidAt", o."placedAt") >= (${q.from.toISOString()}::timestamptz AT TIME ZONE 'UTC')
       AND COALESCE(o."paidAt", o."placedAt") < (${q.to.toISOString()}::timestamptz AT TIME ZONE 'UTC')
     GROUP BY 1, 2
-    ORDER BY ${q.groupBy === "month" ? Prisma.sql`1 ASC` : Prisma.sql`SUM(ol."lineTotal") DESC, 2 ASC`}`;
+    ORDER BY ${q.groupBy === "month" ? Prisma.sql`1 ASC` : Prisma.sql`SUM(${NET_LINE}) DESC, 2 ASC`}`;
 
   const toRow = (key: string | null, label: string, lines: number, revenue: number, costedRevenue: number, cost: number, missing: number): MarginRow => ({
     key,

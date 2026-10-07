@@ -17,6 +17,12 @@ import { loadOrderMailData } from "./order-data";
 import { MAIL_PATHS, withQuery } from "./urls";
 import type { z } from "zod";
 import type { MAIL_TEMPLATE_PROPS } from "./contracts";
+import LeadReceived, { leadReceivedSubject } from "@/emails/LeadReceived";
+import LeadReceivedConfirmation, { leadReceivedConfirmationSubject } from "@/emails/LeadReceivedConfirmation";
+import { leadAdminPath, loadLeadMailData } from "@/server/leads/mail-data";
+import { OPS_MAIL_BUILDERS } from "./builders-ops";
+import { COMMERCE_MAIL_BUILDERS } from "./builders-commerce";
+import { ALERT_MAIL_BUILDERS } from "@/server/alerts/mail";
 
 /** What a template builder hands to `sendMail()`. `null` = nothing to send (skip, not an error). */
 export type BuiltMail = {
@@ -156,6 +162,42 @@ export const MAIL_BUILDERS: { [T in MailTemplateName]: Builder<T> } = {
           notice="This is a test send. Subscribers get a personal unsubscribe link here."
         />
       ),
+    };
+  },
+  // admin-ops templates: order-shipped, owner-invite, customer-email-verification
+  ...OPS_MAIL_BUILDERS,
+  ...COMMERCE_MAIL_BUILDERS,
+  ...ALERT_MAIL_BUILDERS, // alert-confirm, alert-new-arrivals, alert-back-available, alert-price-drop
+
+  "lead-received": async ({ tenantId, props, identity }) => {
+    if (!identity.ownerEmail) {
+      console.warn(`[mail] tenant ${tenantId} has no order notification / contact email; lead mail skipped`);
+      return null;
+    }
+    const lead = await loadLeadMailData(requireTenant(tenantId, "lead-received"), props.leadId, identity.brand.baseUrl);
+    if (!lead) return null;
+    return {
+      to: identity.ownerEmail,
+      subject: leadReceivedSubject(lead),
+      replyTo: lead.email,
+      react: (
+        <LeadReceived
+          brand={identity.brand}
+          lead={lead}
+          adminUrl={`${identity.brand.baseUrl}${leadAdminPath(props.leadId)}`}
+          timeZone={identity.timeZone}
+        />
+      ),
+    };
+  },
+
+  "lead-received-confirmation": async ({ tenantId, props, identity }) => {
+    const lead = await loadLeadMailData(requireTenant(tenantId, "lead-received-confirmation"), props.leadId, identity.brand.baseUrl);
+    if (!lead) return null;
+    return {
+      to: lead.email,
+      subject: leadReceivedConfirmationSubject(identity.brand),
+      react: <LeadReceivedConfirmation brand={identity.brand} lead={lead} />,
     };
   },
 };

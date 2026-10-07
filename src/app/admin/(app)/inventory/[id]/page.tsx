@@ -18,6 +18,8 @@ import { PhotosCard } from "./_components/PhotosCard";
 import { ProductEditor, type EditorProduct } from "./_components/ProductEditor";
 import { StatusCard } from "./_components/StatusCard";
 import { StockControl } from "./_components/StockDrawer";
+import { ProvenanceCard } from "./_ext/provenance/ProvenanceCard";
+import { FacetsCard } from "./_ext/facets/FacetsCard";
 
 /** `[id]` is the product id; a plain number is accepted as stockCode (e.g. /admin/inventory/50231). */
 const loadProduct = cache(async (id: string): Promise<{ ctx: Awaited<ReturnType<typeof requireStaffContext>>; product: ProductDetail }> => {
@@ -90,6 +92,7 @@ export default async function ProductEditPage({ params }: PageProps<"/admin/inve
     blurred: product.blurred,
     acceptsOffers: product.acceptsOffers,
     restrictedSymbols: product.restrictedSymbols,
+    requiresDeactivationCert: product.requiresDeactivationCert,
     onSale: product.onSale,
     tags: product.tags.map((t) => t.name),
     updatedAt: product.updatedAt,
@@ -148,6 +151,8 @@ export default async function ProductEditPage({ params }: PageProps<"/admin/inve
             timeZone={tenant.timeZone}
           />
         ),
+        provenance: <ProvenanceCard productId={product.id} />,
+        facets: <FacetsCard productId={product.id} />,
         danger: <DangerZone productId={product.id} stockCode={product.stockCode} deletable={deletable} archived={product.status === "ARCHIVED"} />,
       }}
     />

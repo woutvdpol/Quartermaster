@@ -192,6 +192,37 @@ export async function listProductsForSitemap(tenantId: string, includeSold: bool
   });
 }
 
+/**
+ * Facet landing pages (/shop/facet/{facet}/{value}) worth indexing: values of filterable facets with
+ * at least one visible product — assigned to the value itself or to a descendant value (the landing
+ * page includes the subtree). Same visibility as listProductsForSitemap.
+ */
+export async function listFacetValuesForSitemap(tenantId: string, includeSold: boolean) {
+  const [values, used] = await Promise.all([
+    db.facetValue.findMany({
+      where: { tenantId, facet: { isFilterable: true } },
+      select: { id: true, parentId: true, slug: true, updatedAt: true, facet: { select: { slug: true } } },
+    }),
+    db.productFacetValue.findMany({
+      where: {
+        tenantId,
+        product: { blurred: false, status: { in: includeSold ? ["ACTIVE", "RESERVED", "SOLD"] : ["ACTIVE", "RESERVED"] } },
+      },
+      select: { facetValueId: true },
+      distinct: ["facetValueId"],
+    }),
+  ]);
+  const byId = new Map(values.map((v) => [v.id, v]));
+  const keep = new Set<string>();
+  for (const { facetValueId } of used) {
+    // Walk up: a value with products makes its ancestors' landing pages non-empty too.
+    for (let v = byId.get(facetValueId), guard = 0; v && !keep.has(v.id) && guard < 50; v = v.parentId ? byId.get(v.parentId) : undefined, guard++) {
+      keep.add(v.id);
+    }
+  }
+  return values.filter((v) => keep.has(v.id)).map((v) => ({ facetSlug: v.facet.slug, valueSlug: v.slug, updatedAt: v.updatedAt }));
+}
+
 export async function listCategoriesForSitemap(tenantId: string) {
   return db.category.findMany({ where: { tenantId, isActive: true }, select: { slug: true, updatedAt: true } });
 }

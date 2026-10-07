@@ -65,6 +65,8 @@ export async function loadOrderMailData(tenantId: string, orderId: string, baseU
     subtotal: order.subtotal,
     shippingTotal: order.shippingTotal,
     surchargeTotal: order.surchargeTotal,
+    discountTotal: order.discountTotal,
+    couponCode: order.couponCode,
     total: order.total,
     paymentStatus: order.paymentStatus,
     paymentMethod: order.paymentMethod,

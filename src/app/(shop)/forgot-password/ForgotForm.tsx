@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { accountCopy } from "@/components/shop/account/_copy";
 import { Alert, Field, Honeypot, SubmitButton } from "@/components/shop/account/form";
+import { Turnstile } from "@/components/shop/turnstile";
 import { forgotPasswordAction } from "./actions";
 
 const t = accountCopy.forgot;
@@ -15,6 +16,7 @@ export function ForgotForm() {
       <Honeypot />
       {state?.error ? <Alert tone="error">{state.error}</Alert> : null}
       <Field id="email" label={accountCopy.common.email} type="email" autoComplete="email" inputMode="email" required defaultValue={state?.email} />
+      <Turnstile action="forgot_password" resetKey={state} />
       <SubmitButton pendingLabel={t.submitting} fullWidth>
         {t.submit}
       </SubmitButton>

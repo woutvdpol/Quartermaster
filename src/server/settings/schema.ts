@@ -62,6 +62,26 @@ const optionalEmail = z.union([z.literal(""), z.email().max(254)]);
 
 const shortText = (max = 200) => z.string().trim().max(max);
 
+/** Removes spaces/dots/dashes and upper-cases (VAT ids and IBANs are typed in many ways). */
+const compactUpper = (s: string) => s.replace(/[\s.\-]/g, "").toUpperCase();
+
+/** Chamber of Commerce (KvK) number; loose so foreign registrations fit. "" = not set. */
+const cocNumber = shortText(30).regex(/^[A-Za-z0-9 .\-/]*$/, "Use letters, digits, spaces or dashes only");
+
+/** EU-style VAT id, e.g. NL123456789B01 (country code + 2–13 characters). "" = not set. */
+const vatNumber = z
+  .string()
+  .max(40)
+  .transform(compactUpper)
+  .pipe(z.string().regex(/^([A-Z]{2}[0-9A-Z+*]{2,13})?$/, "Expected a VAT id like NL123456789B01"));
+
+/** IBAN, basic format check only (country code, 2 check digits, 10–30 characters). "" = not set. */
+const iban = z
+  .string()
+  .max(50)
+  .transform(compactUpper)
+  .pipe(z.string().regex(/^([A-Z]{2}[0-9]{2}[A-Z0-9]{10,30})?$/, "Expected an IBAN like NL91ABNA0417164300"));
+
 // ─── Groups ─────────────────────────────────────────────────────────────────
 
 export const generalSchema = z.object({
@@ -80,6 +100,10 @@ export const generalSchema = z.object({
         .default("NL"),
     })
     .prefault({}),
+  // Business details (invoices). "" = not set; normalised (VAT id / IBAN upper-case without spaces).
+  cocNumber: cocNumber.default(""),
+  vatNumber: vatNumber.default(""),
+  iban: iban.default(""),
   // Time zone lives on Tenant.timezone (single source of truth); validate writes with isValidTimeZone.
   // Extra currencies prices may be *displayed* in. Checkout is always in the shop currency (decision 17).
   displayCurrencies: z.array(z.enum(DISPLAY_CURRENCIES)).max(DISPLAY_CURRENCIES.length).default([]),

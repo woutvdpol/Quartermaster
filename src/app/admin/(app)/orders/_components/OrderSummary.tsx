@@ -7,7 +7,6 @@ import {
   Money,
   PaymentStatusPill,
   Timeline,
-  WipBadge,
 } from "@/components/admin/ui";
 import type { OrderDetail } from "@/server/orders/queries";
 import { ordersCopy, orderCopy } from "../_copy";
@@ -130,17 +129,6 @@ export function OrderSummary({ order, timeZone }: { order: OrderDetail; timeZone
           </ul>
         )}
       </section>
-
-      <InlineAlert
-        tone="info"
-        title={
-          <span className="inline-flex items-center gap-2">
-            {t.wipTitle} <WipBadge />
-          </span>
-        }
-      >
-        {t.wipBody}
-      </InlineAlert>
 
       <section>
         <SectionTitle>{orderCopy.timeline.title}</SectionTitle>

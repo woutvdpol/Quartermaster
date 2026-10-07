@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
 import type { ServiceContext } from "@/server/context";
 import { createTenantContext, resetDb } from "../../../tests/integration/helpers";
@@ -16,7 +16,8 @@ import {
 import { createCategory } from "./categories";
 import { createTag } from "./tags";
 import { adjustStock } from "@/server/stock/ledger";
-import { reserveProduct } from "@/server/stock/reservations";
+import { releaseReservation, reserveProduct } from "@/server/stock/reservations";
+import { setJobTransportForTests, type EnqueuedJob } from "@/server/jobs/queue";
 
 async function newCart(tenantId: string) {
   return db.cart.create({ data: { tenantId, tokenHash: `cart-${Math.random()}`, expiresAt: new Date(Date.now() + 86400_000) } });
@@ -302,6 +303,87 @@ describe("catalog/products", () => {
       expect(desc.rows.map((r) => r.price)).toEqual([700, 600]);
       await expect(listProducts(a, { sort: "price", cursor: desc.nextCursor! })).rejects.toMatchObject({ code: "INVALID" });
       await expect(listProducts(a, { pageSize: 101 })).rejects.toMatchObject({ code: "INVALID" });
+    });
+  });
+
+  describe("deactivation certificate guard", () => {
+    it("blocks ACTIVE for flagged products without a DEACTIVATION_CERT document", async () => {
+      await expect(createProduct(a, { title: "Kar98k (deact.)", price: 90000, status: "ACTIVE", requiresDeactivationCert: true })).rejects.toMatchObject({
+        code: "INVALID",
+      });
+      const gun = await createProduct(a, { title: "Kar98k (deact.)", price: 90000, requiresDeactivationCert: true });
+      const helmet = await createProduct(a, { title: "Helmet", price: 10000 });
+      await expect(setStatus(a, [gun.id, helmet.id], "ACTIVE")).rejects.toMatchObject({
+        code: "INVALID",
+        details: [{ id: gun.id, stockCode: gun.stockCode, reason: expect.stringMatching(/certificate/i) }],
+      });
+      // All-or-nothing: the helmet did not change either.
+      expect((await getProduct(a, helmet.id)).status).toBe("DRAFT");
+
+      await db.productDocument.create({
+        data: { tenantId: a.tenantId, productId: gun.id, kind: "DEACTIVATION_CERT", title: "Cert", storageKey: "k", mimeType: "application/pdf", byteSize: 1 },
+      });
+      expect(await setStatus(a, [gun.id, helmet.id], "ACTIVE")).toEqual({ updated: 2 });
+      // Other target statuses are never blocked.
+      const other = await createProduct(a, { title: "Other", price: 100, requiresDeactivationCert: true });
+      expect(await setStatus(a, [other.id], "ARCHIVED")).toEqual({ updated: 1 });
+    });
+  });
+
+  describe("alert hooks", () => {
+    let jobs: EnqueuedJob[];
+    beforeEach(() => {
+      jobs = [];
+      setJobTransportForTests((job) => void jobs.push(job));
+    });
+    afterEach(() => setJobTransportForTests(null));
+    const named = (name: string) => jobs.filter((j) => j.name === name).map((j) => j.data);
+
+    it("queues match jobs on publish / bump and price-drop jobs on decreases only", async () => {
+      const active = await createProduct(a, { title: "Helmet", price: 10000, status: "ACTIVE" });
+      const draft = await createProduct(a, { title: "Cap", price: 5000 });
+      expect(named("alerts.match-product")).toEqual([{ tenantId: a.tenantId, productId: active.id }]);
+
+      jobs.length = 0;
+      await setStatus(a, [draft.id, active.id], "ACTIVE");
+      expect(named("alerts.match-product")).toEqual([{ tenantId: a.tenantId, productId: draft.id }]);
+
+      jobs.length = 0;
+      await bumpToTop(a, [active.id]);
+      expect(named("alerts.match-product")).toEqual([{ tenantId: a.tenantId, productId: active.id }]);
+
+      jobs.length = 0;
+      await updateProduct(a, active.id, { price: 12000 });
+      await updateProduct(a, active.id, { title: "Helmet M35" });
+      expect(named("alerts.price-drop")).toEqual([]);
+      await updateProduct(a, active.id, { price: 9000 });
+      expect(named("alerts.price-drop")).toEqual([{ tenantId: a.tenantId, productId: active.id, oldPrice: 12000, newPrice: 9000 }]);
+
+      jobs.length = 0;
+      await bulkUpdate(a, [active.id, draft.id], { priceAdjustPercent: -10 });
+      expect(named("alerts.price-drop")).toEqual(
+        expect.arrayContaining([
+          { tenantId: a.tenantId, productId: active.id, oldPrice: 9000, newPrice: 8100 },
+          { tenantId: a.tenantId, productId: draft.id, oldPrice: 5000, newPrice: 4500 },
+        ]),
+      );
+      jobs.length = 0;
+      await bulkUpdate(a, [active.id], { priceAdjustPercent: 10 });
+      expect(named("alerts.price-drop")).toEqual([]);
+    });
+
+    it("queues a back-available job (inside the tx) when a cart hold is released", async () => {
+      const p = await createProduct(a, { title: "Helmet", price: 10000, status: "ACTIVE" });
+      const cart = await newCart(a.tenantId);
+      await reserveProduct({ tenantId: a.tenantId, productId: p.id, cartId: cart.id });
+      jobs.length = 0;
+      expect(await releaseReservation({ tenantId: a.tenantId, productId: p.id, cartId: cart.id })).toBe(1);
+      expect(jobs.filter((j) => j.name === "alerts.back-available")).toEqual([
+        expect.objectContaining({ data: { tenantId: a.tenantId, productId: p.id, excludeCustomerId: null }, options: expect.objectContaining({ inTransaction: false }) }),
+      ]);
+      jobs.length = 0;
+      expect(await releaseReservation({ tenantId: a.tenantId, productId: p.id })).toBe(0);
+      expect(named("alerts.back-available")).toEqual([]);
     });
   });
 });

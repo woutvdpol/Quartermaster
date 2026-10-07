@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { mailSendJob } from "@/server/mail/job";
 import { campaignBatchJob } from "@/server/newsletter/jobs";
+import { ALERT_JOBS } from "@/server/alerts/jobs";
+import { invoiceIssueJob, invoiceRenderJob } from "@/server/invoices/job";
 import { defineJob } from "./registry";
 import { CRON_TASKS, runCronTask, type CronTaskName } from "./cron";
 
@@ -18,11 +20,20 @@ function cronJob<N extends CronTaskName>(task: N) {
 export const CRON_JOBS = {
   "cron.reservations.expire": cronJob("reservations.expire"),
   "cron.rate-limit.prune": cronJob("rate-limit.prune"),
+  "cron.leads.photos.cleanup": cronJob("leads.photos.cleanup"),
+  "cron.alerts.digest": cronJob("alerts.digest"),
+  "cron.alerts.scan": cronJob("alerts.scan"),
+  "cron.offers.expire": cronJob("offers.expire"),
+  "cron.cart.abandoned": cronJob("cart.abandoned"),
+  "cron.rates.refresh": cronJob("rates.refresh"),
 } satisfies { [K in CronTaskName as `cron.${K}`]: unknown };
 
 export const JOBS = {
   "mail.send": mailSendJob,
   "newsletter.campaign.batch": campaignBatchJob,
+  ...ALERT_JOBS, // alerts.match-product, alerts.back-available, alerts.price-drop
+  "invoices.issue": invoiceIssueJob,
+  "invoices.render": invoiceRenderJob,
   ...CRON_JOBS,
 };
 

@@ -149,6 +149,13 @@ export function describeEvent(e: EventLike): {
       };
     case "confirmation_queued":
       return { title: "Order confirmation queued" };
+    case "shipped_mail_queued":
+      return { title: "“Shipped” mail queued" };
+    case "invoice.issued": {
+      const source = str("source") === "manual" ? "by staff" : str("source") === "finalized" ? "automatically after payment" : null;
+      const detail = [typeof d.number === "number" ? `no. ${d.number}` : null, source].filter(Boolean).join(" · ");
+      return { title: "Invoice issued", detail: detail || undefined, tone: "ok" };
+    }
     case "stock.oversold": {
       const lines = Array.isArray(d.lines) ? d.lines.length : 0;
       return {

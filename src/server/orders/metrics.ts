@@ -6,8 +6,9 @@ import type { ServiceContext } from "@/server/context";
 
 /*
  * Dashboard metrics. Definitions (fixing legacy, which counted unpaid "manual" orders as turnover):
- *  - Revenue  = Σ Order.subtotal of PAID orders (excl. shipping AND payment surcharge, = Σ line totals,
- *               consistent with the margin report). PENDING / FAILED / REFUNDED never count.
+ *  - Revenue  = Σ (Order.subtotal − Order.discountTotal) of PAID orders (excl. shipping AND payment
+ *               surcharge; a coupon discount reduces revenue; consistent with the margin report, which
+ *               spreads the discount over the lines pro rata). PENDING / FAILED / REFUNDED never count.
  *  - Period   = last `days` tenant-local calendar days incl. today (tenant timezone), up to now;
  *               an order belongs to the day it was paid (COALESCE(paidAt, placedAt) for legacy rows).
  *  - Previous = the `days` local days directly before.
@@ -51,14 +52,15 @@ export async function kpis(ctx: ServiceContext, opts: { days?: number } = {}) {
         ((date_trunc('day', now() AT TIME ZONE ${tz}) - make_interval(days => ${2 * days - 1})) AT TIME ZONE ${tz}) AT TIME ZONE 'UTC' AS prev_start
     ),
     o AS (
-      SELECT o.id, o.subtotal, (COALESCE(o."paidAt", o."placedAt") >= b.cur_start) AS cur
+      SELECT o.id, o.subtotal - o."discountTotal" AS subtotal, o.subtotal AS gross, o."discountTotal" AS discount, (COALESCE(o."paidAt", o."placedAt") >= b.cur_start) AS cur
       FROM orders o, b
       WHERE o."tenantId" = ${ctx.tenantId} AND o."paymentStatus" = 'PAID'
         AND COALESCE(o."paidAt", o."placedAt") >= b.prev_start
     ),
     l AS (
       SELECT o.cur,
-             SUM(ol."lineTotal") FILTER (WHERE ol."purchasePriceSnapshot" IS NOT NULL) AS costed_rev,
+             ROUND(SUM(ol."lineTotal" - COALESCE(o.discount::numeric * ol."lineTotal" / NULLIF(o.gross, 0), 0))
+               FILTER (WHERE ol."purchasePriceSnapshot" IS NOT NULL)) AS costed_rev,
              SUM(ol."purchasePriceSnapshot"::bigint * ol.quantity) AS cost
       FROM o JOIN order_lines ol ON ol."orderId" = o.id
       GROUP BY o.cur
@@ -108,7 +110,7 @@ export async function revenueByDay(ctx: ServiceContext, opts: { days?: number } 
         interval '1 day')::date AS day
     ),
     o AS (
-      SELECT ((COALESCE("paidAt", "placedAt") AT TIME ZONE 'UTC') AT TIME ZONE ${tz})::date AS day, subtotal
+      SELECT ((COALESCE("paidAt", "placedAt") AT TIME ZONE 'UTC') AT TIME ZONE ${tz})::date AS day, subtotal - "discountTotal" AS subtotal
       FROM orders
       WHERE "tenantId" = ${ctx.tenantId} AND "paymentStatus" = 'PAID'
         AND COALESCE("paidAt", "placedAt") >= (now() - make_interval(days => ${days + 1})) AT TIME ZONE 'UTC'

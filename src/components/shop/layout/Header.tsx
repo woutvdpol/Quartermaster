@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import type { PublicMenuItem } from "@/server/content/menus";
 import { Container } from "@/components/shop/ui/Container";
+import { CurrencySwitcherSlot } from "@/components/shop/currency/CurrencySwitcherSlot";
 import { HeaderActions } from "./HeaderActions";
 import { ChevronDownIcon } from "./icons";
 import { MenuLink } from "./MenuLink";
@@ -12,10 +14,21 @@ import { layoutCopy } from "./_copy";
 const t = layoutCopy.header;
 
 /**
- * Shop header: logo / name, search, wishlist-account-cart actions, and the HEADER menu (two levels;
- * sub-items open on hover and keyboard focus). Sticky; shrinks once scrolled.
+ * Shop header: logo / name, search, display-currency switcher, wishlist-account-cart actions, and the
+ * HEADER menu (two levels; sub-items open on hover and keyboard focus). Sticky; shrinks once scrolled.
+ * The currency switcher reads a cookie, so it streams in behind its own <Suspense>.
  */
-export function Header({ shopName, logoPath, menu }: { shopName: string; logoPath: string | null; menu: PublicMenuItem[] }) {
+export function Header({
+  tenantId,
+  shopName,
+  logoPath,
+  menu,
+}: {
+  tenantId: string;
+  shopName: string;
+  logoPath: string | null;
+  menu: PublicMenuItem[];
+}) {
   return (
     <StickyHeader>
       <Container size="wide" className="flex h-16 items-center gap-2 transition-[height] duration-200 group-data-[scrolled]/header:h-14 sm:gap-4">
@@ -32,7 +45,12 @@ export function Header({ shopName, logoPath, menu }: { shopName: string; logoPat
           <span className={logoPath ? "sr-only" : "truncate font-shop-heading text-xl tracking-wide sm:text-2xl"}>{shopName}</span>
         </Link>
         <SearchBox className="mx-auto hidden w-full max-w-md lg:block" />
-        <HeaderActions className="ml-auto lg:ml-0" />
+        <div className="ml-auto flex items-center gap-1 lg:ml-0">
+          <Suspense fallback={null}>
+            <CurrencySwitcherSlot tenantId={tenantId} className="hidden sm:block" />
+          </Suspense>
+          <HeaderActions />
+        </div>
       </Container>
       <nav aria-label={t.mainNav} className="hidden border-t border-shop-on-primary/15 lg:block">
         <Container size="wide">

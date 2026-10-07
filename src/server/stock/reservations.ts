@@ -4,6 +4,7 @@ import { db } from "@/server/db";
 import { audit } from "@/server/audit";
 import { getSettings } from "@/server/settings";
 import { ServiceError, type ServiceContext } from "@/server/context";
+import { onReservationReleased } from "@/server/alerts/hooks";
 import type { Prisma } from "@/generated/prisma/client";
 import type { ReservationStatus } from "@/generated/prisma/enums";
 
@@ -94,7 +95,9 @@ export type ReleaseTarget = { tenantId: string } & ({ reservationId: string } | 
 
 /**
  * Releases ACTIVE reservation(s): by id, or for a product (optionally only when held by `cartId`).
- * Returns the number of rows released (0 when nothing was held).
+ * Returns the number of rows released (0 when nothing was held). Each released product gets a
+ * "back available" alert job (inside `tx` when given, so it only exists if that commits); the
+ * releasing cart's customer is excluded from that alert.
  */
 export async function releaseReservation(target: ReleaseTarget, tx?: Tx): Promise<number> {
   const where: Prisma.ReservationWhereInput = { tenantId: target.tenantId, status: "ACTIVE" };
@@ -104,8 +107,18 @@ export async function releaseReservation(target: ReleaseTarget, tx?: Tx): Promis
     if (target.cartId) where.cartId = target.cartId;
   }
   const client = tx ?? db;
-  const res = await client.reservation.updateMany({ where, data: { status: "RELEASED", releasedAt: new Date() } });
-  return res.count;
+  const released = await client.reservation.updateManyAndReturn({
+    where,
+    data: { status: "RELEASED", releasedAt: new Date() },
+    select: { productId: true, cartId: true },
+  });
+  for (const r of released) {
+    const excludeCustomerId = r.cartId
+      ? ((await client.cart.findUnique({ where: { id: r.cartId }, select: { customerId: true } }))?.customerId ?? null)
+      : null;
+    await onReservationReleased(target.tenantId, r.productId, { tx, excludeCustomerId });
+  }
+  return released.length;
 }
 
 /** Cron sweeper: flips every ACTIVE reservation past its expiry to EXPIRED (one tenant or all). */

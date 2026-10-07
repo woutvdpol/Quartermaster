@@ -3,6 +3,7 @@
 import { useActionState, useId } from "react";
 import { Button } from "@/components/shop/ui/Button";
 import { cn } from "@/components/shop/ui/cn";
+import { Turnstile } from "@/components/shop/turnstile";
 import { subscribeNewsletter, type NewsletterState } from "./newsletter-action";
 import { layoutCopy } from "./_copy";
 
@@ -16,7 +17,7 @@ export function NewsletterForm({ source = "footer", tone = "light", className }:
   const [state, action, pending] = useActionState<NewsletterState, FormData>(subscribeNewsletter, { status: "idle" });
   const id = useId();
   const message =
-    state.status === "success" ? t.success : state.status === "invalid" ? t.invalid : state.status === "too_many" ? t.tooMany : state.status === "unavailable" ? t.unavailable : null;
+    state.status === "success" ? t.success : state.status === "invalid" ? t.invalid : state.status === "too_many" ? t.tooMany : state.status === "unavailable" ? t.unavailable : state.status === "captcha" ? t.captcha : null;
   const isError = state.status !== "success" && state.status !== "idle";
 
   if (state.status === "success") {
@@ -61,6 +62,7 @@ export function NewsletterForm({ source = "footer", tone = "light", className }:
           {pending ? t.submitting : t.submit}
         </Button>
       </div>
+      <Turnstile action="newsletter" resetKey={state} />
       {message ? (
         <p id={`${id}-msg`} role="alert" className={cn("text-sm", tone === "dark" ? "text-shop-on-primary" : "text-shop-crit")}>
           {message}

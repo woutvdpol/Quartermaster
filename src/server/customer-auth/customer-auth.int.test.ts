@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { VERIFY_EMAIL_PATH } from "@/server/email-verification";
 import { db } from "@/server/db";
 import { hashPassword } from "@/server/auth/password";
 import { login, requestPasswordReset, resetPassword } from "@/server/auth/service";
@@ -127,7 +128,11 @@ describe("registration", () => {
       expect(sub.customerId).not.toBeNull();
 
       await h.drain();
-      const link = linkIn(h.mails.at(-1)!, "/newsletter/confirm");
+      // Registration queues two mails: the newsletter confirmation and the e-mail verification.
+      expect(h.mails).toHaveLength(2);
+      const newsletterMail = h.mails.find((m) => String(m.html).includes("/newsletter/confirm"))!;
+      expect(h.mails.some((m) => String(m.html).includes(VERIFY_EMAIL_PATH))).toBe(true);
+      const link = linkIn(newsletterMail, "/newsletter/confirm");
       expect(link.pathname).toBe("/newsletter/confirm");
       const token = link.searchParams.get("token")!;
 

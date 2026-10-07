@@ -5,6 +5,7 @@ import type { AdminTenantContext } from "@/lib/admin-tenant";
 import { getDictionary } from "@/lib/i18n";
 import type { SessionUser } from "@/server/auth/session";
 import { LogoMark } from "./AdminShell";
+import { CommandPalette } from "./command/CommandPalette";
 import { SidebarNav } from "./SidebarNav";
 import { TenantSwitcher } from "./TenantSwitcher";
 import { ThemeSwitcher } from "./ThemeSwitcher";
@@ -33,15 +34,12 @@ export function Sidebar({ user, tenants, theme }: SidebarProps) {
         activeName={tenants.active?.name ?? null}
       />
 
-      <button
-        type="button"
-        aria-disabled="true"
-        title={t.nav.searchHint}
-        className="mx-1 mt-3 mb-1 flex cursor-not-allowed items-center justify-between rounded-control border border-rail-line px-2 py-1.5 text-[12.5px] text-rail-muted"
-      >
-        <span>{t.nav.search}</span>
-        <kbd className="rounded-[3px] border border-rail-line px-1 font-mono text-[11px]">⌘K</kbd>
-      </button>
+      <CommandPalette
+        superadmin={user.role === "SUPERADMIN"}
+        tenants={user.role === "SUPERADMIN" ? tenants.switchable : []}
+        activeTenantId={tenants.active?.id ?? null}
+        label={t.nav.search}
+      />
 
       <SidebarNav role={user.role} />
 

@@ -34,6 +34,7 @@ export const layoutCopy = {
     invalid: "Enter a valid email address.",
     unavailable: "Signing up is not possible right now. Please try again later.",
     tooMany: "Too many attempts. Please try again later.",
+    captcha: "We could not verify that you are human. Please try again.",
     honeypot: "Leave this field empty",
   },
   ageGate: {

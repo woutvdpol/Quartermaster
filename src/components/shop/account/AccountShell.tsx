@@ -5,7 +5,7 @@ import { cn } from "@/components/shop/ui/cn";
 import { accountCopy } from "./_copy";
 import { logoutCustomerAction } from "./actions";
 
-export type AccountSection = "overview" | "orders" | "addresses" | "wishlist" | "profile" | "privacy";
+export type AccountSection = "overview" | "orders" | "addresses" | "wishlist" | "alerts" | "profile" | "privacy";
 
 const t = accountCopy.account.nav;
 
@@ -13,6 +13,7 @@ const NAV: Array<{ key: AccountSection; href: string; label: string }> = [
   { key: "overview", href: "/account", label: t.overview },
   { key: "orders", href: "/account/orders", label: t.orders },
   { key: "wishlist", href: "/wishlist", label: t.wishlist },
+  { key: "alerts", href: "/account/alerts", label: t.alerts },
   { key: "addresses", href: "/account/addresses", label: t.addresses },
   { key: "profile", href: "/account/profile", label: t.profile },
   { key: "privacy", href: "/account/privacy", label: t.privacy },

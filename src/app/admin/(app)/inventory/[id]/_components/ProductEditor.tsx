@@ -52,6 +52,7 @@ export type EditorProduct = {
   blurred: boolean;
   acceptsOffers: boolean;
   restrictedSymbols: boolean;
+  requiresDeactivationCert: boolean;
   onSale: boolean;
   tags: string[];
   updatedAt: Date;
@@ -64,6 +65,10 @@ type Slots = {
   /** Quantity + "Adjust stock" drawer, rendered inside the Price & stock card. */
   stock: ReactNode;
   danger: ReactNode;
+  /** Public provenance, documents and certificates (server card with its own actions). */
+  provenance?: ReactNode;
+  /** Facet values (server card, saves immediately). */
+  facets?: ReactNode;
 };
 
 /** Markdown → rough plain text for the SERP preview. */
@@ -267,6 +272,8 @@ export function ProductEditor({
               </div>
             </Card>
 
+            {slots.provenance}
+
             <Card title={copy.cards.provenance} aside={copy.cards.provenanceAside}>
               <div className="grid gap-3">
                 <Select
@@ -294,9 +301,11 @@ export function ProductEditor({
                   />
                 )}
                 <Textarea form={F} label={f.notes} name="notes" rows={3} hint={f.notesHint} defaultValue={product.notes} showOptional error={error("notes")} />
-                <p className="text-xs text-muted">{copy.provenance.noSchemaField}</p>
+                <p className="text-xs text-muted">{copy.provenance.publicElsewhere}</p>
               </div>
             </Card>
+
+            {slots.facets}
 
             {slots.danger}
           </div>
@@ -373,6 +382,14 @@ export function ProductEditor({
                   description={f.restrictedSymbolsHint}
                   name="restrictedSymbols"
                   defaultChecked={product.restrictedSymbols}
+                  layout="row"
+                />
+                <Switch
+                  form={F}
+                  label={f.requiresDeactivationCert}
+                  description={f.requiresDeactivationCertHint}
+                  name="requiresDeactivationCert"
+                  defaultChecked={product.requiresDeactivationCert}
                   layout="row"
                 />
                 <Switch form={F} label={f.ageRestricted} name="ageRestricted" defaultChecked={product.ageRestricted} layout="row" />

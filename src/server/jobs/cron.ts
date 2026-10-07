@@ -1,5 +1,7 @@
 import "server-only";
 import { timingSafeEqual, createHash } from "node:crypto";
+import { ALERT_CRON_TASKS } from "@/server/alerts/jobs";
+import { COMMERCE_CRON_TASKS } from "./commerce-cron";
 
 /**
  * Recurring maintenance tasks. Each is idempotent and safe to run concurrently with itself, so
@@ -33,7 +35,26 @@ export const CRON_TASKS = {
       return {};
     },
   },
+  "leads.photos.cleanup": {
+    schedule: "43 3 * * *",
+    description: "Delete lead photo folders without a lead that are older than the 24 h draft lifetime (listable storage only).",
+    run: async () => {
+      const { cleanupOrphanLeadPhotos } = await import("@/server/leads/cleanup");
+      return await cleanupOrphanLeadPhotos();
+    },
+  },
   // TODO(phase 3): "sitemap.generate" once the storefront sitemap exists (likely app/sitemap.ts + ISR instead).
+  ...ALERT_CRON_TASKS, // alerts.digest, alerts.scan
+  ...COMMERCE_CRON_TASKS, // offers.expire, cart.abandoned
+  "rates.refresh": {
+    // ECB publishes ~16:00 CET on working days; 15:30 UTC is after that in summer and winter time.
+    schedule: "30 15 * * *",
+    description: "Fetch the ECB euro reference rates (display currencies only).",
+    run: async () => {
+      const { refreshRates } = await import("@/server/rates");
+      return await refreshRates();
+    },
+  },
 } satisfies Record<string, CronTask>;
 
 export type CronTaskName = keyof typeof CRON_TASKS;

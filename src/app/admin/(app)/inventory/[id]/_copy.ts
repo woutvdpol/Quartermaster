@@ -44,6 +44,8 @@ export const copy = {
     blurredHint: "Photos blurred and details hidden for guests.",
     restrictedSymbols: "Contains restricted symbols",
     restrictedSymbolsHint: "Compliance display rules apply (e.g. §86a).",
+    requiresDeactivationCert: "Deactivated weapon",
+    requiresDeactivationCertHint: "Can only be put up for sale with a deactivation certificate uploaded (Provenance & authenticity).",
     ageRestricted: "18+ required",
     onSale: "On sale",
     slug: "Slug",
@@ -109,8 +111,7 @@ export const copy = {
     purchasedAt: "Purchased",
     invoice: "Invoice",
     totalCost: "Invoice total",
-    noSchemaField:
-      "Public provenance text is not stored yet: the product schema has no field for it. Use the description for now; internal notes stay private.",
+    publicElsewhere: "Internal only. Public provenance text, documents and certificates are in “Provenance & authenticity”.",
   },
 
   status: {

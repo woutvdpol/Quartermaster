@@ -80,6 +80,7 @@ const saveSchema = z.object({
   blurred: z.boolean(),
   acceptsOffers: z.boolean(),
   restrictedSymbols: z.boolean(),
+  requiresDeactivationCert: z.boolean(),
   onSale: z.boolean(),
   tags: z.array(z.string().trim().min(1).max(100, e.tooLong(100))).max(100),
   specifications: z
@@ -139,6 +140,7 @@ export async function saveProductAction(_prev: ActionState, formData: FormData):
     blurred: formData.get("blurred") === "on",
     acceptsOffers: formData.get("acceptsOffers") === "on",
     restrictedSymbols: formData.get("restrictedSymbols") === "on",
+    requiresDeactivationCert: formData.get("requiresDeactivationCert") === "on",
     onSale: formData.get("onSale") === "on",
     tags: formData.getAll("tags").filter((v): v is string => typeof v === "string"),
     specifications: (() => {
@@ -171,6 +173,7 @@ export async function saveProductAction(_prev: ActionState, formData: FormData):
       blurred: d.blurred,
       acceptsOffers: d.acceptsOffers,
       restrictedSymbols: d.restrictedSymbols,
+      requiresDeactivationCert: d.requiresDeactivationCert,
       onSale: d.onSale,
       tagIds,
       ...(d.regenerateSlug ? { regenerateSlug: true } : slugChanged ? { slug: d.slug } : {}),

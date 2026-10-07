@@ -9,9 +9,12 @@ import {
   archiveOrder,
   cancelOrder,
   markPaidManually,
-  setFulfillmentStatus,
   unarchiveOrder,
 } from "@/server/orders/commands";
+import { updateFulfillment } from "@/server/fulfillment";
+import { formatInvoiceNumber, issueInvoice } from "@/server/invoices";
+import { requireTenantDisplay } from "@/server/tenant-display";
+import { opsCopy } from "./_ops-copy";
 import { orderCopy as t } from "../_copy";
 import { failFromError } from "../_lib/errors";
 
@@ -120,14 +123,30 @@ export async function setFulfillmentAction(_prev: ActionState, formData: FormDat
   if (!parsed.success) return actionFail("Check the highlighted fields.", zodFieldErrors(parsed.error));
   try {
     const ctx = await requireStaffContext();
-    await setFulfillmentStatus(ctx, id, {
+    // Through the fulfillment service: same status/tracking update, plus the customer's "shipped"
+    // mail (once per shipment) when the box is ticked. A preset carrier fills in the tracking link.
+    const res = await updateFulfillment(ctx, id, {
       status: parsed.data.status,
       carrier: parsed.data.carrier || null,
       trackingNumber: parsed.data.trackingNumber || null,
       trackingUrl: parsed.data.trackingUrl || null,
+      notifyCustomer: formData.get("notify") === "on",
     });
     revalidateOrder(id);
-    return actionOk(t.fulfillment.done);
+    return actionOk(res.mailQueued ? opsCopy.fulfillment.mailed : t.fulfillment.done);
+  } catch (error) {
+    return failFromError(error, t.notFound);
+  }
+}
+
+export async function issueInvoiceAction(formData: FormData): Promise<ActionResult> {
+  const id = orderId(formData);
+  try {
+    const ctx = await requireStaffContext();
+    const [res, display] = await Promise.all([issueInvoice(ctx, id), requireTenantDisplay(ctx.tenantId)]);
+    revalidatePath(`/admin/orders/${id}`);
+    const label = res.invoice ? formatInvoiceNumber(res.invoice.number, res.invoice.issuedAt, display.timeZone) : "";
+    return actionOk(res.created ? opsCopy.invoice.issueDone(label) : opsCopy.invoice.already(label));
   } catch (error) {
     return failFromError(error, t.notFound);
   }

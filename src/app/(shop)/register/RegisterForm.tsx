@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { accountCopy } from "@/components/shop/account/_copy";
 import { Alert, Field, Honeypot, SubmitButton } from "@/components/shop/account/form";
+import { Turnstile } from "@/components/shop/turnstile";
 import { registerAction } from "./actions";
 
 const t = accountCopy.register;
@@ -46,6 +47,7 @@ export function RegisterForm({ next, minPasswordLength }: { next: string; minPas
         />
         <span>{t.newsletter}</span>
       </label>
+      <Turnstile action="register" resetKey={state} />
       <SubmitButton pendingLabel={t.submitting} fullWidth>
         {t.submit}
       </SubmitButton>

@@ -9,6 +9,7 @@ import {
   mergeSettings,
   parseStoredSettings,
   analyticsSchema,
+  generalSchema,
 } from "./schema";
 
 describe("settings schemas", () => {
@@ -55,6 +56,21 @@ describe("settings schemas", () => {
     expect(appearanceSchema.safeParse({ logoPath: "/uploads/t1/../../etc/passwd" }).success).toBe(false);
     expect(appearanceSchema.safeParse({ logoPath: "https://evil.example/logo.png" }).success).toBe(false);
     expect(appearanceSchema.safeParse({ logoPath: "/uploads/t1/branding/logo.webp" }).success).toBe(true);
+  });
+});
+
+describe("general business details", () => {
+  it("defaults to empty and normalises VAT id / IBAN", () => {
+    expect(defaultSettings("general")).toMatchObject({ cocNumber: "", vatNumber: "", iban: "" });
+    const parsed = generalSchema.parse({ cocNumber: " 12345678 ", vatNumber: "nl 1234.567.89 b01", iban: "nl91 abna 0417 1643 00" });
+    expect(parsed).toMatchObject({ cocNumber: "12345678", vatNumber: "NL123456789B01", iban: "NL91ABNA0417164300" });
+  });
+
+  it("rejects malformed values", () => {
+    expect(generalSchema.safeParse({ vatNumber: "123456789" }).success).toBe(false);
+    expect(generalSchema.safeParse({ iban: "NL91" }).success).toBe(false);
+    expect(generalSchema.safeParse({ iban: "9191ABNA0417164300" }).success).toBe(false);
+    expect(generalSchema.safeParse({ cocNumber: "<script>" }).success).toBe(false);
   });
 });
 

@@ -9,6 +9,8 @@ async function main() {
   await import("dotenv/config");
   const { startWorker } = await import("../src/server/jobs/worker");
   const worker = await startWorker({ cron: process.env.WORKER_CRON !== "0" });
+  // Display exchange rates: fetch the ECB rates once at start when today's are missing (cron does the rest).
+  void import("../src/server/rates").then((m) => m.refreshRatesIfStale());
 
   let stopping = false;
   const shutdown = async (signal: string) => {

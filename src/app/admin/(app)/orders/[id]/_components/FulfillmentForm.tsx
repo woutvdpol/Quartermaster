@@ -4,6 +4,7 @@ import type { FulfillmentStatus } from "@/generated/prisma/enums";
 import {
   ActionMessage,
   ActionToast,
+  Checkbox,
   FormActions,
   Select,
   SubmitButton,
@@ -13,11 +14,12 @@ import {
 } from "@/components/admin/ui";
 import { orderCopy } from "../../_copy";
 import { setFulfillmentAction } from "../actions";
+import { opsCopy } from "../_ops-copy";
 
 const t = orderCopy.fulfillment;
 const STATUSES: FulfillmentStatus[] = ["UNFULFILLED", "PACKED", "SHIPPED", "DELIVERED"];
 
-/** WIP (decision 8) but functional: fulfillment status + carrier/tracking. */
+/** Fulfillment status + carrier/tracking; marking shipped can email the customer (fulfillment service). */
 export function FulfillmentForm({
   orderId,
   paid,
@@ -78,6 +80,12 @@ export function FulfillmentForm({
         placeholder="https://"
         hint={t.trackingUrlHint}
         error={error("trackingUrl")}
+      />
+      <Checkbox
+        name="notify"
+        label={opsCopy.fulfillment.notify}
+        description={opsCopy.fulfillment.notifyHint}
+        defaultChecked={current.status !== "SHIPPED" && current.status !== "DELIVERED"}
       />
       <FormActions>
         <SubmitButton size="sm" disabled={!paid && current.status === "UNFULFILLED"}>

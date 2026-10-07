@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+// Side effect: registers the owner-invite mail notifier (see src/server/mail/hooks.ts).
+import "@/server/mail/hooks";
 import { actionOk, formString, type ActionResult, type ActionState } from "@/components/admin/ui";
 import { requireStaffContext } from "@/server/context";
 import { disableUser, enableUser, inviteOwner, resendOwnerInvite, resetUserTwoFactor } from "@/server/users";

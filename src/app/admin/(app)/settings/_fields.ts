@@ -53,6 +53,15 @@ export const SETTINGS_FORMS: Record<SettingsGroup, GroupMeta> = {
         ],
       },
       {
+        title: "Business details",
+        description: "Printed on invoices. Leave empty to omit.",
+        fields: [
+          { kind: "text", path: "cocNumber", label: "Chamber of Commerce (KvK) number", maxLength: 30, mono: true },
+          { kind: "text", path: "vatNumber", label: "VAT number", maxLength: 40, mono: true, placeholder: "NL123456789B01" },
+          { kind: "text", path: "iban", label: "IBAN", maxLength: 50, mono: true, placeholder: "NL91 ABNA 0417 1643 00" },
+        ],
+      },
+      {
         title: "Display currencies",
         description: "Extra currencies visitors can see prices in. Checkout is always in the shop currency.",
         fields: [

@@ -54,8 +54,6 @@ export const ordersCopy = {
     payment: "Payment",
     shipTo: "Ship to",
     pickup: "Pickup in store",
-    wipTitle: "Track & trace and invoices",
-    wipBody: "Coming in a later phase. Fulfillment status and tracking can already be set on the full order.",
     notFound: "This order no longer exists or belongs to another shop.",
   },
   notFound: "Order not found. It may belong to another shop.",
@@ -92,6 +90,9 @@ export const orderCopy = {
   },
   totals: {
     subtotal: "Subtotal",
+    discount: "Discount",
+    offer: "Accepted offer",
+    viewOffer: "View offer →",
     shipping: "Shipping",
     surcharge: "Payment surcharge",
     vat: "VAT (margin scheme)",
@@ -154,7 +155,6 @@ export const orderCopy = {
     unarchiveDone: "Order restored.",
     packingSlip: "Packing slip",
     invoice: "Invoice",
-    invoiceWip: "Invoices are not built yet.",
     more: "More actions",
   },
   note: {
@@ -167,7 +167,6 @@ export const orderCopy = {
   },
   fulfillment: {
     title: "Fulfillment",
-    wipNote: "Shipping labels and the “shipped” mail come later. Status and tracking are saved already.",
     status: "Status",
     carrier: "Carrier",
     carrierPlaceholder: "PostNL, DHL, bpost…",

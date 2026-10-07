@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ALERT_MAIL_PROPS } from "@/server/alerts/mail-contracts";
 
 /**
  * Serializable inputs of the queued mail templates. Kept free of React/DB imports so it can be
@@ -22,6 +23,21 @@ export const MAIL_TEMPLATE_PROPS = {
   "newsletter-confirm": z.object({ subscriberId: id, tokenEnc: z.string().min(1) }),
   "newsletter-campaign": z.object({ campaignId: id, subscriberId: id }),
   "newsletter-campaign-test": z.object({ campaignId: id }),
+  ...ALERT_MAIL_PROPS, // alert-confirm, alert-new-arrivals, alert-back-available, alert-price-drop
+  // "Sell your collection" leads (src/server/leads): owner notification + seller confirmation.
+  "lead-received": z.object({ leadId: id }),
+  "lead-received-confirmation": z.object({ leadId: id }),
+  // ── admin-ops (phase 5): builders in ./builders-ops.tsx ──
+  "order-shipped": z.object({ orderId: id }),
+  "owner-invite": z.object({ userId: id, tokenEnc: z.string().min(1), invitedBy: z.string().max(254).nullish() }),
+  "customer-email-verification": z.object({ userId: id, tokenEnc: z.string().min(1) }),
+  // ── commerce (phase 5): offers + abandoned cart; builders in ./builders-commerce.tsx ──
+  "offer-received": z.object({ offerId: id }),
+  "offer-submitted": z.object({ offerId: id }),
+  "offer-accepted": z.object({ offerId: id, tokenEnc: z.string().min(1) }),
+  "offer-countered": z.object({ offerId: id, tokenEnc: z.string().min(1) }),
+  "offer-rejected": z.object({ offerId: id }),
+  "abandoned-cart": z.object({ cartId: id }),
 } as const;
 
 export type MailTemplateName = keyof typeof MAIL_TEMPLATE_PROPS;

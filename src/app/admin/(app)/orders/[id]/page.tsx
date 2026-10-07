@@ -18,7 +18,6 @@ import {
   Thumb,
   Timeline,
   Tooltip,
-  WipBadge,
   buttonClasses,
   type Column,
 } from "@/components/admin/ui";
@@ -28,7 +27,9 @@ import { imageUrl } from "@/server/media/product-images";
 import { orderCopy as t } from "../_copy";
 import { addressLines, describeEvent, orderSteps, paymentMethodLabel } from "../_lib/labels";
 import { requireTenantDisplay } from "@/server/tenant-display";
-import { archiveOrderAction, cancelOrderAction, markPaidAction, unarchiveOrderAction } from "./actions";
+import { archiveOrderAction, cancelOrderAction, issueInvoiceAction, markPaidAction, unarchiveOrderAction } from "./actions";
+import { formatInvoiceNumber } from "@/server/invoices/format";
+import { opsCopy as ops } from "./_ops-copy";
 import { FulfillmentForm } from "./_components/FulfillmentForm";
 import { NoteForm } from "./_components/NoteForm";
 import { StatusStepper } from "./_components/StatusStepper";
@@ -116,6 +117,7 @@ export default async function OrderPage({ params }: PageProps<"/admin/orders/[id
   const canMarkPaid = order.paymentStatus === "PENDING" && !order.canceledAt;
   const canCancel = !settled && !order.finalizedAt && !order.canceledAt;
   const hidden = { id: order.id, customerId: order.customerId ?? "" };
+  const invoiceLabel = order.invoice ? formatInvoiceNumber(order.invoice.number, order.invoice.issuedAt, tz) : null;
 
   const lineColumns: Column<Line>[] = [
     {
@@ -268,15 +270,33 @@ export default async function OrderPage({ params }: PageProps<"/admin/orders/[id
             <a href={`/admin/orders/${order.id}/packing-slip`} target="_blank" rel="noopener" className={buttonClasses()}>
               {t.actions.packingSlip}
             </a>
-            <span className="inline-flex items-center gap-1.5">
-              <button type="button" disabled className={buttonClasses()} aria-describedby="invoice-wip">
-                {t.actions.invoice}
-              </button>
-              <span id="invoice-wip" className="sr-only">
-                {t.actions.invoiceWip}
-              </span>
-              <WipBadge />
-            </span>
+            {invoiceLabel ? (
+              <a
+                href={`/admin/orders/${order.id}/invoice`}
+                target="_blank"
+                rel="noopener"
+                className={buttonClasses()}
+                aria-label={ops.invoice.downloadLabel(invoiceLabel)}
+              >
+                {ops.invoice.download(invoiceLabel)}
+              </a>
+            ) : paid ? (
+              <ConfirmDialog
+                trigger={ops.invoice.issue}
+                tone="primary"
+                title={ops.invoice.issueTitle}
+                description={ops.invoice.issueBody}
+                confirmLabel={ops.invoice.issueConfirm}
+                action={issueInvoiceAction}
+                fields={hidden}
+              />
+            ) : (
+              <Tooltip content={ops.invoice.unpaid}>
+                <button type="button" aria-disabled="true" className={buttonClasses({ className: "cursor-not-allowed opacity-60" })}>
+                  {t.actions.invoice}
+                </button>
+              </Tooltip>
+            )}
             {canCancel && (
               <ConfirmDialog
                 trigger={t.actions.cancel}
@@ -382,6 +402,30 @@ export default async function OrderPage({ params }: PageProps<"/admin/orders/[id
                           label: t.totals.subtotal,
                           value: <Money amount={order.subtotal} currency={cur} mono />,
                         },
+                        ...(order.discountTotal > 0 || order.couponCode
+                          ? [
+                              {
+                                label: `${t.totals.discount}${order.couponCode ? ` · ${order.couponCode}` : ""}`,
+                                value: (
+                                  <span className="font-mono">
+                                    −<Money amount={order.discountTotal} currency={cur} mono />
+                                  </span>
+                                ),
+                              },
+                            ]
+                          : []),
+                        ...(order.offerId
+                          ? [
+                              {
+                                label: t.totals.offer,
+                                value: (
+                                  <Link href={`/admin/offers?view=all&offer=${encodeURIComponent(order.offerId)}`} className="text-info hover:underline">
+                                    {t.totals.viewOffer}
+                                  </Link>
+                                ),
+                              },
+                            ]
+                          : []),
                         {
                           label: `${t.totals.shipping}${order.shippingZoneName ? ` · ${order.shippingZoneName}` : ""}`,
                           value: <Money amount={order.shippingTotal} currency={cur} mono />,
@@ -427,15 +471,9 @@ export default async function OrderPage({ params }: PageProps<"/admin/orders/[id
               />
             </section>
 
-            <Card
-              title={
-                <span className="inline-flex items-center gap-2">
-                  {t.fulfillment.title} <WipBadge />
-                </span>
-              }
-            >
+            <Card title={t.fulfillment.title}>
               <div className="grid gap-3">
-                <p className="text-xs text-muted">{t.fulfillment.wipNote}</p>
+                <p className="text-xs text-muted">{ops.fulfillment.note}</p>
                 {(order.shippedAt || order.deliveredAt || order.trackingUrl) && (
                   <KeyValue
                     items={[

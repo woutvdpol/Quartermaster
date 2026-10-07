@@ -8,6 +8,8 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { FulfillmentStatus, PaymentStatus } from "@/generated/prisma/enums";
 import { recordMovement } from "@/server/stock/ledger";
 import { queueOrderConfirmation } from "@/server/mail";
+import { onOrderFinalized } from "@/server/invoices";
+import { onReservationReleased } from "@/server/alerts/hooks";
 import {
   isFinalAttemptStatus,
   isMollieStatus,
@@ -46,13 +48,20 @@ async function addEvent(tx: Tx, tenantId: string, orderId: string, type: string,
   await tx.orderEvent.create({ data: { tenantId, orderId, type, data, actorId: actorId ?? null } });
 }
 
-/** Releases the order's ACTIVE reservations (cancel / failed payment). Returns the number released. */
+/**
+ * Releases the order's ACTIVE reservations (cancel / failed payment) and queues a "back available"
+ * alert per released product (in `tx`). Returns the number released.
+ */
 async function releaseOrderReservations(tx: Tx, tenantId: string, orderId: string, now: Date) {
-  const res = await tx.reservation.updateMany({
+  const released = await tx.reservation.updateManyAndReturn({
     where: { tenantId, orderId, status: "ACTIVE" },
     data: { status: "RELEASED", releasedAt: now },
+    select: { productId: true },
   });
-  return res.count;
+  for (const productId of new Set(released.map((r) => r.productId))) {
+    await onReservationReleased(tenantId, productId, { tx });
+  }
+  return released.length;
 }
 
 // ─── Finalization ───────────────────────────────────────────────────────────
@@ -67,7 +76,7 @@ export type FinalizeResult = {
 
 /**
  * Completes a PAID order exactly once: stock SALE movements, reservations → CONVERTED, products
- * at quantity 0 → SOLD, timeline events and the (TODO) confirmation-mail hook.
+ * at quantity 0 → SOLD, timeline events, the confirmation mails and the invoice auto-issue job.
  *
  * Idempotency/concurrency: `UPDATE orders SET finalizedAt … WHERE finalizedAt IS NULL` is the guard.
  * A concurrent duplicate blocks on the row lock and, after the first commits, matches 0 rows → no-op.
@@ -155,6 +164,8 @@ export async function finalizeOrderTx(
   if (await queueOrderConfirmation(tenantId, orderId, { tx })) {
     await addEvent(tx, tenantId, orderId, "confirmation_queued", undefined, null);
   }
+  // Auto-issue the invoice (job, only if this transaction commits).
+  await onOrderFinalized(tenantId, orderId, { tx });
   return { finalized: true, oversold };
 }
 
@@ -489,7 +500,14 @@ export async function packingSlipData(ctx: ServiceContext, orderId: string) {
     itemCount: order.lines.reduce((n, l) => n + l.quantity, 0),
     showPrices,
     totals: showPrices
-      ? { subtotal: order.subtotal, shipping: order.shippingTotal, surcharge: order.surchargeTotal, total: order.total }
+      ? {
+          subtotal: order.subtotal,
+          discount: order.discountTotal,
+          couponCode: order.couponCode,
+          shipping: order.shippingTotal,
+          surcharge: order.surchargeTotal,
+          total: order.total,
+        }
       : null,
   };
 }

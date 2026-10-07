@@ -56,6 +56,7 @@ export function OrderSummary({ order }: { order: OrderMailData }) {
       ))}
       <Section style={{ paddingTop: "10px" }}>
         <Amount label="Subtotal" value={money(order.subtotal)} />
+        {order.discountTotal ? <Amount label={`Discount${order.couponCode ? ` (${order.couponCode})` : ""}`} value={`−${money(order.discountTotal)}`} /> : null}
         <Amount
           label={order.shippingMethod === "PICKUP" ? "Pickup" : `Shipping${order.shippingZoneName ? ` (${order.shippingZoneName})` : ""}`}
           value={money(order.shippingTotal)}
