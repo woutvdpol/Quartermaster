@@ -92,6 +92,7 @@ vi.mock("./rate-limit", async () => {
     loginPerIp: { limit: 20, windowMs: 1 },
     loginPerAccount: { limit: 5, windowMs: 1 },
     totpPerSession: { limit: 5, windowMs: 1 },
+    totpPerUser: { limit: 15, windowMs: 1 },
     passwordResetPerEmail: { limit: 3, windowMs: 1 },
   };
   return {

@@ -7,6 +7,7 @@ export const RULES = {
   loginPerIp: { limit: 20, windowMs: 15 * 60 * 1000 },
   loginPerAccount: { limit: 5, windowMs: 15 * 60 * 1000 },
   totpPerSession: { limit: 5, windowMs: 10 * 60 * 1000 },
+  totpPerUser: { limit: 15, windowMs: 60 * 60 * 1000 },
   passwordResetPerEmail: { limit: 3, windowMs: 60 * 60 * 1000 },
 } satisfies Record<string, RateLimitRule>;
 

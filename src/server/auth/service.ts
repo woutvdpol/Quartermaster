@@ -97,6 +97,7 @@ const keys = {
   loginIp: (ip: string) => `login:ip:${ip}`,
   loginAccount: (tenantId: string | null, email: string) => `login:email:${tenantId ?? "platform"}:${email}`,
   totpSession: (sessionId: string) => `totp:session:${sessionId}`,
+  totpUser: (userId: string) => `totp:user:${userId}`,
   totpUsed: (userId: string, step: number) => `totp:used:${userId}:${step}`,
   reauth: (userId: string) => `reauth:user:${userId}`,
   reset: (tenantId: string | null, email: string) => `reset:email:${tenantId ?? "platform"}:${email}`,
@@ -222,7 +223,14 @@ export async function verifyLoginTotp(code: string): Promise<VerifyTotpResult> {
   const { user } = session;
 
   const key = keys.totpSession(session.sessionId);
-  if (await rateLimit.isLimited(key, RULES.totpPerSession)) {
+  // The per-user limit stops an attacker who knows the password from getting fresh guesses
+  // by starting a new pending session after each per-session lock-out.
+  const userKey = keys.totpUser(user.id);
+  const [sessionLimited, userLimited] = await Promise.all([
+    rateLimit.isLimited(key, RULES.totpPerSession),
+    rateLimit.isLimited(userKey, RULES.totpPerUser),
+  ]);
+  if (sessionLimited || userLimited) {
     // Too many guesses: kill the pending session so the attacker must pass the password step again
     // (which is itself rate limited per account).
     await destroySession();
@@ -244,13 +252,13 @@ export async function verifyLoginTotp(code: string): Promise<VerifyTotpResult> {
   }
 
   if (!ok) {
-    await rateLimit.hit(key);
+    await Promise.all([rateLimit.hit(key), rateLimit.hit(userKey)]);
     await audit({ action: "auth.totp_failed", tenantId: user.tenantId, actorId: user.id, data: { reason: "invalid_code" } });
     return { ok: false, error: "invalid_code" };
   }
 
   await promoteSession(session.sessionId, user.role);
-  await rateLimit.clear(key);
+  await Promise.all([rateLimit.clear(key), rateLimit.clear(userKey)]);
   await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   await audit({ action: "auth.login", tenantId: user.tenantId, actorId: user.id, data: { method: usedRecoveryCode ? "recovery_code" : "totp" } });
   if (usedRecoveryCode) await audit({ action: "auth.recovery_code_used", tenantId: user.tenantId, actorId: user.id });
