@@ -14,6 +14,8 @@ export type NavItem = {
   slug: string;
   built?: boolean;
   wip?: boolean;
+  /** Only shown to (and reachable by) Quartermaster superadmins. */
+  superadminOnly?: boolean;
 };
 
 export const ADMIN_NAV: { group: NavGroupKey; items: NavItem[] }[] = [
@@ -21,35 +23,36 @@ export const ADMIN_NAV: { group: NavGroupKey; items: NavItem[] }[] = [
   {
     group: "catalog",
     items: [
-      { key: "inventory", slug: "inventory" },
-      { key: "categories", slug: "categories" },
-      { key: "sourcing", slug: "sourcing" },
+      { key: "inventory", slug: "inventory", built: true },
+      { key: "categories", slug: "categories", built: true },
+      { key: "sourcing", slug: "sourcing", built: true },
     ],
   },
   {
     group: "sales",
     items: [
-      { key: "orders", slug: "orders" },
-      { key: "shippingBoard", slug: "shipping-board", wip: true },
-      { key: "customers", slug: "customers" },
+      { key: "orders", slug: "orders", built: true },
+      { key: "shippingBoard", slug: "shipping-board", built: true, wip: true },
+      { key: "customers", slug: "customers", built: true },
     ],
   },
   {
     group: "website",
     items: [
-      { key: "pages", slug: "pages" },
-      { key: "menus", slug: "menus" },
-      { key: "newsletter", slug: "newsletter" },
+      { key: "pages", slug: "pages", built: true },
+      { key: "menus", slug: "menus", built: true },
+      { key: "newsletter", slug: "newsletter", built: true },
     ],
   },
   {
     group: "system",
     items: [
-      { key: "shipping", slug: "shipping" },
-      { key: "paymentMethods", slug: "payment-methods" },
-      { key: "settings", slug: "settings" },
-      { key: "users", slug: "users" },
-      { key: "auditLog", slug: "audit-log" },
+      { key: "shipping", slug: "shipping", built: true },
+      { key: "paymentMethods", slug: "payment-methods", built: true },
+      { key: "settings", slug: "settings", built: true },
+      { key: "users", slug: "users", built: true },
+      { key: "auditLog", slug: "audit-log", built: true },
+      { key: "platform", slug: "platform", built: true, superadminOnly: true },
     ],
   },
 ];

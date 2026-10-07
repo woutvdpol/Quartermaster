@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { logoutAction } from "@/app/admin/login/actions";
 import type { AdminThemePreference } from "@/lib/admin-theme";
 import type { AdminTenantContext } from "@/lib/admin-tenant";
@@ -42,13 +43,13 @@ export function Sidebar({ user, tenants, theme }: SidebarProps) {
         <kbd className="rounded-[3px] border border-rail-line px-1 font-mono text-[11px]">⌘K</kbd>
       </button>
 
-      <SidebarNav />
+      <SidebarNav role={user.role} />
 
       <div className="mt-auto grid gap-3 border-t border-rail-line px-2 pt-3">
-        <div className="text-xs">
+        <Link href="/admin/account" className="-mx-1 block rounded-control px-1 py-0.5 text-xs hover:bg-rail-raised">
           <p className="truncate text-rail-ink">{user.name ?? user.email}</p>
-          <p className="text-rail-muted">{roleLabel}</p>
-        </div>
+          <p className="text-rail-muted">{roleLabel} · Account</p>
+        </Link>
         <ThemeSwitcher current={theme} />
         <form action={logoutAction}>
           <button

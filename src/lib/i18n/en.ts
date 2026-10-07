@@ -43,6 +43,7 @@ export const en = {
       settings: "Settings",
       users: "Users",
       auditLog: "Audit log",
+      platform: "Platform",
     },
   },
   tenant: {

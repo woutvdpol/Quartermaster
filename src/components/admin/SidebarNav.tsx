@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ADMIN_NAV, adminHref } from "@/lib/admin-nav";
+import type { Role } from "@/generated/prisma/enums";
 import { getDictionary } from "@/lib/i18n";
 import { WipBadge } from "./StatusPill";
 
 const t = getDictionary().nav;
 
-export function SidebarNav() {
+export function SidebarNav({ role }: { role: Role }) {
   const pathname = usePathname();
   return (
     <nav aria-label={t.label} className="flex flex-col gap-0.5">
@@ -16,7 +17,7 @@ export function SidebarNav() {
         <div key={group}>
           <h2 className="type-label mx-2 mt-3 mb-1 text-[11px] text-rail-muted">{t.groups[group]}</h2>
           <ul className="flex flex-col gap-0.5">
-            {items.map((item) => {
+            {items.filter((item) => !item.superadminOnly || role === "SUPERADMIN").map((item) => {
               const href = adminHref(item);
               const active = pathname === href || pathname.startsWith(`${href}/`);
               return (
