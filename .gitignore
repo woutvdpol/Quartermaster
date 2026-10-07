@@ -25,3 +25,9 @@ public/uploads/
 .idea/
 .vscode/
 *.log
+
+/src/generated/prisma
+
+# TypeScript / Next generated
+*.tsbuildinfo
+next-env.d.ts

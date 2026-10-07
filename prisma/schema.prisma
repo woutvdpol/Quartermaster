@@ -1,0 +1,184 @@
+// Quartermaster — phase 0 foundation: tenants, users, auth, audit, settings.
+// Domain models (products, orders, …) are added in phase 1.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Tenancy ────────────────────────────────────────────────────────────────
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+model Tenant {
+  id        String       @id @default(cuid())
+  slug      String       @unique
+  name      String
+  status    TenantStatus @default(ACTIVE)
+  currency  String       @default("EUR") @db.Char(3)
+  timezone  String       @default("Europe/Amsterdam")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  domains   TenantDomain[]
+  users     User[]
+  settings  Setting[]
+  auditLogs AuditLog[]
+
+  @@map("tenants")
+}
+
+model TenantDomain {
+  id        String   @id @default(cuid())
+  tenantId  String
+  host      String   @unique // lower-case host incl. port in dev, e.g. "concept.localhost:3000"
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("tenant_domains")
+}
+
+// ─── Users & auth ───────────────────────────────────────────────────────────
+
+enum Role {
+  SUPERADMIN // Quartermaster platform admin, no tenant
+  OWNER // shop owner, bound to one tenant
+  CUSTOMER // shop customer, bound to one tenant
+}
+
+model User {
+  id              String    @id @default(cuid())
+  tenantId        String? // null only for SUPERADMIN
+  role            Role
+  email           String // stored lower-case
+  name            String?
+  passwordHash    String? // "scrypt$N$r$p$salt$hash"; null = no password set yet
+  emailVerifiedAt DateTime?
+  totpSecretEnc   String? // AES-256-GCM encrypted base32 secret
+  totpEnabledAt   DateTime?
+  disabledAt      DateTime?
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tenant        Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  sessions      Session[]
+  authTokens    AuthToken[]
+  recoveryCodes RecoveryCode[]
+  auditLogs     AuditLog[]
+
+  // Uniqueness of SUPERADMIN emails (tenantId IS NULL) is enforced by a partial index in SQL.
+  @@unique([tenantId, email])
+  @@index([email])
+  @@map("users")
+}
+
+model Session {
+  id          String    @id @default(cuid())
+  userId      String
+  tokenHash   String    @unique // sha256(token), the raw token only lives in the cookie
+  expiresAt   DateTime
+  lastSeenAt  DateTime  @default(now())
+  // A session created with a password but awaiting a TOTP code.
+  pendingTotp Boolean   @default(false)
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+enum AuthTokenType {
+  PASSWORD_RESET
+  EMAIL_VERIFICATION
+}
+
+model AuthToken {
+  id        String        @id @default(cuid())
+  userId    String
+  type      AuthTokenType
+  tokenHash String        @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@map("auth_tokens")
+}
+
+model RecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("recovery_codes")
+}
+
+// Sliding-window rate limiting for login, password reset, etc.
+model RateLimitHit {
+  id        BigInt   @id @default(autoincrement())
+  key       String // e.g. "login:ip:1.2.3.4" or "login:email:t1:jan@x.nl"
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+  @@map("rate_limit_hits")
+}
+
+// ─── Audit ──────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        BigInt   @id @default(autoincrement())
+  tenantId  String?
+  actorId   String?
+  action    String // e.g. "auth.login", "order.mark_paid"
+  entity    String?
+  entityId  String?
+  data      Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  actor  User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}
+
+// ─── Settings ───────────────────────────────────────────────────────────────
+
+// One row per (tenant, group); `data` is validated by a Zod schema per group.
+model Setting {
+  id        String   @id @default(cuid())
+  tenantId  String
+  group     String // "general" | "catalog" | "checkout" | "appearance" | …
+  data      Json
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, group])
+  @@map("settings")
+}

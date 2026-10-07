@@ -1,0 +1,951 @@
+<title>Quartermaster Ontwerp C</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Hanken+Grotesk:wght@400;500;600;700&family=Sofia+Sans+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Richting C · Naval Quiet
+   Layout: document met tabs; elk scherm is een app-frame (inklapbare icoon-rail + werkvlak, soms met zijpaneel of ⌘K-palet)
+   in een horizontaal scrollbare container. Eén accent (oker) uitsluitend voor primaire acties. */
+:root{
+  --bg:#EEF1F5; --surface:#FFFFFF; --surface-2:#F6F8FA; --surface-3:#EBEFF4; --sunk:#E4E9F0;
+  --ink:#13203A; --ink-2:#3A4761; --muted:#667288; --faint:#98A2B4; --line:#E3E8EE; --line-strong:#CDD5E0;
+  --rail:#13203A; --rail-2:#1B2A46; --rail-3:#273859; --rail-ink:#DCE3EE; --rail-muted:#8A97AF;
+  --accent:#A47A2C; --accent-hover:#8D6823; --accent-ink:#FFFFFF; --accent-soft:#F6EFE1; --accent-line:#E2D1AD;
+  --ok:#2C6A56; --ok-soft:#E2F0EA; --warn:#93650F; --warn-soft:#F8EFDA; --crit:#A3423A; --crit-soft:#F7E4E2; --info:#3A5D8A; --info-soft:#E5EDF7;
+  --wip:#4F5D77; --wip-a:#EBEFF4; --wip-b:#DDE3EB;
+  --img-a:#E6EBF1; --img-b:#DCE2EA; --img-ink:#7B879B;
+  --chart-line:#2E4A78; --chart-fill:#E3EAF4; --chart-ref:#A9B3C3; --chart-bar:#C3CEDD; --chart-bar-hi:#2E4A78;
+  --scrim:rgba(19,32,58,.26); --shadow:0 1px 2px rgba(19,32,58,.05),0 6px 20px rgba(19,32,58,.05); --shadow-lg:0 2px 6px rgba(19,32,58,.08),0 28px 70px rgba(19,32,58,.24);
+  --focus:#A47A2C;
+  --f-ui:"Hanken Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-label:"Sofia Sans Condensed","Arial Narrow",sans-serif;
+  --f-mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --r-sm:6px; --r:10px; --r-lg:14px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0A1322; --surface:#101C30; --surface-2:#13213A; --surface-3:#192943; --sunk:#0D1829;
+  --ink:#E3E8F1; --ink-2:#B9C3D4; --muted:#8693A9; --faint:#5D6A82; --line:#1E2D47; --line-strong:#2C3E5D;
+  --rail:#070E1A; --rail-2:#0F1A2D; --rail-3:#1A2944; --rail-ink:#D5DCE8; --rail-muted:#7584A0;
+  --accent:#D0A55A; --accent-hover:#DDB673; --accent-ink:#1A1406; --accent-soft:#29231A; --accent-line:#4A3D23;
+  --ok:#76BFA5; --ok-soft:#13302A; --warn:#E0B355; --warn-soft:#33280F; --crit:#E68B81; --crit-soft:#3A1E1D; --info:#90B4E1; --info-soft:#172B48;
+  --wip:#AEB9CB; --wip-a:#192943; --wip-b:#13213A;
+  --img-a:#192943; --img-b:#15233B; --img-ink:#7584A0;
+  --chart-line:#90B4E1; --chart-fill:#15294A; --chart-ref:#4A5A76; --chart-bar:#2A3D5E; --chart-bar-hi:#90B4E1;
+  --scrim:rgba(2,6,14,.6); --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.18); --shadow-lg:0 2px 6px rgba(0,0,0,.4),0 28px 70px rgba(0,0,0,.55);
+  --focus:#D0A55A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0A1322; --surface:#101C30; --surface-2:#13213A; --surface-3:#192943; --sunk:#0D1829;
+  --ink:#E3E8F1; --ink-2:#B9C3D4; --muted:#8693A9; --faint:#5D6A82; --line:#1E2D47; --line-strong:#2C3E5D;
+  --rail:#070E1A; --rail-2:#0F1A2D; --rail-3:#1A2944; --rail-ink:#D5DCE8; --rail-muted:#7584A0;
+  --accent:#D0A55A; --accent-hover:#DDB673; --accent-ink:#1A1406; --accent-soft:#29231A; --accent-line:#4A3D23;
+  --ok:#76BFA5; --ok-soft:#13302A; --warn:#E0B355; --warn-soft:#33280F; --crit:#E68B81; --crit-soft:#3A1E1D; --info:#90B4E1; --info-soft:#172B48;
+  --wip:#AEB9CB; --wip-a:#192943; --wip-b:#13213A;
+  --img-a:#192943; --img-b:#15233B; --img-ink:#7584A0;
+  --chart-line:#90B4E1; --chart-fill:#15294A; --chart-ref:#4A5A76; --chart-bar:#2A3D5E; --chart-bar-hi:#90B4E1;
+  --scrim:rgba(2,6,14,.6); --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.18); --shadow-lg:0 2px 6px rgba(0,0,0,.4),0 28px 70px rgba(0,0,0,.55);
+  --focus:#D0A55A; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-ui);padding-inline:clamp(16px,4vw,48px);padding-block:0 96px;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1280px;margin:0 auto}
+button{font:inherit;color:inherit}
+:where(button,a,[tabindex]):focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:6px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.muted{color:var(--muted)} .faint{color:var(--faint)}
+.lbl{font:600 12px/1.2 var(--f-label);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+
+/* ---------- Page header ---------- */
+header.top{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end;justify-content:space-between;padding-block:44px 20px}
+.brand{display:flex;gap:16px;align-items:center}
+.mark{width:48px;height:48px;border-radius:12px;background:var(--rail);display:grid;place-items:center;flex:none}
+.mark svg{width:26px;height:26px;stroke:var(--rail-ink)}
+h1{margin:0;font:700 34px/1.05 var(--f-ui);letter-spacing:-.025em}
+h1 span{color:var(--muted);font-weight:500}
+.sub{margin:6px 0 0;color:var(--muted);max-width:64ch}
+.theme{display:inline-flex;background:var(--surface-3);border-radius:10px;padding:3px}
+.theme button{border:0;background:none;padding:6px 12px;border-radius:8px;font-size:13px;color:var(--muted);cursor:pointer}
+.theme button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+
+nav.tabs{position:sticky;top:0;z-index:20;background:var(--bg);display:flex;gap:4px;align-items:center;overflow-x:auto;padding-block:12px;margin-bottom:28px;scrollbar-width:thin}
+nav.tabs::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--line)}
+nav.tabs button{border:0;background:none;padding:8px 14px;border-radius:9px;font-size:14.5px;font-weight:500;color:var(--muted);cursor:pointer;white-space:nowrap}
+nav.tabs button:hover{color:var(--ink);background:var(--surface-3)}
+nav.tabs button[aria-selected="true"]{color:var(--ink);background:var(--surface);box-shadow:var(--shadow)}
+nav.tabs .grp{font:600 11px var(--f-label);letter-spacing:.16em;text-transform:uppercase;color:var(--faint);padding:0 6px 0 18px}
+
+section[role=tabpanel]{display:grid;gap:22px}
+.intro{display:grid;gap:6px;max-width:72ch}
+.intro h2{margin:0;font:700 26px/1.15 var(--f-ui);letter-spacing:-.02em;text-wrap:balance}
+.intro p{margin:0;color:var(--muted)}
+.notes{display:flex;flex-wrap:wrap;gap:8px}
+.note{font-size:13px;color:var(--ink-2);background:var(--surface);border-radius:999px;padding:5px 12px;box-shadow:var(--shadow)}
+.note b{font-weight:600}
+.scroll{overflow-x:auto;border-radius:var(--r-lg);box-shadow:var(--shadow-lg);background:var(--surface-2)}
+
+/* ---------- Badges ---------- */
+.st{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;padding:2px 9px;border-radius:6px;white-space:nowrap;line-height:1.6}
+.st::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.s-ok{background:var(--ok-soft);color:var(--ok)} .s-warn{background:var(--warn-soft);color:var(--warn)}
+.s-crit{background:var(--crit-soft);color:var(--crit)} .s-info{background:var(--info-soft);color:var(--info)}
+.s-mute{background:var(--surface-3);color:var(--muted)}
+.wip{display:inline-flex;align-items:center;font:700 10.5px/1 var(--f-label);letter-spacing:.14em;color:var(--wip);padding:4px 7px 3px;border-radius:5px;background:repeating-linear-gradient(-45deg,var(--wip-a) 0 5px,var(--wip-b) 5px 10px);box-shadow:inset 0 0 0 1px var(--line-strong);vertical-align:middle;white-space:nowrap}
+.role{display:inline-flex;align-items:center;gap:6px;font:600 11px/1 var(--f-label);letter-spacing:.12em;text-transform:uppercase;padding:5px 8px 4px;border-radius:5px}
+.role.admin{background:var(--info-soft);color:var(--info)}
+.role.owner{background:var(--surface-3);color:var(--ink-2)}
+
+/* ---------- Buttons ---------- */
+.btn{display:inline-flex;align-items:center;gap:7px;border:0;background:var(--surface-3);color:var(--ink);font-size:13.5px;font-weight:500;padding:8px 14px;border-radius:8px;white-space:nowrap;cursor:default}
+.btn svg{width:16px;height:16px}
+.btn.ghost{background:none;color:var(--ink-2)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.quiet-crit{background:none;color:var(--muted)}
+.ico{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+kbd{font:500 11px var(--f-mono);padding:1px 6px;border-radius:5px;background:var(--surface-3);color:var(--muted)}
+
+/* ---------- App frame ---------- */
+.frame{position:relative;min-width:1120px;display:grid;grid-template-columns:auto 1fr;background:var(--surface-2);min-height:700px;overflow:hidden}
+.rail{background:var(--rail);color:var(--rail-ink);display:flex;flex-direction:column;gap:2px;padding:14px 12px;width:248px;transition:width .2s ease}
+.rail[data-mode="closed"]{width:68px;padding-inline:10px}
+.tenant{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;background:var(--rail-2);border:0;color:inherit;text-align:left;cursor:pointer;width:100%}
+.tenant .av{width:32px;height:32px;border-radius:8px;background:var(--rail-3);display:grid;place-items:center;font:600 12px var(--f-mono);flex:none;color:var(--rail-ink)}
+.tenant .tx{min-width:0;flex:1;display:grid;line-height:1.25}
+.tenant .tx b{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tenant .tx small{font:400 11.5px var(--f-mono);color:var(--rail-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tenant .ico{color:var(--rail-muted);width:16px;height:16px}
+.rail .rolerow{padding:10px 8px 4px;display:flex}
+.rail .role.admin{background:var(--rail-3);color:var(--rail-ink)}
+.rail .role.owner{background:none;color:var(--rail-muted);padding-left:0}
+.rail .find{display:flex;align-items:center;gap:10px;margin:8px 0 6px;padding:8px 10px;border-radius:8px;background:none;border:0;box-shadow:inset 0 0 0 1px var(--rail-3);color:var(--rail-muted);font-size:13px;cursor:pointer;width:100%}
+.rail .find span{flex:1;text-align:left}
+.rail .find kbd{background:var(--rail-3);color:var(--rail-ink)}
+.rail h6{margin:16px 10px 4px;font:600 11px var(--f-label);letter-spacing:.16em;text-transform:uppercase;color:var(--rail-muted)}
+.rail .it{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:8px;color:var(--rail-ink);text-decoration:none;font-size:14px;position:relative}
+.rail .it .ico{color:var(--rail-muted)}
+.rail .it.on{background:var(--rail-3)}
+.rail .it.on .ico{color:var(--rail-ink)}
+.rail .it .lb{flex:1;white-space:nowrap}
+.rail .it .ct{font:500 11.5px var(--f-mono);color:var(--rail-muted)}
+.rail .it .wip{background:none;box-shadow:inset 0 0 0 1px var(--rail-3);color:var(--rail-muted);padding:3px 5px 2px;font-size:9.5px}
+.rail .foot{margin-top:auto;display:grid;gap:4px;padding-top:12px}
+.rail .me{display:flex;align-items:center;gap:10px;padding:8px 10px}
+.rail .me .av{width:28px;height:28px;border-radius:50%;background:var(--rail-3);display:grid;place-items:center;font:600 11px var(--f-mono);flex:none}
+.rail .me small{display:block;color:var(--rail-muted);font-size:11.5px}
+.rail .tog{display:flex;align-items:center;gap:12px;padding:8px 10px;border:0;background:none;color:var(--rail-muted);font-size:13px;border-radius:8px;cursor:pointer;width:100%}
+.rail[data-mode="closed"] :is(.tx,.tenant>.ico,.rolerow,.find span,.find kbd,h6,.lb,.ct,.wip,.me>div,.tog span){display:none}
+.rail[data-mode="closed"] .tenant{padding:4px;justify-content:center;background:none}
+.rail[data-mode="closed"] .find{justify-content:center;padding:8px}
+.rail[data-mode="closed"] .it,.rail[data-mode="closed"] .tog,.rail[data-mode="closed"] .me{justify-content:center;padding-inline:0}
+.rail[data-mode="closed"] h6+.it{margin-top:14px}
+.rail[data-mode="closed"] .it.dot::after{content:"";position:absolute;top:7px;right:12px;width:6px;height:6px;border-radius:50%;background:var(--rail-ink)}
+
+.main{display:flex;flex-direction:column;min-width:0;position:relative}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:22px 36px 18px}
+.crumb{font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:center}
+.crumb i{font-style:normal;color:var(--faint)}
+.bar h3{margin:2px 0 0;font:700 24px/1.2 var(--f-ui);letter-spacing:-.02em;display:flex;gap:10px;align-items:center}
+.actions{display:flex;gap:8px;align-items:center}
+.body{padding:4px 36px 36px;display:grid;gap:20px;align-content:start}
+.panel{background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow)}
+.panel>.hd{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:18px 22px 6px}
+.panel>.hd h4{margin:0;font-size:15px;font-weight:600;letter-spacing:-.005em;display:flex;gap:8px;align-items:center}
+.panel>.hd span{font-size:12.5px;color:var(--muted)}
+.panel>.bd{padding:12px 22px 20px}
+.banner{display:flex;gap:12px;align-items:center;padding:10px 16px;border-radius:var(--r);background:var(--info-soft);color:var(--ink-2);font-size:13.5px}
+.banner .ico{color:var(--info)}
+.banner.wipb{background:repeating-linear-gradient(-45deg,var(--wip-a) 0 8px,var(--surface) 8px 16px);box-shadow:inset 0 0 0 1px var(--line-strong)}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+.kpi{padding:20px 22px}
+.kpi .v{font:500 30px/1.15 var(--f-mono);letter-spacing:-.03em;margin-top:10px}
+.kpi .d{font-size:13px;margin-top:6px;color:var(--muted)}
+.up{color:var(--ok)} .down{color:var(--crit)}
+.g2{display:grid;grid-template-columns:1.65fr 1fr;gap:20px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px}
+svg text{fill:var(--muted);font:11px var(--f-mono)}
+.todo{display:grid;gap:2px}
+.todo div{display:flex;justify-content:space-between;align-items:center;padding:9px 0;font-size:14px}
+.todo div+div{box-shadow:0 -1px 0 var(--line)}
+.todo .n{font:500 14px var(--f-mono);min-width:28px;text-align:right}
+
+/* Tables (geen verticale lijnen, alleen ruimte en een haarlijn) */
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font:600 11.5px var(--f-label);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);text-align:left;padding:12px 14px;white-space:nowrap}
+td{padding:13px 14px;vertical-align:middle;box-shadow:0 -1px 0 var(--line)}
+th:first-child,td:first-child{padding-left:22px} th:last-child,td:last-child{padding-right:22px}
+td.r,th.r{text-align:right}
+tbody tr.sel td{background:var(--surface-2)}
+tbody tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--ink),0 -1px 0 var(--line)}
+tr.click{cursor:pointer}
+tr.click:hover td{background:var(--surface-2)}
+.pr{display:flex;gap:14px;align-items:center}
+.pr small{display:block;color:var(--muted);font-size:12.5px}
+.th{width:44px;height:44px;border-radius:8px;flex:none;background:repeating-linear-gradient(135deg,var(--img-a) 0 6px,var(--img-b) 6px 12px)}
+.chk{width:16px;height:16px;border-radius:5px;box-shadow:inset 0 0 0 1.5px var(--line-strong);display:inline-block;vertical-align:middle}
+.chk.on{background:var(--ink);box-shadow:none;position:relative}
+.chk.on::after{content:"";position:absolute;left:5px;top:2px;width:4px;height:8px;border:solid var(--surface);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.views{display:flex;gap:4px;padding:16px 22px 4px;flex-wrap:wrap}
+.views span{padding:6px 12px;border-radius:8px;font-size:13.5px;color:var(--muted)}
+.views span.on{background:var(--surface-3);color:var(--ink);font-weight:500}
+.views span i{font:500 11.5px var(--f-mono);font-style:normal;color:var(--faint);margin-left:6px}
+.filters{display:flex;gap:8px;align-items:center;padding:8px 22px 12px;flex-wrap:wrap}
+.search{display:flex;align-items:center;gap:8px;background:var(--surface-2);border-radius:8px;padding:8px 12px;font-size:13.5px;color:var(--faint);min-width:280px}
+.chip{font-size:13px;border-radius:8px;padding:6px 10px;color:var(--muted);box-shadow:inset 0 0 0 1px var(--line-strong)}
+.chip.set{box-shadow:none;background:var(--surface-3);color:var(--ink)}
+.pager{display:flex;justify-content:space-between;padding:14px 22px;font-size:13px;color:var(--muted);box-shadow:0 -1px 0 var(--line)}
+
+/* ⌘K palette */
+.scrim{position:absolute;inset:0;background:var(--scrim);z-index:5}
+.pal{position:absolute;z-index:6;left:50%;top:84px;transform:translateX(-50%);width:640px;background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow-lg);overflow:hidden}
+.pal .q{display:flex;align-items:center;gap:12px;padding:18px 20px;font-size:18px;box-shadow:0 1px 0 var(--line)}
+.pal .q .caret{display:inline-block;width:1.5px;height:20px;background:var(--ink);vertical-align:-3px;margin-left:1px}
+.pal .q .scope{margin-left:auto;font-size:12px;color:var(--muted);background:var(--surface-3);padding:3px 8px;border-radius:6px}
+.pal .grp{padding:10px 12px 4px}
+.pal .grp .lbl{padding:6px 10px}
+.pal .opt{display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:9px;font-size:14px}
+.pal .opt.act{background:var(--surface-3)}
+.pal .opt .ico{color:var(--muted)}
+.pal .opt .meta{margin-left:auto;font-size:12.5px;color:var(--muted);display:flex;gap:10px;align-items:center}
+.pal .ft{display:flex;gap:18px;padding:12px 20px;font-size:12.5px;color:var(--muted);box-shadow:0 -1px 0 var(--line);background:var(--surface-2)}
+
+/* Editor */
+.ed{display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start}
+.col{display:grid;gap:20px}
+.field{display:grid;gap:6px}
+.in{background:var(--surface-2);border-radius:8px;padding:10px 12px;font-size:14px;box-shadow:inset 0 0 0 1px var(--line)}
+.in.area{min-height:96px;line-height:1.6}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.r3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.gal{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.gal .im{aspect-ratio:1;border-radius:10px;background:repeating-linear-gradient(135deg,var(--img-a) 0 7px,var(--img-b) 7px 14px);position:relative;display:flex;align-items:flex-end;padding:8px}
+.gal .im span{font:500 10.5px var(--f-mono);color:var(--img-ink);background:var(--surface);padding:1px 6px;border-radius:4px}
+.gal .im.cover{grid-column:span 2;grid-row:span 2;flex-direction:column;align-items:flex-start;justify-content:space-between}
+.gal .im.cover svg{align-self:center;width:70%;margin:auto}
+.gal .im.cover svg path{fill:none;stroke:var(--img-ink);stroke-width:2}
+.gal .tagc{font:600 10.5px var(--f-label);letter-spacing:.14em;background:var(--ink);color:var(--surface);padding:3px 7px 2px;border-radius:5px}
+.drop{aspect-ratio:1;border-radius:10px;box-shadow:inset 0 0 0 1.5px var(--line-strong);display:grid;place-items:center;text-align:center;font-size:12px;color:var(--muted);padding:8px}
+.path{display:flex;gap:10px;align-items:center;font-size:12.5px;color:var(--muted);padding-top:14px;flex-wrap:wrap}
+.path code{font:500 12px var(--f-mono);color:var(--ink-2);background:var(--surface-3);padding:2px 7px;border-radius:5px}
+.tax{display:flex;flex-wrap:wrap;gap:8px}
+.tax span{font-size:13px;background:var(--surface-3);border-radius:7px;padding:5px 10px}
+.tax span em{font:600 10.5px var(--f-label);font-style:normal;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-right:6px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:9px 14px;font-size:14px;margin:0}
+.kv dt{color:var(--muted)} .kv dd{margin:0;text-align:right}
+.seg{display:flex;background:var(--surface-3);border-radius:9px;padding:3px;gap:2px}
+.seg span{flex:1;text-align:center;font-size:13px;padding:6px 4px;border-radius:7px;color:var(--muted)}
+.seg span.on{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:var(--shadow)}
+.sw{width:36px;height:20px;border-radius:10px;background:var(--line-strong);position:relative;flex:none}
+.sw::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:var(--surface);box-shadow:0 1px 2px rgba(19,32,58,.2)}
+.sw.on{background:var(--ink)} .sw.on::after{left:18px}
+.line{display:flex;justify-content:space-between;align-items:center;gap:14px;font-size:14px}
+.margin{display:grid;gap:8px;padding:14px;border-radius:9px;background:var(--ok-soft)}
+.margin .big{font:500 24px var(--f-mono);color:var(--ok);letter-spacing:-.02em}
+.serp{display:grid;gap:3px;font-size:13px}
+.serp .u{font:12px var(--f-mono);color:var(--ok)} .serp .t{font-size:16px;color:var(--info)}
+
+/* Order list + drawer */
+.drawer{position:absolute;z-index:4;top:0;right:0;bottom:0;width:480px;background:var(--surface);box-shadow:var(--shadow-lg);display:flex;flex-direction:column;transition:transform .22s ease}
+.drawer[hidden]{display:none}
+.drawer .dh{padding:22px 26px 16px;display:grid;gap:10px;box-shadow:0 1px 0 var(--line)}
+.drawer .dh .top{display:flex;justify-content:space-between;align-items:center}
+.drawer .dh h4{margin:0;font:700 22px var(--f-ui);letter-spacing:-.02em}
+.x{border:0;background:var(--surface-3);border-radius:8px;width:32px;height:32px;display:grid;place-items:center;cursor:pointer;color:var(--muted)}
+.drawer .db{overflow:auto;padding:6px 26px 20px;display:grid;gap:22px;align-content:start;flex:1}
+.drawer .sec{display:grid;gap:10px}
+.drawer .df{padding:14px 26px;display:flex;flex-wrap:wrap;gap:8px;box-shadow:0 -1px 0 var(--line);background:var(--surface-2)}
+.lines{display:grid;gap:12px}
+.lines .pr{justify-content:space-between}
+.lines .pr>span{white-space:nowrap}
+.lines .pr>div:first-child{display:flex;gap:12px;align-items:center}
+.tl{display:grid;gap:14px;font-size:13.5px}
+.tl div{display:grid;grid-template-columns:14px 1fr;gap:10px}
+.tl div::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--line-strong);margin-top:6px}
+.tl div.k::before{background:var(--ink)}
+.tl small{display:block;color:var(--muted);font:12px var(--f-mono)}
+.wipbox{border-radius:9px;padding:12px 14px;background:repeating-linear-gradient(-45deg,var(--wip-a) 0 8px,var(--surface) 8px 16px);box-shadow:inset 0 0 0 1px var(--line-strong);display:grid;gap:8px;font-size:13.5px}
+
+/* Board */
+.board{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.lane{display:grid;gap:10px;align-content:start}
+.lane h5{margin:0;padding:4px 4px 6px;display:flex;justify-content:space-between;align-items:center;font:600 12px var(--f-label);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.card{background:var(--surface);border-radius:10px;padding:14px 16px;display:grid;gap:6px;font-size:13.5px;box-shadow:var(--shadow)}
+.card .h{display:flex;justify-content:space-between;align-items:baseline}
+.card .h b{font:600 14px var(--f-mono)}
+.lane.dim .card{opacity:.75}
+
+/* Settings */
+.set{display:grid;grid-template-columns:220px 1fr;gap:28px;align-items:start}
+.snav{display:grid;gap:2px}
+.snav span{padding:8px 12px;border-radius:8px;font-size:14px;color:var(--ink-2);display:flex;justify-content:space-between;align-items:center}
+.snav span.on{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:var(--shadow)}
+.snav .lbl{padding:18px 12px 6px;display:flex;gap:6px;align-items:center}
+.snav .lock{color:var(--muted)}
+.zones{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.zone{background:var(--surface-2);border-radius:10px;padding:16px;display:grid;gap:12px;align-content:start}
+.zone .zt{display:flex;justify-content:space-between;align-items:center}
+.zone .zt b{font-size:15px}
+.cc{display:flex;flex-wrap:wrap;gap:5px}
+.cc span{font:500 11.5px var(--f-mono);background:var(--surface);padding:2px 6px;border-radius:5px;color:var(--ink-2)}
+.tiers{display:grid;grid-template-columns:1fr auto;font-size:13.5px}
+.tiers span{padding:6px 0;box-shadow:0 -1px 0 var(--line)}
+.tiers span:nth-child(even){text-align:right;font-family:var(--f-mono)}
+.srow{display:flex;justify-content:space-between;gap:20px;align-items:center;padding:14px 0}
+.srow+.srow{box-shadow:0 -1px 0 var(--line)}
+.srow p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.pm{display:flex;flex-wrap:wrap;gap:8px}
+.pm span{display:inline-flex;gap:8px;align-items:center;font-size:13.5px;background:var(--surface-2);padding:7px 12px;border-radius:8px}
+.pm span .ico{width:15px;height:15px;color:var(--ok)}
+
+/* Plan */
+.princ{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.princ div{background:var(--surface);border-radius:var(--r);padding:20px 22px;box-shadow:var(--shadow);display:grid;gap:6px;align-content:start}
+.princ b{font-size:15.5px}
+.princ p{margin:0;font-size:14px;color:var(--muted)}
+.dec{background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow);display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))}
+.dec div{padding:16px 22px;display:grid;grid-template-columns:150px 1fr;gap:14px;font-size:14px;box-shadow:0 -1px 0 var(--line)}
+.dec div b{font:600 12px var(--f-label);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding-top:2px}
+.phase{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:2px;background:var(--line);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
+.phase div{background:var(--surface);padding:16px 18px;display:grid;gap:4px;align-content:start;font-size:13.5px}
+.phase div .n{font:500 11.5px var(--f-mono);color:var(--muted)}
+.phase div b{font-size:15px}
+.phase div span{color:var(--muted)}
+.phase div.now{background:var(--accent-soft)}
+.tok{display:flex;flex-wrap:wrap;gap:10px}
+.tok div{display:grid;gap:6px;font:500 11.5px var(--f-mono);color:var(--muted);width:92px}
+.tok i{display:block;height:44px;border-radius:9px;box-shadow:inset 0 0 0 1px var(--line)}
+.stack{display:flex;flex-wrap:wrap;gap:8px}
+.stack span{font:500 12.5px var(--f-mono);background:var(--surface);border-radius:7px;padding:5px 10px;box-shadow:var(--shadow);color:var(--ink-2)}
+.stack span b{color:var(--ink);font-weight:500}
+
+/* Tenant popover */
+.pop{position:absolute;z-index:7;left:256px;top:12px;width:320px;background:var(--surface);border-radius:12px;box-shadow:var(--shadow-lg);padding:8px;display:grid;gap:2px}
+.pop[hidden]{display:none}
+.pop .lbl{padding:10px 10px 6px}
+.pop .o{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;font-size:14px}
+.pop .o.on{background:var(--surface-3)}
+.pop .o .av{width:30px;height:30px;border-radius:7px;background:var(--surface-3);display:grid;place-items:center;font:600 11px var(--f-mono);color:var(--ink-2);flex:none}
+.pop .o.on .av{background:var(--ink);color:var(--surface)}
+.pop .o small{display:block;font:12px var(--f-mono);color:var(--muted)}
+.pop .o .ico{margin-left:auto;color:var(--ink)}
+.pop hr{border:0;height:1px;background:var(--line);margin:6px 4px}
+
+/* Shop (concept) – volgt dezelfde tokens, eigen ritme */
+.shop{min-width:1120px;background:var(--surface);color:var(--ink)}
+.shop .nav{display:flex;justify-content:space-between;align-items:center;padding:20px 48px;box-shadow:0 1px 0 var(--line)}
+.shop .nav b{font:700 19px var(--f-ui);letter-spacing:-.01em}
+.shop .nav nav{display:flex;gap:26px;font-size:14px;color:var(--ink-2)}
+.shop .nav .r{display:flex;gap:18px;align-items:center;font-size:13.5px;color:var(--ink-2)}
+.shop .pdp{display:grid;grid-template-columns:1.25fr 1fr;gap:56px;padding:40px 48px 32px}
+.shop .big{aspect-ratio:5/4;border-radius:16px;background:var(--surface-2);position:relative;display:grid;place-items:center}
+.shop .big svg{width:62%}
+.shop .big svg path{fill:none;stroke:var(--img-ink);stroke-width:1.6}
+.shop .big .p{position:absolute;left:16px;bottom:14px;font:500 11.5px var(--f-mono);color:var(--muted);background:var(--surface);padding:3px 8px;border-radius:6px}
+.shop .lens{position:absolute;right:12%;top:16%;width:132px;height:132px;border-radius:50%;background:var(--surface-3);box-shadow:0 0 0 4px var(--surface),var(--shadow-lg);display:grid;place-items:center;font:500 12px var(--f-mono);color:var(--ink-2);text-align:center}
+.shop .thumbs{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:12px}
+.shop .thumbs div{aspect-ratio:1;border-radius:10px;background:repeating-linear-gradient(135deg,var(--img-a) 0 6px,var(--img-b) 6px 12px)}
+.shop .thumbs div.on{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--ink)}
+.shop .eyebrow{font:600 12px var(--f-label);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.shop h4{margin:10px 0 14px;font:700 38px/1.1 var(--f-ui);letter-spacing:-.03em}
+.shop .price{display:flex;align-items:baseline;gap:14px}
+.shop .price b{font:500 30px var(--f-mono);letter-spacing:-.03em}
+.shop .cur{font-size:13px;color:var(--muted)}
+.shop .res{display:flex;gap:12px;align-items:center;margin:22px 0 16px;padding:14px 16px;border-radius:12px;background:var(--surface-2);font-size:14px}
+.shop .res b{font:500 16px var(--f-mono)}
+.shop .res .bar2{flex:1;height:4px;border-radius:2px;background:var(--sunk);overflow:hidden;max-width:120px}
+.shop .res .bar2 i{display:block;height:100%;width:94.7%;background:var(--ink)}
+.shop .cta{display:flex;gap:10px}
+.shop .cta span{padding:14px 22px;border-radius:10px;font-weight:600;font-size:15px;text-align:center}
+.shop .cta .a{flex:1;background:var(--accent);color:var(--accent-ink)}
+.shop .cta .b{background:var(--surface-3)}
+.shop .pay{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:14px;font-size:12.5px;color:var(--muted)}
+.shop .pay span{font:500 11.5px var(--f-mono);background:var(--surface-2);padding:3px 8px;border-radius:5px;color:var(--ink-2)}
+.shop .spec{display:grid;grid-template-columns:auto 1fr;gap:10px 22px;font-size:14px;margin:28px 0 0;padding-top:22px;box-shadow:0 -1px 0 var(--line)}
+.shop .spec dt{color:var(--muted)} .shop .spec dd{margin:0}
+.shop .prov{margin-top:22px;display:grid;grid-template-columns:56px 1fr;gap:14px;align-items:center;padding:16px;border-radius:12px;background:var(--surface-2);font-size:13.5px}
+.shop .qr{width:56px;height:56px;border-radius:6px;background:conic-gradient(var(--ink) 25%,var(--surface) 0 50%,var(--ink) 0 75%,var(--surface) 0) 0 0/14px 14px;box-shadow:0 0 0 4px var(--surface)}
+.shop .alert{margin:0 48px 44px;padding:20px 24px;border-radius:14px;background:var(--surface-2);display:flex;justify-content:space-between;align-items:center;font-size:14.5px}
+
+@media (max-width:720px){h1{font-size:28px}.dec div{grid-template-columns:1fr;gap:4px}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="brand">
+    <div class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" class="ico"><path d="M12 3v15M8 7h8M12 18c-3.5 0-6-2-6.5-5M12 18c3.5 0 6-2 6.5-5M4 13l1.5-1.5L7 13M17 13l1.5-1.5L20 13"/><circle cx="12" cy="4.5" r="1.5"/></svg></div>
+    <div>
+      <h1>Quartermaster <span>· ontwerp C</span></h1>
+      <p class="sub">Richting "Naval Quiet": rustig, ruim en gericht. Diep marineblauw, koel staalgrijs, witte vlakken en één okerkleur die alleen de primaire actie draagt.</p>
+    </div>
+  </div>
+  <div class="theme" role="group" aria-label="Thema">
+    <button type="button" data-theme-set="" aria-pressed="true">Systeem</button>
+    <button type="button" data-theme-set="light" aria-pressed="false">Licht</button>
+    <button type="button" data-theme-set="dark" aria-pressed="false">Donker</button>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="Schermen">
+  <button role="tab" aria-selected="true" aria-controls="t-plan" id="b-plan">Plan</button>
+  <span class="grp">Admin</span>
+  <button role="tab" aria-selected="false" aria-controls="t-dash" id="b-dash" tabindex="-1">Dashboard</button>
+  <button role="tab" aria-selected="false" aria-controls="t-prod" id="b-prod" tabindex="-1">Voorraad</button>
+  <button role="tab" aria-selected="false" aria-controls="t-edit" id="b-edit" tabindex="-1">Product bewerken</button>
+  <button role="tab" aria-selected="false" aria-controls="t-order" id="b-order" tabindex="-1">Order</button>
+  <button role="tab" aria-selected="false" aria-controls="t-board" id="b-board" tabindex="-1">Verzendbord</button>
+  <button role="tab" aria-selected="false" aria-controls="t-set" id="b-set" tabindex="-1">Instellingen</button>
+  <span class="grp">Shop</span>
+  <button role="tab" aria-selected="false" aria-controls="t-shop" id="b-shop" tabindex="-1">Productpagina</button>
+</nav>
+
+<!-- ================= PLAN ================= -->
+<section role="tabpanel" id="t-plan" aria-labelledby="b-plan">
+  <div class="intro"><h2>Richting C in het kort</h2><p>Zelfde schermen en inhoud als ontwerp A, andere houding. Minder lijnen, meer lucht; scheiding door ruimte en vlaktinten. De navigatie klapt in tot een icoonrail, details openen in een zijpaneel zodat de lijst in beeld blijft.</p></div>
+  <div class="princ">
+    <div><b>Eén accent, één betekenis</b><p>Oker is uitsluitend de primaire actie per scherm. Status gebruikt eigen gedempte tinten; grafieken zijn marineblauw.</p></div>
+    <div><b>Lijst blijft staan</b><p>Order openen gebeurt in een zijpaneel rechts. Volgende order bekijken is één klik, zonder terugnavigeren.</p></div>
+    <div><b>Toetsenbord eerst</b><p>⌘K zoekt producten op StockCode, orders op nummer en wisselt van shop. Elke actie heeft een sneltoets.</p></div>
+    <div><b>Eerlijk over de staat</b><p>Onderdelen die nog in aanbouw zijn, dragen een gestreept <span class="wip">WIP</span>-label in menu, knop en scherm.</p></div>
+  </div>
+
+  <div class="intro" style="margin-top:8px"><h2>Besluiten van de eigenaar</h2><p>Verwerkt in alle schermen van deze variant.</p></div>
+  <div class="dec">
+    <div><b>Multi-tenant</b><span>Quartermaster-beheerder wisselt tussen shops via de wisselaar boven in de rail. Een eigenaar ziet alleen de eigen shop. Rollen: <span class="role admin">Quartermaster admin</span> <span class="role owner">Eigenaar</span></span></div>
+    <div><b>In aanbouw</b><span>Verzendbord, track &amp; trace en factuur zijn <span class="wip">WIP</span>.</span></div>
+    <div><b>Orders</b><span>Nooit verwijderen. Alleen <b>Archiveren</b>; historie en boekhouding blijven intact.</span></div>
+    <div><b>Betalen</b><span>Alleen via Mollie: iDEAL, Bancontact, creditcard, PayPal (via Mollie). Andere valuta alleen ter weergave, afrekenen in euro.</span></div>
+    <div><b>Verzending</b><span>Zones per land (Benelux, EU-1, Wereld) met gewichtsstaffels.</span></div>
+    <div><b>Reservering</b><span>Uniek item ligt 15 minuten vast in het mandje.</span></div>
+    <div><b>Afbeeldingen</b><span>Lokaal opgeslagen, geen Cloudflare. Pad: <span class="mono">/uploads/products/50231/01.webp</span></span></div>
+    <div><b>Inkoop</b><span>Inkoopadministratie per product plus margerapport per categorie.</span></div>
+    <div><b>Analytics</b><span>Eigen, cookieloze bezoekersstatistiek in de admin (Matomo blijft optie).</span></div>
+  </div>
+
+  <div class="intro" style="margin-top:8px"><h2>Fasering</h2></div>
+  <div class="phase">
+    <div><span class="n">Fase 0</span><b>Fundament</b><span>Auth, 2FA, rollen, tenants, shell, ⌘K</span></div>
+    <div class="now"><span class="n">Fase 1 · nu</span><b>Admin kern</b><span>Voorraad, foto's, orders, klanten, inkoop</span></div>
+    <div><span class="n">Fase 2</span><b>Admin compleet</b><span>Dashboard, zones, instellingen, CMS</span></div>
+    <div><span class="n">Fase 3</span><b>Shop</b><span>Catalogus, mandje 15 min, Mollie</span></div>
+    <div><span class="n">Fase 4</span><b>Overgang</b><span>ETL, redirects, cutover</span></div>
+    <div><span class="n">Fase 5</span><b>Vernieuwingen</b><span>Verzendbord, factuur, bieden</span></div>
+  </div>
+
+  <div class="intro" style="margin-top:8px"><h2>Tokens</h2><p>Licht en donker uit dezelfde set. Donker is diep marine, nooit zwart.</p></div>
+  <div class="tok">
+    <div><i style="background:var(--bg)"></i>--bg</div>
+    <div><i style="background:var(--surface)"></i>--surface</div>
+    <div><i style="background:var(--surface-3)"></i>--surface-3</div>
+    <div><i style="background:var(--rail)"></i>--rail</div>
+    <div><i style="background:var(--ink)"></i>--ink</div>
+    <div><i style="background:var(--muted)"></i>--muted</div>
+    <div><i style="background:var(--chart-line)"></i>--chart-line</div>
+    <div><i style="background:var(--accent)"></i>--accent</div>
+    <div><i style="background:var(--ok)"></i>--ok</div>
+    <div><i style="background:var(--warn)"></i>--warn</div>
+    <div><i style="background:var(--crit)"></i>--crit</div>
+  </div>
+  <div class="stack">
+    <span><b>next</b> 16</span><span><b>prisma</b> 7</span><span><b>postgres</b> 18</span><span><b>eigen auth</b> + 2fa</span><span><b>tenant</b> per shop-id</span><span><b>mollie</b> only</span><span><b>sharp</b> → /uploads (webp, avif)</span><span><b>eigen analytics</b> cookieloos</span><span><b>pg-boss</b></span><span><b>react-email</b></span><span><b>vitest</b> + playwright</span>
+  </div>
+</section>
+
+<!-- ================= DASHBOARD ================= -->
+<section role="tabpanel" id="t-dash" aria-labelledby="b-dash" hidden>
+  <div class="intro"><h2>Dashboard</h2><p>Bekeken als Quartermaster admin, met de shopwisselaar open. Rail uitgeklapt. Omzet telt alleen door Mollie bevestigde betalingen.</p></div>
+  <div class="notes"><span class="note">Shopwisselaar · alleen voor <b>Quartermaster admin</b></span><span class="note">Bezoekers uit <b>eigen analytics</b></span><span class="note">Margerapport uit inkoopadministratie</span></div>
+  <div class="scroll"><div class="frame">
+    <aside class="rail" data-rail="dash" data-role="admin" data-mode="open" aria-label="Hoofdnavigatie"></aside>
+    <div class="pop" id="tenantpop">
+      <div class="lbl">Wissel van shop · 3</div>
+      <div class="o on"><span class="av">VB</span><div>Depot Van den Berg<small>depotvandenberg.nl</small></div><svg class="ico" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+      <div class="o"><span class="av">KZ</span><div>Kazerne 1940<small>kazerne1940.be</small></div></div>
+      <div class="o"><span class="av">OH</span><div>Ordnance House<small>ordnancehouse.eu</small></div></div>
+      <hr>
+      <div class="o"><span class="av">QM</span><div>Platformoverzicht<small>alle shops · omzet, gezondheid</small></div></div>
+      <div class="o"><span class="av">+</span><div>Nieuwe shop aanmaken</div></div>
+    </div>
+    <div class="main">
+      <div class="bar">
+        <div><div class="crumb">Depot Van den Berg <i>/</i> Overzicht</div><h3>Goedemorgen, Wout</h3></div>
+        <div class="actions"><span class="btn ghost">Laatste 30 dagen</span><span class="btn primary"><svg class="ico" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Nieuw product</span></div>
+      </div>
+      <div class="body">
+        <div class="banner"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><span>Je beheert deze shop als <b>Quartermaster admin</b>. Wijzigingen worden in het audit-log onder jouw naam vastgelegd.</span></div>
+        <div class="kpis">
+          <div class="panel kpi"><div class="lbl">Omzet</div><div class="v">€ 18.410</div><div class="d"><span class="up">+12,3%</span> t.o.v. € 16.390</div></div>
+          <div class="panel kpi"><div class="lbl">Orders</div><div class="v">47</div><div class="d"><span class="up">+6</span> t.o.v. 41</div></div>
+          <div class="panel kpi"><div class="lbl">Gem. orderwaarde</div><div class="v">€ 391,70</div><div class="d"><span class="down">−3,1%</span> t.o.v. € 404,40</div></div>
+          <div class="panel kpi"><div class="lbl">Marge</div><div class="v">41%</div><div class="d">uit inkoopprijs · 44 van 47 orders</div></div>
+        </div>
+        <div class="g2">
+          <div class="panel"><div class="hd"><h4>Omzet per dag</h4><span>betaald via Mollie · excl. verzending</span></div><div class="bd">
+            <svg viewBox="0 0 600 196" width="100%" role="img" aria-label="Omzet per dag van 8 september tot 7 oktober, van circa 250 tot 1.130 euro per dag, stijgend">
+              <g stroke="var(--line)" stroke-width="1"><line x1="56" y1="16" x2="588" y2="16"/><line x1="56" y1="66.7" x2="588" y2="66.7"/><line x1="56" y1="117.3" x2="588" y2="117.3"/><line x1="56" y1="168" x2="588" y2="168"/></g>
+              <text x="48" y="20" text-anchor="end">€1.500</text><text x="48" y="70.7" text-anchor="end">€1.000</text><text x="48" y="121.3" text-anchor="end">€500</text><text x="48" y="172" text-anchor="end">€0</text>
+              <line x1="56" y1="112.6" x2="588" y2="112.6" stroke="var(--chart-ref)" stroke-width="1" stroke-dasharray="3 4"/>
+              <text x="62" y="107" style="fill:var(--faint)">gem. vorige periode € 546</text>
+              <path d="M56.0 132.5 L74.3 124.4 L92.7 141.7 L111.0 110.2 L129.4 118.3 L147.7 98.1 L166.1 135.6 L184.4 109.2 L202.8 120.4 L221.1 92.0 L239.4 142.7 L257.8 128.5 L276.1 104.2 L294.5 97.1 L312.8 132.5 L331.2 82.9 L349.5 114.3 L367.9 120.4 L386.2 93.0 L404.6 105.2 L422.9 67.7 L441.2 124.4 L459.6 93.0 L477.9 109.2 L496.3 76.8 L514.6 104.2 L533.0 62.6 L551.3 93.0 L569.7 86.9 L588.0 53.5 L588 168 L56 168 Z" fill="var(--chart-fill)"/>
+              <path d="M56.0 132.5 L74.3 124.4 L92.7 141.7 L111.0 110.2 L129.4 118.3 L147.7 98.1 L166.1 135.6 L184.4 109.2 L202.8 120.4 L221.1 92.0 L239.4 142.7 L257.8 128.5 L276.1 104.2 L294.5 97.1 L312.8 132.5 L331.2 82.9 L349.5 114.3 L367.9 120.4 L386.2 93.0 L404.6 105.2 L422.9 67.7 L441.2 124.4 L459.6 93.0 L477.9 109.2 L496.3 76.8 L514.6 104.2 L533.0 62.6 L551.3 93.0 L569.7 86.9 L588.0 53.5" fill="none" stroke="var(--chart-line)" stroke-width="2" stroke-linejoin="round"/>
+              <circle cx="588" cy="53.5" r="4" fill="var(--chart-line)" stroke="var(--surface)" stroke-width="2"/>
+              <text x="580" y="44" text-anchor="end" style="fill:var(--ink)">vandaag € 1.130</text>
+              <text x="56" y="188">8 sep</text><text x="312.8" y="188" text-anchor="middle">22 sep</text><text x="588" y="188" text-anchor="end">7 okt</text>
+            </svg>
+          </div></div>
+          <div class="panel"><div class="hd"><h4>Vandaag te doen</h4><span>8 open</span></div><div class="bd todo">
+            <div><span>Betaald, nog niet verzonden</span><span class="n">5</span></div>
+            <div><span>Betaling open bij Mollie</span><span class="n">1</span></div>
+            <div><span>Mislukte betaling, item weer vrij</span><span class="n">1</span></div>
+            <div><span>Bod ontvangen</span><span class="n">1</span></div>
+            <div><span class="muted">Nu in een mandje · max. 15 min</span><span class="n muted">3</span></div>
+          </div></div>
+        </div>
+        <div class="g3">
+          <div class="panel"><div class="hd"><h4>Bezoekers</h4><span>eigen analytics · cookieloos</span></div><div class="bd">
+            <div style="display:flex;gap:18px;align-items:baseline;margin-bottom:6px"><span class="mono" style="font-size:24px">3.448</span><span class="muted" style="font-size:13px">14 dagen · nu 14 online</span></div>
+            <svg viewBox="0 0 360 160" width="100%" role="img" aria-label="Bezoekers per dag, 24 september tot 7 oktober, tussen 176 en 342, hoogste vandaag">
+              <g stroke="var(--line)"><line x1="34" y1="20" x2="352" y2="20"/><line x1="34" y1="80" x2="352" y2="80"/><line x1="34" y1="140" x2="352" y2="140"/></g>
+              <text x="28" y="24" text-anchor="end">400</text><text x="28" y="84" text-anchor="end">200</text><text x="28" y="144" text-anchor="end">0</text>
+              <g fill="var(--chart-bar)"><rect x="40" y="76.4" width="14" height="63.6" rx="2"/><rect x="62" y="65.6" width="14" height="74.4" rx="2"/><rect x="84" y="70.7" width="14" height="69.3" rx="2"/><rect x="106" y="83.0" width="14" height="57.0" rx="2"/><rect x="128" y="87.2" width="14" height="52.8" rx="2"/><rect x="150" y="60.8" width="14" height="79.2" rx="2"/><rect x="172" y="49.7" width="14" height="90.3" rx="2"/><rect x="194" y="53.9" width="14" height="86.1" rx="2"/><rect x="216" y="63.2" width="14" height="76.8" rx="2"/><rect x="238" y="67.1" width="14" height="72.9" rx="2"/><rect x="260" y="80.6" width="14" height="59.4" rx="2"/><rect x="282" y="85.4" width="14" height="54.6" rx="2"/><rect x="304" y="44.6" width="14" height="95.4" rx="2"/></g>
+              <rect x="326" y="37.4" width="14" height="102.6" rx="2" fill="var(--chart-bar-hi)"/>
+              <text x="40" y="156">24 sep</text><text x="340" y="156" text-anchor="end">vandaag</text>
+            </svg>
+            <dl class="kv" style="font-size:13px;margin-top:8px"><dt>Top pagina</dt><dd>/product/50231</dd><dt>Bron</dt><dd>Zoekmachine 58% · direct 27%</dd></dl>
+          </div></div>
+          <div class="panel" style="grid-column:span 2"><div class="hd"><h4>Margerapport per categorie</h4><span>laatste 30 dagen · omzet en marge op inkoopprijs</span></div><div class="bd">
+            <svg viewBox="0 0 640 200" width="100%" role="img" aria-label="Marge per categorie: Insignes 52 procent, Helmen 46, Uitrusting 41, Uniformen 34, Documenten 22">
+              <g stroke="var(--line)"><line x1="130" y1="10" x2="130" y2="172"/><line x1="230" y1="10" x2="230" y2="172"/><line x1="330" y1="10" x2="330" y2="172"/><line x1="430" y1="10" x2="430" y2="172"/></g>
+              <line x1="130" y1="10" x2="130" y2="172" stroke="var(--line-strong)"/>
+              <line x1="335" y1="6" x2="335" y2="176" stroke="var(--chart-ref)" stroke-dasharray="3 4"/>
+              <text x="335" y="192" text-anchor="middle" style="fill:var(--ink)">gem. 41%</text>
+              <text x="130" y="192" text-anchor="middle">0%</text><text x="230" y="192" text-anchor="middle">20%</text><text x="430" y="192" text-anchor="middle">60%</text>
+              <g style="font:13px var(--f-ui)">
+                <text x="0" y="31" style="fill:var(--ink);font:13px var(--f-ui)">Insignes</text>
+                <text x="0" y="63" style="fill:var(--ink);font:13px var(--f-ui)">Helmen</text>
+                <text x="0" y="95" style="fill:var(--ink);font:13px var(--f-ui)">Uitrusting</text>
+                <text x="0" y="127" style="fill:var(--ink);font:13px var(--f-ui)">Uniformen</text>
+                <text x="0" y="159" style="fill:var(--ink);font:13px var(--f-ui)">Documenten</text>
+              </g>
+              <g fill="var(--chart-line)">
+                <rect x="130" y="18" width="260" height="18" rx="3"/>
+                <rect x="130" y="50" width="230" height="18" rx="3"/>
+                <rect x="130" y="82" width="205" height="18" rx="3"/>
+                <rect x="130" y="114" width="170" height="18" rx="3"/>
+                <rect x="130" y="146" width="110" height="18" rx="3"/>
+              </g>
+              <text x="398" y="31">52%</text><text x="368" y="63">46%</text><text x="343" y="95">41%</text><text x="308" y="127">34%</text><text x="248" y="159">22%</text>
+              <text x="636" y="31" text-anchor="end" style="fill:var(--ink)">€ 2.480</text>
+              <text x="636" y="63" text-anchor="end" style="fill:var(--ink)">€ 6.120</text>
+              <text x="636" y="95" text-anchor="end" style="fill:var(--ink)">€ 3.270</text>
+              <text x="636" y="127" text-anchor="end" style="fill:var(--ink)">€ 4.890</text>
+              <text x="636" y="159" text-anchor="end" style="fill:var(--ink)">€ 1.650</text>
+              <text x="636" y="192" text-anchor="end">omzet</text>
+            </svg>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ================= VOORRAAD ================= -->
+<section role="tabpanel" id="t-prod" aria-labelledby="b-prod" hidden>
+  <div class="intro"><h2>Voorraad</h2><p>Bekeken als eigenaar, rail ingeklapt. Het ⌘K-palet staat open: StockCode intikken vindt het product, de order en de bijbehorende acties.</p></div>
+  <div class="notes"><span class="note">⌘K · zoek, ga naar, doe</span><span class="note">Opgeslagen weergaven</span><span class="note">Inkoop en marge als kolom</span><span class="note">Reservering zichtbaar met resterende tijd</span></div>
+  <div class="scroll"><div class="frame" id="frame-prod">
+    <aside class="rail" data-rail="prod" data-role="owner" data-mode="closed" aria-label="Hoofdnavigatie"></aside>
+    <div class="main">
+      <div class="bar">
+        <div><div class="crumb">Catalogus</div><h3>Voorraad</h3></div>
+        <div class="actions"><span class="btn ghost">Importeren</span><span class="btn ghost">Exporteren</span><span class="btn primary"><svg class="ico" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Nieuw product</span></div>
+      </div>
+      <div class="body">
+        <div class="panel">
+          <div class="views"><span class="on">Te koop<i>412</i></span><span>In mandje<i>3</i></span><span>Concept<i>18</i></span><span>Verkocht<i>2.906</i></span><span>Archief<i>5.114</i></span><span>Zonder foto<i>7</i></span><span class="faint">+ weergave</span></div>
+          <div class="filters"><span class="search"><svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>Titel, StockCode of SKU</span><span class="chip set">Periode · WO2</span><span class="chip set">Land · Duitsland</span><span class="chip">Categorie</span><span class="chip">Prijs</span><span class="chip">Herkomst</span><span class="muted" style="margin-left:auto;font-size:13px">Gepubliceerd, nieuwste eerst</span></div>
+          <table><thead><tr><th><span class="chk"></span></th><th>Product</th><th>StockCode</th><th>Status</th><th class="r">Inkoop</th><th class="r">Prijs</th><th class="r">Marge</th><th>Gepubliceerd</th></tr></thead><tbody>
+            <tr><td><span class="chk"></span></td><td><div class="pr"><div class="th"></div><div>Stahlhelm M40 Heer, ET64<small>WO2 · Duitsland · Heer · Helmen</small></div></div></td><td class="mono">50231</td><td><span class="st s-ok">Te koop</span></td><td class="r mono muted">€ 610</td><td class="r mono">€ 1.450,00</td><td class="r mono up">58%</td><td class="mono muted">06-10-2026</td></tr>
+            <tr><td><span class="chk"></span></td><td><div class="pr"><div class="th"></div><div>Koppelslot Heer, aluminium<small>WO2 · Duitsland · Heer · Uitrusting</small></div></div></td><td class="mono">50229</td><td><span class="st s-ok">Te koop</span></td><td class="r mono muted">€ 45</td><td class="r mono">€ 115,00</td><td class="r mono up">61%</td><td class="mono muted">06-10-2026</td></tr>
+            <tr><td><span class="chk"></span></td><td><div class="pr"><div class="th"></div><div>Fliegerbluse, 2e model<small>WO2 · Duitsland · Luftwaffe · Uniformen</small></div></div></td><td class="mono">48812</td><td><span class="st s-warn">In mandje · 11:42</span></td><td class="r mono muted">€ 980</td><td class="r mono">€ 2.350,00</td><td class="r mono up">58%</td><td class="mono muted">02-10-2026</td></tr>
+            <tr><td><span class="chk"></span></td><td><div class="pr"><div class="th"></div><div>Brotbeutel M31, gemerkt 1940<small>WO2 · Duitsland · Heer · Uitrusting</small></div></div></td><td class="mono">50201</td><td><span class="st s-ok">Te koop</span></td><td class="r mono faint">—</td><td class="r mono">€ 185,00</td><td class="r mono faint">—</td><td class="mono muted">29-09-2026</td></tr>
+            <tr><td><span class="chk"></span></td><td><div class="pr"><div class="th"></div><div>Feldmütze M34, Trapez-adelaar<small>WO2 · Duitsland · Heer · Hoofddeksels</small></div></div></td><td class="mono">50187</td><td><span class="st s-info">Bod open</span></td><td class="r mono muted">€ 220</td><td class="r mono">€ 595,00</td><td class="r mono up">63%</td><td class="mono muted">24-09-2026</td></tr>
+            <tr><td><span class="chk"></span></td><td><div class="pr"><div class="th"></div><div>Gasmaskerbus M38, origineel gelakt<small>WO2 · Duitsland · Heer · Uitrusting</small></div></div></td><td class="mono">50176</td><td><span class="st s-mute">Concept</span></td><td class="r mono muted">€ 30</td><td class="r mono">€ 89,00</td><td class="r mono up">66%</td><td class="mono muted">—</td></tr>
+          </tbody></table>
+          <div class="pager"><span>1–25 van 412</span><span class="mono">‹ 1 2 3 … 17 ›</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="scrim" data-pal></div>
+    <div class="pal" data-pal role="dialog" aria-label="Opdrachtpalet (voorbeeld)">
+      <div class="q"><svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><span class="mono">5023<span class="caret"></span></span><span class="scope">Depot Van den Berg</span></div>
+      <div class="grp"><div class="lbl">Producten</div>
+        <div class="opt act"><div class="th" style="width:32px;height:32px;border-radius:6px"></div><span>Stahlhelm M40 Heer, ET64</span><span class="meta"><span class="mono">#50231</span><span class="st s-ok">Te koop</span><kbd>↵</kbd></span></div>
+        <div class="opt"><div class="th" style="width:32px;height:32px;border-radius:6px"></div><span>Koppelslot Heer, aluminium</span><span class="meta"><span class="mono">#50229</span><span class="st s-ok">Te koop</span></span></div>
+        <div class="opt"><div class="th" style="width:32px;height:32px;border-radius:6px"></div><span>Zeltbahn 31, splintertarn</span><span class="meta"><span class="mono">#50230</span><span class="st s-mute">Verkocht</span></span></div>
+      </div>
+      <div class="grp"><div class="lbl">Acties voor #50231</div>
+        <div class="opt"><svg class="ico" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg><span>Naar boven halen</span><span class="meta"><kbd>⌘</kbd><kbd>↑</kbd></span></div>
+        <div class="opt"><svg class="ico" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/></svg><span>Bewerken</span><span class="meta"><kbd>E</kbd></span></div>
+        <div class="opt"><svg class="ico" viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h9"/></svg><span>Prijs wijzigen…</span><span class="meta"><kbd>P</kbd></span></div>
+      </div>
+      <div class="grp" style="padding-bottom:10px"><div class="lbl">Ga naar</div>
+        <div class="opt"><svg class="ico" viewBox="0 0 24 24"><path d="M3 13l3-8h12l3 8v6H3zM3 13h5l1 2h6l1-2h5"/></svg><span>Orders met #50231</span><span class="meta">geen</span></div>
+      </div>
+      <div class="ft"><span><kbd>↑</kbd> <kbd>↓</kbd> kiezen</span><span><kbd>↵</kbd> openen</span><span><kbd>Tab</kbd> acties</span><span style="margin-left:auto"><kbd>Esc</kbd> sluiten</span></div>
+    </div>
+  </div></div>
+  <div><button type="button" class="btn" id="paltoggle">Palet verbergen</button></div>
+</section>
+
+<!-- ================= PRODUCT EDIT ================= -->
+<section role="tabpanel" id="t-edit" aria-labelledby="b-edit" hidden>
+  <div class="intro"><h2>Product bewerken</h2><p>Foto's worden lokaal opgeslagen en bij upload omgezet naar WebP en AVIF. Inkoop en marge staan naast prijs, zodat de verkoopprijs nooit los van de inkoop wordt gezet.</p></div>
+  <div class="notes"><span class="note">Lokale opslag · <span class="mono">/uploads/products/50231/</span></span><span class="note">Inkoopadministratie per item</span><span class="note">Autosave, één primaire knop</span></div>
+  <div class="scroll"><div class="frame">
+    <aside class="rail" data-rail="prod" data-role="owner" data-mode="closed" aria-label="Hoofdnavigatie"></aside>
+    <div class="main">
+      <div class="bar">
+        <div><div class="crumb">Voorraad <i>/</i> <span class="mono">#50231</span></div><h3>Stahlhelm M40 Heer, ET64</h3></div>
+        <div class="actions"><span class="muted" style="font-size:13px">Concept opgeslagen 14:02</span><span class="btn ghost">Bekijk in shop</span><span class="btn ghost">Dupliceren</span><span class="btn primary">Publiceren</span></div>
+      </div>
+      <div class="body">
+        <div class="ed">
+          <div class="col">
+            <div class="panel"><div class="hd"><h4>Foto's</h4><span>7 van 20 · eerste is omslag · slepen om te sorteren</span></div><div class="bd">
+              <div class="gal">
+                <div class="im cover"><span class="tagc">OMSLAG</span><svg viewBox="0 0 300 160" aria-hidden="true"><path d="M34 122 C34 64 84 30 150 30 C214 30 260 64 262 112 L284 120 L284 130 L20 130 L20 122 Z M60 100 C80 96 220 96 240 102"/></svg><span>01.webp</span></div>
+                <div class="im"><span>02.webp</span></div><div class="im"><span>03.webp</span></div><div class="im"><span>04.webp</span></div>
+                <div class="im"><span>05.webp</span></div><div class="im"><span>06.webp</span></div><div class="im"><span>07.webp</span></div>
+                <div class="drop">Sleep foto's hierheen of plak met ⌘V</div>
+              </div>
+              <div class="path"><svg class="ico" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M3 7h6l2 2h10v10H3z"/></svg><code>/uploads/products/50231/01.webp</code><span>· lokaal · 7 bestanden · 4,8 MB · varianten 400, 800, 1600 px</span></div>
+            </div></div>
+            <div class="panel"><div class="hd"><h4>Beschrijving</h4><span>NL · EN</span></div><div class="bd" style="display:grid;gap:16px">
+              <div class="field"><span class="lbl">Titel</span><div class="in">Stahlhelm M40 Heer, ET64</div></div>
+              <div class="field"><span class="lbl">Omschrijving</span><div class="in area">Originele M40-helm met enkele Heer-decal, ca. 80% aanwezig. Gestempeld ET64 met lotnummer 3721. Liner van leer, maat 57, compleet met kinriem. Fabrieksverf origineel, lichte slijtage aan de rand.</div></div>
+              <div class="field"><span class="lbl">Classificatie</span><div class="tax"><span><em>periode</em>WO2 (1939–45)</span><span><em>land</em>Duitsland</span><span><em>onderdeel</em>Heer</span><span><em>type</em>Helmen › M40</span><span><em>maker</em>Eisenhüttenwerke Thale</span><span style="background:none;box-shadow:inset 0 0 0 1px var(--line-strong);color:var(--muted)">+ toevoegen</span></div></div>
+            </div></div>
+            <div class="panel"><div class="hd"><h4>Herkomst en echtheid</h4><span>publiek zichtbaar</span></div><div class="bd" style="display:grid;gap:14px">
+              <div class="field"><span class="lbl">Publieke herkomst</span><div class="in">Uit een Nederlandse privécollectie, sinds 1978 in één hand.</div></div>
+              <div class="line"><span>Certificaat van echtheid met QR-verificatie</span><span class="sw on"></span></div>
+            </div></div>
+          </div>
+          <div class="col">
+            <div class="panel"><div class="hd"><h4>Status</h4></div><div class="bd" style="display:grid;gap:14px">
+              <div class="seg"><span>Concept</span><span class="on">Te koop</span><span>Verkocht</span><span>Archief</span></div>
+              <dl class="kv"><dt>Gepubliceerd</dt><dd class="mono">06-10-2026</dd><dt>In mandje</dt><dd>nee</dd><dt>Op verlanglijst</dt><dd class="mono">23×</dd></dl>
+            </div></div>
+            <div class="panel"><div class="hd"><h4>Prijs en voorraad</h4></div><div class="bd" style="display:grid;gap:14px">
+              <div class="r2"><div class="field"><span class="lbl">Prijs</span><div class="in mono">€ 1.450,00</div></div><div class="field"><span class="lbl">Voorraad</span><div class="in mono">1</div></div></div>
+              <div class="r2"><div class="field"><span class="lbl">Gewicht</span><div class="in mono">1.250 g</div></div><div class="field"><span class="lbl">SKU</span><div class="in mono">QM-H-0231</div></div></div>
+              <div class="line"><span>Bod toestaan</span><span class="sw on"></span></div>
+            </div></div>
+            <div class="panel"><div class="hd"><h4>Inkoop en marge</h4><span>intern</span></div><div class="bd" style="display:grid;gap:14px">
+              <dl class="kv"><dt>Ingekocht van</dt><dd>Collectie v. d. Berg</dd><dt>Inkoopdatum</dt><dd class="mono">14-09-2026</dd><dt>Inkoopprijs</dt><dd class="mono">€ 610,00</dd><dt>Bijkomende kosten</dt><dd class="mono">€ 0,00</dd><dt>Inkooporder</dt><dd class="mono">IO-2026-0088</dd></dl>
+              <div class="margin"><span class="lbl" style="color:var(--ok)">Marge bij huidige prijs</span><span class="big">€ 840,00 · 58%</span></div>
+            </div></div>
+            <div class="panel"><div class="hd"><h4>Zichtbaarheid</h4></div><div class="bd" style="display:grid;gap:12px">
+              <div class="line"><span>Alleen voor ingelogde klanten</span><span class="sw"></span></div>
+              <div class="line"><span>Bevat beperkte symbolen</span><span class="sw on"></span></div>
+              <div class="line"><span>18+ vereist</span><span class="sw"></span></div>
+              <p class="muted" style="margin:0;font-size:13px">Niet leverbaar in: DE, AT (regel uit categorie)</p>
+            </div></div>
+            <div class="panel"><div class="hd"><h4>Zoekmachine</h4></div><div class="bd"><div class="serp"><span class="u">depotvandenberg.nl/product/50231/stahlhelm-m40-heer-et64</span><span class="t">Stahlhelm M40 Heer, ET64 | Depot Van den Berg</span><span class="muted">Originele M40-helm met Heer-decal, gestempeld ET64, lotnummer 3721…</span></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ================= ORDER ================= -->
+<section role="tabpanel" id="t-order" aria-labelledby="b-order" hidden>
+  <div class="intro"><h2>Order</h2><p>De orderlijst blijft staan; een order opent in het zijpaneel rechts. Klik een andere rij om te wisselen. Orders worden nooit verwijderd, alleen gearchiveerd.</p></div>
+  <div class="notes"><span class="note">Zijpaneel, lijst blijft in beeld</span><span class="note"><b>Archiveren</b> in plaats van verwijderen</span><span class="note">Track &amp; trace en factuur <span class="wip">WIP</span></span><span class="note">Betaling via Mollie-webhook</span></div>
+  <div class="scroll"><div class="frame" style="min-height:760px">
+    <aside class="rail" data-rail="order" data-role="owner" data-mode="closed" aria-label="Hoofdnavigatie"></aside>
+    <div class="main">
+      <div class="bar">
+        <div><div class="crumb">Verkoop</div><h3>Orders</h3></div>
+        <div class="actions"><span class="btn ghost">Exporteren</span></div>
+      </div>
+      <div class="body">
+        <div class="panel">
+          <div class="views"><span class="on">Open<i>8</i></span><span>Te verzenden<i>5</i></span><span>Verzonden<i>14</i></span><span>Alle<i>3.121</i></span><span>Gearchiveerd<i>1.204</i></span></div>
+          <table style="margin-top:8px"><thead><tr><th>Order</th><th>Klant</th><th>Betaling</th><th>Verzending</th><th class="r">Totaal</th></tr></thead><tbody id="orows">
+            <tr class="click sel" tabindex="0" data-o="24117"><td class="mono">#24117</td><td>H. de Groot<small class="muted" style="display:block;font-size:12.5px">NL · 05-10 21:11</small></td><td><span class="st s-ok">iDEAL</span></td><td><span class="st s-warn">Te verzenden</span></td><td class="r mono">€ 845,00</td></tr>
+            <tr class="click" tabindex="0" data-o="24116"><td class="mono">#24116</td><td>M. Fischer<small class="muted" style="display:block;font-size:12.5px">DE · 07-10 08:40</small></td><td><span class="st s-info">Open · Mollie</span></td><td><span class="st s-mute">Wacht</span></td><td class="r mono">€ 312,50</td></tr>
+            <tr class="click" tabindex="0" data-o="24115"><td class="mono">#24115</td><td>J. Peeters<small class="muted" style="display:block;font-size:12.5px">BE · 04-10 16:02</small></td><td><span class="st s-ok">Bancontact</span></td><td><span class="st s-ok">Verzonden</span></td><td class="r mono">€ 129,00</td></tr>
+            <tr class="click" tabindex="0" data-o="24114"><td class="mono">#24114</td><td>R. Clarke<small class="muted" style="display:block;font-size:12.5px">UK · 04-10 11:27</small></td><td><span class="st s-crit">Mislukt · PayPal</span></td><td><span class="st s-mute">—</span></td><td class="r mono">€ 1.250,00</td></tr>
+            <tr class="click" tabindex="0" data-o="24112"><td class="mono">#24112</td><td>P. Laurent<small class="muted" style="display:block;font-size:12.5px">FR · 04-10 09:15</small></td><td><span class="st s-ok">Creditcard</span></td><td><span class="st s-warn">Te verzenden</span></td><td class="r mono">€ 1.980,00</td></tr>
+            <tr class="click" tabindex="0" data-o="24111"><td class="mono">#24111</td><td>S. Visser<small class="muted" style="display:block;font-size:12.5px">NL · 03-10 19:58</small></td><td><span class="st s-ok">iDEAL</span></td><td><span class="st s-warn">Te verzenden</span></td><td class="r mono">€ 59,00</td></tr>
+          </tbody></table>
+        </div>
+      </div>
+      <aside class="drawer" id="drawer" aria-label="Orderdetail">
+        <div class="dh">
+          <div class="top"><span class="crumb">Order <span class="mono" data-f="date">05-10-2026 21:11</span></span><button class="x" type="button" id="dclose" aria-label="Zijpaneel sluiten"><svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+          <h4 class="mono" data-f="no">#24117</h4>
+          <div style="display:flex;gap:8px;flex-wrap:wrap" data-f="pills"><span class="st s-ok">Betaald · iDEAL</span><span class="st s-warn">Te verzenden</span></div>
+        </div>
+        <div class="db">
+          <div class="sec"><span class="lbl">Klant</span>
+            <div style="font-size:14px;display:grid;gap:2px"><b data-f="name">Henk de Groot</b><span class="muted" data-f="addr">Dorpsstraat 12, 7311 AB Apeldoorn, Nederland</span><span class="muted" data-f="hist">3e order · klant sinds 2023</span></div>
+          </div>
+          <div class="sec"><span class="lbl">Artikelen</span>
+            <div class="lines" data-f="lines">
+              <div class="pr"><div><div class="th" style="width:40px;height:40px"></div><div>KNIL koppelslot, messing<small class="mono">#50198</small></div></div><span class="mono">€ 395,00</span></div>
+              <div class="pr"><div><div class="th" style="width:40px;height:40px"></div><div>Mobilisatie-veldjas M34, 1939<small class="mono">#49720</small></div></div><span class="mono">€ 425,00</span></div>
+            </div>
+            <dl class="kv" style="margin-top:6px"><dt>Verzending</dt><dd class="mono" data-f="ship">Benelux · 2–5 kg · € 25,00</dd><dt>Btw</dt><dd class="muted">margeregeling</dd><dt><b>Totaal</b></dt><dd class="mono"><b data-f="total">€ 845,00</b></dd></dl>
+          </div>
+          <div class="sec"><span class="lbl">Betaling</span>
+            <dl class="kv"><dt>Mollie</dt><dd class="mono" data-f="pay">tr_7GkQe2 · iDEAL · ING</dd><dt>Bevestigd</dt><dd class="mono" data-f="paid">05-10 21:14 · webhook</dd></dl>
+          </div>
+          <div class="sec">
+            <div class="wipbox">
+              <div style="display:flex;justify-content:space-between;align-items:center"><b>Track &amp; trace en factuur</b><span class="wip">WIP</span></div>
+              <span class="muted">Komt in een volgende fase. Tot dan: code handmatig in de notitie, factuur buiten Quartermaster.</span>
+            </div>
+          </div>
+          <div class="sec"><span class="lbl">Tijdlijn</span><div class="tl">
+            <div class="k">Notitie: "Jas apart in zuurvrij papier"<small>06-10 09:02 · Wout</small></div>
+            <div class="k">Betaling bevestigd via Mollie-webhook<small>05-10 21:14 · systeem</small></div>
+            <div>Voorraad afgeboekt, reservering omgezet<small>05-10 21:14 · systeem</small></div>
+            <div>Order geplaatst, 2 items 15 min gereserveerd<small>05-10 21:11 · klant</small></div>
+          </div></div>
+        </div>
+        <div class="df">
+          <span class="btn ghost"><svg class="ico" viewBox="0 0 24 24"><path d="M3 4h18v4H3zM5 8v12h14V8M10 12h4"/></svg>Archiveren</span>
+          <span class="btn ghost">Pakbon</span>
+          <span class="btn ghost">Factuur <span class="wip">WIP</span></span>
+          <span class="btn primary" style="order:-1;flex:1 0 100%;justify-content:center">Markeer als verzonden</span>
+        </div>
+      </aside>
+    </div>
+  </div></div>
+  <p class="muted" style="margin:0;font-size:13.5px">Klik of gebruik Enter op een rij om het zijpaneel te vullen. Er is bewust geen "Verwijderen": een gearchiveerde order verdwijnt uit de werklijsten en blijft vindbaar onder "Gearchiveerd".</p>
+</section>
+
+<!-- ================= VERZENDBORD ================= -->
+<section role="tabpanel" id="t-board" aria-labelledby="b-board" hidden>
+  <div class="intro"><h2>Verzendbord <span class="wip">WIP</span></h2><p>Concept voor de dagelijkse routine: betaalde orders schuiven van inpakken naar verzonden. Nog niet gebouwd; label, track &amp; trace en verzendmail volgen in fase 5.</p></div>
+  <div class="scroll"><div class="frame">
+    <aside class="rail" data-rail="board" data-role="owner" data-mode="closed" aria-label="Hoofdnavigatie"></aside>
+    <div class="main">
+      <div class="bar">
+        <div><div class="crumb">Verkoop</div><h3>Verzendbord <span class="wip">WIP</span></h3></div>
+        <div class="actions"><span class="btn ghost">Lijstweergave</span><span class="btn primary">Pakbonnen printen (3)</span></div>
+      </div>
+      <div class="body">
+        <div class="banner wipb"><span class="wip">WIP</span><span>Dit bord is een voorproefje. Statussen zijn al echt; slepen, labels en track &amp; trace zijn nog niet actief.</span></div>
+        <div class="board">
+          <div class="lane dim"><h5>Betaling open <span class="mono">1</span></h5>
+            <div class="card"><div class="h"><b>#24116</b><span class="mono">€ 312,50</span></div><span>M. Fischer · DE · EU-1</span><span class="st s-info">iDEAL open · reservering 06:20</span></div>
+          </div>
+          <div class="lane"><h5>Inpakken <span class="mono">3</span></h5>
+            <div class="card"><div class="h"><b>#24117</b><span class="mono">€ 845,00</span></div><span>H. de Groot · NL · 2 items</span><span class="st s-warn">Betaald 05-10</span></div>
+            <div class="card"><div class="h"><b>#24112</b><span class="mono">€ 1.980,00</span></div><span>P. Laurent · FR · verzekerd</span><span class="st s-warn">Betaald 04-10</span></div>
+            <div class="card"><div class="h"><b>#24111</b><span class="mono">€ 59,00</span></div><span>S. Visser · NL</span><span class="st s-warn">Betaald 03-10</span></div>
+          </div>
+          <div class="lane"><h5>Klaar voor verzending <span class="mono">2</span></h5>
+            <div class="card"><div class="h"><b>#24110</b><span class="mono">€ 215,00</span></div><span>K. Müller · AT · EU-1</span><span class="st s-mute">Label <span class="wip" style="margin-left:4px">WIP</span></span></div>
+            <div class="card"><div class="h"><b>#24108</b><span class="mono">€ 488,00</span></div><span>T. Brown · UK · Wereld</span><span class="st s-mute">Douane CN22 nodig</span></div>
+          </div>
+          <div class="lane"><h5>Verzonden <span class="mono">14</span></h5>
+            <div class="card"><div class="h"><b>#24115</b><span class="mono">€ 129,00</span></div><span>J. Peeters · BE</span><span class="st s-ok">Verzonden 05-10</span></div>
+            <div class="card"><div class="h"><b>#24107</b><span class="mono">€ 640,00</span></div><span>L. Bakker · NL</span><span class="st s-ok">Afgeleverd</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ================= INSTELLINGEN ================= -->
+<section role="tabpanel" id="t-set" aria-labelledby="b-set" hidden>
+  <div class="intro"><h2>Instellingen</h2><p>Getypeerde groepen in plaats van losse sleutels. Verzending werkt met zones op land; het land komt uit het adres, niet uit een keuzelijst van de klant. Platforminstellingen zijn alleen voor Quartermaster admin.</p></div>
+  <div class="notes"><span class="note">Zones: Benelux · EU-1 · Wereld</span><span class="note">Gewichtsstaffels per zone</span><span class="note">Alleen Mollie</span><span class="note">Mandje-reservering 15 min</span></div>
+  <div class="scroll"><div class="frame" style="min-height:820px">
+    <aside class="rail" data-rail="set" data-role="admin" data-mode="closed" aria-label="Hoofdnavigatie"></aside>
+    <div class="main">
+      <div class="bar">
+        <div><div class="crumb">Depot Van den Berg <i>/</i> Instellingen</div><h3>Verzending en betalen</h3></div>
+        <div class="actions"><span class="muted" style="font-size:13px">2 wijzigingen niet opgeslagen</span><span class="btn ghost">Annuleren</span><span class="btn primary">Opslaan</span></div>
+      </div>
+      <div class="body"><div class="set">
+        <nav class="snav" aria-label="Instellingen-groepen">
+          <span>Algemeen</span><span>Catalogus en mandje</span><span class="on">Verzending en betalen</span><span>Mails</span><span>Juridisch en leeftijd</span><span>Analytics</span><span>Gebruikers</span>
+          <div class="lbl"><svg class="ico lock" viewBox="0 0 24 24" style="width:14px;height:14px"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Platform</div>
+          <span>Shops en domeinen</span><span>Abonnementen</span><span>Audit-log</span>
+          <p class="muted" style="font-size:12.5px;margin:8px 12px 0">Alleen zichtbaar voor <span class="role admin" style="margin-top:4px">Quartermaster admin</span></p>
+        </nav>
+        <div class="col">
+          <div class="panel"><div class="hd"><h4>Verzendzones</h4><span>prijs per gewichtsstaffel, incl. verpakking</span></div><div class="bd">
+            <div class="zones">
+              <div class="zone"><div class="zt"><b>Benelux</b><span class="muted" style="font-size:12.5px">3 landen</span></div><div class="cc"><span>NL</span><span>BE</span><span>LU</span></div>
+                <div class="tiers"><span>tot 2 kg</span><span>€ 6,95</span><span>2–5 kg</span><span>€ 9,95</span><span>5–10 kg</span><span>€ 14,95</span><span>10–20 kg</span><span>€ 19,95</span></div></div>
+              <div class="zone"><div class="zt"><b>EU-1</b><span class="muted" style="font-size:12.5px">9 landen</span></div><div class="cc"><span>DE</span><span>FR</span><span>AT</span><span>DK</span><span>IT</span><span>ES</span><span>PT</span><span>IE</span><span>SE</span></div>
+                <div class="tiers"><span>tot 2 kg</span><span>€ 12,50</span><span>2–5 kg</span><span>€ 17,50</span><span>5–10 kg</span><span>€ 24,00</span><span>10–20 kg</span><span>€ 32,00</span></div></div>
+              <div class="zone"><div class="zt"><b>Wereld</b><span class="muted" style="font-size:12.5px">overige landen</span></div><div class="cc"><span>UK</span><span>US</span><span>CH</span><span>NO</span><span>CA</span><span>AU</span><span>…</span></div>
+                <div class="tiers"><span>tot 2 kg</span><span>€ 24,00</span><span>2–5 kg</span><span>€ 38,00</span><span>5–10 kg</span><span>€ 55,00</span><span>10–20 kg</span><span>€ 85,00</span></div></div>
+            </div>
+            <div class="srow" style="margin-top:8px"><div><b>Verzekerd verzenden</b><p>Toeslag 1% van de orderwaarde, minimaal € 5,00. Verplicht boven € 500.</p></div><span class="sw on"></span></div>
+            <div class="srow"><div><b>Gratis verzending</b><p>Vanaf een orderwaarde, per zone. Nu alleen Benelux vanaf € 250.</p></div><span class="sw on"></span></div>
+          </div></div>
+          <div class="panel"><div class="hd"><h4>Betalen via Mollie</h4><span class="st s-ok">Verbonden · live</span></div><div class="bd">
+            <div class="pm">
+              <span><svg class="ico" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>iDEAL</span>
+              <span><svg class="ico" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Bancontact</span>
+              <span><svg class="ico" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Creditcard</span>
+              <span><svg class="ico" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>PayPal (via Mollie)</span>
+            </div>
+            <div class="srow" style="margin-top:6px"><div><b>Afrekenvaluta</b><p>Altijd euro. Andere valuta worden alleen ter indicatie getoond (koers dagelijks bijgewerkt).</p></div><span class="mono">EUR · weergave USD, GBP</span></div>
+            <div class="srow"><div><b>Reservering in mandje</b><p>Hoe lang een uniek item vastligt nadat het in een mandje is gelegd.</p></div><span class="in mono" style="padding:7px 12px">15 min</span></div>
+          </div></div>
+        </div>
+      </div></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ================= SHOP ================= -->
+<section role="tabpanel" id="t-shop" aria-labelledby="b-shop" hidden>
+  <div class="intro"><h2>Productpagina (concept)</h2><p>Fase 3. De shop erft de tokens van de tenant; hier in de rustige marine-uitvoering. Zichtbare 15-minutenreservering, afrekenen via Mollie, valutakeuze alleen voor weergave.</p></div>
+  <div class="notes"><span class="note">Afbeelding uit <span class="mono">/uploads/products/50231/</span></span><span class="note">Reservering met aftelbalk</span><span class="note">Mobiel: galerij boven, vaste koopknop onder</span></div>
+  <div class="scroll"><div class="shop">
+    <div class="nav"><b>Depot Van den Berg</b><nav><span>Helmen</span><span>Uniformen</span><span>Uitrusting</span><span>Insignes</span><span>Archief</span></nav><div class="r"><span>Zoeken</span><span>Verlanglijst 4</span><span>EUR € ▾</span><span>Mandje 1</span></div></div>
+    <div class="pdp">
+      <div>
+        <div class="big"><svg viewBox="0 0 300 160" aria-hidden="true"><path d="M34 122 C34 64 84 30 150 30 C214 30 260 64 262 112 L284 120 L284 130 L20 130 L20 122 Z M60 100 C80 96 220 96 240 102 M196 58 l14 -4 l6 12 l-14 4 z"/></svg><span class="p">/uploads/products/50231/01.webp</span><div class="lens">ET64<br>lot 3721</div></div>
+        <div class="thumbs"><div class="on"></div><div></div><div></div><div></div><div></div><div></div></div>
+      </div>
+      <div>
+        <div class="eyebrow">WO2 · Duitsland · Heer · Helmen · #50231</div>
+        <h4>Stahlhelm M40 Heer, ET64</h4>
+        <div class="price"><b>€ 1.450,00</b><span class="cur">≈ US$ 1.587 · ter indicatie</span></div>
+        <div class="muted" style="font-size:13.5px;margin-top:6px">Margeregeling · verzekerde verzending Benelux € 9,95 + 1%</div>
+        <div class="res"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg><span>Voor jou gereserveerd nog <b>14:12</b></span><span class="bar2" aria-hidden="true"><i></i></span></div>
+        <div class="cta"><span class="a">Afrekenen</span><span class="b">Doe een bod</span><span class="b" aria-label="Op verlanglijst">♡</span></div>
+        <div class="pay">Veilig betalen via Mollie <span>iDEAL</span><span>Bancontact</span><span>Creditcard</span><span>PayPal</span></div>
+        <dl class="spec"><dt>Maker</dt><dd>Eisenhüttenwerke Thale (ET), maat 64</dd><dt>Lotnummer</dt><dd>3721</dd><dt>Liner</dt><dd>Leer, maat 57, compleet</dd><dt>Decal</dt><dd>Heer, enkel, ca. 80%</dd><dt>Staat</dt><dd>Zeer goed, originele verf</dd></dl>
+        <div class="prov"><div class="qr" aria-hidden="true"></div><div><b>Certificaat van echtheid</b><br><span class="muted">Uit een Nederlandse privécollectie sinds 1978. Levenslange garantie op echtheid.</span></div></div>
+      </div>
+    </div>
+    <div class="alert"><span><b>Te laat?</b> Ontvang een mail zodra er een nieuwe M40 Heer binnenkomt.</span><span class="btn" style="background:var(--ink);color:var(--surface)">Meld me</span></div>
+  </div></div>
+</section>
+</div>
+
+<script>
+(function(){
+  var I={
+    dash:'<path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-3H4zM14 7h6V4h-6z"/>',
+    order:'<path d="M3 13l3-8h12l3 8v6H3zM3 13h5l1 2h6l1-2h5"/>',
+    board:'<path d="M3 6h11v10H3zM14 9h4l3 3.5V16h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+    cust:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18 14.8c1.8.7 3 2.5 3.5 5.2"/>',
+    prod:'<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5zM3 7.5l9 4.5 9-4.5M12 12v9"/>',
+    buy:'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3"/>',
+    cat:'<path d="M4 5h7v7H4zM13 5h7v7h-7zM4 14h7v6H4zM13 14h7v6h-7z"/>',
+    page:'<path d="M6 3h8l4 4v14H6zM14 3v4h4M9 12h6M9 16h6"/>',
+    stats:'<path d="M5 20V11M11 20V5M17 20v-6M3 20h18"/>',
+    set:'<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
+    shops:'<path d="M4 9l1.5-5h13L20 9M4 9v11h16V9M4 9h16M9 20v-6h6v6"/>',
+    audit:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+    search:'<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
+    updown:'<path d="M8 9l4-4 4 4M8 15l4 4 4-4"/>',
+    side:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>'
+  };
+  function ic(k){return '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">'+I[k]+'</svg>'}
+  var nav=[
+    ["Werk",[["dash","Dashboard"],["order","Orders","5"],["board","Verzendbord","wip"],["cust","Klanten"]]],
+    ["Catalogus",[["prod","Voorraad","412"],["buy","Inkoop en marge"],["cat","Categorieën"]]],
+    ["Website",[["page","Pagina's en menu's"],["stats","Bezoekers"]]],
+    ["Systeem",[["set","Instellingen"]]]
+  ];
+  var adminNav=["Platform",[["shops","Alle shops","3"],["audit","Audit-log"]]];
+  document.querySelectorAll(".rail").forEach(function(r){
+    var on=r.getAttribute("data-rail"),admin=r.getAttribute("data-role")==="admin";
+    var h='<button type="button" class="tenant" '+(admin?'data-pop aria-haspopup="true" aria-expanded="'+(on==="dash")+'"':'tabindex="-1"')+' aria-label="Shop: Depot Van den Berg'+(admin?', wissel van shop':'')+'"><span class="av">VB</span><span class="tx"><b>Depot Van den Berg</b><small>depotvandenberg.nl</small></span>'+(admin?ic("updown"):"")+'</button>';
+    h+='<div class="rolerow"><span class="role '+(admin?'admin">Quartermaster admin':'owner">Eigenaar')+'</span></div>';
+    h+='<button type="button" class="find" tabindex="-1" aria-label="Zoeken">'+ic("search")+'<span>Zoeken of opdracht</span><kbd>⌘K</kbd></button>';
+    var groups=admin?nav.concat([adminNav]):nav;
+    groups.forEach(function(g){
+      h+="<h6>"+g[0]+"</h6>";
+      g[1].forEach(function(it){
+        var c=it[2]||"",badge=c==="wip"?'<span class="wip">WIP</span>':(c?'<span class="ct">'+c+'</span>':"");
+        h+='<a href="#" tabindex="-1" class="it'+(it[0]===on?" on":"")+(it[0]==="order"?" dot":"")+'" aria-label="'+it[1]+'">'+ic(it[0])+'<span class="lb">'+it[1]+'</span>'+badge+'</a>';
+      });
+    });
+    h+='<div class="foot"><button type="button" class="tog" aria-label="Rail in- of uitklappen">'+ic("side")+'<span>Inklappen</span></button><div class="me"><span class="av">WV</span><div>Wout<small>'+(admin?"Quartermaster admin":"Eigenaar")+'</small></div></div></div>';
+    r.innerHTML=h;
+    r.querySelector(".tog").addEventListener("click",function(){
+      var c=r.getAttribute("data-mode")==="closed";r.setAttribute("data-mode",c?"open":"closed");
+      this.querySelector("span").textContent=c?"Inklappen":"Uitklappen";
+      var p=r.parentNode.querySelector(".pop");if(p&&!c){p.hidden=true;var b=r.querySelector("[data-pop]");if(b)b.setAttribute("aria-expanded","false")}
+    });
+    if(r.getAttribute("data-mode")==="closed")r.querySelector(".tog span").textContent="Uitklappen";
+    var pb=r.querySelector("[data-pop]"),pop=r.parentNode.querySelector(".pop");
+    if(pb&&pop){pb.addEventListener("click",function(){pop.hidden=!pop.hidden;pb.setAttribute("aria-expanded",String(!pop.hidden))})}
+  });
+
+  /* Tabs */
+  var tabs=[].slice.call(document.querySelectorAll('[role="tab"]'));
+  function show(id,focus){tabs.forEach(function(t){var s=t.getAttribute("aria-controls")===id;t.setAttribute("aria-selected",String(s));t.tabIndex=s?0:-1;document.getElementById(t.getAttribute("aria-controls")).hidden=!s;if(s&&focus)t.focus()});try{localStorage.setItem("qm-c-tab",id)}catch(e){}}
+  tabs.forEach(function(t,i){
+    t.addEventListener("click",function(){show(t.getAttribute("aria-controls"))});
+    t.addEventListener("keydown",function(e){var d=e.key==="ArrowRight"?1:e.key==="ArrowLeft"?-1:0;if(!d)return;e.preventDefault();var n=tabs[(i+d+tabs.length)%tabs.length];show(n.getAttribute("aria-controls"),true)});
+  });
+  var hs=(location.hash||"").slice(1);
+  if(hs&&document.getElementById(hs)&&document.getElementById(hs).getAttribute("role")==="tabpanel")show(hs);
+  else{try{var s=localStorage.getItem("qm-c-tab");if(s&&document.getElementById(s))show(s)}catch(e){}}
+
+  /* Thema */
+  var tb=[].slice.call(document.querySelectorAll("[data-theme-set]"));
+  function theme(v){if(v)document.documentElement.setAttribute("data-theme",v);else document.documentElement.removeAttribute("data-theme");tb.forEach(function(b){b.setAttribute("aria-pressed",String(b.getAttribute("data-theme-set")===v))});try{localStorage.setItem("qm-c-theme",v)}catch(e){}}
+  tb.forEach(function(b){b.addEventListener("click",function(){theme(b.getAttribute("data-theme-set"))})});
+  try{var tv=localStorage.getItem("qm-c-theme");if(tv)theme(tv)}catch(e){}
+
+  /* ⌘K-palet (voorbeeld) */
+  var pt=document.getElementById("paltoggle"),pal=[].slice.call(document.querySelectorAll("[data-pal]"));
+  function palSet(open){pal.forEach(function(p){p.hidden=!open});pt.textContent=open?"Palet verbergen":"Palet tonen (⌘K)"}
+  pt.addEventListener("click",function(){palSet(pal[0].hidden)});
+  document.addEventListener("keydown",function(e){
+    var prodOpen=!document.getElementById("t-prod").hidden;
+    if(prodOpen&&(e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();palSet(pal[0].hidden)}
+    if(e.key==="Escape"){if(prodOpen&&!pal[0].hidden)palSet(false);var dr=document.getElementById("drawer");if(!document.getElementById("t-order").hidden&&!dr.hidden)closeDrawer()}
+  });
+  pal[0].addEventListener("click",function(){palSet(false)});
+
+  /* Order-zijpaneel */
+  var O={
+    "24117":{date:"05-10-2026 21:11",pills:[["ok","Betaald · iDEAL"],["warn","Te verzenden"]],name:"Henk de Groot",addr:"Dorpsstraat 12, 7311 AB Apeldoorn, Nederland",hist:"3e order · klant sinds 2023",lines:[["KNIL koppelslot, messing","50198","€ 395,00"],["Mobilisatie-veldjas M34, 1939","49720","€ 425,00"]],ship:"Benelux · 2–5 kg · € 25,00",total:"€ 845,00",pay:"tr_7GkQe2 · iDEAL · ING",paid:"05-10 21:14 · webhook"},
+    "24116":{date:"07-10-2026 08:40",pills:[["info","Open bij Mollie"],["mute","Wacht op betaling"]],name:"Martin Fischer",addr:"Lindenallee 4, 50968 Köln, Duitsland",hist:"1e order",lines:[["Brotbeutel M31, gemerkt 1940","50201","€ 185,00"],["Feldflasche M31 met beker","50188","€ 115,00"]],ship:"EU-1 · tot 2 kg · € 12,50",total:"€ 312,50",pay:"tr_Wm81Lp · iDEAL · open",paid:"— · reservering verloopt 08:55"},
+    "24115":{date:"04-10-2026 16:02",pills:[["ok","Betaald · Bancontact"],["ok","Verzonden"]],name:"Jan Peeters",addr:"Kerkstraat 88, 2000 Antwerpen, België",hist:"5e order · klant sinds 2021",lines:[["Ärmelabzeichen Heer, BeVo","50140","€ 119,05"]],ship:"Benelux · tot 2 kg · € 9,95",total:"€ 129,00",pay:"tr_3b9Rxa · Bancontact",paid:"04-10 16:03 · webhook"},
+    "24114":{date:"04-10-2026 11:27",pills:[["crit","Mislukt · PayPal"],["mute","Geen verzending"]],name:"Robert Clarke",addr:"14 Harbour Road, Portsmouth PO1 3AA, Verenigd Koninkrijk",hist:"1e order",lines:[["Fallschirmjäger-Knochensack, 2e model","49911","€ 1.212,00"]],ship:"Wereld · 2–5 kg · € 38,00",total:"€ 1.250,00",pay:"tr_Pq20Zs · PayPal via Mollie",paid:"mislukt 11:43 · item weer vrij"},
+    "24112":{date:"04-10-2026 09:15",pills:[["ok","Betaald · Creditcard"],["warn","Te verzenden"]],name:"Pierre Laurent",addr:"12 rue des Lilas, 69003 Lyon, Frankrijk",hist:"2e order",lines:[["Waffenrock Infanterie, Unteroffizier","49870","€ 1.920,00"]],ship:"EU-1 · 2–5 kg · € 17,50 + verzekerd",total:"€ 1.980,00",pay:"tr_Lk5Hd1 · Visa",paid:"04-10 09:16 · webhook"},
+    "24111":{date:"03-10-2026 19:58",pills:[["ok","Betaald · iDEAL"],["warn","Te verzenden"]],name:"Sanne Visser",addr:"Molenweg 3, 8011 CD Zwolle, Nederland",hist:"1e order",lines:[["Koppelslot Heer, aluminium","50229","€ 52,05"]],ship:"Benelux · tot 2 kg · € 6,95",total:"€ 59,00",pay:"tr_Gy7Nc4 · iDEAL · Rabobank",paid:"03-10 19:59 · webhook"}
+  };
+  var dr=document.getElementById("drawer"),rows=[].slice.call(document.querySelectorAll("#orows tr")),last=rows[0];
+  function f(k){return dr.querySelector('[data-f="'+k+'"]')}
+  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+  function openOrder(id,row){
+    var o=O[id];if(!o)return;
+    f("no").textContent="#"+id;f("date").textContent=o.date;f("name").textContent=o.name;f("addr").textContent=o.addr;f("hist").textContent=o.hist;
+    f("ship").textContent=o.ship;f("total").textContent=o.total;f("pay").textContent=o.pay;f("paid").textContent=o.paid;
+    f("pills").innerHTML=o.pills.map(function(p){return '<span class="st s-'+p[0]+'">'+esc(p[1])+'</span>'}).join("");
+    f("lines").innerHTML=o.lines.map(function(l){return '<div class="pr"><div><div class="th" style="width:40px;height:40px"></div><div>'+esc(l[0])+'<small class="mono">#'+l[1]+'</small></div></div><span class="mono">'+esc(l[2])+'</span></div>'}).join("");
+    rows.forEach(function(r){r.classList.toggle("sel",r===row)});
+    dr.hidden=false;last=row;
+  }
+  function closeDrawer(){dr.hidden=true;rows.forEach(function(r){r.classList.remove("sel")});if(last)last.focus()}
+  rows.forEach(function(r){
+    r.addEventListener("click",function(){openOrder(r.getAttribute("data-o"),r)});
+    r.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();openOrder(r.getAttribute("data-o"),r)}});
+  });
+  document.getElementById("dclose").addEventListener("click",closeDrawer);
+})();
+</script>

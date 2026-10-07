@@ -1,0 +1,21 @@
+# Local development services. The Next.js app runs on the host (`npm run dev`).
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: quartermaster-postgres
+    environment:
+      POSTGRES_USER: quartermaster
+      POSTGRES_PASSWORD: quartermaster
+      POSTGRES_DB: quartermaster
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quartermaster -d quartermaster"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
