@@ -2,7 +2,7 @@
 
 Multi-tenant webshop platform for militaria dealers. Successor of **Concept500** (Laravel 12 · Backpack · Livewire), rebuilt on **Next.js** and **Prisma**.
 
-> **Status:** phases 0–3 done — admin and storefront (catalog, product pages, cart with 15-minute holds, checkout with Mollie, customer accounts, wishlist, CMS pages, SEO) are functional. Next: phase 4 (migration from Concept500 and go-live) and phase 5 (extras). Plans and decisions in [`docs/`](docs).
+> **Status:** phases 0–3 and 5 done — admin, storefront and extras (facets, per-country compliance, saved searches & alerts, provenance & certificates, offers, coupons, invoices, shipping board, ⌘K, exchange rates, leads). Next: phase 4 — migration from Concept500 (see `docs/etl/`) and go-live.
 
 ## Goals
 
