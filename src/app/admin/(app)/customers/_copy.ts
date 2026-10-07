@@ -90,9 +90,9 @@ export const customerCopy = {
     trigger: "Anonymize…",
     dialogTitle: "Anonymize this customer permanently?",
     confirm: "Anonymize permanently",
-    kept: "Kept: the orders with their amounts, items, payment status, shipping country and dates — needed for the bookkeeping and VAT.",
+    kept: "Kept: the orders with their amounts, items, payment status and dates, plus the customer name and addresses on those orders — required for the 7-year bookkeeping retention.",
     scrubbed:
-      "Scrubbed: name, email, phone and internal notes; the name, email, phone and customer note on every order; all order addresses except the country; stored payment-provider details.",
+      "Scrubbed: the customer profile (name, email, phone, internal notes); the email, phone and customer note on every order; stored payment-provider details.",
     deleted: "Deleted: the address book, wishlist, carts and newsletter subscription.",
     notCovered: "Not covered: a linked login account (handle it under Users) and free text in order timeline notes.",
     irreversible: "This cannot be undone.",

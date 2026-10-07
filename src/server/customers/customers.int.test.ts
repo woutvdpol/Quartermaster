@@ -98,9 +98,11 @@ describe("customers", () => {
     for (const o of orders) {
       expect(o.customerId).toBe(c.id);
       expect(o.email).toBe(cust.email);
-      expect(o.customerName).toBe("Anonymized customer");
+      // Name and address stay on orders for fiscal retention; contact details are removed.
+      expect(o.customerName).not.toBe("Anonymized customer");
       expect(o.phone).toBeNull();
-      expect(o.addresses[0]).toMatchObject({ street: "-", city: "-", postalCode: null, countryCode: "NL" });
+      expect(o.addresses[0].street).not.toBe("-");
+      expect(o.addresses[0]).toMatchObject({ phone: null, countryCode: "NL" });
       expect(o.lines[0].lineTotal).toBe(4200);
       for (const pay of o.payments) expect(pay.raw).toBeNull();
     }

@@ -89,3 +89,10 @@ Kanttekeningen:
 - Reserveringstijd instelbaar door eigenaar, 5–60 min (standaard 15).
 - Leeftijdsverificatie: modi off / popup / checkout.
 - Standaarden: gast-checkout aan, gevoelige items blurren voor gasten, eigen analytics.
+
+## Fase 1–2 afronding — akkoord eigenaar
+- Anonimiseren wist het klantprofiel, **niet** naam/adres op orders (fiscale bewaarplicht 7 jaar).
+- Oversell: boeken wat er is + waarschuwing op order; geen automatische refund (later).
+- Refunds tellen niet mee in omzet/marge.
+- Nieuwsbriefbevestiging via pagina met bevestigknop (POST) i.p.v. directe GET-link.
+- Voorraad handmatig naar 0 → status blijft (geen automatische SOLD).

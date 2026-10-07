@@ -238,9 +238,11 @@ export async function updateCustomer(ctx: ServiceContext, customerId: string, in
  *
  * Kept:     the Customer row (id), all orders with amounts, lines (product snapshots), payments
  *           (amounts/status), shipping country (needed for VAT), timestamps.
- * Scrubbed: customer email (→ anonymized-<id>@anonymized.invalid), names, phone, internal notes,
- *           userId link; order snapshot email/name/phone/customer note; order addresses (all but
- *           countryCode); Payment.raw (Mollie payloads contain consumer name/IBAN).
+ * Kept on orders (owner decision — 7-year fiscal retention): customer name and billing/shipping
+ *           addresses, so invoices and bookkeeping stay complete.
+ * Scrubbed: customer profile email (→ anonymized-<id>@anonymized.invalid), names, phone, internal
+ *           notes, userId link; order snapshot email/phone/customer note; order address phone;
+ *           Payment.raw (Mollie payloads contain consumer name/IBAN).
  * Deleted:  address book, wishlist, carts (+ their reservations via cascade), newsletter subscriptions.
  * Orders matched: linked by customerId OR guest orders with the same email.
  *
@@ -267,23 +269,10 @@ export async function anonymizeCustomer(ctx: ServiceContext, customerId: string)
     if (orderIds.length) {
       await tx.order.updateMany({
         where: { tenantId, id: { in: orderIds } },
-        data: { customerId: id, email: anonEmail, customerName: "Anonymized customer", phone: null, customerNote: null },
+        data: { customerId: id, email: anonEmail, phone: null, customerNote: null },
       });
-      await tx.orderAddress.updateMany({
-        where: { tenantId, orderId: { in: orderIds } },
-        data: {
-          firstName: "Anonymized",
-          lastName: "",
-          company: null,
-          street: "-",
-          houseNumber: null,
-          line2: null,
-          postalCode: null,
-          city: "-",
-          region: null,
-          phone: null,
-        },
-      });
+      // Names and addresses on orders are retained for the fiscal retention period.
+      await tx.orderAddress.updateMany({ where: { tenantId, orderId: { in: orderIds } }, data: { phone: null } });
       await tx.payment.updateMany({ where: { tenantId, orderId: { in: orderIds } }, data: { raw: Prisma.DbNull } });
       await tx.orderEvent.createMany({
         data: orderIds.map((orderId) => ({ tenantId, orderId, type: "customer.anonymized", actorId: ctx.actor.id })),
