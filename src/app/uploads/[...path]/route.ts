@@ -1,9 +1,17 @@
 import { connection } from "next/server";
 import { getStorage, isValidKey } from "@/server/media/storage";
+import { db } from "@/server/db";
+import { canAccessTenant, currentUser } from "@/server/auth/guards";
 
 // Product image keys are immutable (a new upload always gets a new image id), so they can be cached forever.
 const IMMUTABLE_KEY = /^[A-Za-z0-9_-]+\/products\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+(\.[a-z0-9]+|\/[a-z]+\.webp)$/;
 const SERVABLE_EXT = /\.(webp|jpe?g|png|avif|gif)$/i;
+// Served by their own access-checked routes (/api/documents, /api/certificates) — never here.
+const PRIVATE_KEY = /^[A-Za-z0-9_-]+\/(products\/[A-Za-z0-9_-]+\/docs|certificates)\//;
+// Lead photos ("sell your collection"): staff of that tenant only.
+const LEAD_KEY = /^([A-Za-z0-9_-]+)\/leads\//;
+// Product images: `{tenantId}/products/{productId}/…`; variant files live under `{imageId}/{variant}.webp`.
+const PRODUCT_KEY = /^([A-Za-z0-9_-]+)\/products\/([A-Za-z0-9_-]+)\//;
 
 function notFound() {
   return new Response("Not found", { status: 404, headers: { "Cache-Control": "no-store" } });
@@ -17,11 +25,27 @@ export async function GET(request: Request, ctx: RouteContext<"/uploads/[...path
   await connection();
   const { path } = await ctx.params;
   const key = path.join("/");
-  if (!isValidKey(key) || !SERVABLE_EXT.test(key)) return notFound();
+  if (!isValidKey(key) || !SERVABLE_EXT.test(key) || PRIVATE_KEY.test(key)) return notFound();
 
-  // TODO(phase 3, shop): products with `blurred = true` must not expose sharp images to guests.
-  // Hook here: resolve the product from the key (`{tenantId}/products/{productId}/…`) and, for
-  // non-authenticated visitors, serve only the `blur` variant (or 403). Admin previews are unaffected.
+  let privateCache = false;
+  const lead = LEAD_KEY.exec(key);
+  if (lead) {
+    const user = await currentUser();
+    if (!user || user.role === "CUSTOMER" || !canAccessTenant(user, lead[1])) return notFound();
+    privateCache = true;
+  }
+
+  // Sensitive (blurred) products: visitors without a session of that shop only get the blur variant.
+  const product = PRODUCT_KEY.exec(key);
+  if (product && !key.endsWith("/blur.webp")) {
+    const row = await db.product.findFirst({ where: { id: product[2], tenantId: product[1] }, select: { blurred: true } });
+    if (row?.blurred) {
+      const user = await currentUser();
+      const allowed = !!user && (user.tenantId === product[1] || canAccessTenant(user, product[1]));
+      if (!allowed) return notFound();
+      privateCache = true;
+    }
+  }
 
   const storage = getStorage();
   const info = await storage.head(key);
@@ -31,7 +55,11 @@ export async function GET(request: Request, ctx: RouteContext<"/uploads/[...path
     "Content-Type": info.contentType,
     ETag: info.etag,
     "Last-Modified": info.lastModified.toUTCString(),
-    "Cache-Control": IMMUTABLE_KEY.test(key) ? "public, max-age=31536000, immutable" : "public, max-age=300",
+    "Cache-Control": privateCache
+      ? "private, no-store"
+      : IMMUTABLE_KEY.test(key)
+        ? "public, max-age=31536000, immutable"
+        : "public, max-age=300",
     "X-Content-Type-Options": "nosniff",
     "Content-Security-Policy": "default-src 'none'; sandbox",
   });

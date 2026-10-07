@@ -130,6 +130,15 @@ export async function listProductImages(ctx: ServiceContext, productId: string):
 }
 
 /** Bytes used by all product images of a tenant (originals + variants). */
+/** Quota usage: product images plus provenance documents (src/server/provenance). */
+async function usedBytesInclDocuments(tenantId: string, client: Prisma.TransactionClient = db): Promise<number> {
+  const [images, docs] = await Promise.all([
+    tenantStorageUsage(tenantId, client),
+    client.productDocument.aggregate({ where: { tenantId }, _sum: { byteSize: true } }),
+  ]);
+  return images + (docs._sum.byteSize ?? 0);
+}
+
 export async function tenantStorageUsage(tenantId: string, client: Prisma.TransactionClient = db): Promise<number> {
   const [row] = await client.$queryRaw<{ used: bigint | null }[]>`
     SELECT COALESCE(SUM(
@@ -200,7 +209,7 @@ export async function addProductImages(
   if (existing + parsed.data.length > maxImages) {
     throw new ServiceError("CONFLICT", `A product can have at most ${maxImages} photos`, { limit: maxImages, existing });
   }
-  if ((await tenantStorageUsage(tenantId)) >= quotaBytes) {
+  if ((await usedBytesInclDocuments(tenantId)) >= quotaBytes) {
     throw new ServiceError("CONFLICT", "Storage quota exceeded", { quotaBytes });
   }
   for (const file of parsed.data) {
@@ -275,7 +284,7 @@ export async function addProductImages(
       if (count + prepared.length > maxImages) {
         throw new ServiceError("CONFLICT", `A product can have at most ${maxImages} photos`, { limit: maxImages, existing: count });
       }
-      const used = await tenantStorageUsage(tenantId, tx);
+      const used = await usedBytesInclDocuments(tenantId, tx);
       if (used + addedBytes > quotaBytes) {
         throw new ServiceError("CONFLICT", "Storage quota exceeded", { quotaBytes, usedBytes: used, requestedBytes: addedBytes });
       }

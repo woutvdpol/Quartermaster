@@ -1,5 +1,5 @@
 import "server-only";
-import { createReadStream } from "node:fs";
+import { createReadStream, type Dirent } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
@@ -22,7 +22,15 @@ export interface StorageDriver {
   delete(key: string): Promise<void>;
   /** Deletes everything under a "directory" prefix (must end with `/`). */
   deletePrefix(prefix: string): Promise<void>;
+  /**
+   * Optional: the direct children of a "directory" prefix (must end with `/`); [] when it does not
+   * exist. Drivers that cannot list cheaply leave it out, and callers skip listing-based maintenance.
+   */
+  list?(prefix: string): Promise<StorageEntry[]>;
 }
+
+/** One child of a listed prefix: a blob ("file") or a sub-prefix ("dir"). */
+export type StorageEntry = { name: string; kind: "file" | "dir"; lastModified: Date };
 
 export type StoredObjectInfo = {
   size: number;
@@ -169,6 +177,30 @@ export class LocalDriver implements StorageDriver {
   async deletePrefix(prefix: string): Promise<void> {
     assertValidPrefix(prefix);
     await fs.rm(this.resolve(prefix.slice(0, -1)), { recursive: true, force: true });
+  }
+
+  /** Direct children; entries that are not valid key segments (temp files, dotfiles) are skipped. */
+  async list(prefix: string): Promise<StorageEntry[]> {
+    assertValidPrefix(prefix);
+    const dir = this.resolve(prefix.slice(0, -1));
+    let names: Dirent[];
+    try {
+      names = await fs.readdir(dir, { withFileTypes: true });
+    } catch (error) {
+      if (isNotFound(error)) return [];
+      throw error;
+    }
+    const out: StorageEntry[] = [];
+    for (const d of names) {
+      if (!SEGMENT.test(d.name) || !(d.isFile() || d.isDirectory())) continue;
+      try {
+        const stat = await fs.stat(path.join(dir, d.name));
+        out.push({ name: d.name, kind: d.isDirectory() ? "dir" : "file", lastModified: stat.mtime });
+      } catch (error) {
+        if (!isNotFound(error)) throw error; // removed meanwhile
+      }
+    }
+    return out;
   }
 }
 
