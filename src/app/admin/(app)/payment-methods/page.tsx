@@ -4,7 +4,7 @@ import { Card, ConfirmDialog, DateTime, EmptyState, InlineAlert, KeyValue, PageH
 import { requireStaffContext } from "@/server/context";
 import { getMollieStatus, listMollieMethods, type MollieMethodInfo } from "@/server/payments/mollie-config";
 import { loadErrorMessage } from "../_system/errors";
-import { getTenantInfo } from "../_system/tenant";
+import { requireTenantDisplay } from "@/server/tenant-display";
 import { removeMollieKeyAction } from "./actions";
 import { MethodsForm, type MethodRow } from "./_components/MethodsForm";
 import { MollieKeyForm } from "./_components/MollieKeyForm";
@@ -22,7 +22,7 @@ function limits(m: MollieMethodInfo): string | null {
 
 export default async function PaymentMethodsPage() {
   const ctx = await requireStaffContext();
-  const [status, tenant] = await Promise.all([getMollieStatus(ctx), getTenantInfo(ctx.tenantId)]);
+  const [status, tenant] = await Promise.all([getMollieStatus(ctx), requireTenantDisplay(ctx.tenantId)]);
 
   let methods: MollieMethodInfo[] | null = null;
   let methodsError: string | null = null;
@@ -67,7 +67,7 @@ export default async function PaymentMethodsPage() {
                     { label: "Mode", value: status.mode === "live" ? "Live" : "Test" },
                     {
                       label: "Verified",
-                      value: status.verifiedAt ? <DateTime value={status.verifiedAt} timeZone={tenant.timezone} /> : "—",
+                      value: status.verifiedAt ? <DateTime value={status.verifiedAt} timeZone={tenant.timeZone} /> : "—",
                     },
                   ]}
                 />

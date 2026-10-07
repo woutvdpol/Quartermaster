@@ -4,7 +4,7 @@ import { Card, ConfirmDialog, EmptyState, InlineAlert, Money, PageHeader, Status
 import { requireStaffContext } from "@/server/context";
 import { getSettings } from "@/server/settings";
 import { countryName, getCoverage, listZones, REST_OF_WORLD, type ShippingZoneWithRates } from "@/server/shipping";
-import { getTenantInfo } from "../_system/tenant";
+import { requireTenantDisplay } from "@/server/tenant-display";
 import { deleteZoneAction } from "./actions";
 import { MoveButtons } from "./_components/MoveButtons";
 import { QuoteTester } from "./_components/QuoteTester";
@@ -45,7 +45,7 @@ export default async function ShippingPage() {
   const [zones, coverage, tenant, checkout] = await Promise.all([
     listZones(ctx),
     getCoverage(ctx),
-    getTenantInfo(ctx.tenantId),
+    requireTenantDisplay(ctx.tenantId),
     getSettings(ctx.tenantId, "checkout"),
   ]);
   const currency = tenant.currency;

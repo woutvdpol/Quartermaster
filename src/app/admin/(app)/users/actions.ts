@@ -5,7 +5,8 @@ import { actionOk, formString, type ActionResult, type ActionState } from "@/com
 import { requireStaffContext } from "@/server/context";
 import { disableUser, enableUser, inviteOwner, resendOwnerInvite, resetUserTwoFactor } from "@/server/users";
 import { fail, failFrom } from "../_system/errors";
-import { getTenantInfo, inviteLink } from "../_system/tenant";
+import { inviteLink } from "../_system/tenant";
+import { requireTenantDisplay } from "@/server/tenant-display";
 
 const PATH = "/admin/users";
 
@@ -17,7 +18,7 @@ export async function inviteOwnerAction(_prev: ActionState, formData: FormData):
   if (!email) return fail("Check the highlighted fields.", { email: ["Enter an e-mail address."] });
   try {
     const ctx = await requireStaffContext();
-    const [result, tenant] = await Promise.all([inviteOwner(ctx, { email, name: name || null }), getTenantInfo(ctx.tenantId)]);
+    const [result, tenant] = await Promise.all([inviteOwner(ctx, { email, name: name || null }), requireTenantDisplay(ctx.tenantId)]);
     revalidatePath(PATH);
     return actionOk(`Invite created for ${result.user.email}.`, {
       email: result.user.email,
@@ -33,7 +34,7 @@ export async function inviteOwnerAction(_prev: ActionState, formData: FormData):
 export async function resendInviteAction(userId: string): Promise<ActionResult<string, InviteData>> {
   try {
     const ctx = await requireStaffContext();
-    const [result, tenant] = await Promise.all([resendOwnerInvite(ctx, userId), getTenantInfo(ctx.tenantId)]);
+    const [result, tenant] = await Promise.all([resendOwnerInvite(ctx, userId), requireTenantDisplay(ctx.tenantId)]);
     revalidatePath(PATH);
     return actionOk("New invite link created. The previous link no longer works.", {
       email: "",

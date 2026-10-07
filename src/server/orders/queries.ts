@@ -71,7 +71,7 @@ export async function listOrders(ctx: ServiceContext, query: ListOrdersQuery = {
   const base = filterWhere(ctx.tenantId, q);
   const where: Prisma.OrderWhereInput = { AND: [base, viewWhere(q.view)] };
 
-  const [rows, total, ...counts] = await Promise.all([
+  const [rows, counts] = await Promise.all([
     db.order.findMany({
       where,
       orderBy: [{ placedAt: "desc" }, { number: "desc" }],
@@ -100,9 +100,9 @@ export async function listOrders(ctx: ServiceContext, query: ListOrdersQuery = {
         addresses: { where: { type: "SHIPPING" }, select: { countryCode: true, city: true } },
       },
     }),
-    db.order.count({ where }),
-    ...ORDER_VIEWS.map((v) => db.order.count({ where: { AND: [base, viewWhere(v)] } })),
+    viewCounts(base),
   ]);
+  const total = counts[q.view];
 
   return {
     items: rows.map(({ _count, addresses, ...o }) => ({
@@ -114,8 +114,38 @@ export async function listOrders(ctx: ServiceContext, query: ListOrdersQuery = {
     page: q.page,
     pageSize: q.pageSize,
     pageCount: Math.max(1, Math.ceil(total / q.pageSize)),
-    counts: Object.fromEntries(ORDER_VIEWS.map((v, i) => [v, counts[i]])) as Record<OrderView, number>,
+    counts,
   };
+}
+
+const SHIPPABLE = new Set(["UNFULFILLED", "PACKED"]);
+const SHIPPED = new Set(["SHIPPED", "DELIVERED"]);
+const FAILED = new Set(["FAILED", "CANCELED", "EXPIRED"]);
+
+/**
+ * Per-view counts in 2 queries instead of one COUNT per view: group the non-archived orders by
+ * (paymentStatus, fulfillmentStatus) and derive every view from those buckets (mirrors viewWhere()).
+ */
+async function viewCounts(base: Prisma.OrderWhereInput): Promise<Record<OrderView, number>> {
+  const [groups, archived] = await Promise.all([
+    db.order.groupBy({
+      by: ["paymentStatus", "fulfillmentStatus"],
+      where: { AND: [base, { archivedAt: null }] },
+      _count: { _all: true },
+    }),
+    db.order.count({ where: { AND: [base, { archivedAt: { not: null } }] } }),
+  ]);
+  const c: Record<OrderView, number> = { open: 0, toShip: 0, shipped: 0, failed: 0, archived, all: archived };
+  for (const g of groups) {
+    const n = g._count._all;
+    const paidUnshipped = g.paymentStatus === "PAID" && SHIPPABLE.has(g.fulfillmentStatus);
+    c.all += n;
+    if (g.paymentStatus === "PENDING" || paidUnshipped) c.open += n;
+    if (paidUnshipped) c.toShip += n;
+    if (SHIPPED.has(g.fulfillmentStatus)) c.shipped += n;
+    if (FAILED.has(g.paymentStatus)) c.failed += n;
+  }
+  return c;
 }
 export type OrderListItem = Awaited<ReturnType<typeof listOrders>>["items"][number];
 

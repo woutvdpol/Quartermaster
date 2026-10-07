@@ -30,7 +30,7 @@ import { OrderDrawer } from "./_components/OrderDrawer";
 import { OrderSummary } from "./_components/OrderSummary";
 import { dayRange, parseDay, startOfLocalDay } from "./_lib/dates";
 import { countryName, paymentMethodLabel } from "./_lib/labels";
-import { getTenantDisplay } from "./_lib/tenant";
+import { requireTenantDisplay } from "@/server/tenant-display";
 
 export const metadata: Metadata = { title: t.title };
 
@@ -44,7 +44,7 @@ function parseView(value: string | undefined): OrderView {
 export default async function OrdersPage({ searchParams }: PageProps<"/admin/orders">) {
   const sp = await searchParams;
   const ctx = await requireStaffContext();
-  const display = await getTenantDisplay(ctx);
+  const display = await requireTenantDisplay(ctx.tenantId);
 
   const view = parseView(getParam(sp, "view"));
   const q = getParam(sp, "q")?.slice(0, 200);

@@ -1,24 +1,11 @@
 import "server-only";
-import { cache } from "react";
 import { unstable_rethrow } from "next/navigation";
-import { db } from "@/server/db";
 import { AuthError } from "@/server/auth/guards";
-import { ServiceError, type ServiceContext } from "@/server/context";
+import { ServiceError } from "@/server/context";
 import type { CategoryNode } from "@/server/catalog/categories";
 import { actionFail, type ActionResult } from "@/components/admin/ui";
 
-/*
- * Small route-local reads/helpers for the inventory and categories screens.
- * GAP: there is no shared service for the tenant's display settings (currency + timezone), so this
- * reads the two columns directly. Replace with a settings/tenant service once one exists.
- */
-
-export type TenantLocale = { currency: string; timeZone: string };
-
-export const getTenantLocale = cache(async (ctx: ServiceContext): Promise<TenantLocale> => {
-  const tenant = await db.tenant.findUnique({ where: { id: ctx.tenantId }, select: { currency: true, timezone: true } });
-  return { currency: tenant?.currency ?? "EUR", timeZone: tenant?.timezone ?? "Europe/Amsterdam" };
-});
+/* Small route-local reads/helpers for the inventory and categories screens. */
 
 export type FlatCategory = { id: string; title: string; path: string; depth: number; parentId: string | null; isActive: boolean };
 

@@ -14,7 +14,7 @@ import {
 import { requireStaffContext } from "@/server/context";
 import { listOrders, type OrderListItem } from "@/server/orders/queries";
 import { countryName, paymentMethodLabel } from "../orders/_lib/labels";
-import { getTenantDisplay } from "../orders/_lib/tenant";
+import { requireTenantDisplay } from "@/server/tenant-display";
 import { boardCopy } from "./_copy";
 
 const t = boardCopy;
@@ -119,7 +119,7 @@ export default async function ShippingBoardPage() {
   const [open, shipped, display] = await Promise.all([
     listOrders(ctx, { view: "open", pageSize: OPEN_LIMIT }),
     listOrders(ctx, { view: "shipped", pageSize: SHIPPED_LIMIT }),
-    getTenantDisplay(ctx),
+    requireTenantDisplay(ctx.tenantId),
   ]);
   const { awaiting, packing, ready } = bucketOpenOrders(open.items, display.timeZone);
   const shippedCards: Card[] = shipped.items.map((order) => ({

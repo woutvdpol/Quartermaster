@@ -19,7 +19,7 @@ import { listOrders } from "@/server/orders/queries";
 import { stockOverview } from "@/server/stock/ledger";
 import { visitorsSummary } from "@/server/analytics";
 import { marginReport } from "@/server/purchasing";
-import { getTenantFormat } from "../../sourcing/_lib/tenant";
+import { requireTenantDisplay } from "@/server/tenant-display";
 import { addDays, startOfLocalDay, todayIn } from "../../sourcing/_lib/time";
 import { copy } from "../_copy";
 import { MarginBars } from "./MarginBars";
@@ -53,7 +53,7 @@ function trendOf(k: Kpi): "up" | "down" | "flat" {
 // ─── KPIs ───────────────────────────────────────────────────────────────────
 
 export async function KpiSection({ ctx, days }: { ctx: ServiceContext; days: number }) {
-  const [res, fmt] = await Promise.all([safe("kpis", () => kpis(ctx, { days })), getTenantFormat(ctx)]);
+  const [res, fmt] = await Promise.all([safe("kpis", () => kpis(ctx, { days })), requireTenantDisplay(ctx.tenantId)]);
   if (!res.ok) return <SectionError />;
   const k = res.value;
   const cur = fmt.currency;
@@ -97,7 +97,7 @@ export async function KpiSection({ ctx, days }: { ctx: ServiceContext; days: num
 // ─── Revenue chart ──────────────────────────────────────────────────────────
 
 export async function RevenueSection({ ctx, days }: { ctx: ServiceContext; days: number }) {
-  const [res, fmt] = await Promise.all([safe("revenueByDay", () => revenueByDay(ctx, { days })), getTenantFormat(ctx)]);
+  const [res, fmt] = await Promise.all([safe("revenueByDay", () => revenueByDay(ctx, { days })), requireTenantDisplay(ctx.tenantId)]);
   return (
     <Card title={copy.chart.title} aside={copy.chart.aside}>
       {res.ok ? <RevenueChart data={res.value} currency={fmt.currency} days={days} /> : <SectionError />}
@@ -244,7 +244,7 @@ function TopList({ title, rows }: { title: string; rows: { key: string; label: s
 // ─── Latest orders ──────────────────────────────────────────────────────────
 
 export async function LatestOrdersSection({ ctx }: { ctx: ServiceContext }) {
-  const [res, fmt] = await Promise.all([safe("listOrders", () => listOrders(ctx, { view: "all", pageSize: 5 })), getTenantFormat(ctx)]);
+  const [res, fmt] = await Promise.all([safe("listOrders", () => listOrders(ctx, { view: "all", pageSize: 5 })), requireTenantDisplay(ctx.tenantId)]);
   const aside = (
     <Link href="/admin/orders" className="hover:text-ink">
       {copy.latest.all}
@@ -316,7 +316,7 @@ export async function LatestOrdersSection({ ctx }: { ctx: ServiceContext }) {
 // ─── Stock strip ────────────────────────────────────────────────────────────
 
 export async function StockSection({ ctx }: { ctx: ServiceContext }) {
-  const [res, fmt] = await Promise.all([safe("stockOverview", () => stockOverview(ctx)), getTenantFormat(ctx)]);
+  const [res, fmt] = await Promise.all([safe("stockOverview", () => stockOverview(ctx)), requireTenantDisplay(ctx.tenantId)]);
   const aside = (
     <Link href="/admin/inventory" className="hover:text-ink">
       {copy.stock.inventory}
@@ -375,7 +375,7 @@ export async function StockSection({ ctx }: { ctx: ServiceContext }) {
 const MARGIN_ROWS = 6;
 
 export async function MarginSection({ ctx }: { ctx: ServiceContext }) {
-  const fmt = await getTenantFormat(ctx);
+  const fmt = await requireTenantDisplay(ctx.tenantId);
   const today = todayIn(fmt.timeZone);
   const from = startOfLocalDay(addDays(today, -29), fmt.timeZone);
   const to = startOfLocalDay(addDays(today, 1), fmt.timeZone);

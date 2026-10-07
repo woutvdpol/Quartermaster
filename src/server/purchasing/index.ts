@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { db } from "@/server/db";
+import { requireTenantDisplay } from "@/server/tenant-display";
 import { audit } from "@/server/audit";
 import { ServiceError, type ServiceContext } from "@/server/context";
 import { Prisma } from "@/generated/prisma/client";
@@ -364,8 +365,8 @@ export type MarginRow = {
  */
 export async function marginReport(ctx: ServiceContext, input: z.input<typeof marginSchema>) {
   const q = marginSchema.parse(input);
-  const tenant = await db.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { timezone: true, currency: true } });
-  const tz = tenant.timezone;
+  const tenant = await requireTenantDisplay(ctx.tenantId);
+  const tz = tenant.timeZone;
   const groupSql = {
     category: Prisma.sql`cat.id AS key, COALESCE(cat.title, 'Uncategorized') AS label`,
     supplier: Prisma.sql`s.id AS key, COALESCE(s.name, 'Unknown supplier') AS label`,

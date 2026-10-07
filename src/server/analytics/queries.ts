@@ -1,7 +1,8 @@
 import "server-only";
 import { z } from "zod";
 import { db } from "@/server/db";
-import { ServiceError, type ServiceContext } from "@/server/context";
+import { requireTenantDisplay } from "@/server/tenant-display";
+import type { ServiceContext } from "@/server/context";
 import { AuthError, canAccessTenant } from "@/server/auth/guards";
 import { parseInput } from "@/server/catalog/errors";
 import { getSettings } from "@/server/settings";
@@ -21,14 +22,12 @@ const summarySchema = z.object({ days: z.coerce.number().int().min(1).max(366).d
 export async function visitorsSummary(ctx: ServiceContext, input: z.input<typeof summarySchema> = {}): Promise<AnalyticsSummary | null> {
   if (!canAccessTenant(ctx.actor, ctx.tenantId)) throw new AuthError("FORBIDDEN");
   const { days } = parseInput(summarySchema, input);
-  const tenant = await db.tenant.findUnique({ where: { id: ctx.tenantId }, select: { id: true, timezone: true } });
-  if (!tenant) throw new ServiceError("NOT_FOUND", "Tenant not found");
-  const settings = await getSettings(tenant.id, "analytics");
+  const [tenant, settings] = await Promise.all([requireTenantDisplay(ctx.tenantId), getSettings(ctx.tenantId, "analytics")]);
 
   if (settings.provider === "matomo") {
-    return matomoSummary({ matomoUrl: settings.matomoUrl, siteId: settings.matomoSiteId, days, timezone: tenant.timezone });
+    return matomoSummary({ matomoUrl: settings.matomoUrl, siteId: settings.matomoSiteId, days, timezone: tenant.timeZone });
   }
-  return ownSummary(tenant.id, tenant.timezone, days);
+  return ownSummary(tenant.id, tenant.timeZone, days);
 }
 
 /** Own cookieless analytics over the last `days` local days (today included) in `tz`. */
@@ -37,7 +36,7 @@ export async function ownSummary(tenantId: string, tz: string, days: number): Pr
   // Range start = local midnight `back` days ago in `tz`, converted back to the UTC wall clock that
   // `createdAt` (timestamp without time zone, written as UTC) uses. Repeated per query with bound params.
 
-  const [series, totals, topPages, topReferrers, live] = await Promise.all([
+  const [series, topPages, topReferrers, live] = await Promise.all([
     db.$queryRaw<{ date: string; pageviews: number; visitors: number }[]>`
       WITH bounds AS (
         SELECT date_trunc('day', now() AT TIME ZONE ${tz}::text) AS today_local
@@ -55,11 +54,6 @@ export async function ownSummary(tenantId: string, tz: string, days: number): Pr
            generate_series(b.today_local - make_interval(days => ${back}::int), b.today_local, interval '1 day') AS d
       LEFT JOIN v ON v.day = d
       ORDER BY d`,
-    db.$queryRaw<{ pageviews: number; visitors: number }[]>`
-      SELECT COUNT(*)::int AS pageviews, COUNT(DISTINCT "visitorHash")::int AS visitors
-      FROM page_views
-      WHERE "tenantId" = ${tenantId}
-        AND "createdAt" >= ((date_trunc('day', now() AT TIME ZONE ${tz}::text) - make_interval(days => ${back}::int)) AT TIME ZONE ${tz}::text) AT TIME ZONE 'UTC'`,
     db.$queryRaw<{ path: string; pageviews: number; visitors: number }[]>`
       SELECT split_part(path, '?', 1) AS path, COUNT(*)::int AS pageviews, COUNT(DISTINCT "visitorHash")::int AS visitors
       FROM page_views
@@ -82,8 +76,9 @@ export async function ownSummary(tenantId: string, tz: string, days: number): Pr
     provider: "own",
     days,
     timezone: tz,
-    // Hashes rotate per local day, so distinct-over-range equals the sum of daily uniques.
-    totals: { pageviews: totals[0]?.pageviews ?? 0, visitors: totals[0]?.visitors ?? 0 },
+    // Hashes rotate per local day, so distinct-over-range equals the sum of daily uniques — derived
+    // from the series instead of a separate scan over page_views.
+    totals: series.reduce((t, d) => ({ pageviews: t.pageviews + d.pageviews, visitors: t.visitors + d.visitors }), { pageviews: 0, visitors: 0 }),
     series,
     topPages,
     topReferrers,

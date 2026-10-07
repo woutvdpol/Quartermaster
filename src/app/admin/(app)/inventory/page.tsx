@@ -32,7 +32,8 @@ import { listPurchaseRecords } from "@/server/purchasing";
 import { stockOverview } from "@/server/stock/ledger";
 import { imageUrl } from "@/server/media/product-images";
 import { copy } from "./_copy";
-import { flattenCategories, getTenantLocale } from "./_data";
+import { requireTenantDisplay } from "@/server/tenant-display";
+import { flattenCategories } from "./_data";
 import { BulkActions, type BulkRowMeta } from "./_components/BulkActions";
 import { PriceRangeFilter } from "./_components/PriceRangeFilter";
 import { ReservationCountdown } from "./_components/ReservationCountdown";
@@ -94,7 +95,7 @@ export default async function InventoryPage({ searchParams }: PageProps<"/admin/
     listCategoryTree(ctx),
     listTags(ctx),
     listPurchaseRecords(ctx, { pageSize: 200 }),
-    getTenantLocale(ctx),
+    requireTenantDisplay(ctx.tenantId),
   ]);
   const { currency, timeZone } = locale;
 

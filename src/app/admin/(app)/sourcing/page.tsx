@@ -20,7 +20,7 @@ import { requireStaffContext } from "@/server/context";
 import { listPurchaseRecords, listSuppliers } from "@/server/purchasing";
 import { copy } from "./_copy";
 import { allocatedCostByRecord } from "./_data";
-import { getTenantFormat } from "./_lib/tenant";
+import { requireTenantDisplay } from "@/server/tenant-display";
 import { todayIn } from "./_lib/time";
 import { RecordFormDrawer } from "./_components/RecordFormDrawer";
 import { SourcingTabs } from "./_components/SourcingTabs";
@@ -40,7 +40,7 @@ export default async function PurchaseRecordsPage({ searchParams }: PageProps<"/
   const [result, suppliers, fmt] = await Promise.all([
     listPurchaseRecords(ctx, { page, pageSize: PAGE_SIZE, search: q || undefined, supplierId: supplierId || undefined }),
     listSuppliers(ctx),
-    getTenantFormat(ctx),
+    requireTenantDisplay(ctx.tenantId),
   ]);
   const allocated = await allocatedCostByRecord(ctx, result.items.map((r) => r.id));
   type Row = (typeof result.items)[number] & { allocated: number };

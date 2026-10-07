@@ -66,7 +66,12 @@ export async function getSession(): Promise<ValidSession | null> {
 
   const session = await db.session.findUnique({
     where: { tokenHash: hashToken(token) },
-    include: { user: true },
+    // Only the columns the session needs — never pull password/TOTP secrets into every request.
+    include: {
+      user: {
+        select: { id: true, tenantId: true, role: true, email: true, name: true, totpEnabledAt: true, disabledAt: true },
+      },
+    },
   });
   if (!session) return null;
 

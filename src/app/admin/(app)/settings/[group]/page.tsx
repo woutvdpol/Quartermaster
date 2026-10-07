@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { Button, Card, KeyValue, PageHeader } from "@/components/admin/ui";
 import { requireStaffContext } from "@/server/context";
 import { getSettings, isSettingsGroup, PLATFORM_ONLY_GROUPS } from "@/server/settings";
-import { getTenantInfo } from "../../_system/tenant";
+import { requireTenantDisplay } from "@/server/tenant-display";
 import { saveSettingsAction } from "../actions";
 import { SETTINGS_FORMS } from "../_fields";
 import { SettingsForm } from "../_components/SettingsForm";
@@ -21,7 +21,7 @@ export default async function SettingsGroupPage({ params }: PageProps<"/admin/se
   const isSuper = ctx.actor.role === "SUPERADMIN";
   if (!isSettingsGroup(group) || (PLATFORM_ONLY_GROUPS.has(group) && !isSuper)) notFound();
 
-  const [values, tenant] = await Promise.all([getSettings(ctx.tenantId, group), getTenantInfo(ctx.tenantId)]);
+  const [values, tenant] = await Promise.all([getSettings(ctx.tenantId, group), requireTenantDisplay(ctx.tenantId)]);
   const meta = SETTINGS_FORMS[group];
   const formId = `settings-${group}`;
 
@@ -42,7 +42,7 @@ export default async function SettingsGroupPage({ params }: PageProps<"/admin/se
         <KeyValue
           items={[
             { label: "Shop currency", value: tenant.currency, mono: true },
-            { label: "Time zone", value: tenant.timezone, mono: true },
+            { label: "Time zone", value: tenant.timeZone, mono: true },
             { label: "Primary domain", value: tenant.primaryHost ?? "—", mono: true },
           ]}
         />

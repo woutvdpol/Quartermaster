@@ -1,7 +1,8 @@
 import "server-only";
 import { z } from "zod";
 import { db } from "@/server/db";
-import { ServiceError, type ServiceContext } from "@/server/context";
+import { requireTenantDisplay } from "@/server/tenant-display";
+import type { ServiceContext } from "@/server/context";
 
 /*
  * Dashboard metrics. Definitions (fixing legacy, which counted unpaid "manual" orders as turnover):
@@ -17,9 +18,7 @@ import { ServiceError, type ServiceContext } from "@/server/context";
 const daysSchema = z.object({ days: z.coerce.number().int().min(1).max(366).default(30) });
 
 async function tenantTimezone(tenantId: string): Promise<string> {
-  const t = await db.tenant.findUnique({ where: { id: tenantId }, select: { timezone: true } });
-  if (!t) throw new ServiceError("NOT_FOUND", "Tenant not found");
-  return t.timezone;
+  return (await requireTenantDisplay(tenantId)).timeZone; // request-cached tenant read
 }
 
 export type Kpi = { value: number; previous: number; changePct: number | null };

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Card, ConfirmDialog, DataTable, DateTime, EmptyState, PageHeader, StatusPill, type Column } from "@/components/admin/ui";
 import { requireStaffContext } from "@/server/context";
 import { listStaff, type StaffMember } from "@/server/users";
-import { getTenantInfo } from "../_system/tenant";
+import { requireTenantDisplay } from "@/server/tenant-display";
 import { disableUserAction, enableUserAction, resetTwoFactorAction } from "./actions";
 import { InviteForm } from "./_components/InviteForm";
 import { ResendInviteButton } from "./_components/ResendInviteButton";
@@ -19,7 +19,7 @@ function statusOf(u: StaffMember) {
 export default async function UsersPage() {
   const ctx = await requireStaffContext();
   const isSuper = ctx.actor.role === "SUPERADMIN";
-  const [staff, tenant] = await Promise.all([listStaff(ctx), getTenantInfo(ctx.tenantId)]);
+  const [staff, tenant] = await Promise.all([listStaff(ctx), requireTenantDisplay(ctx.tenantId)]);
   const now = new Date();
 
   const columns: Column<StaffMember>[] = [
@@ -48,7 +48,7 @@ export default async function UsersPage() {
       key: "lastLogin",
       header: "Last sign-in",
       hideBelow: "md",
-      cell: (u) => (u.lastLoginAt ? <DateTime value={u.lastLoginAt} format="relative" now={now} timeZone={tenant.timezone} /> : <span className="text-muted">Never</span>),
+      cell: (u) => (u.lastLoginAt ? <DateTime value={u.lastLoginAt} format="relative" now={now} timeZone={tenant.timeZone} /> : <span className="text-muted">Never</span>),
     },
     {
       key: "actions",
@@ -56,7 +56,7 @@ export default async function UsersPage() {
       align: "right",
       cell: (u) => (
         <span className="flex flex-wrap justify-end gap-1.5">
-          {u.invitePending && !u.disabledAt && <ResendInviteButton userId={u.id} email={u.email} timeZone={tenant.timezone} />}
+          {u.invitePending && !u.disabledAt && <ResendInviteButton userId={u.id} email={u.email} timeZone={tenant.timeZone} />}
           {isSuper && u.totpEnabled && (
             <ConfirmDialog
               trigger="Reset 2FA"
@@ -115,7 +115,7 @@ export default async function UsersPage() {
           </p>
         </div>
         <Card title="Invite an owner">
-          <InviteForm timeZone={tenant.timezone} />
+          <InviteForm timeZone={tenant.timeZone} />
         </Card>
       </div>
     </>

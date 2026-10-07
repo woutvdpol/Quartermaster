@@ -9,7 +9,8 @@ import { listProductImages } from "@/server/media/product-images";
 import { MAX_UPLOAD_BYTES } from "@/server/media/images";
 import { listPurchaseRecords } from "@/server/purchasing";
 import { listMovements } from "@/server/stock/ledger";
-import { countWishlisted, getTenantDisplay, photoLimit } from "./_data";
+import { requireTenantDisplay } from "@/server/tenant-display";
+import { countWishlisted, photoLimit } from "./_data";
 import { UPLOAD_TRANSPORT_MAX_BYTES } from "./_lib/limits";
 import { categoryOptions, purchaseRecordOption } from "./_lib/options";
 import { DangerZone } from "./_components/DangerZone";
@@ -36,17 +37,22 @@ export async function generateMetadata({ params }: PageProps<"/admin/inventory/[
 }
 
 export default async function ProductEditPage({ params }: PageProps<"/admin/inventory/[id]">) {
-  const { ctx, product } = await loadProduct((await params).id);
-
-  const [images, tree, tags, records, movements, tenant, wishlistCount, limit] = await Promise.all([
-    listProductImages(ctx, product.id),
+  const { id } = await params;
+  const ctx = await requireStaffContext();
+  // Product-independent reads start right away, in parallel with the product lookup.
+  const shared = Promise.all([
     listCategoryTree(ctx),
     listTags(ctx),
     listPurchaseRecords(ctx, { pageSize: 200 }),
-    listMovements(ctx, product.id, { limit: 50 }),
-    getTenantDisplay(ctx),
-    countWishlisted(ctx, product.id),
+    requireTenantDisplay(ctx.tenantId),
     photoLimit(ctx),
+  ]);
+  shared.catch(() => {}); // rethrown by the await below; avoids an unhandled rejection on notFound()
+  const { product } = await loadProduct(id);
+
+  const [[tree, tags, records, tenant, limit], [images, movements, wishlistCount]] = await Promise.all([
+    shared,
+    Promise.all([listProductImages(ctx, product.id), listMovements(ctx, product.id, { limit: 50 }), countWishlisted(ctx, product.id)]),
   ]);
 
   const recordOptions = records.items.map(purchaseRecordOption);
@@ -98,7 +104,7 @@ export default async function ProductEditPage({ params }: PageProps<"/admin/inve
       product={editorProduct}
       currency={tenant.currency}
       timeZone={tenant.timeZone}
-      shopHost={tenant.shopHost}
+      shopHost={tenant.primaryHost ?? `${tenant.slug}.example`}
       shopName={tenant.name}
       categories={categoryOptions(tree)}
       purchaseRecords={recordOptions}

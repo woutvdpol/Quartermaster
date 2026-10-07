@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Card, ConfirmDialog, DateTime, PageHeader, StatusPill } from "@/components/admin/ui";
 import { MIN_PASSWORD_LENGTH } from "@/server/auth/password";
 import { listSessions } from "@/server/users";
-import { getTenantInfo } from "../_system/tenant";
+import { requireTenantDisplay } from "@/server/tenant-display";
 import { requireAccount } from "./_session";
 import { revokeOtherSessionsAction, revokeSessionAction } from "./actions";
 import { PasswordForm } from "./_components/PasswordForm";
@@ -41,7 +41,7 @@ export default async function AccountPage() {
   const { user, sessionId } = await requireAccount();
   const [sessions, timeZone] = await Promise.all([
     listSessions(user, sessionId),
-    user.tenantId ? getTenantInfo(user.tenantId).then((t) => t.timezone) : Promise.resolve(undefined),
+    user.tenantId ? requireTenantDisplay(user.tenantId).then((t) => t.timeZone) : Promise.resolve(undefined),
   ]);
   const now = new Date();
   const others = sessions.filter((s) => !s.current).length;

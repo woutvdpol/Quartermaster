@@ -14,7 +14,7 @@ import {
 import { ServiceError, requireStaffContext } from "@/server/context";
 import { getPurchaseRecord, listSuppliers } from "@/server/purchasing";
 import { copy } from "../../_copy";
-import { getTenantFormat } from "../../_lib/tenant";
+import { requireTenantDisplay } from "@/server/tenant-display";
 import { todayIn } from "../../_lib/time";
 import { RecordFormDrawer } from "../../_components/RecordFormDrawer";
 import { allocateCostAction, deleteRecordAction } from "./actions";
@@ -24,7 +24,7 @@ import { ProductPicker } from "./ProductPicker";
 async function load(id: string) {
   const ctx = await requireStaffContext();
   try {
-    const [record, suppliers, fmt] = await Promise.all([getPurchaseRecord(ctx, id), listSuppliers(ctx), getTenantFormat(ctx)]);
+    const [record, suppliers, fmt] = await Promise.all([getPurchaseRecord(ctx, id), listSuppliers(ctx), requireTenantDisplay(ctx.tenantId)]);
     return { record, suppliers, fmt };
   } catch (e) {
     if (e instanceof ServiceError && e.code === "NOT_FOUND") notFound();

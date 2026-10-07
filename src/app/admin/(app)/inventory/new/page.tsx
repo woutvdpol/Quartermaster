@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/admin/ui";
 import { requireStaffContext } from "@/server/context";
 import { listCategoryTree } from "@/server/catalog/categories";
 import { copy } from "../[id]/_copy";
-import { getTenantDisplay } from "../[id]/_data";
+import { requireTenantDisplay } from "@/server/tenant-display";
 import { categoryOptions } from "../[id]/_lib/options";
 import { NewProductForm } from "./NewProductForm";
 
@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: copy.newTitle };
 
 export default async function NewProductPage() {
   const ctx = await requireStaffContext();
-  const [tree, tenant] = await Promise.all([listCategoryTree(ctx), getTenantDisplay(ctx)]);
+  const [tree, tenant] = await Promise.all([listCategoryTree(ctx), requireTenantDisplay(ctx.tenantId)]);
   return (
     <>
       <PageHeader

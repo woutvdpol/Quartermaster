@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { db } from "@/server/db";
+import { requireTenantDisplay } from "@/server/tenant-display";
 import { audit } from "@/server/audit";
 import { getSettings } from "@/server/settings";
 import { ServiceError, type ServiceContext } from "@/server/context";
@@ -119,9 +120,9 @@ async function usedThisMonth(client: Prisma.TransactionClient | typeof db, tenan
 export async function getNewsletterQuota(ctx: ServiceContext) {
   const [platform, tenant] = await Promise.all([
     getSettings(ctx.tenantId, "platform"),
-    db.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { timezone: true } }),
+    requireTenantDisplay(ctx.tenantId),
   ]);
-  const { used, window } = await usedThisMonth(db, ctx.tenantId, tenant.timezone);
+  const { used, window } = await usedThisMonth(db, ctx.tenantId, tenant.timeZone);
   const quota = platform.newsletterQuota;
   return {
     enabled: platform.newsletterEnabled,

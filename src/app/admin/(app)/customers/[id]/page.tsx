@@ -21,7 +21,7 @@ import {
 import { requireStaffContext, ServiceError } from "@/server/context";
 import { getCustomer, type CustomerDetail } from "@/server/customers";
 import { addressLines } from "../../orders/_lib/labels";
-import { getTenantDisplay } from "../../orders/_lib/tenant";
+import { requireTenantDisplay } from "@/server/tenant-display";
 import { customerCopy as t, customersCopy } from "../_copy";
 import { anonymizeCustomerAction } from "./actions";
 import { ProfileForm } from "./_components/ProfileForm";
@@ -31,7 +31,7 @@ type OrderRow = CustomerDetail["orders"][number];
 const load = cache(async (id: string) => {
   const ctx = await requireStaffContext();
   try {
-    const [customer, display] = await Promise.all([getCustomer(ctx, id), getTenantDisplay(ctx)]);
+    const [customer, display] = await Promise.all([getCustomer(ctx, id), requireTenantDisplay(ctx.tenantId)]);
     return { customer, display };
   } catch (e) {
     if (e instanceof ServiceError && e.code === "NOT_FOUND") notFound();

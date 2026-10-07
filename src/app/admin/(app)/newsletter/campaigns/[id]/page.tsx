@@ -16,7 +16,7 @@ import {
   getNewsletterQuota,
   subscriberCounts,
 } from "@/server/newsletter";
-import { getTenantInfo } from "../../../_system/tenant";
+import { requireTenantDisplay } from "@/server/tenant-display";
 import { copy } from "../../_copy";
 import { deleteCampaignAction } from "../../actions";
 import { CampaignEditor } from "../../_components/CampaignEditor";
@@ -60,7 +60,7 @@ export default async function CampaignPage({
     loadCampaign(ctx, id),
     getNewsletterQuota(ctx),
     subscriberCounts(ctx),
-    getTenantInfo(ctx.tenantId),
+    requireTenantDisplay(ctx.tenantId),
   ]);
 
   if (!campaign) {
@@ -169,7 +169,7 @@ export default async function CampaignPage({
                       value: (
                         <DateTime
                           value={campaign.sentAt}
-                          timeZone={tenant.timezone}
+                          timeZone={tenant.timeZone}
                         />
                       ),
                     },
@@ -178,7 +178,7 @@ export default async function CampaignPage({
                       value: (
                         <DateTime
                           value={campaign.createdAt}
-                          timeZone={tenant.timezone}
+                          timeZone={tenant.timeZone}
                         />
                       ),
                     },

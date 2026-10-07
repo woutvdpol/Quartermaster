@@ -19,7 +19,7 @@ import {
 import { requireStaffContext } from "@/server/context";
 import { marginReport, type MarginRow } from "@/server/purchasing";
 import { copy } from "../_copy";
-import { getTenantFormat } from "../_lib/tenant";
+import { requireTenantDisplay } from "@/server/tenant-display";
 import { addDays, isYmd, startOfLocalDay, todayIn } from "../_lib/time";
 import { SourcingTabs } from "../_components/SourcingTabs";
 
@@ -56,7 +56,7 @@ const pctText = (p: number | null) => (p == null ? copy.margin.noCost : `${p.toL
 export default async function MarginReportPage({ searchParams }: PageProps<"/admin/sourcing/margin">) {
   const sp = await searchParams;
   const ctx = await requireStaffContext();
-  const fmt = await getTenantFormat(ctx);
+  const fmt = await requireTenantDisplay(ctx.tenantId);
   const today = todayIn(fmt.timeZone);
   const { from, to, group, invalid } = parseRange(sp, today);
 

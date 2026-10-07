@@ -3,7 +3,7 @@ import { formatDate } from "@/components/admin/ui/date-utils";
 import { AuthError } from "@/server/auth/guards";
 import { requireStaffContext, ServiceError } from "@/server/context";
 import { packingSlipData, type PackingSlipData } from "@/server/orders/commands";
-import { getTenantDisplay } from "../../_lib/tenant";
+import { requireTenantDisplay } from "@/server/tenant-display";
 import { addressLines, countryName, paymentMethodLabel } from "../../_lib/labels";
 
 /*
@@ -140,7 +140,7 @@ export async function GET(request: Request, { params }: RouteContext<"/admin/ord
   const { id } = await params;
   try {
     const ctx = await requireStaffContext();
-    const [data, display] = await Promise.all([packingSlipData(ctx, id), getTenantDisplay(ctx)]);
+    const [data, display] = await Promise.all([packingSlipData(ctx, id), requireTenantDisplay(ctx.tenantId)]);
     return new Response(render(data, display.timeZone), {
       headers: {
         "Content-Type": "text/html; charset=utf-8",

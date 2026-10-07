@@ -1,6 +1,7 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
-import { db } from "@/server/db";
+import { getAdminTenantContext } from "@/lib/admin-tenant";
 import { AuthError, canAccessTenant, requireRole } from "@/server/auth/guards";
 import type { SessionUser } from "@/server/auth/session";
 
@@ -21,21 +22,26 @@ export const ADMIN_TENANT_COOKIE = "qm_tenant";
 /**
  * Resolves the tenant a staff member is working on:
  * OWNER → their own tenant; SUPERADMIN → the tenant chosen in the switcher (cookie),
- * falling back to the first active tenant.
+ * falling back to the first active tenant. A chosen tenant that is not ACTIVE is FORBIDDEN.
+ *
+ * Cached per request: the layout, the page and every Suspense'd card share one session lookup and
+ * one tenant lookup (the switcher list from getAdminTenantContext, which the sidebar needs anyway).
+ * The returned object is stable within a request, so `cache()`d helpers keyed on it dedupe too.
  */
-export async function requireStaffContext(): Promise<ServiceContext> {
+export const requireStaffContext = cache(async (): Promise<ServiceContext> => {
   const user = await requireRole("SUPERADMIN", "OWNER");
   let tenantId = user.tenantId;
   if (user.role === "SUPERADMIN") {
-    const chosen = (await cookies()).get(ADMIN_TENANT_COOKIE)?.value;
+    const [{ switchable }, cookieStore] = await Promise.all([getAdminTenantContext(user), cookies()]);
+    const chosen = cookieStore.get(ADMIN_TENANT_COOKIE)?.value;
     const tenant = chosen
-      ? await db.tenant.findFirst({ where: { id: chosen, status: "ACTIVE" }, select: { id: true } })
-      : await db.tenant.findFirst({ where: { status: "ACTIVE" }, orderBy: { name: "asc" }, select: { id: true } });
+      ? switchable.find((t) => t.id === chosen && t.status === "ACTIVE")
+      : switchable.find((t) => t.status === "ACTIVE");
     tenantId = tenant?.id ?? null;
   }
   if (!tenantId || !canAccessTenant(user, tenantId)) throw new AuthError("FORBIDDEN");
   return { tenantId, actor: { id: user.id, role: user.role, tenantId: user.tenantId, email: user.email } };
-}
+});
 
 /** Domain errors that UI layers can map to messages. */
 export class ServiceError extends Error {

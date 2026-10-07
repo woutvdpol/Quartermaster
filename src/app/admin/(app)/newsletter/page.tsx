@@ -28,7 +28,7 @@ import {
   type SubscriberRow,
   type SubscriberStatus,
 } from "@/server/newsletter";
-import { getTenantInfo } from "../_system/tenant";
+import { requireTenantDisplay } from "@/server/tenant-display";
 import { copy } from "./_copy";
 import { NewsletterDisabled } from "./_components/NewsletterDisabled";
 import { CampaignStatusPill } from "./_components/CampaignStatusPill";
@@ -61,7 +61,7 @@ export default async function NewsletterPage({
   const ctx = await requireStaffContext();
   const [quota, tenant] = await Promise.all([
     getNewsletterQuota(ctx),
-    getTenantInfo(ctx.tenantId),
+    requireTenantDisplay(ctx.tenantId),
   ]);
 
   if (!quota.enabled) {
@@ -94,7 +94,7 @@ export default async function NewsletterPage({
         }
       />
       <div className="grid content-start gap-4 p-4 md:px-[22px] md:py-5">
-        <StatsStrip counts={counts} quota={quota} timeZone={tenant.timezone} />
+        <StatsStrip counts={counts} quota={quota} timeZone={tenant.timeZone} />
 
         <ViewTabs
           label={copy.tabs.label}
@@ -114,13 +114,13 @@ export default async function NewsletterPage({
         />
 
         {tab === "campaigns" ? (
-          <CampaignsTable ctx={ctx} timeZone={tenant.timezone} />
+          <CampaignsTable ctx={ctx} timeZone={tenant.timeZone} />
         ) : (
           <SubscribersTable
             ctx={ctx}
             sp={sp}
             counts={counts}
-            timeZone={tenant.timezone}
+            timeZone={tenant.timeZone}
           />
         )}
       </div>

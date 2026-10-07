@@ -19,7 +19,7 @@ import {
 } from "@/components/admin/ui";
 import { requireStaffContext } from "@/server/context";
 import { ANONYMIZED_EMAIL_DOMAIN, listCustomers } from "@/server/customers";
-import { getTenantDisplay } from "../orders/_lib/tenant";
+import { requireTenantDisplay } from "@/server/tenant-display";
 import { customersCopy as t } from "./_copy";
 
 export const metadata: Metadata = { title: t.title };
@@ -41,7 +41,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
 
   const [list, display] = await Promise.all([
     listCustomers(ctx, { search: q, sort, page, pageSize: PAGE_SIZE }),
-    getTenantDisplay(ctx),
+    requireTenantDisplay(ctx.tenantId),
   ]);
 
   const columns: Column<Row>[] = [

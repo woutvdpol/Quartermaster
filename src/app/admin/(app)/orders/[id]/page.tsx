@@ -27,7 +27,7 @@ import { getOrder, type OrderDetail } from "@/server/orders/queries";
 import { imageUrl } from "@/server/media/product-images";
 import { orderCopy as t } from "../_copy";
 import { addressLines, describeEvent, orderSteps, paymentMethodLabel } from "../_lib/labels";
-import { getTenantDisplay } from "../_lib/tenant";
+import { requireTenantDisplay } from "@/server/tenant-display";
 import { archiveOrderAction, cancelOrderAction, markPaidAction, unarchiveOrderAction } from "./actions";
 import { FulfillmentForm } from "./_components/FulfillmentForm";
 import { NoteForm } from "./_components/NoteForm";
@@ -39,7 +39,7 @@ type PaymentRow = OrderDetail["payments"][number];
 const load = cache(async (id: string) => {
   const ctx = await requireStaffContext();
   try {
-    const [order, display] = await Promise.all([getOrder(ctx, id), getTenantDisplay(ctx)]);
+    const [order, display] = await Promise.all([getOrder(ctx, id), requireTenantDisplay(ctx.tenantId)]);
     return { order, display };
   } catch (e) {
     if (e instanceof ServiceError && e.code === "NOT_FOUND") notFound();
