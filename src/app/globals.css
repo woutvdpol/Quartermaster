@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* Tailwind v4 preflight resets buttons to `cursor: default`; everything clickable gets the pointer.
+   In `base`, so a `cursor-*` utility still wins. */
+@layer base {
+  :is(button, [role="button"], summary, select, label[for], input:is([type="checkbox"], [type="radio"], [type="submit"], [type="button"], [type="reset"])):not(:disabled, [aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}
+
 /*
  * Quartermaster theme system
  * ──────────────────────────
