@@ -9,13 +9,12 @@ import {
   DateTime,
   EmptyState,
   Field,
+  FileInput,
   FormActions,
   Select,
   SubmitButton,
   Switch,
   TextInput,
-  controlClass,
-  cx,
   toast,
   useActionForm,
 } from "@/components/admin/ui";
@@ -129,16 +128,7 @@ export function DocumentsPanel({
         <ActionToast state={state} errors={false} />
         <Field label={t.file} hint={t.fileHint} error={clientError ?? error("file")} required>
           {(control) => (
-            <input
-              {...control}
-              ref={fileRef}
-              type="file"
-              name="file"
-              accept={ACCEPT}
-              required
-              onChange={checkFile}
-              className={cx(controlClass, "cursor-pointer file:mr-3 file:rounded-control file:border-0 file:bg-panel-2 file:px-2 file:py-1 file:text-xs")}
-            />
+            <FileInput {...control} ref={fileRef} name="file" accept={ACCEPT} required onChange={checkFile} />
           )}
         </Field>
         <div className="grid gap-3 sm:grid-cols-2">

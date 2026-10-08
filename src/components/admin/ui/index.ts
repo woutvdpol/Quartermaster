@@ -105,6 +105,7 @@ export { KeyValue, type KeyValueItem } from "./KeyValue";
 export { Timeline, type TimelineItem } from "./Timeline";
 
 // Media
+export { FileInput, type FileInputProps } from "./FileInput";
 export { Dropzone, type DropzoneItem, type DropzoneProps } from "./Dropzone";
 
 // Existing admin primitives, re-exported for one-stop imports

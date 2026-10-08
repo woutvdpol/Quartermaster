@@ -5,6 +5,8 @@ import {
   Button,
   Drawer,
   EmptyState,
+  Field,
+  FileInput,
   InlineAlert,
   Spinner,
   SubmitButton,
@@ -134,19 +136,19 @@ function UploadImage({ pageId, onPick }: { pageId: string; onPick: (key: string)
       }}
     >
       <input type="hidden" name="pageId" value={pageId} />
-      <TextInput
-        label={ti.uploadLabel}
-        name="file"
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/avif"
-        required
-        hint={ti.uploadHint}
-        error={error}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          setError(file && file.size > MAX_UPLOAD ? ti.tooLarge : null);
-        }}
-      />
+      <Field label={ti.uploadLabel} hint={ti.uploadHint} error={error ?? undefined} required>
+        {(control) => (
+          <FileInput
+            {...control}
+            name="file"
+            accept="image/jpeg,image/png,image/webp,image/avif"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              setError(file && file.size > MAX_UPLOAD ? ti.tooLarge : null);
+            }}
+          />
+        )}
+      </Field>
       <div>
         <SubmitButton pendingLabel={ti.uploading}>{ti.uploadSubmit}</SubmitButton>
       </div>

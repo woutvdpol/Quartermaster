@@ -220,6 +220,12 @@ export const en = {
       close: "Close",
       working: "Working…",
     },
+    fileInput: {
+      choose: "Choose file",
+      chooseMany: "Choose files",
+      none: "No file chosen",
+      many: (n: number) => `${n} files selected`,
+    },
     dropzone: {
       title: "Drop images here",
       body: "or paste with ⌘V / Ctrl+V",

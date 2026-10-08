@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useEffectEvent, useId, useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
-import { Button, ConfirmDialog, InlineAlert, Spinner, buttonClasses, cx, formatMoney, toast } from "@/components/admin/ui";
+import { Button, ConfirmDialog, FileInput, InlineAlert, Spinner, buttonClasses, cx, formatMoney, toast } from "@/components/admin/ui";
 import {
   cancelImportAction,
   discardImportAction,
@@ -197,15 +197,14 @@ function UploadStep({
         <label htmlFor={fileId} className="text-[13px] font-medium text-ink">
           {t.file.label}
         </label>
-        <input
+        <FileInput
           id={fileId}
           name="file"
-          type="file"
           accept=".csv,text/csv"
           aria-describedby={`${fileId}-hint${fileError ? ` ${fileId}-error` : ""}`}
           aria-invalid={fileError ? true : undefined}
           onChange={() => setFileError(null)}
-          className="block w-full max-w-md text-[13px] text-ink-2 file:mr-3 file:cursor-pointer file:rounded-control file:border file:border-line file:bg-panel-2 file:px-3 file:py-1.5 file:text-ink"
+          className="max-w-md"
         />
         <p id={`${fileId}-hint`} className="text-xs text-muted">
           {t.file.hint(MAX_IMPORT_FILE_MB)}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ActionMessage, Button, Drawer, Textarea, labelClass, toast } from "@/components/admin/ui";
+import { ActionMessage, Button, Drawer, FileInput, Textarea, labelClass, toast } from "@/components/admin/ui";
 import type { ImportResult } from "@/server/redirects";
 import { PendingButton, useKeepForm } from "../../_system/client";
 import { importRedirectsAction } from "../actions";
@@ -45,7 +45,7 @@ function ImportForm() {
         <label htmlFor="redirect-csv-file" className={labelClass}>
           {t.import.file}
         </label>
-        <input id="redirect-csv-file" type="file" name="file" accept=".csv,text/csv,text/plain" className="text-sm" />
+        <FileInput id="redirect-csv-file" name="file" accept=".csv,text/csv,text/plain" />
         {error("file") ? <p className="text-xs text-crit">{error("file")}</p> : null}
       </div>
       <Textarea label={t.import.paste} name="csv" rows={8} inputClassName="font-mono text-xs" placeholder={t.import.pasteHint} spellCheck={false} />
