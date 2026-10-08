@@ -5,6 +5,7 @@ import { login, logout, verifyLoginTotp } from "@/server/auth/service";
 import { getRequestScope } from "@/server/tenant";
 import { safeAdminRedirect } from "@/lib/admin-nav";
 import { getDictionary } from "@/lib/i18n";
+import { isSetupPending } from "@/server/onboarding/setup-rules";
 
 export type LoginFormState = { error?: string; email?: string } | undefined;
 export type TotpFormState = { error?: string; restart?: boolean } | undefined;
@@ -18,22 +19,26 @@ export async function loginAction(_prev: LoginFormState, formData: FormData): Pr
   const t = getDictionary().login.errors;
   const email = field(formData, "email").trim();
   const password = field(formData, "password");
-  const next = safeAdminRedirect(field(formData, "next"));
+  let next = safeAdminRedirect(field(formData, "next"));
   if (!email || !password) return { error: t.missing, email };
 
   let result: Awaited<ReturnType<typeof login>>;
+  let setupPending = false;
   try {
     // Platform host → SUPERADMIN login; a shop's own host → that shop's OWNER.
     // Unknown hosts get the same generic error as wrong credentials.
     const scope = await getRequestScope();
     if (scope.kind === "unknown") return { error: t.invalid_credentials, email };
     result = await login({ email, password, tenantId: scope.kind === "tenant" ? scope.tenant.id : null });
+    setupPending = scope.kind === "tenant" && isSetupPending(scope.tenant);
   } catch (error) {
     console.error("loginAction failed", error);
     return { error: t.unexpected, email };
   }
 
   if (!result.ok) return { error: t[result.error], email };
+  // A shop that has not finished onboarding opens the setup wizard instead of the dashboard.
+  if (next === "/admin/dashboard" && setupPending) next = "/admin/setup";
   if (result.next === "totp") {
     redirect(next === "/admin/dashboard" ? "/admin/login/2fa" : `/admin/login/2fa?next=${encodeURIComponent(next)}`);
   }

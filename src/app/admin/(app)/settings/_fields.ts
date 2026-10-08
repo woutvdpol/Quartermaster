@@ -145,31 +145,12 @@ export const SETTINGS_FORMS: Record<SettingsGroup, GroupMeta> = {
       },
     ],
   },
+  // Colours, fonts, preset, shape and logo moved to Website → Theme (/admin/theme, draft → publish);
+  // /admin/settings/appearance redirects there. Only the read-only image paths remain described here.
   appearance: {
     label: "Appearance",
     description: "Shop colours, fonts and images.",
     sections: [
-      {
-        title: "Theme",
-        description: "The overall look of the storefront. More themes follow with the theme builder.",
-        fields: [{ kind: "radio", path: "theme", label: "Theme", options: [{ value: "gallery", label: "Gallery — clean and modern, large photos" }] }],
-      },
-      {
-        title: "Colours",
-        description: "Primary: buttons and links. Secondary: tints the light backgrounds. Accent: stock numbers and highlights.",
-        fields: [
-          { kind: "color", path: "colors.primary", label: "Primary colour" },
-          { kind: "color", path: "colors.secondary", label: "Secondary colour" },
-          { kind: "color", path: "colors.accent", label: "Accent colour" },
-        ],
-      },
-      {
-        title: "Fonts",
-        fields: [
-          { kind: "font", path: "headingFont", label: "Heading font" },
-          { kind: "font", path: "textFont", label: "Text font" },
-        ],
-      },
       {
         title: "Images",
         description: "Uploaded files. Changing them is not available on this screen yet.",
@@ -183,7 +164,7 @@ export const SETTINGS_FORMS: Record<SettingsGroup, GroupMeta> = {
   },
   content: {
     label: "Content",
-    description: "Home page, banner and contact options.",
+    description: "Home page, banner, contact options, search engines and AI assistants.",
     sections: [
       {
         title: "Pages",
@@ -195,11 +176,25 @@ export const SETTINGS_FORMS: Record<SettingsGroup, GroupMeta> = {
           { kind: "switch", path: "newsletterPopup", label: "Newsletter pop-up", description: "Invite first-time visitors to sign up." },
         ],
       },
+      {
+        title: "Search engines & AI assistants",
+        description: "How Google, ChatGPT, Claude, Perplexity and others describe and find the shop.",
+        fields: [
+          { kind: "textarea", path: "seo.description", label: "Shop description", maxLength: 300, rows: 3, description: "One or two sentences about the shop. Used as the home page description and by AI assistants. Leave empty for a generated text." },
+          {
+            kind: "switch",
+            path: "seo.allowAiTraining",
+            label: "Allow AI training crawlers",
+            description: "Off blocks crawlers that collect pages to train AI models (GPTBot, ClaudeBot, Google-Extended …). AI search assistants can still find and cite the shop.",
+          },
+          { kind: "tags", path: "seo.sameAs", label: "Official profiles", maxTags: 10, placeholder: "https://www.instagram.com/yourshop", description: "Links to the shop's own social media or marketplace pages (https). Press Enter after each one." },
+        ],
+      },
     ],
   },
   legal: {
     label: "Legal & age",
-    description: "Age verification, sensitive items and disclaimers.",
+    description: "Age verification, sensitive items, returns and disclaimers.",
     sections: [
       {
         title: "Age verification",
@@ -216,6 +211,22 @@ export const SETTINGS_FORMS: Record<SettingsGroup, GroupMeta> = {
           },
           { kind: "number", path: "minimumAge", label: "Minimum age", integer: true, min: 16, max: 21, unit: "years" },
           { kind: "switch", path: "blurSensitiveForGuests", label: "Blur sensitive items for guests", description: "Visitors must sign in to see items marked sensitive." },
+        ],
+      },
+      {
+        title: "Returns",
+        description: "Shown to search engines with every item. EU consumers have a 14-day right of withdrawal.",
+        fields: [
+          { kind: "number", path: "returns.days", label: "Return window", integer: true, min: 0, max: 365, unit: "days", description: "0 = returns not accepted." },
+          {
+            kind: "segmented",
+            path: "returns.fees",
+            label: "Return shipping",
+            options: [
+              { value: "customer", label: "Paid by customer" },
+              { value: "free", label: "Free" },
+            ],
+          },
         ],
       },
       {
@@ -295,7 +306,7 @@ export const SETTINGS_FORMS: Record<SettingsGroup, GroupMeta> = {
 };
 
 /** Order in the sub-navigation (platform last, SUPERADMIN only). */
-export const SHOP_GROUPS: SettingsGroup[] = ["general", "catalog", "checkout", "appearance", "content", "legal", "mail", "analytics"];
+export const SHOP_GROUPS: SettingsGroup[] = ["general", "catalog", "checkout", "content", "legal", "mail", "analytics"];
 
 export function groupFields(group: SettingsGroup): SettingField[] {
   return SETTINGS_FORMS[group].sections.flatMap((s) => s.fields);

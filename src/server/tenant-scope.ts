@@ -24,7 +24,8 @@ import { db } from "@/server/db";
  *     by the order read queries and the customers service; the integration test
  *     tests/integration/tenant-isolation.int.test.ts proves cross-tenant reads/writes fail for
  *     products, orders, customers, pages and redirects at service level and through tenantDb.
- *   - User and AuditLog have a nullable tenantId (platform rows) and are NOT scoped here.
+ *   - User and AuditLog have a nullable tenantId (platform rows) and are NOT scoped here; neither is
+ *     DealerApplication (platform-level; tenantId is only set once an application is approved).
  */
 
 /** Models with a required `tenantId` (kept in sync with prisma/schema.prisma by a unit test). */
@@ -35,6 +36,7 @@ export const TENANT_SCOPED_MODELS: ReadonlySet<string> = new Set([
   "ShippingZone", "ShippingRate", "ContentPage", "ContentBlock", "MenuItem", "NewsletterSubscriber",
   "NewsletterCampaign", "PageView", "Facet", "FacetValue", "ProductFacetValue", "SavedSearch", "AlertDelivery",
   "ProductDocument", "Certificate", "ComplianceRule", "Offer", "Coupon", "CouponRedemption", "Lead", "Redirect",
+  "ImportJob",
 ]);
 
 export class TenantScopeError extends Error {

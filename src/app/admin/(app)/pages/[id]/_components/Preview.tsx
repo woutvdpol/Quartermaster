@@ -201,6 +201,23 @@ function body(type: ContentBlockType, d: BlockDraft, ctx: Ctx): ReactNode {
         </div>
       );
     }
+    case "FAQ": {
+      const items = Array.isArray(d.items) ? (d.items as { question?: unknown; answer?: unknown }[]) : [];
+      return (
+        <div className="grid gap-2">
+          <Title>{str(d.title)}</Title>
+          <div className="grid divide-y divide-line rounded-[4px] border border-line">
+            {items.map((it, i) => (
+              <div key={i} className="grid gap-1 px-2.5 py-2">
+                <p className="text-[12.5px] font-medium text-ink">{str(it.question) || "—"}</p>
+                {i === 0 && str(it.answer) ? <Markdown source={str(it.answer)} className="text-[12px] text-ink-2" /> : null}
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-muted">Shown as an expandable list (first answer opened here)</p>
+        </div>
+      );
+    }
     case "NEWSLETTER_SIGNUP":
       return (
         <div className="grid gap-2 rounded-[4px] bg-panel-2 p-3">

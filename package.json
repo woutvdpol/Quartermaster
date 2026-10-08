@@ -22,7 +22,10 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "e2e": "playwright test",
     "e2e:install": "playwright install --with-deps chromium",
-    "etl": "tsx --import ./scripts/server-only-shim.mjs scripts/etl/index.ts"
+    "etl": "tsx --import ./scripts/server-only-shim.mjs scripts/etl/index.ts",
+    "perf": "tsx scripts/perf/measure.ts",
+    "perf:lighthouse": "tsx scripts/perf/lighthouse.ts",
+    "fonts:sync": "tsx scripts/fonts/sync-shop-fonts.ts"
   },
   "dependencies": {
     "@mollie/api-client": "^4.6.0",

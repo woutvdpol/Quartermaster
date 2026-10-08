@@ -3,21 +3,26 @@ import { notFound } from "next/navigation";
 import { Suspense, type CSSProperties } from "react";
 import { getRequestScope } from "@/server/tenant";
 import { getShopContext } from "@/server/storefront/context";
-import { getLegalLinks, getPublicMenus } from "@/server/storefront/content";
+import { getLegalLinks, getPublicMenus, withoutMenuDuplicates } from "@/server/storefront/content";
+import { getLaunchState } from "@/server/storefront/launch";
+import { NotLiveRibbon, OpeningSoon } from "@/components/shop/layout/OpeningSoon";
 import { hasConfirmedAge } from "@/server/storefront/age";
-import { shopThemeVars } from "@/server/storefront/theme";
 import {
-  shopFontFamily,
-  shopThemeFontFamilies,
+  shopAppearanceStyle,
+  shopFontTables,
 } from "@/components/shop/layout/fonts";
+import { AgeGate, ThemePreviewBridge } from "@/components/shop/layout/lazy";
+import { ShopFonts } from "@/components/shop/layout/ShopFonts";
 import { Header } from "@/components/shop/layout/Header";
 import { Footer } from "@/components/shop/layout/Footer";
 import { HeaderCountsProvider } from "@/components/shop/layout/HeaderCounts";
 import { ServerHeaderCounts } from "@/components/shop/layout/ServerHeaderCounts";
-import { AgeGate } from "@/components/shop/layout/AgeGate";
 import { AnalyticsBeacon } from "@/components/shop/layout/AnalyticsBeacon";
 import { TurnstileSiteKeyProvider } from "@/components/shop/turnstile/TurnstileSiteKey";
 import { layoutCopy } from "@/components/shop/layout/_copy";
+import { shopDescription } from "@/server/seo";
+import { metaDescription } from "@/lib/seo/text";
+import { shopOgDefaults } from "@/lib/seo/metadata";
 import "./shop.css";
 
 /*
@@ -31,19 +36,18 @@ import "./shop.css";
 export async function generateMetadata(): Promise<Metadata> {
   const shop = await getShopContext();
   if (!shop) return {};
-  const banner = shop.settings.appearance.bannerPath;
+  // "Coming soon" shops and staff theme previews stay out of search engines
+  // (src/server/storefront/launch.ts; previews also get X-Robots-Tag from src/proxy.ts).
+  const launch = await getLaunchState();
+  const hidden = launch.prelaunch || shop.themePreview !== null;
   return {
+    ...(hidden ? { robots: { index: false, follow: false } } : {}),
     metadataBase: new URL(shop.origin),
     title: { template: `%s · ${shop.shopName}`, default: shop.shopName },
-    description: `${shop.shopName} — online shop`,
+    description: metaDescription(shopDescription(shop)),
     applicationName: shop.shopName,
-    openGraph: {
-      type: "website",
-      siteName: shop.shopName,
-      locale: "en",
-      ...(banner ? { images: [{ url: banner }] } : {}),
-    },
-    twitter: { card: banner ? "summary_large_image" : "summary" },
+    openGraph: shopOgDefaults(shop),
+    twitter: { card: "summary_large_image" },
     ...(shop.settings.appearance.logoPath
       ? { icons: { icon: shop.settings.appearance.logoPath } }
       : {}),
@@ -57,22 +61,29 @@ export default async function ShopLayout({ children }: LayoutProps<"/">) {
   if (!shop) notFound();
 
   const { appearance, legal, analytics } = shop.settings;
-  const [menus, legalLinks, ageOk] = await Promise.all([
+  const launch = await getLaunchState();
+  const style = shopAppearanceStyle(appearance) as CSSProperties;
+  // Not live yet: visitors get the "Opening soon" page instead of any shop page; staff see the shop.
+  if (launch.prelaunch && !launch.staff) {
+    return (
+      <TurnstileSiteKeyProvider siteKey={process.env.TURNSTILE_SITE_KEY || process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || undefined}>
+        <div className="shop-root flex min-h-dvh flex-col" data-shop-theme={appearance.theme} style={style}>
+          <ShopFonts appearance={appearance} />
+          <OpeningSoon shop={shop} />
+        </div>
+      </TurnstileSiteKeyProvider>
+    );
+  }
+  const notLive = launch.prelaunch;
+  const [menus, allLegalLinks, ageOk] = await Promise.all([
     getPublicMenus(shop.tenant.id),
     getLegalLinks(shop.tenant.id),
     legal.ageVerification === "popup"
       ? hasConfirmedAge(legal.minimumAge)
       : Promise.resolve(true),
   ]);
-
-  const themeFonts = shopThemeFontFamilies(appearance.theme);
-  const style = shopThemeVars({
-    colors: appearance.colors,
-    headingFontFamily: shopFontFamily(appearance.headingFont),
-    textFontFamily: shopFontFamily(appearance.textFont),
-    accentFontFamily: themeFonts.accent,
-    monoFontFamily: themeFonts.mono,
-  }) as CSSProperties;
+  // Pages the footer menu already links (e.g. a "Service" column) are not repeated in the legal row.
+  const legalLinks = withoutMenuDuplicates(allLegalLinks, menus.footer);
 
   return (
     <TurnstileSiteKeyProvider
@@ -88,6 +99,7 @@ export default async function ShopLayout({ children }: LayoutProps<"/">) {
           data-shop-theme={appearance.theme}
           style={style}
         >
+          <ShopFonts appearance={appearance} />
           <a
             href="#main"
             className="sr-only z-50 rounded-shop-sm bg-shop-surface px-4 py-2 text-shop-ink shadow-shop-pop focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
@@ -110,7 +122,15 @@ export default async function ShopLayout({ children }: LayoutProps<"/">) {
           <Suspense fallback={null}>
             <ServerHeaderCounts tenantId={shop.tenant.id} />
           </Suspense>
-          {analytics.provider === "own" ? (
+          {notLive && !shop.themePreview ? <NotLiveRibbon /> : null}
+          {shop.themePreview ? (
+            <ThemePreviewBridge
+              hasDraft={shop.themePreview.hasDraft}
+              notLive={notLive}
+              {...shopFontTables()}
+            />
+          ) : null}
+          {analytics.provider === "own" && !shop.themePreview && !notLive ? (
             <Suspense fallback={null}>
               <AnalyticsBeacon />
             </Suspense>

@@ -33,10 +33,11 @@ export async function generateMetadata({ params, searchParams }: PageProps<"/sho
   const shop = await requireShop();
   const { slug } = await params;
   const { category } = await loadCategory(shop.tenant.id, slug);
-  const query = parseCatalogParams(await searchParams, defaultSortFor(shop, "shop"));
+  const defaultSort = defaultSortFor(shop, "shop");
+  const query = parseCatalogParams(await searchParams, defaultSort);
   const description =
-    category.seoDescription || (category.description ? markdownToPlainText(category.description).slice(0, 160) : null) || copy.shop.metaDescription(shop.shopName);
-  return catalogMetadata({ path: categoryHref(category.slug), params: query, title: category.seoTitle || category.title, description });
+    category.seoDescription || (category.description ? markdownToPlainText(category.description) : null) || copy.category.metaDescription(category.title, shop.shopName);
+  return catalogMetadata({ shop, defaultSort, path: categoryHref(category.slug), params: query, title: category.seoTitle || copy.category.metaTitle(category.title), description });
 }
 
 export default async function CategoryPage({ params, searchParams }: PageProps<"/shop/category/[slug]">) {

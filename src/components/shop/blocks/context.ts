@@ -5,6 +5,8 @@ import type { ShopContext } from "@/server/storefront/context";
 export type BlockContext = {
   tenantId: string;
   shopName: string;
+  /** Absolute shop origin (JSON-LD links, e.g. the FAQPage answers). */
+  origin: string;
   card: CardOptions;
   gridColumns: 3 | 4;
   showStockCode: boolean;
@@ -18,6 +20,7 @@ export function blockContext(shop: ShopContext, opts: { viewerSignedIn: boolean;
   return {
     tenantId: shop.tenant.id,
     shopName: shop.shopName,
+    origin: shop.origin,
     card: {
       currency: shop.tenant.currency,
       viewerSignedIn: opts.viewerSignedIn,

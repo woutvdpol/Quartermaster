@@ -2,13 +2,19 @@
 export const catalogCopy = {
   shop: {
     title: "Shop",
-    metaDescription: (shop: string) => `Browse original items for sale at ${shop}.`,
+    metaTitle: "All items for sale",
+    metaDescription: (shop: string) => `Browse every item for sale at ${shop}: unique pieces, each with its own stock number, photos and description.`,
     searchTitle: (q: string) => `Search: “${q}”`,
+  },
+  category: {
+    metaTitle: (category: string) => `${category} for sale`,
+    metaDescription: (category: string, shop: string) => `${category} for sale at ${shop}. Every item is unique, photographed and described individually.`,
   },
   facet: {
     title: (value: string) => value,
     intro: (facet: string, value: string) => `All items for sale with ${facet.toLowerCase()} “${value}”.`,
-    metaDescription: (facet: string, value: string, shop: string) => `${facet}: ${value} — original items for sale at ${shop}.`,
+    metaTitle: (facet: string, value: string) => `${value} (${facet.toLowerCase()}) — items for sale`,
+    metaDescription: (facet: string, value: string, shop: string) => `${facet}: ${value} — items for sale at ${shop}. Every item is unique, photographed and described individually.`,
   },
   archive: {
     title: "Sold archive",

@@ -18,9 +18,9 @@ export type RequestScope =
   | { kind: "tenant"; tenant: NonNullable<Awaited<ReturnType<typeof findTenantByHost>>> }
   | { kind: "unknown" };
 
+/** The ACTIVE tenant owning `host` (hosts are unique). One query: `include` would cost a second round trip. */
 async function findTenantByHost(host: string) {
-  const domain = await db.tenantDomain.findUnique({ where: { host }, include: { tenant: true } });
-  return domain && domain.tenant.status === "ACTIVE" ? domain.tenant : null;
+  return db.tenant.findFirst({ where: { status: "ACTIVE", domains: { some: { host } } } });
 }
 
 /**

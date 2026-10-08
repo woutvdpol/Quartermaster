@@ -110,3 +110,13 @@ test("admin login page renders", async ({ page }) => {
   await expect(page.getByLabel(/email/i)).toBeVisible();
   await expect(page.getByLabel(/password/i)).toBeVisible();
 });
+
+// Theme builder preview (src/lib/theme-preview.ts): the preview flag alone must never show a draft.
+test("theme preview is staff-only and never cached", async ({ page }) => {
+  const res = await page.goto("/?qm-theme-preview=1");
+  expect(res?.status()).toBe(200);
+  expect(res?.headers()["cache-control"] ?? "").toMatch(/no-store/);
+  await expect(page.locator(".shop-root")).toBeVisible();
+  await expect(page.getByText("Theme preview", { exact: false })).toHaveCount(0);
+  await page.goto("/?qm-theme-preview=0");
+});

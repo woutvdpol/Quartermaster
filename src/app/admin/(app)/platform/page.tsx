@@ -14,6 +14,7 @@ import {
   type Column,
 } from "@/components/admin/ui";
 import { listTenants, requirePlatformContext, type TenantListItem } from "@/server/platform";
+import { countApplications } from "@/server/onboarding";
 import { CreateTenantDrawer } from "./_components/CreateTenantDrawer";
 import { STATUS_LABEL, STATUS_TONE, timeZoneOptions, type TenantStatusValue } from "./_shared";
 
@@ -28,7 +29,12 @@ export default async function PlatformPage({ searchParams }: PageProps<"/admin/p
   const status = STATUSES.find((s) => s === statusParam?.toUpperCase());
   const q = getParam(sp, "q")?.slice(0, 120);
 
-  const [tenants, all] = await Promise.all([listTenants(ctx, { status, search: q || undefined }), listTenants(ctx)]);
+  const [tenants, all, applicationCounts] = await Promise.all([
+    listTenants(ctx, { status, search: q || undefined }),
+    listTenants(ctx),
+    countApplications(ctx),
+  ]);
+  const pendingApplications = applicationCounts.PENDING;
   const count = (s?: TenantStatusValue) => (s ? all.filter((t) => t.status === s).length : all.length);
   const now = new Date();
   const basePath = "/admin/platform";
@@ -77,6 +83,9 @@ export default async function PlatformPage({ searchParams }: PageProps<"/admin/p
         title="Shops"
         actions={
           <>
+            <Link href="/admin/platform/applications" className={buttonClasses()}>
+              Applications{pendingApplications ? ` (${pendingApplications} pending)` : ""}
+            </Link>
             <Link href="/admin/platform/audit" className={buttonClasses()}>
               Platform audit log
             </Link>

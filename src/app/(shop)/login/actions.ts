@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { verifyLoginTotp } from "@/server/auth/service";
 import { destroySession } from "@/server/auth/session";
 import { clientIp, customerLogin, hasPendingCustomerTotp, safeShopRedirect } from "@/server/customer-auth";
-import { getRequestTenant } from "@/server/tenant";
+// Not while the shop is "coming soon" (src/server/storefront/launch.ts).
+import { getOpenShopTenant as getRequestTenant } from "@/server/storefront/launch";
 import { accountCopy } from "@/components/shop/account/_copy";
 
 export type LoginState = { error?: string; email?: string } | undefined;

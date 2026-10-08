@@ -10,8 +10,9 @@ import { ARCHIVE_PATH, SHOP_PATH, parseCatalogParams } from "@/server/storefront
 export async function generateMetadata({ searchParams }: PageProps<"/archive">): Promise<Metadata> {
   const shop = await requireShop();
   if (!shop.settings.catalog.publicArchive) return {};
-  const params = parseCatalogParams(await searchParams, defaultSortFor(shop, "archive"));
-  return catalogMetadata({ path: ARCHIVE_PATH, params, title: copy.archive.title, description: copy.archive.metaDescription(shop.shopName) });
+  const defaultSort = defaultSortFor(shop, "archive");
+  const params = parseCatalogParams(await searchParams, defaultSort);
+  return catalogMetadata({ shop, defaultSort, path: ARCHIVE_PATH, params, title: copy.archive.title, description: copy.archive.metaDescription(shop.shopName) });
 }
 
 export default async function ArchivePage({ searchParams }: PageProps<"/archive">) {

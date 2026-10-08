@@ -229,7 +229,7 @@ Partiële unique index op actieve reserveringen; CHECK's op bedragen, hoeveelhed
 | `regions` + `weights` + `region_weights` | `ShippingZone` + `ShippingRate` | `delivery_charge` decimal euro's × 100; landen handmatig toewijzen; "Pickup in store" → `isPickup = true` |
 | `payment_methods` | — | alleen Mollie (besluit 16); toeslag-% eventueel naar `Setting` "checkout" |
 | `currencies` | — | weergave-only; koersen later in eigen tabel/cache |
-| `content_pages` + `content_blocks` | `ContentPage` + `ContentBlock` | kolommen per type → `data` JSON; `EMAILER` → `NEWSLETTER_SIGNUP`; absolute URL's → relatief; CF-images downloaden |
+| `content_pages` + `content_blocks` | `ContentPage` + `ContentBlock` | kolommen per type → `data` JSON; `EMAILER` → `NEWSLETTER_SIGNUP`; nieuw type `FAQ` zonder legacy-tegenhanger (migratie `20261008140000_content_block_faq`); absolute URL's → relatief; CF-images downloaden |
 | `contents` (ShopPageEnum) | `ContentPage(systemKey)` + TEXT-blocks | |
 | `menu_items` | `MenuItem` | parent-fix (seed wees naar verkeerde parent); URL's relatief |
 | `emailer_subscribers` | `NewsletterSubscriber` | `active → confirmedAt = email_verified_at`, `unsubscribed → unsubscribedAt`, `pending` → alleen meenemen indien recent; `last_updated_by_ip` niet meenemen (AVG) |

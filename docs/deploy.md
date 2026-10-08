@@ -90,6 +90,7 @@ Eén `Dockerfile`, drie targets — bouw ze uit dezelfde commit en tag ze gelijk
 SHA=$(git rev-parse --short HEAD); REG=ghcr.io/<org>
 docker build --build-arg NEXT_DEPLOYMENT_ID=$SHA \
   --build-arg NEXT_PUBLIC_TURNSTILE_SITE_KEY=<publieke site key> \
+  --build-arg NEXT_COMPRESS=false \
   -t $REG/quartermaster:$SHA .
 docker build --target worker  -t $REG/quartermaster-worker:$SHA .
 docker build --target migrate -t $REG/quartermaster-migrate:$SHA .
@@ -130,6 +131,7 @@ Alles is runtime-config (behalve de build-args hierboven); één image gaat door
 | Variabele | Waar | Verplicht | Toelichting |
 |---|---|---|---|
 | `DATABASE_URL` | Secret | ja | node-postgres/libpq-URL; managed: `?sslmode=require`. Ook gebruikt door pg_dump (geen Prisma-only parameters). |
+| `DATABASE_POOL_MAX` | ConfigMap | nee (default 10) | Maximaal aantal DB-verbindingen per proces (node-postgres-pool, `src/server/db.ts`). Houd replica's × waarde + worker + migrate-Job onder `max_connections` van Postgres (managed: vaak 25–100). Ongeldige waarde → default + waarschuwing in de log. |
 | `APP_ENCRYPTION_KEY` | Secret | ja | 32 bytes base64. Versleutelt TOTP-secrets, Mollie-credentials, signeert tokens. **Nooit zomaar roteren** — bestaande data wordt onleesbaar. |
 | `SMTP_URL` | Secret | ja (prod) | `smtps://user:pass@host:465`. Zonder: mailjobs falen en blijven retryen (bewust, mail wordt nooit stil weggegooid). |
 | `TURNSTILE_SECRET_KEY` | Secret | ja (prod) | Leeg = beschermde formulieren geweigerd in productie. |
@@ -137,6 +139,7 @@ Alles is runtime-config (behalve de build-args hierboven); één image gaat door
 | `MATOMO_TOKEN` | Secret | nee | Alleen naar `MATOMO_URL` gestuurd. |
 | `PLATFORM_HOST` | ConfigMap | ja | Superadmin-host, bijv. `platform.example.nl` (zonder schema; met poort alleen als die in de URL staat). |
 | `APP_URL` | ConfigMap | ja | `https://<platform-host>`; basis voor maillinks zonder shopdomein en voor de Mollie-webhook-URL. |
+| `SHOP_SUBDOMAIN_BASE` | ConfigMap | ja (onboarding) | Basis-host voor platform-subdomeinen van nieuwe shops: bij goedkeuring van een aanmelding krijgt de shop `<slug>.<SHOP_SUBDOMAIN_BASE>` als primair domein, bijv. `quartermaster.nl` → `dealer.quartermaster.nl`. Zonder schema, met poort alleen in dev. Default (dev) `localhost:3000` → `<slug>.localhost:3000` (browsers resolven `*.localhost` naar 127.0.0.1). Vereist wildcard-DNS + wildcard-certificaat, zie §15. |
 | `MAIL_FROM_FALLBACK` | ConfigMap | ja | Afzender; moet door SPF/DKIM van de SMTP-provider gedekt zijn. |
 | `TRUSTED_PROXY_HOPS` | ConfigMap | ja (k8s: `1`) | Zie §9. |
 | `CSP_MODE` | ConfigMap | nee (default `report-only`) | Content-Security-Policy: `report-only` (alleen melden, `[csp]`-regels in de log), `enforce` (blokkeren) of `off`. Per request gelezen; wijzigen = ConfigMap + pod-herstart. Zie `04-security-review.md` R2. |
@@ -153,6 +156,7 @@ Alles is runtime-config (behalve de build-args hierboven); één image gaat door
 | `PORT`, `HOSTNAME`, `NODE_OPTIONS` | Deployment | — | Gezet in de manifests. |
 | `TURNSTILE_SITE_KEY` | ConfigMap | ja (productie) | Publieke site key, runtime. |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `NEXT_DEPLOYMENT_ID` | **build-arg** | nee (fallback) / aanbevolen | Zie §3. |
+| `NEXT_COMPRESS` | **build-arg** | `true` | `false` = Node comprimeert niet; alléén samen met brotli/gzip op de ingress (`deploy/k8s/ingress-nginx/values.yaml`). Voor docker-compose/bare `next start`: laten staan. Zie docs/perf/round2.md. |
 | `DATABASE_URL_TEST`, `SEED_*` | — | — | Alleen tests/seeding, niet in productie. |
 | `LEGACY_DATABASE_URL`, `LEGACY_CF_ACCOUNT_HASH` | Secret `quartermaster-etl` | alleen ETL | Zie §17. |
 
@@ -342,6 +346,8 @@ Per domein dat Quartermaster bedient:
 5. Controle: `curl -I https://<domein>/` → 200, geldig certificaat, juiste shop.
 
 **Wildcard** (bijv. `*.quartermaster.nl` voor tenant-subdomeinen of staging): DNS `*.quartermaster.nl` → LB; certificaat via **DNS-01** (HTTP-01 kan geen wildcards) met een DNS-provider-solver in de ClusterIssuer (voorbeeld voor Cloudflare in `cluster-issuers.yaml`), één `tls`-entry `hosts: ["*.quartermaster.nl"]` en één rule `host: "*.quartermaster.nl"`. Eigen domeinen van tenants blijven losse hosts.
+
+**Onboarding-subdomeinen**: goedgekeurde aanmeldingen (platform-admin → *Dealer applications*) krijgen automatisch `<slug>.<SHOP_SUBDOMAIN_BASE>` als `TenantDomain`. Dat werkt alleen met de wildcard hierboven voor precies die basis (`*.<SHOP_SUBDOMAIN_BASE>`): DNS, `tls`-entry en ingress-rule. Zet de wildcard-host ook in de Turnstile-widget. Eigen domeinen vraagt de eigenaar aan in stap *Go live* van de startwizard; de superadmin krijgt een mail en voegt het domein toe via de stappen 1–5 hierboven.
 
 **Platform-host**: moet bereikbaar zijn voor Mollie (webhooks naar `APP_URL/api/webhooks/mollie/<tenantId>`), dus nooit achter een IP-allowlist zetten.
 

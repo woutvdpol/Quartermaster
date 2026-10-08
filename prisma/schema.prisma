@@ -371,8 +371,10 @@ model Product {
   createdAt                DateTime      @default(now())
   updatedAt                DateTime      @updatedAt
 
-  // Full-text search: added later as a generated tsvector column + GIN index
-  // (title, description, sku, stockCode) in raw SQL, plus pg_trgm on title.
+  // Search: the shop and the admin search with `ILIKE '%word%'` on title / description / sku
+  // (src/server/storefront-catalog/queries.ts, src/server/catalog/products.ts). pg_trgm GIN indexes
+  // (migration 20261008120000_search_trigram_indexes) make those substring matches index scans.
+  // A tsvector column (ranking, stemming) can still be added later.
 
   tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   category           Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
@@ -399,6 +401,9 @@ model Product {
   @@index([tenantId, categoryId, status])
   @@index([tenantId, soldAt])
   @@index([purchaseRecordId])
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_title_trgm_idx")
+  @@index([description(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_description_trgm_idx")
+  @@index([sku(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_sku_trgm_idx")
   @@map("products")
 }
 
@@ -1014,6 +1019,7 @@ enum ContentBlockType {
   GALLERY
   CATEGORIES
   NEWSLETTER_SIGNUP // legacy EMAILER
+  FAQ // question/answer pairs (FAQPage JSON-LD); new in Quartermaster
 }
 
 model ContentPage {

@@ -12,6 +12,8 @@
  *  - Products/categories are referenced by id; the service checks they belong to the tenant.
  *  - Optional text defaults to "" and optional objects to null, so stored data is always complete.
  *  - Legacy EMAILER is `NEWSLETTER_SIGNUP` (enum name in the schema).
+ *  - FAQ (new, no legacy equivalent) holds `items: { question, answer }[]`; the answer is Markdown.
+ *    The storefront renders it as a <details> accordion and emits one FAQPage JSON-LD per page.
  */
 import { z } from "zod";
 import { ContentBlockType } from "@/generated/prisma/enums";
@@ -62,6 +64,29 @@ const imageList = (max: number) =>
     .default([])
     .refine((a) => new Set(a).size === a.length, "Duplicate image");
 
+/** Limits of the FAQ block (also used by the admin editor). */
+export const FAQ_LIMITS = { items: 30, question: 200, answer: 2000 } as const;
+
+export const faqItemSchema = z.object({
+  question: requiredText(FAQ_LIMITS.question),
+  answer: z.string().trim().min(1, "Required").max(FAQ_LIMITS.answer),
+});
+export type FaqItem = z.output<typeof faqItemSchema>;
+
+const faqItems = z
+  .array(faqItemSchema)
+  .min(1, "Add at least one question")
+  .max(FAQ_LIMITS.items, `At most ${FAQ_LIMITS.items} questions`)
+  .superRefine((items, ctx) => {
+    // One question once: duplicates confuse readers and make the FAQPage markup ambiguous.
+    const seen = new Set<string>();
+    items.forEach((it, i) => {
+      const k = it.question.toLowerCase().replace(/\s+/g, " ");
+      if (seen.has(k)) ctx.addIssue({ code: "custom", path: [i, "question"], message: "This question is already in the list" });
+      seen.add(k);
+    });
+  });
+
 // ─── Per-type data ───────────────────────────────────────────────────────────
 
 export const BLOCK_SCHEMAS = {
@@ -86,6 +111,7 @@ export const BLOCK_SCHEMAS = {
   }),
   NEW_ITEMS: z.object({ title, count: z.int().min(1).max(24).default(6), cta: optionalLink }),
   NEWSLETTER_SIGNUP: z.object({ title: requiredText(100), text: text(500) }),
+  FAQ: z.object({ title, items: faqItems }),
 } as const satisfies Record<ContentBlockType, z.ZodType>;
 
 export type BlockDataMap = { [T in ContentBlockType]: z.output<(typeof BLOCK_SCHEMAS)[T]> };
@@ -150,6 +176,13 @@ export const BLOCK_DEFAULTS: BlockDataMap = {
   CATEGORIES: { title: "Shop by category", categoryIds: [] },
   NEW_ITEMS: { title: "New arrivals", count: 6, cta: { label: "View all", href: "/shop" } },
   NEWSLETTER_SIGNUP: { title: "Stay up to date", text: "Receive new arrivals in your inbox." },
+  FAQ: {
+    title: "Frequently asked questions",
+    items: [
+      { question: "How do I know an item is original?", answer: "Every item is checked before it is listed. If we have any doubt, we say so in the description." },
+      { question: "How long does shipping take?", answer: "We ship within two working days of payment. Shipping costs depend on weight and destination and are shown at checkout. Questions? [Contact us](/contact)." },
+    ],
+  },
 };
 
 export function defaultBlockData<T extends ContentBlockType>(type: T): BlockDataMap[T] {
@@ -184,6 +217,7 @@ export const BLOCK_CATALOG: readonly BlockCatalogEntry[] = [
   { type: "TESTIMONIAL", label: "Testimonial", description: "A customer review. Consecutive testimonials are shown as one slider.", icon: "MessageSquareQuote", group: "engagement" },
   { type: "CATEGORIES", label: "Categories", description: "Slider with chosen (or all top-level) categories.", icon: "FolderTree", group: "shop" },
   { type: "NEW_ITEMS", label: "New arrivals", description: "The latest active products (1–24).", icon: "Sparkles", group: "shop" },
+  { type: "FAQ", label: "FAQ", description: "Questions and answers in an expandable list (1–30). Adds FAQ structured data for search engines and AI assistants.", icon: "CircleHelp", group: "text" },
   { type: "NEWSLETTER_SIGNUP", label: "Newsletter signup", description: "Sign-up form for the newsletter.", icon: "Mail", group: "engagement", requiresFeature: "newsletter" },
 ];
 

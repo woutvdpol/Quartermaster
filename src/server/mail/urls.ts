@@ -18,6 +18,12 @@ export const MAIL_PATHS = {
   newsletterUnsubscribe: "/api/newsletter/unsubscribe",
   /** Storefront page that shows the outcome (`?status=confirmed|invalid|expired|unsubscribed`). */
   newsletterStatusPage: "/newsletter",
+  /** Platform host: confirm a dealer application's e-mail (page with a POST button). */
+  dealerApplicationVerify: "/apply/verify",
+  /** Tenant host: accept the owner invite (choose a password → setup wizard). */
+  dealerInviteAccept: "/admin/accept-invite",
+  /** Platform host: dealer applications in the platform admin. */
+  platformApplications: "/admin/platform/applications",
 } as const;
 
 function isLocalHost(host: string): boolean {

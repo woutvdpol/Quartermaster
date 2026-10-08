@@ -34,6 +34,8 @@ configMapGenerator:
       # Overlays MUST override these two.
       - PLATFORM_HOST=platform.example.invalid
       - APP_URL=https://platform.example.invalid
+      # Approved dealers get <slug>.<SHOP_SUBDOMAIN_BASE> (needs wildcard DNS + TLS, docs/deploy.md §15).
+      - SHOP_SUBDOMAIN_BASE=example.invalid
       - MAIL_FROM_FALLBACK=no-reply@example.invalid
       # 0 = ignore X-Forwarded-For (default, safe without a proxy). Overlays behind ingress-nginx set 1.
       - TRUSTED_PROXY_HOPS=0

@@ -31,7 +31,7 @@ export function ProductGrid({
   return (
     <ul
       role="list"
-      className={cn("grid grid-cols-2 gap-x-4 gap-y-9 sm:gap-x-6 md:grid-cols-3 lg:gap-x-8", columns === 4 && "lg:grid-cols-4", className)}
+      className={cn("grid grid-cols-2 gap-x-shop-grid gap-y-shop-grid-y sm:gap-x-shop-grid-sm md:grid-cols-3 lg:gap-x-shop-grid-lg", columns === 4 && "lg:grid-cols-4", className)}
     >
       {products.map((p, i) => (
         <li key={p.id} className="flex">

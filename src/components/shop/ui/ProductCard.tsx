@@ -1,7 +1,7 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { Badge } from "./Badge";
 import { cn } from "./cn";
+import { IntentLink } from "./IntentLink";
 import { formatIndicative } from "./money";
 import { Price } from "./Price";
 import { LockedImg, ShopImg } from "./ShopImg";
@@ -84,9 +84,9 @@ export function ProductCard({
         <div className="flex items-start justify-between gap-3">
           <H className="line-clamp-2 font-shop-body text-[0.97rem] leading-snug font-medium tracking-normal text-shop-ink">
             {/* Stretched link: the whole card is clickable, slots stay above it (z-10). */}
-            <Link href={product.href} className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none group-has-[:focus-visible]:underline">
+            <IntentLink href={product.href} className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none group-has-[:focus-visible]:underline">
               {product.title}
-            </Link>
+            </IntentLink>
           </H>
           {product.showPrice ? (
             <Price cents={product.priceCents} currency={product.currency} display={null} size="sm" className={cn("shrink-0 [&>span:first-child]:font-bold", sold && "opacity-60")} />

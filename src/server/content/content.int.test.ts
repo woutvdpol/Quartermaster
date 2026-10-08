@@ -156,6 +156,34 @@ describe("content pages", () => {
     await expectError(addBlock(ctx, page.id, { type: "NOPE" as never }), "INVALID");
   });
 
+  it("FAQ blocks: add with defaults, update/reorder items, reject invalid items, public read", async () => {
+    const page = await createPage(ctx, { title: "FAQ", published: true });
+    const faq = await addBlock(ctx, page.id, { type: "FAQ" });
+    expect(faq.type).toBe("FAQ");
+    expect((faq.data as { items: unknown[] }).items.length).toBeGreaterThan(0);
+
+    const items = [
+      { question: "  Do you ship abroad?  ", answer: "Yes, see [shipping](/shipping)." },
+      { question: "Can I return an item?", answer: "Within **14 days**." },
+    ];
+    const updated = await updateBlock(ctx, faq.id, { data: { title: "Questions", items } });
+    expect(updated.data).toEqual({ title: "Questions", items: [{ question: "Do you ship abroad?", answer: "Yes, see [shipping](/shipping)." }, items[1]] });
+    // Reorder = save the items in a new order.
+    const reordered = await updateBlock(ctx, faq.id, { data: { title: "Questions", items: [items[1], items[0]] } });
+    expect((reordered.data as { items: { question: string }[] }).items.map((i) => i.question)).toEqual(["Can I return an item?", "Do you ship abroad?"]);
+
+    await expectError(updateBlock(ctx, faq.id, { data: { items: [] } }), "INVALID");
+    await expectError(updateBlock(ctx, faq.id, { data: { items: [{ question: "Q", answer: "" }] } }), "INVALID");
+    await expectError(updateBlock(ctx, faq.id, { data: { items: [{ question: "x".repeat(201), answer: "A" }] } }), "INVALID");
+    await expectError(updateBlock(ctx, faq.id, { data: { items: Array.from({ length: 31 }, (_, i) => ({ question: `Q${i}`, answer: "A" })) } }), "INVALID");
+    await expectError(addBlock(ctx, page.id, { type: "FAQ", data: { items: [{ question: "Same?", answer: "A" }, { question: "same?", answer: "B" }] } }), "INVALID");
+
+    const pub = await getPublishedPageBySlug(ctx.tenantId, "faq");
+    expect(pub?.blocks).toEqual([{ id: faq.id, type: "FAQ", data: { title: "Questions", items: [items[1], { ...items[0], question: "Do you ship abroad?" }] } }]);
+    await removeBlock(ctx, faq.id);
+    expect(await blockTypes(ctx, page.id)).toEqual([]);
+  });
+
   it("requires the newsletter feature for NEWSLETTER_SIGNUP blocks", async () => {
     const page = await createPage(ctx, { title: "N" });
     await expectError(addBlock(ctx, page.id, { type: "NEWSLETTER_SIGNUP" }), "FORBIDDEN");

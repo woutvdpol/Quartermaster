@@ -22,6 +22,7 @@ import LeadReceivedConfirmation, { leadReceivedConfirmationSubject } from "@/ema
 import { leadAdminPath, loadLeadMailData } from "@/server/leads/mail-data";
 import { OPS_MAIL_BUILDERS } from "./builders-ops";
 import { COMMERCE_MAIL_BUILDERS } from "./builders-commerce";
+import { ONBOARDING_MAIL_BUILDERS } from "./builders-onboarding";
 import { ALERT_MAIL_BUILDERS } from "@/server/alerts/mail";
 
 /** What a template builder hands to `sendMail()`. `null` = nothing to send (skip, not an error). */
@@ -167,6 +168,7 @@ export const MAIL_BUILDERS: { [T in MailTemplateName]: Builder<T> } = {
   // admin-ops templates: order-shipped, owner-invite, customer-email-verification
   ...OPS_MAIL_BUILDERS,
   ...COMMERCE_MAIL_BUILDERS,
+  ...ONBOARDING_MAIL_BUILDERS,
   ...ALERT_MAIL_BUILDERS, // alert-confirm, alert-new-arrivals, alert-back-available, alert-price-drop
 
   "lead-received": async ({ tenantId, props, identity }) => {

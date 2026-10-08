@@ -38,6 +38,20 @@ export const MAIL_TEMPLATE_PROPS = {
   "offer-countered": z.object({ offerId: id, tokenEnc: z.string().min(1) }),
   "offer-rejected": z.object({ offerId: id }),
   "abandoned-cart": z.object({ cartId: id }),
+  // ── onboarding (dealer sign-up → approval → setup wizard); builders in ./builders-onboarding.tsx ──
+  /** Platform mail to the applicant: "we received your application, confirm your email". */
+  "dealer-application-verify": z.object({ applicationId: id, tokenEnc: z.string().min(1) }),
+  /** Platform mail to the applicant: application rejected (with the reason). */
+  "dealer-application-rejected": z.object({ applicationId: id }),
+  /** Tenant mail to the new OWNER: set a password (INVITE token, 24 h) → setup wizard. */
+  "dealer-invite": z.object({ userId: id, tokenEnc: z.string().min(1) }),
+  /** Platform mail to one SUPERADMIN (`to`): new verified application, migration or domain request. */
+  "platform-admin-notice": z.object({
+    kind: z.enum(["application", "migration", "domain"]),
+    applicationId: id.optional(),
+    tenantId: id.optional(),
+    detail: z.string().max(300).optional(),
+  }),
 } as const;
 
 export type MailTemplateName = keyof typeof MAIL_TEMPLATE_PROPS;

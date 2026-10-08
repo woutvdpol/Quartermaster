@@ -91,9 +91,10 @@ async function CartContent() {
     );
   }
 
-  const [ctx, display] = await Promise.all([getCheckoutContext(tenantId, token, viewer), getVisitorDisplayCurrency(tenantId)]);
+  // The cart was just loaded: hand it on instead of letting both services read it again.
+  const [ctx, display] = await Promise.all([getCheckoutContext(tenantId, token, viewer, { cart }), getVisitorDisplayCurrency(tenantId)]);
   const country = ctx.defaultCountry;
-  const quote = country ? await quoteCheckout(tenantId, token, { countryCode: country }) : null;
+  const quote = country ? await quoteCheckout(tenantId, token, { countryCode: country }, { cart }) : null;
   const lines = toCartLineData(cart, { guest: !viewer, blurSensitiveForGuests: shop.settings.legal.blurSensitiveForGuests, showStockCode: shop.settings.catalog.showStockCode });
   const hasUnavailable = lines.some((l) => l.state === "unavailable");
   const canCheckout = cart.buyableCount > 0 && (!quote || quote.minimumShortfall === 0);

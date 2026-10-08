@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getRequestTenant } from "@/server/tenant";
+// Not while the shop is "coming soon" (src/server/storefront/launch.ts).
+import { getOpenShopTenant as getRequestTenant } from "@/server/storefront/launch";
 import { clientIp } from "@/server/customer-auth/current";
 import { take } from "@/server/auth/rate-limit";
 import { getShopViewer } from "@/server/cart";

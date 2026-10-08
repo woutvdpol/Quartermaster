@@ -100,7 +100,7 @@ async function CheckoutContent() {
 
   const [quote, legalLinks] = await Promise.all([
     ctx.defaultCountry
-      ? quoteCheckout(tenantId, token, { countryCode: ctx.defaultCountry, paymentMethod: ctx.payment.methods[0]?.id ?? null })
+      ? quoteCheckout(tenantId, token, { countryCode: ctx.defaultCountry, paymentMethod: ctx.payment.methods[0]?.id ?? null }, { cart })
       : Promise.resolve(null),
     getLegalLinks(tenantId),
   ]);

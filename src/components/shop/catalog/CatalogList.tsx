@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { Badge, LockedImg, Price, ShopImg, cn, type DisplayCurrency, type ProductCardData } from "@/components/shop/ui";
+import { IntentLink } from "@/components/shop/ui/IntentLink";
 import { uiCopy } from "@/components/shop/ui/_copy";
 import { catalogCopy as copy } from "./_copy";
 
@@ -49,9 +49,9 @@ export function CatalogList({
                   </p>
                 ) : null}
                 <h3 className="font-shop-body text-base leading-snug font-medium tracking-normal text-shop-ink sm:text-lg">
-                  <Link href={p.href} className="underline-offset-4 after:absolute after:inset-0 after:content-[''] group-hover:underline">
+                  <IntentLink href={p.href} className="underline-offset-4 after:absolute after:inset-0 after:content-[''] group-hover:underline">
                     {p.title}
-                  </Link>
+                  </IntentLink>
                 </h3>
                 <div className="flex flex-wrap items-center gap-2 empty:hidden">
                   {sold ? <Badge tone="sold">{copy.product.status.sold}</Badge> : null}

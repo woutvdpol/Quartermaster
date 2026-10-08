@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { adminFontVariables } from "@/lib/admin-fonts";
 import { ADMIN_THEME_COOKIE, adminThemeAttributes, parseAdminThemeCookie } from "@/lib/admin-theme";
+// Admin-only stylesheet (not in the root layout, so the storefront does not download it).
+import "../globals.css";
 
 export const metadata: Metadata = {
   title: { template: "%s · Quartermaster admin", default: "Quartermaster admin" },

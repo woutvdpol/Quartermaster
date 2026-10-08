@@ -6,6 +6,8 @@ import { LocalDriver, setStorageForTests } from "@/server/media/storage";
 import { GET } from "@/app/uploads/[...path]/route";
 
 vi.mock("next/server", () => ({ connection: async () => {} }));
+// No Next data cache in tests: shopCache's unstable_cache becomes a pass-through.
+vi.mock("next/cache", () => ({ unstable_cache: (fn: () => unknown) => fn, revalidateTag: () => {} }));
 const blurred = new Set<string>();
 let viewer: { role: string; tenantId: string | null } | null = null;
 vi.mock("@/server/db", () => ({
@@ -25,6 +27,10 @@ beforeAll(async () => {
   await driver.put("t1/products/p1/i1/thumb.webp", new TextEncoder().encode("webp-bytes"), "image/webp");
   await driver.put("t1/products/p1/i1.jpg", new TextEncoder().encode("jpg"), "image/jpeg");
   await driver.put("t1/branding/logo.png", new TextEncoder().encode("png"), "image/png");
+  await driver.put("t1/branding/logo-0123456789ab.webp", new TextEncoder().encode("logo"), "image/webp");
+  await driver.put("t1/content/home/hero-c2b3177b2456.jpg", new TextEncoder().encode("hero"), "image/jpeg");
+  await driver.put("t1/content/p1/c0123456789abcdef01234567/card.webp", new TextEncoder().encode("card"), "image/webp");
+  await driver.put("t1/content/p1/summer.jpg", new TextEncoder().encode("manual"), "image/jpeg");
   await fs.writeFile(path.join(root, "t1", "evil.svg"), "<svg/>");
   await fs.writeFile(path.join(root, "secret.webp"), "outside-key-space");
   await driver.put("t1/products/p1/docs/d1.jpg", new TextEncoder().encode("doc"), "image/jpeg");
@@ -54,6 +60,19 @@ describe("GET /uploads/[...path]", () => {
     expect(res.headers.get("content-length")).toBe("10");
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
     expect(await res.text()).toBe("webp-bytes");
+  });
+
+  it("serves hash-suffixed content images and logos as immutable", async () => {
+    for (const segments of [
+      ["t1", "branding", "logo-0123456789ab.webp"],
+      ["t1", "content", "home", "hero-c2b3177b2456.jpg"],
+      ["t1", "content", "p1", "c0123456789abcdef01234567", "card.webp"],
+    ]) {
+      const res = await get(segments);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    }
+    expect((await get(["t1", "content", "p1", "summer.jpg"])).headers.get("cache-control")).toBe("public, max-age=300");
   });
 
   it("serves originals as immutable and other files with a short cache", async () => {

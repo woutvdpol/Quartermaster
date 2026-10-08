@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { ServiceError } from "@/server/context";
@@ -12,7 +13,7 @@ import { calculateShippingQuote, type QuoteResult, type ShippingOption } from "@
 import { loadQuoteZones } from "@/server/shipping/quote";
 import { countryName, isCountryCode, type CountryCode } from "@/server/shipping/countries";
 import { resolveCompliance } from "@/server/compliance";
-import { getCart, lockCart, loadCartLinesTx, summarize, type CartView, type ShopViewer } from "@/server/cart";
+import { getCart, getTenantCurrency, lockCart, loadCartLinesTx, summarize, type CartView, type ShopViewer } from "@/server/cart";
 import type { Prisma } from "@/generated/prisma/client";
 import { parseCheckoutInput, type FieldErrors } from "./schema";
 import { computeTotals, deliverableCountries, freeShippingProgress, minimumOrderShortfall, selectOption, type FreeShippingProgress, type Totals } from "./totals";
@@ -86,24 +87,42 @@ function requirementsFor(
   };
 }
 
+/**
+ * Shipping zones for the read-only cart/checkout views, memoised per request (React cache): the cart
+ * and checkout pages ask for them in getCheckoutContext AND quoteCheckout. placeOrder reads them fresh.
+ */
+const requestQuoteZones = cache(loadQuoteZones);
+
+/**
+ * A cart the caller already loaded in this request (the cart page reads it once and passes it on),
+ * so getCheckoutContext / quoteCheckout don't run the same cart queries again. Must be the
+ * getCart(tenantId, token) result for the same tenant and token.
+ */
+export type PreloadedCart = { cart: CartView | null };
+
 /** Everything the checkout page needs to render (read-only). */
-export async function getCheckoutContext(tenantId: string, token: string | null | undefined, viewer: ShopViewer | null): Promise<CheckoutContext> {
-  const [cart, checkout, legal, general, platform, zones, payment, tenant] = await Promise.all([
-    getCart(tenantId, token),
+export async function getCheckoutContext(
+  tenantId: string,
+  token: string | null | undefined,
+  viewer: ShopViewer | null,
+  preloaded?: PreloadedCart,
+): Promise<CheckoutContext> {
+  const [cart, checkout, legal, general, platform, zones, payment, currency] = await Promise.all([
+    preloaded ? preloaded.cart : getCart(tenantId, token),
     getSettings(tenantId, "checkout"),
     getSettings(tenantId, "legal"),
     getSettings(tenantId, "general"),
     getSettings(tenantId, "platform"),
-    loadQuoteZones(tenantId),
+    requestQuoteZones(tenantId),
     getPaymentSetup(tenantId),
-    db.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { currency: true } }),
+    getTenantCurrency(tenantId),
   ]);
   const countries = deliverableCountries(zones);
   const preferred = [cart?.countryCode, general.address.country].find((c): c is CountryCode => !!c && isCountryCode(c) && countries.includes(c));
   const buyable = (cart?.lines ?? []).filter((l) => l.state === "held" || l.state === "lapsed");
   return {
     cart,
-    currency: tenant.currency,
+    currency,
     countries,
     defaultCountry: preferred ?? countries[0] ?? null,
     payment,
@@ -254,16 +273,17 @@ export async function quoteCheckout(
   tenantId: string,
   token: string | null | undefined,
   input: z.input<typeof quoteInputSchema>,
+  preloaded?: PreloadedCart,
 ): Promise<CheckoutQuote> {
   const data = quoteInputSchema.parse(input);
   const [cart, checkout, zones, rules] = await Promise.all([
-    getCart(tenantId, token),
+    preloaded ? preloaded.cart : getCart(tenantId, token),
     getSettings(tenantId, "checkout"),
-    loadQuoteZones(tenantId),
+    requestQuoteZones(tenantId),
     data.paymentMethod ? getSurchargeRules(tenantId) : Promise.resolve({} as SurchargeRules),
   ]);
   const buyable = (cart?.lines ?? []).filter((l) => l.state === "held" || l.state === "lapsed");
-  const currency = cart?.currency ?? (await db.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { currency: true } })).currency;
+  const currency = cart?.currency ?? (await getTenantCurrency(tenantId));
   const [coupon, restricted] = await Promise.all([
     cart?.couponCode && buyable.length
       ? evaluateCoupon(tenantId, cart.couponCode, { subtotal: cart.couponBase, shippingPrice: 0, email: cart.email }, (n) => formatMoney(n, currency))

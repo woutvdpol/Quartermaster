@@ -183,6 +183,8 @@ const listSchema = z.object({
   priceMin: money.optional(),
   priceMax: money.optional(),
   purchaseRecordId: idSchema.optional(),
+  /** Products created by this product import (src/server/import; Product.legacyData.importJobId). */
+  importJobId: idSchema.optional(),
   sort: z.enum(PRODUCT_SORTS).default("publishedAt"),
   dir: z.enum(["asc", "desc"]).optional(),
   page: z.int().min(1).max(100_000).optional(),
@@ -293,6 +295,7 @@ function filterSql(tenantId: string, q: z.output<typeof listSchema>): Prisma.Sql
   if (q.priceMin !== undefined) parts.push(Prisma.sql`p.price >= ${q.priceMin}`);
   if (q.priceMax !== undefined) parts.push(Prisma.sql`p.price <= ${q.priceMax}`);
   if (q.purchaseRecordId) parts.push(Prisma.sql`p."purchaseRecordId" = ${q.purchaseRecordId}`);
+  if (q.importJobId) parts.push(Prisma.sql`p."legacyData"->>'importJobId' = ${q.importJobId}`);
   return Prisma.join(parts, " AND ");
 }
 
@@ -434,7 +437,7 @@ export type ProductDetail = Awaited<ReturnType<typeof getProduct>>;
 
 type CreateData = z.output<typeof createSchema>;
 
-async function createInTx(tx: Tx, ctx: ServiceContext, data: CreateData, note: string) {
+async function createInTx(tx: Tx, ctx: ServiceContext, data: CreateData, note: string, extra: { legacyData?: Prisma.InputJsonValue } = {}) {
   await assertRefs(tx, ctx.tenantId, data);
   if (data.status === "ACTIVE" && (data.price <= 0 || data.quantity <= 0)) {
     throw new ServiceError("INVALID", "An active product needs a price and stock");
@@ -471,6 +474,7 @@ async function createInTx(tx: Tx, ctx: ServiceContext, data: CreateData, note: s
       purchaseRecordId: data.purchaseRecordId ?? null,
       status: data.status,
       publishedAt: data.status === "ACTIVE" ? new Date() : null,
+      ...(extra.legacyData !== undefined ? { legacyData: extra.legacyData } : {}),
     },
     select: { id: true, stockCode: true, slug: true, status: true },
   });
@@ -516,6 +520,21 @@ export async function createProduct(ctx: ServiceContext, input: CreateProductInp
   await auditProducts(ctx, "product.create", [product.id], { stockCode: product.stockCode, title: data.title });
   if (product.status === "ACTIVE") await onProductPublished(ctx.tenantId, product.id);
   return { id: product.id, stockCode: product.stockCode, slug: product.slug };
+}
+
+/**
+ * Creates a product inside the caller's transaction (product import, src/server/import): same rules
+ * as createProduct (validation, stockCode, slug, opening stock movement) plus `legacyData`. The caller
+ * audits and fires publish hooks after its transaction commits. A slug race surfaces as a P2002 error.
+ */
+export async function createProductInTx(
+  tx: Tx,
+  ctx: ServiceContext,
+  input: CreateProductInput,
+  opts: { note?: string; legacyData?: Prisma.InputJsonValue } = {},
+) {
+  const data = parseInput(createSchema, input);
+  return createInTx(tx, ctx, data, opts.note ?? "Opening stock", { legacyData: opts.legacyData });
 }
 
 /**

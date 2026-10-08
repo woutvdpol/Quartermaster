@@ -71,12 +71,14 @@ function ToastCard({ item }: { item: ToastItem }) {
   return (
     <div
       role={item.tone === "crit" ? "alert" : undefined}
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
+      // Click-through: the card never blocks the page under it (e.g. a panel's primary button in the
+      // bottom-right corner). Only its buttons take the pointer; hovering or focusing them pauses dismissal.
+      onPointerOver={(e) => setPaused((e.target as HTMLElement).closest("button") !== null)}
+      onPointerLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
       className={cx(
-        "pointer-events-auto flex items-start gap-2.5 rounded-card border border-l-4 border-line bg-panel px-3 py-2.5 text-[13px] text-ink shadow-pop",
+        "pointer-events-none flex items-start gap-2.5 rounded-card border border-l-4 border-line bg-panel px-3 py-2.5 text-[13px] text-ink shadow-pop",
         "motion-safe:animate-[qm-toast-in_160ms_ease-out]",
         toneClass[item.tone],
       )}
@@ -94,7 +96,7 @@ function ToastCard({ item }: { item: ToastItem }) {
               item.action?.onClick();
               toast.dismiss(item.id);
             }}
-            className="justify-self-start text-xs font-medium text-accent underline underline-offset-2 hover:text-accent-strong"
+            className="pointer-events-auto justify-self-start text-xs font-medium text-accent underline underline-offset-2 hover:text-accent-strong"
           >
             {item.action.label}
           </button>
@@ -104,7 +106,7 @@ function ToastCard({ item }: { item: ToastItem }) {
         type="button"
         onClick={() => toast.dismiss(item.id)}
         aria-label={t.dismiss}
-        className="-mt-0.5 -mr-1 grid size-6 shrink-0 place-items-center rounded-control text-muted hover:bg-panel-2 hover:text-ink"
+        className="pointer-events-auto -mt-0.5 -mr-1 grid size-6 shrink-0 place-items-center rounded-control text-muted hover:bg-panel-2 hover:text-ink"
       >
         <span aria-hidden="true">×</span>
       </button>

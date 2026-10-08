@@ -200,20 +200,10 @@ export async function queryCategoryTiles(tenantId: string, ids: string[]): Promi
 }
 export const getCategoryTiles = shopCache("category-tiles", "catalog", queryCategoryTiles);
 
-/** Public, indexable products for the sitemap (sensitive items excluded: guests cannot open them). */
-export async function listProductsForSitemap(tenantId: string, includeSold: boolean) {
-  return db.product.findMany({
-    where: { tenantId, blurred: false, status: { in: includeSold ? ["ACTIVE", "RESERVED", "SOLD"] : ["ACTIVE", "RESERVED"] } },
-    select: { stockCode: true, slug: true, updatedAt: true },
-    orderBy: { stockCode: "desc" },
-    take: 45_000,
-  });
-}
-
 /**
  * Facet landing pages (/shop/facet/{facet}/{value}) worth indexing: values of filterable facets with
  * at least one visible product — assigned to the value itself or to a descendant value (the landing
- * page includes the subtree). Same visibility as listProductsForSitemap.
+ * page includes the subtree). Sensitive (`blurred`) products are skipped: guests cannot open them.
  */
 export async function listFacetValuesForSitemap(tenantId: string, includeSold: boolean) {
   const [values, used] = await Promise.all([

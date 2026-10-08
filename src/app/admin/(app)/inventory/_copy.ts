@@ -4,6 +4,7 @@ export const copy = {
   crumb: "Catalog",
   title: "Inventory",
   newProduct: "New product",
+  importProducts: "Import",
   caption: "Products",
   loading: "Loading inventory",
   views: {
@@ -35,6 +36,7 @@ export const copy = {
     uncategorised: "Uncategorised",
     tag: "Tag",
     purchase: "Purchase",
+    importJob: "Import",
     search: "Search",
     priceMin: "Min price",
     priceMax: "Max price",

@@ -19,3 +19,24 @@ export function ProductGridSkeleton({ count = 8, columns = 4 }: { count?: number
     </div>
   );
 }
+
+/**
+ * Placeholder for the CATEGORIES block (src/components/shop/blocks/ShopBlocks.tsx): same rail/grid
+ * geometry (square tile + two text lines), so the streamed-in block does not shift the page (CLS).
+ */
+export function CategoryTilesSkeleton({ heading = false }: { heading?: boolean }) {
+  return (
+    <div aria-busy="true">
+      {heading ? <Skeleton className="mb-6 h-8 w-56 max-w-full sm:mb-8" /> : null}
+      <div className="grid auto-cols-[42%] grid-flow-col gap-3 overflow-hidden pb-2 sm:auto-cols-auto sm:grid-flow-row sm:grid-cols-3 sm:pb-0 md:grid-cols-4 lg:grid-cols-6">
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className={cn("flex flex-col gap-2.5", i === 3 && "sm:hidden md:flex", i > 3 && "sm:hidden lg:flex")}>
+            <Skeleton className="aspect-square w-full" />
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-3.5 w-1/3" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

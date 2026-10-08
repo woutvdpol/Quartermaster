@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { formatMoney } from "@/components/shop/ui";
-import { quoteShipping } from "@/server/shipping/quote";
+import { estimateShopShipping } from "@/server/storefront/shipping";
 import { countryName } from "@/server/shipping/countries";
 import { visitorCountry } from "@/server/storefront-catalog/country";
 import { catalogCopy as copy } from "../_copy";
@@ -27,7 +27,8 @@ export async function ShippingHint({
 }) {
   const h = await headers();
   const country = visitorCountry({ cfIpCountry: h.get("cf-ipcountry"), acceptLanguage: h.get("accept-language") }, shopCountry || "NL");
-  const quote = await quoteShipping(tenantId, {
+  // Zones come from the data cache (identical for every visitor); only the country is per request.
+  const quote = await estimateShopShipping(tenantId, {
     countryCode: country,
     totalWeightGrams: weightGrams,
     subtotal: price,

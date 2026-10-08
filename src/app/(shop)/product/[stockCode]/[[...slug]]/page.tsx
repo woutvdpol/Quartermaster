@@ -6,7 +6,6 @@ import { JsonLd } from "@/components/shop/ui";
 import { requireShop } from "@/server/storefront/context";
 import { getShopViewer } from "@/server/storefront/viewer";
 import { getVisitorDisplayCurrency } from "@/server/rates/display";
-import { markdownToPlainText } from "@/server/content/markdown";
 import { redirectOrNotFound } from "@/server/redirects/runtime";
 import {
   getProduct,
@@ -22,7 +21,10 @@ import {
   ProductDetail,
   type ProductGeo,
 } from "@/components/shop/catalog/product/ProductDetail";
-import { productJsonLd } from "@/components/shop/catalog/product/json-ld";
+import { productJsonLd, shippingDetailsJsonLd } from "@/lib/seo/json-ld";
+import { productMetaDescription, productOgImage, productOgTags } from "@/lib/seo/metadata";
+import { metaTitle } from "@/lib/seo/text";
+import { blockedShippingCountries, deliveryCountries, loadSeoShop } from "@/server/seo";
 
 type Props = PageProps<"/product/[stockCode]/[[...slug]]">;
 
@@ -87,7 +89,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     product,
     shop.settings.legal.blurSensitiveForGuests,
   );
-  const title = product.seoTitle || product.title;
+  const title = metaTitle(product.seoTitle, product.title);
+  // Markdown alternate for AI assistants (/product/{No}.md → src/app/md/product).
+  const alternates = { canonical: product.href, types: { "text/markdown": `/product/${product.stockCode}.md` } };
   if (locked) {
     // Sensitive item for a guest: no description, no image, not indexable.
     return {
@@ -96,37 +100,30 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       robots: { index: false, follow: false },
     };
   }
-  const description =
-    product.seoDescription ||
-    (product.description
-      ? markdownToPlainText(product.description).slice(0, 160)
-      : undefined);
-  // No preview image where a compliance rule blurs the photos.
-  const image = geo.blurred ? undefined : product.images[0];
+  const { catalog } = shop.settings;
+  const showPrice = product.status !== "sold" || catalog.showPriceWhenSold;
+  const description = productMetaDescription(product, shop.shopName, showPrice ? shop.tenant.currency : null);
+  // No preview image where a compliance rule blurs the photos; generated card when there are none.
+  const image = geo.blurred ? null : productOgImage(product);
+  // Sensitive items are never indexed (signed-in customers can still view them); sold items only
+  // while the shop keeps a public archive (docs/seo-geo.md §Verkochte items).
+  const noindex = product.blurred || (product.status === "sold" && !catalog.publicArchive);
   return {
     title,
     description,
-    alternates: { canonical: product.href },
-    // Sensitive items are never indexed (signed-in customers can still view them).
-    robots: product.blurred ? { index: false, follow: false } : undefined,
+    alternates,
+    // Only set when needed: `robots: undefined` would also wipe the layout's noindex (coming soon / preview).
+    ...(noindex ? { robots: { index: false, follow: true } } : {}),
     openGraph: {
       title,
       description,
       url: product.href,
-      ...(image
-        ? {
-            images: [
-              {
-                url: image.large,
-                width: image.width ?? undefined,
-                height: image.height ?? undefined,
-                alt: image.alt ?? product.title,
-              },
-            ],
-          }
-        : {}),
+      siteName: shop.shopName,
+      images: [image ?? { url: `/og/product/${product.stockCode}`, width: 1200, height: 630, alt: product.title }],
     },
-    twitter: { card: image ? "summary_large_image" : "summary" },
+    twitter: { card: "summary_large_image", title, description },
+    // og:type product + product:* tags (Next's openGraph types have no "product").
+    other: productOgTags(product, shop.tenant.currency, showPrice),
   };
 }
 
@@ -136,7 +133,7 @@ export default async function ProductPage({ params }: Props) {
   ensureCanonical(product, slug);
 
   const live = product.status === "available";
-  const [locked, reserved, own, display] = await Promise.all([
+  const [locked, reserved, own, display, seo] = await Promise.all([
     isLocked(
       shop.tenant.id,
       product,
@@ -149,7 +146,9 @@ export default async function ProductPage({ params }: Props) {
       ? ownReservedIds(shop.tenant.id, [product.id])
       : Promise.resolve(new Set<string>()),
     getVisitorDisplayCurrency(shop.tenant.id),
+    loadSeoShop(shop),
   ]);
+  const blocked = await blockedShippingCountries(shop.tenant.id, product, deliveryCountries(seo.zones, ""));
   // Held by this visitor's own cart: shown as for sale, with "In your cart" in the buy box.
   const inCart = own.has(product.id);
   const status: PublicStatus =
@@ -162,9 +161,20 @@ export default async function ProductPage({ params }: Props) {
       {!locked ? (
         <JsonLd
           data={productJsonLd(
-            shop,
+            seo.seo,
             geo.blurred ? { ...product, images: [] } : product,
             status,
+            {
+              showPrice: status !== "sold" || shop.settings.catalog.showPriceWhenSold,
+              shipping: status === "sold" ? [] : shippingDetailsJsonLd(seo.zones, {
+                weightGrams: product.weightGrams,
+                price: product.price,
+                freeShippingThreshold: shop.settings.checkout.freeShippingThresholdCents,
+                currency: shop.tenant.currency,
+                blockedCountries: blocked,
+              }),
+              returns: seo.seo.returns,
+            },
           )}
         />
       ) : null}

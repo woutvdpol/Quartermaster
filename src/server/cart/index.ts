@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { ServiceError } from "@/server/context";
@@ -196,17 +197,23 @@ export function summarize(lines: CartLine[]) {
   };
 }
 
+/**
+ * The shop currency, memoised per request (React cache; outside a render it simply queries). Cart,
+ * checkout context and quote all need it; it only changes through the platform admin.
+ */
+export const getTenantCurrency = cache(async (tenantId: string): Promise<string> => {
+  const tenant = await db.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { currency: true } });
+  return tenant.currency;
+});
+
 /** Read-only cart view for the cart page / checkout / header. Null when there is no cart. */
 export async function getCart(tenantId: string, token: string | null | undefined): Promise<CartView | null> {
   const cart = await findCart(tenantId, token);
   if (!cart) return null;
-  const [lines, tenant] = await Promise.all([
-    loadLines(tenantId, cart.id),
-    db.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { currency: true } }),
-  ]);
+  const [lines, currency] = await Promise.all([loadLines(tenantId, cart.id), getTenantCurrency(tenantId)]);
   return {
     id: cart.id,
-    currency: tenant.currency,
+    currency,
     countryCode: cart.countryCode,
     customerId: cart.customerId,
     couponCode: cart.couponCode,

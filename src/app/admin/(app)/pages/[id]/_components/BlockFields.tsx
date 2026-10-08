@@ -131,6 +131,8 @@ function FieldFor({
           }}
         />
       );
+    case "faq":
+      return <FaqField spec={spec} value={Array.isArray(value) ? (value as unknown[]) : []} onChange={onChange} errors={errors} />;
   }
 }
 
@@ -299,6 +301,94 @@ function ImagesField({ label, max, value, onChange, error, editor }: { label: st
           </div>
         </div>
       }
+    </GroupField>
+  );
+}
+
+// ─── FAQ ─────────────────────────────────────────────────────────────────────
+
+type FaqDraftItem = { question: string; answer: string };
+
+function toFaqItems(value: unknown[]): FaqDraftItem[] {
+  return value.map((v) => {
+    const o = v && typeof v === "object" ? (v as { question?: unknown; answer?: unknown }) : {};
+    return { question: typeof o.question === "string" ? o.question : "", answer: typeof o.answer === "string" ? o.answer : "" };
+  });
+}
+
+/** Question/answer list with add, remove and move up/down (FAQ block). */
+function FaqField({
+  spec,
+  value,
+  onChange,
+  errors,
+}: {
+  spec: Extract<FieldSpec, { kind: "faq" }>;
+  value: unknown[];
+  onChange: (v: FaqDraftItem[]) => void;
+  errors: Record<string, string[]>;
+}) {
+  const items = toFaqItems(value);
+  const set = (i: number, patch: Partial<FaqDraftItem>) => onChange(items.map((it, j) => (j === i ? { ...it, ...patch } : it)));
+  const move = (i: number, d: -1 | 1) => {
+    const next = [...items];
+    [next[i], next[i + d]] = [next[i + d], next[i]];
+    onChange(next);
+  };
+  return (
+    <GroupField label={spec.label} hint={f.faqHint(items.length, spec.max)} error={errors[spec.key]}>
+      <div className="grid gap-3">
+        {items.length > 0 && (
+          <ol className="grid gap-3">
+            {items.map((it, i) => {
+              const n = i + 1;
+              return (
+                <li key={i} className="grid gap-2.5 rounded-control border border-line bg-panel-2 p-3">
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <TextInput
+                        label={f.faqQuestion(n)}
+                        value={it.question}
+                        maxLength={spec.questionMax}
+                        required
+                        error={errors[`${spec.key}.${i}.question`]}
+                        onChange={(e) => set(i, { question: e.target.value })}
+                      />
+                    </div>
+                    <div className="flex shrink-0 gap-0.5 pt-6">
+                      <Button size="sm" variant="ghost" className="px-1.5" aria-label={f.faqMoveUp(n)} disabled={i === 0} onClick={() => move(i, -1)}>
+                        ↑
+                      </Button>
+                      <Button size="sm" variant="ghost" className="px-1.5" aria-label={f.faqMoveDown(n)} disabled={i === items.length - 1} onClick={() => move(i, 1)}>
+                        ↓
+                      </Button>
+                      <Button size="sm" variant="ghost" className="px-1.5" aria-label={f.faqRemove(n)} onClick={() => onChange(items.filter((_, j) => j !== i))}>
+                        ×
+                      </Button>
+                    </div>
+                  </div>
+                  <Textarea
+                    label={f.faqAnswer}
+                    value={it.answer}
+                    rows={3}
+                    maxLength={spec.answerMax}
+                    required
+                    hint={f.faqAnswerHint(it.answer.length, spec.answerMax)}
+                    error={errors[`${spec.key}.${i}.answer`]}
+                    inputClassName="font-mono text-[12.5px]"
+                    onChange={(e) => set(i, { answer: e.target.value })}
+                  />
+                </li>
+              );
+            })}
+          </ol>
+        )}
+        <div>
+          <Button size="sm" disabled={items.length >= spec.max} onClick={() => onChange([...items, { question: "", answer: "" }])}>
+            {f.faqAdd}
+          </Button>
+        </div>
+      </div>
     </GroupField>
   );
 }

@@ -1,7 +1,8 @@
 "use server";
 
 import { requestPasswordResetEmail } from "@/server/mail";
-import { getRequestTenant } from "@/server/tenant";
+// Not while the shop is "coming soon" (src/server/storefront/launch.ts).
+import { getOpenShopTenant as getRequestTenant } from "@/server/storefront/launch";
 import { clientIp } from "@/server/customer-auth";
 import { turnstileTokenFrom, verifyTurnstile } from "@/server/turnstile";
 import { accountCopy } from "@/components/shop/account/_copy";

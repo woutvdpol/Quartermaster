@@ -29,8 +29,20 @@ export function readableOn(background: string): string {
   return contrastRatio(background, LIGHT_INK) >= contrastRatio(background, DARK_INK) ? LIGHT_INK : DARK_INK;
 }
 
+/** Theme-builder tunables → CSS values (see appearanceSchema: corners / buttonShape / density). */
+export const CORNER_RADII = {
+  sharp: { radius: "0px", radiusSm: "0px" },
+  soft: { radius: "6px", radiusSm: "6px" },
+  round: { radius: "14px", radiusSm: "10px" },
+} as const;
+export const BUTTON_RADII = { square: "0px", rounded: "8px", pill: "999px" } as const;
+export const DENSITY_SCALE = { compact: "0.75", comfortable: "1", spacious: "1.3" } as const;
+
 export type ThemeInput = {
   colors: { primary: string; secondary: string; accent: string };
+  corners?: keyof typeof CORNER_RADII;
+  buttonShape?: keyof typeof BUTTON_RADII;
+  density?: keyof typeof DENSITY_SCALE;
   headingFontFamily: string;
   textFontFamily: string;
   /** Theme-owned roles (emphasis serif, stock numbers); optional so callers/tests can omit them. */
@@ -52,5 +64,8 @@ export function shopThemeVars(input: ThemeInput): Record<`--${string}`, string> 
     "--shop-font-body": input.textFontFamily,
     ...(input.accentFontFamily ? { "--shop-font-accent": input.accentFontFamily } : {}),
     ...(input.monoFontFamily ? { "--shop-font-mono": input.monoFontFamily } : {}),
+    ...(input.corners ? { "--shop-radius": CORNER_RADII[input.corners].radius, "--shop-radius-sm": CORNER_RADII[input.corners].radiusSm } : {}),
+    ...(input.buttonShape ? { "--shop-radius-control": BUTTON_RADII[input.buttonShape] } : {}),
+    ...(input.density ? { "--shop-density": DENSITY_SCALE[input.density] } : {}),
   };
 }

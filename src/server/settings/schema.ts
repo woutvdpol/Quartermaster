@@ -36,16 +36,23 @@ export const FONT_ALLOWLIST = [
   "Archivo",
   "Work Sans",
   "Libre Caslon Display",
+  // Theme "fieldkit" display face (next/font has no fallback metrics for it: adjustFontFallback off).
+  "Big Shoulders",
 ] as const;
 
 /**
- * Storefront theme presets. A preset sets the layout character (radii, button shape, neutrals, accent
- * and mono fonts) on top of the tenant's colours and fonts — see `.shop-root[data-shop-theme]` in
- * src/app/(shop)/shop.css. Only "gallery" ships now; "archive", "fieldkit" and "vault" are designed
- * (docs/design/shop-options) and are meant for the later theme builder. Field Kit's display face
- * (Big Shoulders) is not declared yet: next/font has no fallback metrics for it, add it with that theme.
+ * Storefront theme presets. A preset sets the layout character (neutrals, header treatment, heading
+ * style, accent and mono fonts) on top of the tenant's colours and fonts — see
+ * `.shop-root[data-shop-theme]` in src/app/(shop)/shop.css and the builder defaults in
+ * src/server/theme/presets.ts. Designs: docs/design/shop-options.
  */
-export const SHOP_THEMES = ["gallery"] as const;
+export const SHOP_THEMES = ["gallery", "archive", "fieldkit", "vault"] as const;
+/** Corner radius of cards/images (sharp 0 · soft 6px · round 14px). */
+export const SHOP_CORNERS = ["sharp", "soft", "round"] as const;
+/** Shape of buttons, inputs and chips (square 0 · rounded 8px · pill). */
+export const SHOP_BUTTON_SHAPES = ["square", "rounded", "pill"] as const;
+/** Spacing scale for sections and grids (compact 0.75 · comfortable 1 · spacious 1.3). */
+export const SHOP_DENSITIES = ["compact", "comfortable", "spacious"] as const;
 
 export const hexColor = z
   .string()
@@ -176,10 +183,17 @@ export const appearanceSchema = z.object({
   theme: z.enum(SHOP_THEMES).default("gallery"),
   headingFont: font.default("Hanken Grotesk"),
   textFont: font.default("Hanken Grotesk"),
+  // Theme-builder tunables (defaults = the Gallery look). Edited only via Website → Theme.
+  corners: z.enum(SHOP_CORNERS).default("soft"),
+  buttonShape: z.enum(SHOP_BUTTON_SHAPES).default("pill"),
+  density: z.enum(SHOP_DENSITIES).default("comfortable"),
   logoPath: storedPath.default(null),
   bannerPath: storedPath.default(null),
   ctaImagePath: storedPath.default(null),
 });
+
+/** Public profile URL (social media, marketplace shop, association page) — https only. */
+const profileUrl = z.url({ protocol: /^https$/ }).max(300);
 
 export const contentSchema = z.object({
   homeRedirectsToShop: z.boolean().default(false),
@@ -187,6 +201,18 @@ export const contentSchema = z.object({
   bannerOnPages: z.boolean().default(false),
   contactForm: z.boolean().default(true),
   newsletterPopup: z.boolean().default(false),
+  // Search engines & AI assistants (docs/seo-geo.md).
+  seo: z
+    .object({
+      // Default meta description of the shop (home page, Organization, llms.txt). "" = generated.
+      description: shortText(300).default(""),
+      // false: robots.txt blocks AI *training* crawlers (GPTBot, ClaudeBot, Google-Extended …);
+      // AI *search* crawlers that cite the shop in answers stay allowed either way.
+      allowAiTraining: z.boolean().default(true),
+      // Official profiles of the shop elsewhere (schema.org sameAs: entity consistency).
+      sameAs: z.array(profileUrl).max(10).default([]),
+    })
+    .prefault({}),
 });
 
 export const legalSchema = z.object({
@@ -196,6 +222,14 @@ export const legalSchema = z.object({
   minimumAge: z.int().min(16).max(21).default(18),
   // Decision 19: products flagged sensitive are blurred for guests (login to view).
   blurSensitiveForGuests: z.boolean().default(true),
+  // Published return policy (structured data on products + Organization, markdown/llms.txt summaries).
+  // EU consumers have a 14-day right of withdrawal on distance sales; 0 = returns not accepted.
+  returns: z
+    .object({
+      days: z.int().min(0).max(365).default(14),
+      fees: z.enum(["customer", "free"]).default("customer"),
+    })
+    .prefault({}),
   disclaimers: z
     .object({
       footer: shortText(2000).default(""),

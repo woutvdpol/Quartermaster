@@ -178,3 +178,38 @@ export function TestimonialsBlock({ items }: { items: BlockData<"TESTIMONIAL">[]
     </Container>
   );
 }
+
+/**
+ * FAQ: a native <details>/<summary> accordion — works without JavaScript, keyboard and screen-reader
+ * accessible by default, and every answer is in the initial HTML (crawlers and AI fetchers read it
+ * even while collapsed). Items open independently. Each item has an anchor (`#faq-{block}-{n}`).
+ * The FAQPage JSON-LD for the whole page is emitted once by BlockRenderer.
+ */
+export function FaqBlock({ data, blockId }: { data: BlockData<"FAQ">; blockId: string }) {
+  return (
+    <Container size="narrow">
+      {data.title ? <h2 className={cn(H2, "mb-6 sm:mb-8")}>{emphasis(data.title)}</h2> : null}
+      <div className="border-t border-shop-line">
+        {data.items.map((it, i) => (
+          <details key={i} id={`faq-${blockId}-${i + 1}`} className="group scroll-mt-32 border-b border-shop-line">
+            <summary className="flex cursor-pointer list-none items-start justify-between gap-4 py-5 text-[1.0625rem] font-semibold text-shop-ink transition-colors hover:text-shop-primary sm:text-lg [&::-webkit-details-marker]:hidden">
+              <span>{it.question}</span>
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                className="mt-1 size-4 shrink-0 text-shop-muted transition-transform duration-200 group-open:rotate-45 motion-reduce:transition-none"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+            </summary>
+            <Markdown source={it.answer} className="pr-8 pb-6 text-shop-ink-2" />
+          </details>
+        ))}
+      </div>
+    </Container>
+  );
+}

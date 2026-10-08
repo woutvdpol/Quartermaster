@@ -20,6 +20,8 @@ export function SettingsNav({ active, showPlatform }: { active: SettingsGroup | 
     <nav aria-label="Settings sections" className="grid content-start gap-3 md:sticky md:top-4">
       <ul className="flex flex-wrap gap-1 md:grid md:gap-0.5">
         {SHOP_GROUPS.map((g) => link(`/admin/settings/${g}`, SETTINGS_FORMS[g].label, active === g))}
+        {/* Colours, fonts and logo live in the theme builder (draft → publish). */}
+        {link("/admin/theme", "Theme & logo →", false)}
       </ul>
       {showPlatform && (
         <div className="grid gap-1 border-t border-line pt-2.5">

@@ -1,5 +1,6 @@
 import { deleteDraftPhoto, uploadLeadPhoto, LEAD_PHOTO_MAX_BYTES } from "@/server/leads";
-import { getRequestTenant } from "@/server/tenant";
+// Not while the shop is "coming soon" (src/server/storefront/launch.ts).
+import { getOpenShopTenant as getRequestTenant } from "@/server/storefront/launch";
 import { clientIpFromHeaders, isSameOrigin } from "@/server/request-meta";
 import { leadsCopy } from "@/components/shop/leads/_copy";
 import type { LeadUploadResponse } from "@/components/shop/leads/types";

@@ -11,6 +11,11 @@ const t = getDictionary().nav;
 
 export function SidebarNav({ role }: { role: Role }) {
   const pathname = usePathname();
+  // The most specific matching item is active ("/admin/platform/applications" ≠ "/admin/platform").
+  const activeHref = ADMIN_NAV.flatMap((g) => g.items)
+    .map(adminHref)
+    .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
+    .sort((a, b) => b.length - a.length)[0];
   return (
     <nav aria-label={t.label} className="flex flex-col gap-0.5">
       {ADMIN_NAV.map(({ group, items }) => (
@@ -19,7 +24,7 @@ export function SidebarNav({ role }: { role: Role }) {
           <ul className="flex flex-col gap-0.5">
             {items.filter((item) => !item.superadminOnly || role === "SUPERADMIN").map((item) => {
               const href = adminHref(item);
-              const active = pathname === href || pathname.startsWith(`${href}/`);
+              const active = href === activeHref;
               return (
                 <li key={item.key}>
                   <Link

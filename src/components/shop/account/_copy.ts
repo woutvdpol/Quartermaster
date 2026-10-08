@@ -1,3 +1,5 @@
+import { wishlistCopy } from "./_copy-wishlist";
+
 /** English copy for customer accounts, auth pages, wishlist and newsletter pages (multi-language later). */
 export const accountCopy = {
   common: {
@@ -209,23 +211,7 @@ export const accountCopy = {
       rate_limited: "Too many attempts. Please wait 15 minutes.",
     },
   },
-  wishlist: {
-    title: "Wishlist",
-    intro: "Items you saved. Every item is unique — once it is sold, it is gone.",
-    empty: "Your wishlist is empty.",
-    emptyHint: "Tap the heart on any item to save it here.",
-    browse: "Browse the shop",
-    add: "Add to wishlist",
-    remove: "Remove from wishlist",
-    saved: "Saved",
-    save: "Save",
-    loginToSave: "Log in to save items to your wishlist",
-    available: "Available",
-    reserved: "Reserved",
-    sold: "Sold",
-    addedOn: "Saved on",
-    error: "Could not update your wishlist. Please try again.",
-  },
+  wishlist: wishlistCopy,
   menu: {
     login: "Log in",
     register: "Create account",

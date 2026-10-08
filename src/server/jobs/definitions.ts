@@ -4,6 +4,7 @@ import { campaignBatchJob } from "@/server/newsletter/jobs";
 import { ALERT_JOBS } from "@/server/alerts/jobs";
 import { invoiceIssueJob, invoiceRenderJob } from "@/server/invoices/job";
 import { passwordResetRequestJob } from "@/server/auth/jobs";
+import { importImagesJob, importRunJob } from "@/server/import/jobs";
 import { defineJob } from "./registry";
 import { CRON_TASKS, runCronTask, type CronTaskName } from "./cron";
 
@@ -36,6 +37,8 @@ export const JOBS = {
   ...ALERT_JOBS, // alerts.match-product, alerts.back-available, alerts.price-drop
   "invoices.issue": invoiceIssueJob,
   "invoices.render": invoiceRenderJob,
+  "import.run": importRunJob,
+  "import.images": importImagesJob,
   ...CRON_JOBS,
 };
 

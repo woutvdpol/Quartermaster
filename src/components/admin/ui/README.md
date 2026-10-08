@@ -200,7 +200,7 @@ so they work as they are. On a statically rendered page, wrap them in `<Suspense
 | Component | Client | Key props |
 | --- | --- | --- |
 | `toast(title, opts)`, `toast.ok/info/warn/crit`, `toast.dismiss(id?)` | call from client code | `opts`: `description`, `duration` (ms, 0 = sticky; default 5s, crit 8s), `action: {label, onClick}` |
-| `Toaster` | yes | mount one time (see above). Polite live region; crit toasts use `role=alert`; hover or focus pauses dismissal |
+| `Toaster` | yes | mount one time (see above). Polite live region; crit toasts use `role=alert`. Toasts are click-through (only their buttons take the pointer), so they never block controls underneath; hovering or focusing a toast button pauses dismissal |
 | `ActionToast` | yes | `state` (ActionResult), `errors` (also toast failures, default true) |
 | `InlineAlert` | – | `tone: info\|ok\|warn\|crit`, `title`, `children`, `action`, `live: "none"\|"status"\|"alert"` |
 | `ActionMessage` | – | `state`, `showSuccess`. Shows ActionResult message as an InlineAlert |

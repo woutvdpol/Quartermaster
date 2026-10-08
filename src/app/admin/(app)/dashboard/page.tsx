@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { PageHeader, buttonClasses } from "@/components/admin/ui";
+import { InlineAlert, PageHeader, buttonClasses } from "@/components/admin/ui";
+import { SETUP_STEPS, completedStepCount, getPendingSetup } from "@/server/onboarding";
 import { requireStaffContext } from "@/server/context";
 import { copy, parsePeriod } from "./_copy";
 import { PeriodLinks } from "./_components/PeriodLinks";
@@ -22,6 +23,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/admin/
   const sp = await searchParams;
   const days = parsePeriod(sp.days);
   const ctx = await requireStaffContext();
+  const setup = await getPendingSetup(ctx);
 
   return (
     <>
@@ -38,6 +40,23 @@ export default async function DashboardPage({ searchParams }: PageProps<"/admin/
         }
       />
       <div className="grid content-start gap-4 p-4 md:px-[22px] md:py-5">
+        {setup ? (
+          <InlineAlert
+            tone="info"
+            title="Finish setting up your shop"
+            action={
+              <Link href="/admin/setup" className={buttonClasses({ variant: "primary", size: "sm" })}>
+                Continue setup
+              </Link>
+            }
+          >
+            {completedStepCount(setup.state)} of {SETUP_STEPS.length} steps done. The wizard walks you through payments, shipping, products and legal pages.
+          </InlineAlert>
+        ) : sp.setup === "done" ? (
+          <InlineAlert tone="ok" title="Your shop is live">
+            Setup is complete. You can change everything later under Settings.
+          </InlineAlert>
+        ) : null}
         <Suspense key={`kpi-${days}`} fallback={<KpiSkeleton />}>
           <KpiSection ctx={ctx} days={days} />
         </Suspense>

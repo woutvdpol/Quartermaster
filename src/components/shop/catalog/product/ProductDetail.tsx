@@ -235,9 +235,9 @@ export function ProductDetail({
           </div>
 
           <div className="flex min-w-0 flex-col gap-6 empty:hidden">
-            <Suspense fallback={null}>
-              <ProvenanceBlock productId={product.id} />
-            </Suspense>
+            {/* Not streamed: provenance is a key fact for search engines / AI crawlers that read raw
+                HTML (docs/seo-geo.md). Its data is cached per tenant, so this costs no extra query. */}
+            <ProvenanceBlock productId={product.id} />
 
             {status !== "available" ? (
               <section className="flex flex-col gap-4 rounded-shop border border-shop-line p-6" aria-labelledby="pd-notify">

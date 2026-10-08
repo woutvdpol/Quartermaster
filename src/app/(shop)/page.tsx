@@ -11,25 +11,32 @@ import { blockContext } from "@/components/shop/blocks/context";
 import { JsonLd } from "@/components/shop/ui/JsonLd";
 import { PlatformLanding } from "./_platform/PlatformLanding";
 import { platformCopy } from "./_platform/_copy";
+import { organizationJsonLd, websiteJsonLd } from "@/lib/seo/json-ld";
+import { shopOgDefaults } from "@/lib/seo/metadata";
+import { metaDescription } from "@/lib/seo/text";
+import { loadSeoShop, shopDescription } from "@/server/seo";
 import { shopPageCopy } from "./_copy";
 
 const t = shopPageCopy.home;
 
 export async function generateMetadata(): Promise<Metadata> {
   const shop = await getShopContext();
-  if (!shop) return { title: { absolute: platformCopy.name }, description: platformCopy.metaDescription };
+  if (!shop) return { title: { absolute: platformCopy.name }, description: platformCopy.metaDescription, alternates: { canonical: "/" } };
   const page = await getStorefrontHomePage(shop.tenant.id);
   const firstText = page?.blocks.find((b) => b.type === "TEXT" || b.type === "TEXT_IMAGE" || b.type === "TEXT_HORIZONTAL");
-  const description =
-    page?.seoDescription ||
-    (page?.blocks[0]?.type === "HERO" && page.blocks[0].data.subtitle) ||
-    (firstText && "markdown" in firstText.data ? markdownToPlainText(firstText.data.markdown).slice(0, 160) : null) ||
-    `${shop.shopName} — online shop`;
+  const description = metaDescription(
+    page?.seoDescription,
+    shop.settings.content.seo.description,
+    page?.blocks[0]?.type === "HERO" && page.blocks[0].data.subtitle,
+    firstText && "markdown" in firstText.data ? markdownToPlainText(firstText.data.markdown) : null,
+    shopDescription(shop),
+  );
+  const title = page?.seoTitle || shop.shopName;
   return {
-    title: { absolute: page?.seoTitle || shop.shopName },
+    title: { absolute: title },
     description,
     alternates: { canonical: "/" },
-    openGraph: { url: "/", title: page?.seoTitle || shop.shopName, description },
+    openGraph: { ...shopOgDefaults(shop), url: "/", title, description },
   };
 }
 
@@ -47,31 +54,14 @@ export default async function HomePage() {
   const shop = await requireShop();
   if (shop.settings.content.homeRedirectsToShop) redirect("/shop");
 
-  const [page, viewer] = await Promise.all([getStorefrontHomePage(shop.tenant.id), getShopViewer(shop.tenant.id)]);
+  const [page, viewer, { seo }] = await Promise.all([getStorefrontHomePage(shop.tenant.id), getShopViewer(shop.tenant.id), loadSeoShop(shop)]);
   const blocks = page?.blocks.length ? page.blocks : fallbackBlocks(shop.shopName);
   const ctx = blockContext(shop, { viewerSignedIn: !!viewer, withBanner: shop.settings.content.bannerOnHome });
   const heroFirst = blocks[0]?.type === "HERO";
 
-  const logo = shop.settings.appearance.logoPath;
-  const org = {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    name: shop.shopName,
-    url: shop.origin,
-    ...(logo ? { logo: new URL(logo, shop.origin).toString() } : {}),
-    ...(shop.settings.general.contactEmail ? { email: shop.settings.general.contactEmail } : {}),
-  };
-  const site = {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: shop.shopName,
-    url: shop.origin,
-    potentialAction: {
-      "@type": "SearchAction",
-      target: { "@type": "EntryPoint", urlTemplate: `${shop.origin}/shop?q={search_term_string}` },
-      "query-input": "required name=search_term_string",
-    },
-  };
+  // Organization (OnlineStore) + WebSite: the shop's entity for search engines and AI assistants.
+  const org = organizationJsonLd(seo);
+  const site = websiteJsonLd(seo);
 
   return (
     <>

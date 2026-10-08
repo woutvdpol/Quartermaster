@@ -6,7 +6,7 @@
 //   npm run db:seed:demo -- --reset   # delete previously seeded demo rows, then seed again
 //   npm run db:seed:demo -- --images-only   # regenerate the photos of existing demo products in place
 //   npm run db:seed:demo -- --home-only     # re-apply the demo home page composition (idempotent)
-//   npm run db:seed:demo -- --content-only  # shop details (empty fields only), legal/service pages, header/footer menus
+//   npm run db:seed:demo -- --content-only  # shop details (empty fields only), legal/service/FAQ pages, header/footer menus
 //   npm run db:seed:demo -- --refresh       # all three of the above; nothing else is touched
 //
 // Rules:
@@ -1467,9 +1467,95 @@ function shopPages(spec: TenantSpec, shopName: string): { key?: "TERMS" | "PRIVA
           ),
         ],
       },
+      {
+        slug: "faq",
+        title: "Frequently asked questions",
+        blocks: [
+          text("", `Answers to the questions collectors ask us most: authenticity and certificates, reservations, shipping and customs, returns and deactivated weapons. Not listed? [Contact us](/contact), we usually reply within one working day.`),
+          faqBlock(spec, i.email),
+        ],
+      },
     );
   }
   return pages;
+}
+
+/**
+ * The demo FAQ (docs/seo-geo.md §7.1): the questions collectors actually ask a militaria dealer —
+ * authenticity, certificates, reservations, shipping and customs, returns, deactivated weapons.
+ * Facts match the demo data: shipping zones from the spec, 14-day returns, the 15-minute cart hold
+ * (checkout.reservationMinutes) and the 30-minute payment hold (PAYMENT_HOLD_MINUTES).
+ */
+function faqBlock(spec: TenantSpec, email: string): BlockDef {
+  const from = (name: string) => {
+    const z = spec.zones.find((x) => x.name === name);
+    return z?.rates.length ? euro(Math.min(...z.rates.map((r) => r.price))) : null;
+  };
+  const zoneLines = spec.zones
+    .filter((z) => !z.isPickup)
+    .map((z) => `- **${z.name}**: from ${from(z.name)}`)
+    .join("\n");
+  const pickup = spec.zones.some((z) => z.isPickup);
+  const items: { question: string; answer: string }[] = [
+    {
+      question: "Are your items original?",
+      answer:
+        "Yes. We only sell period originals: no reproductions, no \"restored to original\" pieces sold as untouched. Every item is examined, measured and photographed from all sides before it is listed, and anything we are unsure about is stated in the description.\n\nEvery item comes with our lifetime authenticity guarantee: should a recognised independent expert ever show that an item is not original as described, we take it back and refund the full purchase price and shipping costs, for as long as you own it.",
+    },
+    {
+      question: "What is a certificate of authenticity and how do I check one?",
+      answer:
+        "Many items come with a numbered certificate of authenticity. It records the photos, measurements and provenance we documented for that piece.\n\nEach certificate carries a QR code. Scan it with your phone, or enter the certificate number on our [verify page](/verify), to see the original record on our own site. If the record does not match the item in front of you, contact us.",
+    },
+    {
+      question: "How does reserving an item work?",
+      answer:
+        "Every item is unique, so adding it to your cart reserves it for you for **15 minutes**. Other visitors then see it as *Reserved* and cannot buy it.\n\nOnce you start paying, the item stays held for up to 30 minutes while the payment completes. If you do not check out in time, the reservation ends and the item becomes available again. Simply add it to your cart again if it is still free.",
+    },
+    {
+      question: "Can you hold an item for me for longer?",
+      answer: `We can hold an item for a few days if you are discussing it with us. [Email us](mailto:${email}) with the item number (No.) and we will mark it as reserved for you.`,
+    },
+    {
+      question: "Which countries do you ship to, and what does it cost?",
+      answer: [
+        "We ship worldwide. Costs depend on the weight of your order and the destination, and are always shown at checkout before you pay:",
+        zoneLines,
+        ...(pickup ? ["Collecting your order in person (Netherlands and Belgium) is free, by appointment."] : []),
+        "See [shipping & zones](/shipping) for details.",
+      ].join("\n\n"),
+    },
+    {
+      question: "How are items packed, and are they insured?",
+      answer:
+        "Every item is packed by hand, double-boxed where needed, and shipped within two working days of payment. Shipments within Europe are sent tracked and insured up to the value the carrier allows; you can add insurance at checkout where it is offered. You receive the tracking link by email as soon as the parcel leaves.",
+    },
+    {
+      question: "Will I have to pay customs duties or import VAT?",
+      answer:
+        "Within the European Union: no. Parcels from the Netherlands to another EU country have no customs or import charges.\n\nOutside the EU (for example the United Kingdom, Switzerland, Norway or the United States), the destination country may charge import duties, import VAT and a handling fee from the carrier. These are paid by the buyer on delivery and are not included in our prices. We always declare the real value and describe items as antique or collectible; we cannot mark shipments as a gift or under-declare them.",
+    },
+    {
+      question: "Can I return an item?",
+      answer:
+        "Yes, within 14 days of receipt, in the condition you received it.\n\n1. Email us with your order number.\n2. Pack the item as well as we did and send it back insured.\n3. We refund the purchase price within 14 days of receiving it.\n\nReturn shipping is at your expense, unless the item was not as described. See our [returns page](/returns).",
+    },
+    {
+      question: "Do you sell deactivated weapons?",
+      answer:
+        "Yes, but only firearms deactivated to the current EU standard (Commission Implementing Regulation (EU) 2015/2403, as amended by Regulation (EU) 2018/337). Every deactivated weapon carries the EU deactivation mark and comes with its official deactivation certificate; you can see the certificate on the item page before you buy.\n\nDeactivated weapons are sold to adults (18+) only and are not shipped to countries where owning or importing them is not allowed. You are responsible for knowing the rules in your own country; ask us before ordering if you are unsure.",
+    },
+    {
+      question: "Do I need to be 18 to buy edged weapons?",
+      answer:
+        "Yes. Bayonets, daggers, swords and other edged weapons, and deactivated firearms, are sold to adults only. Some of these items cannot be shipped to every country; the checkout tells you if an item cannot be delivered to your address.",
+    },
+    {
+      question: "Do you buy items or whole collections?",
+      answer: "Yes. We buy single pieces and complete collections, and we are happy to give an honest opinion on what you have. Use the [sell your collection](/sell) form and add a few photos.",
+    },
+  ];
+  return { type: "FAQ", data: { title: "", items } };
 }
 
 /**
@@ -1533,6 +1619,7 @@ async function seedShopContent(ctx: ServiceContext, spec: TenantSpec, superadmin
   if (info.full) {
     await ensureItem("FOOTER", service, "Shipping & zones", page("shipping"));
     await ensureItem("FOOTER", service, "Returns", page("returns"));
+    await ensureItem("FOOTER", service, "FAQ", page("faq"));
   }
   await ensureItem("FOOTER", service, "About", page("about"));
   await ensureItem("FOOTER", service, "Contact", page("contact"));

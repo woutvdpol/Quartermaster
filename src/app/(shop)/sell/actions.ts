@@ -4,7 +4,8 @@ import { leadsCopy } from "@/components/shop/leads/_copy";
 import type { SellFormState } from "@/components/shop/leads/types";
 import { clientIp } from "@/server/customer-auth";
 import { leadInputFromForm, submitLead } from "@/server/leads";
-import { getRequestTenant } from "@/server/tenant";
+// Not while the shop is "coming soon" (src/server/storefront/launch.ts).
+import { getOpenShopTenant as getRequestTenant } from "@/server/storefront/launch";
 import { turnstileTokenFrom } from "@/server/turnstile";
 
 const t = leadsCopy.errors;

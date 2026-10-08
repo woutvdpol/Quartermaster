@@ -2,12 +2,13 @@
 // Real authorization happens in server code (src/server/auth/guards.ts).
 import { NextResponse, type NextRequest } from "next/server";
 import { buildCsp, createNonce, cspHeaderName, parseCspMode, reportingEndpointsHeader } from "@/lib/csp";
+import { THEME_PREVIEW_COOKIE, THEME_PREVIEW_HEADER, THEME_PREVIEW_MAX_AGE_SECONDS, THEME_PREVIEW_PARAM } from "@/lib/theme-preview";
 
 // Keep in sync with SESSION_COOKIE in src/server/auth/session.ts (that module is server-only).
 const SESSION_COOKIE = "qm_session";
 
 /** Admin paths reachable without a session cookie (prefix match on a path segment boundary). */
-const PUBLIC_ADMIN_PATHS = ["/admin/login", "/admin/forgot-password", "/admin/reset-password"];
+const PUBLIC_ADMIN_PATHS = ["/admin/login", "/admin/forgot-password", "/admin/reset-password", "/admin/accept-invite"];
 
 const SECURITY_HEADERS: Record<string, string> = {
   "Referrer-Policy": "strict-origin-when-cross-origin",
@@ -36,6 +37,11 @@ export function proxy(request: NextRequest) {
     ? buildCsp({ nonce, area: isAdmin ? "admin" : "shop", dev: process.env.NODE_ENV === "development" })
     : null;
 
+  // Theme preview (src/lib/theme-preview.ts): only a request flag here; the shop checks the staff session.
+  const previewParam = isAdmin ? null : request.nextUrl.searchParams.get(THEME_PREVIEW_PARAM);
+  const previewOn =
+    !isAdmin && (previewParam === "1" || (previewParam !== "0" && request.cookies.get(THEME_PREVIEW_COOKIE)?.value === "1"));
+
   let response: NextResponse;
   if (
     isAdmin &&
@@ -51,6 +57,8 @@ export function proxy(request: NextRequest) {
     requestHeaders.set("x-qm-host", normalizeHost(request.headers.get("host")));
     // Next takes the script nonce from the request's CSP header; never let the client supply one.
     for (const name of CSP_REQUEST_HEADERS) requestHeaders.delete(name);
+    requestHeaders.delete(THEME_PREVIEW_HEADER);
+    if (previewParam === "1" || previewParam === "0") requestHeaders.set(THEME_PREVIEW_HEADER, previewParam);
     if (csp && nonce && cspMode !== "off") {
       requestHeaders.set(cspHeaderName(cspMode), csp);
       requestHeaders.set("x-nonce", nonce);
@@ -59,6 +67,23 @@ export function proxy(request: NextRequest) {
   }
 
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) response.headers.set(name, value);
+  if (previewParam === "1") {
+    response.cookies.set(THEME_PREVIEW_COOKIE, "1", {
+      httpOnly: true,
+      sameSite: "strict",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: THEME_PREVIEW_MAX_AGE_SECONDS,
+    });
+  } else if (previewParam === "0") {
+    response.cookies.delete(THEME_PREVIEW_COOKIE);
+  }
+  // A preview may render the draft theme: never let a shared cache keep it.
+  if (previewOn) {
+    response.headers.set("Cache-Control", "private, no-store");
+    // Draft themes must never be indexed (docs/seo-geo.md).
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  }
   // Admin: never framed. Shop (checkout, account forms): same-origin only (clickjacking).
   response.headers.set("X-Frame-Options", isAdmin ? "DENY" : "SAMEORIGIN");
   if (csp && cspMode !== "off") {
@@ -69,5 +94,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon\\.ico|uploads/|uploads$|api/health).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon\\.ico|fonts/|uploads/|uploads$|api/health).*)"],
 };

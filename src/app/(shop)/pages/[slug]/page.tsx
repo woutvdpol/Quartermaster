@@ -9,6 +9,8 @@ import { BlockRenderer } from "@/components/shop/blocks/BlockRenderer";
 import { blockContext } from "@/components/shop/blocks/context";
 import { Breadcrumbs } from "@/components/shop/ui/Breadcrumbs";
 import { Container } from "@/components/shop/ui/Container";
+import { shopOgDefaults } from "@/lib/seo/metadata";
+import { metaDescription, metaTitle } from "@/lib/seo/text";
 
 /*
  * Published CMS pages. Canonical public URL is `/{slug}` (contentPageHref; menus link there): a
@@ -28,17 +30,22 @@ async function load(slugParam: string) {
 
 export async function generateMetadata({ params }: PageProps<"/pages/[slug]">): Promise<Metadata> {
   const { slug } = await params;
-  const { page } = await load(slug);
-  if (!page) return {};
+  const { shop, page } = await load(slug);
+  if (!shop || !page) return {};
   const textBlock = page.blocks.find((b) => "markdown" in b.data && typeof b.data.markdown === "string" && b.data.markdown);
-  const description =
-    page.seoDescription ||
-    (textBlock && "markdown" in textBlock.data ? markdownToPlainText(textBlock.data.markdown as string).slice(0, 160) : undefined);
+  const hero = page.blocks[0]?.type === "HERO" ? page.blocks[0].data.subtitle : null;
+  const description = metaDescription(
+    page.seoDescription,
+    textBlock && "markdown" in textBlock.data ? markdownToPlainText(textBlock.data.markdown as string) : null,
+    hero,
+  );
+  const title = metaTitle(page.seoTitle, page.title);
   return {
-    title: page.seoTitle || page.title,
+    title,
     description,
-    alternates: { canonical: page.href },
-    openGraph: { type: "article", url: page.href, title: page.seoTitle || page.title, description, modifiedTime: page.updatedAt },
+    // Markdown alternate for AI assistants (/{slug}.md → src/app/md/page).
+    alternates: { canonical: page.href, types: { "text/markdown": `${page.href}.md` } },
+    openGraph: { ...shopOgDefaults(shop), type: "article", url: page.href, title, description, modifiedTime: page.updatedAt },
   };
 }
 

@@ -35,6 +35,8 @@ configMapGenerator:
     literals:
       - PLATFORM_HOST=platform.quartermaster.example
       - APP_URL=https://platform.quartermaster.example
+      # Approved dealers get <slug>.<SHOP_SUBDOMAIN_BASE> (needs wildcard DNS + TLS, docs/deploy.md §15).
+      - SHOP_SUBDOMAIN_BASE=quartermaster.example
       - MAIL_FROM_FALLBACK=no-reply@quartermaster.example
       # Behind exactly one proxy that overwrites X-Forwarded-For (ingress-nginx, see
       # deploy/k8s/ingress-nginx/values.yaml). Never raise this without changing the controller config.

@@ -2,12 +2,15 @@ import { Suspense, type ReactNode } from "react";
 import type { BlockData } from "@/server/content/blocks";
 import type { PublicBlock } from "@/server/content/pages";
 import { Container } from "@/components/shop/ui/Container";
-import { ProductGridSkeleton, Skeleton } from "@/components/shop/ui/Skeleton";
+import { CategoryTilesSkeleton, ProductGridSkeleton, Skeleton } from "@/components/shop/ui/Skeleton";
 import { cn } from "@/components/shop/ui/cn";
+import { JsonLd } from "@/components/shop/ui/JsonLd";
+import { faqPageJsonLd } from "@/lib/seo/json-ld";
 import type { BlockContext } from "./context";
 import { CategoriesBlock, NewItemsBlock, NewsletterBlock, TextProductBlock } from "./ShopBlocks";
 import {
   CtaBlock,
+  FaqBlock,
   GalleryBlock,
   HeroBlock,
   QuoteBlock,
@@ -34,16 +37,23 @@ function group(blocks: PublicBlock[]): Group[] {
 }
 
 /**
- * Renders a CMS page's blocks (all 13 types). Server component; product/category blocks fetch
+ * Renders a CMS page's blocks (all 14 types). Server component; product/category blocks fetch
  * their own (cached) data and stream in behind skeletons. The first HERO renders the page's h1
- * when `heroIsTitle` is set (otherwise the page renders its own h1).
+ * when `heroIsTitle` is set (otherwise the page renders its own h1). When the page has FAQ blocks,
+ * one FAQPage JSON-LD covering all of them is emitted here (once per page).
  */
 export function BlockRenderer({ blocks, ctx, heroIsTitle = false }: { blocks: PublicBlock[]; ctx: BlockContext; heroIsTitle?: boolean }) {
   // A disabled newsletter feature hides its sign-up blocks entirely (no empty section).
-  const groups = group(ctx.newsletterEnabled ? blocks : blocks.filter((b) => b.type !== "NEWSLETTER_SIGNUP"));
+  const shown = ctx.newsletterEnabled ? blocks : blocks.filter((b) => b.type !== "NEWSLETTER_SIGNUP");
+  const groups = group(shown);
+  const faq = faqPageJsonLd(
+    shown.flatMap((b) => (b.type === "FAQ" ? b.data.items : [])),
+    ctx.origin,
+  );
   return (
     // A plain block flow (not flex) so the sections' vertical margins collapse into one gap.
     <div>
+      {faq ? <JsonLd data={faq} /> : null}
       {groups.map((g, i) => {
         if (g.kind === "testimonials") {
           return (
@@ -68,7 +78,7 @@ export function BlockRenderer({ blocks, ctx, heroIsTitle = false }: { blocks: Pu
 
 /** ~72px between sections on desktop (margins collapse); "sunken" = full-bleed tinted band. */
 function Section({ children, tone }: { children: ReactNode; tone?: "sunken" }) {
-  return <section className={cn("my-12 last:mb-0! lg:my-18", tone === "sunken" && "bg-shop-sunken py-12 lg:py-18")}>{children}</section>;
+  return <section className={cn("my-shop-section last:mb-0! lg:my-shop-section-lg", tone === "sunken" && "bg-shop-sunken py-shop-section lg:py-shop-section-lg")}>{children}</section>;
 }
 
 function renderBlock(b: PublicBlock, ctx: BlockContext, index: number): ReactNode {
@@ -101,12 +111,14 @@ function renderBlock(b: PublicBlock, ctx: BlockContext, index: number): ReactNod
       );
     case "CATEGORIES":
       return (
-        <Suspense fallback={<Container><Skeleton className="aspect-[6/1] w-full" /></Container>}>
+        <Suspense fallback={<Container><CategoryTilesSkeleton heading={!!b.data.title} /></Container>}>
           <CategoriesBlock data={b.data} ctx={ctx} />
         </Suspense>
       );
     case "NEWSLETTER_SIGNUP":
       return <NewsletterBlock data={b.data} ctx={ctx} />;
+    case "FAQ":
+      return <FaqBlock data={b.data} blockId={b.id} />;
     case "HERO":
     case "TESTIMONIAL":
       return null; // handled by BlockRenderer

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Button, Card, KeyValue, PageHeader } from "@/components/admin/ui";
 import { requireStaffContext } from "@/server/context";
 import { getSettings, isSettingsGroup, PLATFORM_ONLY_GROUPS } from "@/server/settings";
@@ -17,6 +17,8 @@ export async function generateMetadata({ params }: PageProps<"/admin/settings/[g
 
 export default async function SettingsGroupPage({ params }: PageProps<"/admin/settings/[group]">) {
   const { group } = await params;
+  // Appearance (colours, fonts, preset, logo) is edited in the theme builder.
+  if (group === "appearance") redirect("/admin/theme");
   const ctx = await requireStaffContext();
   const isSuper = ctx.actor.role === "SUPERADMIN";
   if (!isSettingsGroup(group) || (PLATFORM_ONLY_GROUPS.has(group) && !isSuper)) notFound();

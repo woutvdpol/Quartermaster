@@ -45,7 +45,7 @@ const PAGE_SIZE = 25;
 /** The tab without a `view` param. */
 const DEFAULT_VIEW: ProductView = "forSale";
 const TAB_ORDER: ProductView[] = ["forSale", "inCart", "draft", "sold", "archived", "noPhoto", "all"];
-const FILTER_PARAMS = ["q", "category", "tag", "pmin", "pmax", "purchase"];
+const FILTER_PARAMS = ["q", "category", "tag", "pmin", "pmax", "purchase", "import"];
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 function parseView(raw: string | undefined): ProductView {
@@ -74,6 +74,7 @@ export default async function InventoryPage({ searchParams }: PageProps<"/admin/
   const categoryId = categoryParam === "none" ? null : parseId(categoryParam);
   const tagId = parseId(getParam(sp, "tag"));
   const purchaseRecordId = parseId(getParam(sp, "purchase"));
+  const importJobId = parseId(getParam(sp, "import"));
   const priceMin = parseMinor(getParam(sp, "pmin"));
   const priceMax = parseMinor(getParam(sp, "pmax"));
 
@@ -86,6 +87,7 @@ export default async function InventoryPage({ searchParams }: PageProps<"/admin/
       priceMin,
       priceMax,
       purchaseRecordId,
+      importJobId,
       sort: sort?.key,
       dir: sort?.dir,
       page,
@@ -177,9 +179,14 @@ export default async function InventoryPage({ searchParams }: PageProps<"/admin/
   ];
 
   const newProduct = (
-    <Link href={`${BASE}/new`} className={buttonClasses({ variant: "primary" })}>
-      <span aria-hidden="true">+</span> {copy.newProduct}
-    </Link>
+    <div className="flex flex-wrap gap-2">
+      <Link href={`${BASE}/import`} className={buttonClasses()}>
+        {copy.importProducts}
+      </Link>
+      <Link href={`${BASE}/new`} className={buttonClasses({ variant: "primary" })}>
+        <span aria-hidden="true">+</span> {copy.newProduct}
+      </Link>
+    </div>
   );
 
   const noProductsAtAll = list.counts.all === 0 && list.counts.archived === 0 && !filtersActive;
@@ -249,6 +256,7 @@ export default async function InventoryPage({ searchParams }: PageProps<"/admin/
                   )}
                   <PriceRangeFilter key={`${priceMin ?? ""}-${priceMax ?? ""}`} min={priceMin ?? null} max={priceMax ?? null} currency={currency} />
                   <FilterChip param="q" label={copy.filters.search} basePath={BASE} searchParams={sp} />
+                  {importJobId && <FilterChip param="import" label={copy.filters.importJob} valueLabel={importJobId.slice(-6)} basePath={BASE} searchParams={sp} />}
                   {priceMin !== undefined && (
                     <FilterChip param="pmin" label={copy.filters.priceMin} valueLabel={formatMoney(priceMin, currency)} basePath={BASE} searchParams={sp} />
                   )}

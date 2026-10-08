@@ -30,24 +30,47 @@ export const getPublicMenus = shopCache("menus", "content", async (tenantId: str
 
 export type LegalLink = { key: string; label: string; href: string };
 
-/** Published system pages for the footer's legal row (terms, privacy, contact). */
+/** Regular pages (no system role) that also belong in the legal row: the setup wizard creates these. */
+export const SERVICE_PAGE_SLUGS = { RETURNS: "returns", SHIPPING: "shipping" } as const;
+const LEGAL_ORDER = ["TERMS", "PRIVACY", "RETURNS", "SHIPPING", "CONTACT"];
+
+/**
+ * Published pages for the footer's legal row: terms, privacy, returns, shipping, contact. Returns and
+ * shipping are regular pages found by slug (wizard templates). Use `withoutMenuDuplicates` so a page the
+ * shop already links from its footer menu is not shown twice.
+ */
 export const getLegalLinks = shopCache("legal-links", "content", async (tenantId: string): Promise<LegalLink[]> => {
   const now = new Date();
   const rows = await db.contentPage.findMany({
-    where: { tenantId, systemKey: { in: ["TERMS", "PRIVACY", "CONTACT"] }, publishedAt: { not: null, lte: now } },
+    where: {
+      tenantId,
+      publishedAt: { not: null, lte: now },
+      OR: [
+        { systemKey: { in: ["TERMS", "PRIVACY", "CONTACT"] } },
+        { systemKey: null, slug: { in: Object.values(SERVICE_PAGE_SLUGS) } },
+      ],
+    },
     select: { slug: true, title: true, systemKey: true },
   });
-  const order = ["TERMS", "PRIVACY", "CONTACT"];
+  const keyOf = (r: { slug: string; systemKey: string | null }) =>
+    r.systemKey ?? (r.slug === SERVICE_PAGE_SLUGS.RETURNS ? "RETURNS" : "SHIPPING");
   return rows
-    .sort((a, b) => order.indexOf(a.systemKey!) - order.indexOf(b.systemKey!))
-    .map((r) => ({ key: r.systemKey!, label: r.title, href: contentPageHref(r) }));
+    .map((r) => ({ key: keyOf(r), label: r.title, href: contentPageHref(r) }))
+    .sort((a, b) => LEGAL_ORDER.indexOf(a.key) - LEGAL_ORDER.indexOf(b.key));
 });
 
-/** Published regular + system pages (not HOME) for the sitemap. */
-export async function listPublishedPagesForSitemap(tenantId: string) {
-  const rows = await db.contentPage.findMany({
-    where: { tenantId, publishedAt: { not: null, lte: new Date() }, NOT: { systemKey: "HOME" } },
-    select: { slug: true, systemKey: true, updatedAt: true },
-  });
-  return rows.map((r) => ({ href: contentPageHref(r), updatedAt: r.updatedAt }));
+/**
+ * Drops the returns/shipping links when the footer menu already links those pages (pure). The system
+ * links (terms, privacy, contact) always stay, as they always have.
+ */
+export function withoutMenuDuplicates(links: LegalLink[], menu: PublicMenuItem[]): LegalLink[] {
+  const hrefs = new Set<string>();
+  const walk = (items: PublicMenuItem[]) => {
+    for (const i of items) {
+      if (i.href) hrefs.add(i.href);
+      walk(i.children);
+    }
+  };
+  walk(menu);
+  return links.filter((l) => !((l.key === "RETURNS" || l.key === "SHIPPING") && hrefs.has(l.href)));
 }

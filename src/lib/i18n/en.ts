@@ -40,6 +40,7 @@ export const en = {
       leads: "Leads",
       alerts: "Alerts",
       pages: "Pages",
+      theme: "Theme",
       menus: "Menus",
       redirects: "Redirects",
       newsletter: "Newsletter",
@@ -50,6 +51,7 @@ export const en = {
       auditLog: "Audit log",
       compliance: "Compliance",
       platform: "Platform",
+      applications: "Dealer applications",
     },
   },
   tenant: {

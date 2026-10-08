@@ -14,8 +14,13 @@ import {
  * Fonts for all admin themes, exposed as CSS variables. globals.css maps each theme's
  * --qm-font-display / -label / -body / -mono onto these variables.
  *
- * Only design A ("depot", the default) is preloaded; B and C fonts are still self-hosted but load
- * on demand when those themes are selected.
+ * Preloading (docs/perf/round2.md): only the BODY face of design A ("depot", the default) is preloaded,
+ * and only its `latin` file (IBM Plex Sans is one variable file for all weights). The display/label
+ * face (Barlow Condensed), the mono face and every latin-ext file load on first use (`display: swap`
+ * with size-adjusted fallbacks). Preloading all of them (12 files, ~175 kB incl. latin-ext files a
+ * page rarely needs) competed with CSS/JS and cost ~0.5 s mobile LCP. B and C fonts are still
+ * self-hosted but load on demand when those themes are selected. `subsets` only controls preloading:
+ * next/font still declares the latin-ext faces.
  *
  * Note: Google renamed "Big Shoulders Stencil Display" to the variable "Big Shoulders Stencil"
  * (with an optical-size axis); large headings automatically get the display cut. next/font has no
@@ -28,9 +33,10 @@ const barlowCondensed = Barlow_Condensed({
   weight: ["500", "600", "700"],
   variable: "--font-barlow-condensed",
   display: "swap",
+  preload: false,
 });
 const ibmPlexSans = IBM_Plex_Sans({
-  subsets: ["latin", "latin-ext"],
+  subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-ibm-plex-sans",
   display: "swap",
@@ -40,6 +46,7 @@ const ibmPlexMono = IBM_Plex_Mono({
   weight: ["400", "500"],
   variable: "--font-ibm-plex-mono",
   display: "swap",
+  preload: false,
 });
 
 // B · Field Ledger

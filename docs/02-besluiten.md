@@ -118,6 +118,7 @@ Kanttekeningen:
 ## Innovaties ronde 1 — akkoord eigenaar (08-10-2026)
 Volgorde: **themabuilder + startwizard** → **AI-plaatsingsassistent + slim zoeken** → doorlopend: **hele app sneller** (meten vóór/na).
 - **Aanmelden:** handelaren melden zich zelf aan op het platform; SUPERADMIN keurt goed; daarna start de wizard.
+  - *Binnenkort open* (uitwerking 08-10-2026): zolang de wizard niet is afgerond (`setupState` ≠ null, `setupCompletedAt` = null) zien bezoekers en klanten alleen een pagina "Opening soon" in de huisstijl van de shop (naam/logo, contactmail, nieuwsbriefaanmelding als die aan staat). Status **200 + noindex** (geen 503: een layout kan geen statuscode zetten en de proxy doet geen DB-lookups); robots.txt verbiedt alles, sitemap is leeg; winkelwagen, checkout, account, biedingen, alerts en "verkoop je collectie" weigeren. Ingelogde OWNERs van die shop zien de echte shop met een balk "Not live yet" (samengevoegd met de theme-preview-balk). Bestaande shops (`setupState` null) merken niets. Code: `src/server/storefront/launch.ts`.
 - **Themabuilder:** preset (Gallery/Archive/Field Kit/Vault) + afstemmen (kleuren, lettertypes, hoekafronding, knopvorm, dichtheid, logo). Concept → live preview → publiceren.
 - **Imports in de wizard:** WooCommerce-CSV, Shopify-CSV en Concept500 (onze ETL).
 - **Sneller:** hele app (shop Core Web Vitals, admin-schermen, zoeken), met meetrapport vooraf en achteraf.

@@ -36,6 +36,8 @@ configMapGenerator:
     literals:
       - PLATFORM_HOST=platform.staging.quartermaster.example
       - APP_URL=https://platform.staging.quartermaster.example
+      # Approved dealers get <slug>.<SHOP_SUBDOMAIN_BASE> (needs wildcard DNS + TLS, docs/deploy.md §15).
+      - SHOP_SUBDOMAIN_BASE=staging.quartermaster.example
       - MAIL_FROM_FALLBACK=no-reply@staging.quartermaster.example
       - TRUSTED_PROXY_HOPS=1
       - TURNSTILE_SITE_KEY=  # public Cloudflare Turnstile site key (runtime)

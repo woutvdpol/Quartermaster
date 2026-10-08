@@ -6,27 +6,30 @@
  * The shop layout sets the raw tenant values as inline CSS variables on the `.shop-root` element:
  *   --shop-primary / --shop-secondary / --shop-accent           (appearance.colors, #rrggbb)
  *   --shop-on-primary / --shop-on-secondary / --shop-on-accent  (black or white, computed for contrast)
- *   --shop-font-heading / --shop-font-body                      (next/font family of the chosen allowlist font)
+ *   --shop-font-heading / --shop-font-body                      (self-hosted family of the chosen allowlist font,
+ *                                                               src/components/shop/layout/fonts.ts)
  * Everything else (paper background, ink, lines, tints) is derived below with color-mix, so a shop
  * only ever configures three colours and two fonts.
  *
  * Utilities: this file generates Tailwind utilities for the shop sources only (`source(none)` + the
- * two @source lines) with the extra `shop-*` tokens. Common utilities (flex, px-4 …) are therefore
- * emitted twice (here and in globals.css); that is harmless because for any element in a shop file
- * both conflicting classes live in this sheet, which loads after globals.css, in Tailwind's order.
+ * @source lines) with the extra `shop-*` tokens. It is the storefront's ONLY stylesheet: the admin's
+ * globals.css is imported by src/app/admin/layout.tsx, not the root layout (performance: it no longer
+ * blocks rendering of shop pages), so the Tailwind preflight is imported here as well.
  *
  * Usage: bg-shop-bg, bg-shop-surface, text-shop-ink, text-shop-muted, border-shop-line,
  * bg-shop-primary text-shop-on-primary, bg-shop-primary-soft, text-shop-primary, bg-shop-accent …,
  * font-shop-heading, font-shop-body, font-shop-accent, font-shop-mono, rounded-shop, rounded-shop-control (buttons,
  * inputs, chips: pill in theme gallery), shadow-shop. Plus `shop-prose` for Markdown.
  */
-/* Same layer order as globals.css (tailwindcss), so `base` below stays under `utilities`. */
+/* Same layer order as `@import "tailwindcss"`, so `base` below stays under `utilities`. */
 @layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
 @import "tailwindcss/utilities.css" layer(utilities) source(none);
 
 @source "./";
 @source "../../components/shop";
+@source "../layout.tsx"; /* root <html>/<body> classes */
 
 @theme inline {
   --color-shop-bg: var(--shop-bg);
@@ -71,6 +74,14 @@
   --radius-shop-control: var(--shop-radius-control);
   --shadow-shop: var(--shop-shadow);
   --shadow-shop-pop: var(--shop-shadow-pop);
+
+  /* Density (theme builder): section rhythm and product-grid gaps scale with --shop-density. */
+  --spacing-shop-section: calc(3rem * var(--shop-density));
+  --spacing-shop-section-lg: calc(4.5rem * var(--shop-density));
+  --spacing-shop-grid: calc(1rem * var(--shop-density));
+  --spacing-shop-grid-sm: calc(1.5rem * var(--shop-density));
+  --spacing-shop-grid-lg: calc(2rem * var(--shop-density));
+  --spacing-shop-grid-y: calc(2.25rem * var(--shop-density));
 }
 
 .shop-root {
@@ -87,10 +98,10 @@
   --shop-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /*
-   * Theme "gallery" (the default and, for now, only preset): white ground, quiet warm-grey surfaces
+   * Theme "gallery" (the default preset): white ground, quiet warm-grey surfaces
    * tinted by the secondary colour, near-black ink, 6px image radius and pill-shaped controls.
-   * Future presets (archive, fieldkit, vault — docs/design/shop-options) override this block under
-   * `.shop-root[data-shop-theme="…"]`; components only ever use the tokens below.
+   * The other presets (archive, fieldkit, vault — docs/design/shop-options) override this block under
+   * `.shop-root[data-shop-theme="…"]` (below); components only ever use the tokens below.
    */
   --shop-bg: #ffffff;
   --shop-surface: #ffffff;
@@ -118,11 +129,19 @@
   --shop-lightbox: color-mix(in oklab, var(--shop-ink) 92%, #000);
   --shop-on-lightbox: #ffffff;
 
+  /* Radii and density are also set inline from the theme-builder tunables (corners, buttonShape, density). */
   --shop-radius: 6px;
   --shop-radius-sm: 6px;
   --shop-radius-control: 999px;
+  --shop-density: 1;
   --shop-shadow: 0 1px 2px rgb(20 20 20 / 0.05), 0 6px 20px rgb(20 20 20 / 0.06);
   --shop-shadow-pop: 0 16px 48px rgb(20 20 20 / 0.18);
+
+  /* Heading character (h1–h4 base style below). */
+  --shop-heading-weight: 600;
+  --shop-heading-tracking: -0.02em;
+  --shop-heading-transform: none;
+  --shop-heading-leading: 1.1;
 
   background-color: var(--shop-bg);
   color: var(--shop-ink);
@@ -134,15 +153,124 @@
 }
 
 /*
+ * Theme presets (theme builder, docs/design/shop-options). Each block overrides the neutrals and the
+ * heading/shape character above; the tenant's three colours and two fonts still apply (inline vars).
+ * Neutrals derive from --shop-secondary ("background tint"), so tuning it re-tints the whole shop.
+ * Radii here are fallbacks only: the builder's corners/buttonShape are always set inline.
+ */
+
+/* Archive — auction catalogue: warm paper, serif headings at regular weight, hairlines, square. */
+.shop-root[data-shop-theme="archive"] {
+  --shop-bg: color-mix(in oklab, var(--shop-secondary) 38%, #fbf9f3);
+  --shop-surface: color-mix(in oklab, var(--shop-secondary) 16%, #fffdf8);
+  --shop-sunken: color-mix(in oklab, var(--shop-secondary) 88%, #f4f0e6);
+  --shop-ink: color-mix(in oklab, var(--shop-primary) 6%, #1e1c17);
+  --shop-ink-2: color-mix(in oklab, var(--shop-ink) 84%, var(--shop-bg));
+  --shop-muted: color-mix(in oklab, var(--shop-ink) 70%, var(--shop-bg));
+  --shop-line: color-mix(in oklab, var(--shop-secondary) 72%, #a99d82);
+  --shop-line-strong: color-mix(in oklab, var(--shop-ink) 80%, var(--shop-bg));
+  --shop-primary-soft: color-mix(in oklab, var(--shop-primary) 8%, var(--shop-bg));
+  --shop-secondary-soft: color-mix(in oklab, var(--shop-secondary) 50%, var(--shop-bg));
+  --shop-accent-soft: color-mix(in oklab, var(--shop-accent) 8%, var(--shop-bg));
+  --shop-radius: 0px;
+  --shop-radius-sm: 0px;
+  --shop-radius-control: 0px;
+  --shop-shadow: 0 1px 0 rgb(30 28 23 / 0.06);
+  --shop-shadow-pop: 0 14px 40px rgb(30 28 23 / 0.16);
+  --shop-heading-weight: 400;
+  --shop-heading-tracking: -0.01em;
+  --shop-heading-leading: 1.05;
+}
+
+/* Field Kit — utilitarian spec sheet: khaki ground, dark olive header, condensed uppercase display. */
+.shop-root[data-shop-theme="fieldkit"] {
+  --shop-bg: color-mix(in oklab, var(--shop-secondary) 45%, #f3f0e6);
+  --shop-surface: color-mix(in oklab, var(--shop-secondary) 22%, #f8f6f0);
+  --shop-sunken: var(--shop-secondary);
+  --shop-ink: color-mix(in oklab, var(--shop-primary) 4%, #23281b);
+  --shop-ink-2: color-mix(in oklab, var(--shop-ink) 86%, var(--shop-bg));
+  --shop-muted: color-mix(in oklab, var(--shop-ink) 74%, var(--shop-bg));
+  --shop-line: color-mix(in oklab, var(--shop-secondary) 70%, #8f8770);
+  --shop-line-strong: var(--shop-ink);
+  --shop-primary-soft: color-mix(in oklab, var(--shop-primary) 10%, var(--shop-bg));
+  --shop-secondary-soft: color-mix(in oklab, var(--shop-secondary) 55%, var(--shop-bg));
+  --shop-accent-soft: color-mix(in oklab, var(--shop-accent) 10%, var(--shop-bg));
+  --shop-radius: 0px;
+  --shop-radius-sm: 0px;
+  --shop-radius-control: 0px;
+  --shop-shadow: 0 1px 0 rgb(35 40 27 / 0.12);
+  --shop-shadow-pop: 0 12px 32px rgb(35 40 27 / 0.24);
+  --shop-heading-weight: 800;
+  --shop-heading-tracking: 0.01em;
+  --shop-heading-transform: uppercase;
+  --shop-heading-leading: 0.95;
+}
+/* The sticky site header (StickyHeader renders the root's only direct <header> child) goes dark olive:
+ * the neutrals are re-scoped inside it, so the header's own token classes need no changes. */
+.shop-root[data-shop-theme="fieldkit"] > header {
+  --shop-bg: #2f3524;
+  --shop-surface: #2f3524;
+  --shop-sunken: #3d4431;
+  --shop-ink: #ece8dc;
+  --shop-ink-2: #dcd6c4;
+  --shop-muted: #b9b29c;
+  --shop-line: #4a5238;
+  --shop-line-strong: #6b7356;
+  --shop-primary-soft: color-mix(in oklab, var(--shop-primary) 22%, #2f3524);
+  color-scheme: dark;
+}
+/* Emphasis in Field Kit headings: same display face, accent colour instead of italics. */
+.shop-root[data-shop-theme="fieldkit"] :where(h1, h2, h3) em {
+  font-family: inherit;
+  font-style: normal;
+  font-weight: inherit;
+  color: var(--shop-accent);
+}
+
+/* Vault — dark and premium: near-black ground, brass primary, display serif, generous spacing. */
+.shop-root[data-shop-theme="vault"] {
+  --shop-bg: color-mix(in oklab, var(--shop-secondary) 45%, #0a0b09);
+  --shop-surface: color-mix(in oklab, var(--shop-secondary) 72%, #0a0b09);
+  --shop-sunken: var(--shop-secondary);
+  --shop-ink: color-mix(in oklab, var(--shop-primary) 6%, #ece6d8);
+  --shop-ink-2: color-mix(in oklab, var(--shop-ink) 88%, var(--shop-bg));
+  --shop-muted: color-mix(in oklab, var(--shop-ink) 72%, var(--shop-bg));
+  --shop-line: color-mix(in oklab, var(--shop-secondary) 70%, #4a4a42);
+  --shop-line-strong: color-mix(in oklab, var(--shop-ink) 38%, var(--shop-bg));
+  --shop-primary-strong: color-mix(in oklab, var(--shop-primary) 82%, #ffffff);
+  --shop-primary-soft: color-mix(in oklab, var(--shop-primary) 14%, var(--shop-bg));
+  --shop-secondary-soft: color-mix(in oklab, var(--shop-secondary) 60%, #3a3a33);
+  --shop-accent-soft: color-mix(in oklab, var(--shop-accent) 14%, var(--shop-bg));
+  --shop-ok: #8fcf98;
+  --shop-ok-soft: color-mix(in oklab, #8fcf98 14%, var(--shop-bg));
+  --shop-warn: #e2b75c;
+  --shop-warn-soft: color-mix(in oklab, #e2b75c 14%, var(--shop-bg));
+  --shop-crit: #f0958a;
+  --shop-crit-soft: color-mix(in oklab, #f0958a 14%, var(--shop-bg));
+  --shop-scrim: rgb(0 0 0 / 0.62);
+  --shop-lightbox: #050505;
+  --shop-radius: 0px;
+  --shop-radius-sm: 0px;
+  --shop-radius-control: 0px;
+  --shop-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
+  --shop-shadow-pop: 0 18px 50px rgb(0 0 0 / 0.6);
+  --shop-heading-weight: 400;
+  --shop-heading-tracking: 0.01em;
+  --shop-heading-leading: 1.08;
+  color-scheme: dark;
+}
+
+/*
  * Heading defaults live in the base layer (below utilities) so utilities on a heading (font-shop-body, tracking-normal,
  * leading-snug, font-medium … e.g. ProductCard titles) can override them; unlayered they would win.
  */
 @layer base {
   .shop-root :where(h1, h2, h3, h4) {
     font-family: var(--shop-font-heading);
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    line-height: 1.1;
+    font-weight: var(--shop-heading-weight);
+    letter-spacing: var(--shop-heading-tracking);
+    text-transform: var(--shop-heading-transform);
+    line-height: var(--shop-heading-leading);
     text-wrap: balance;
   }
 }

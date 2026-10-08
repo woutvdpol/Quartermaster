@@ -1,0 +1,57 @@
+export const applyCopy = {
+  metaTitle: "Open your shop",
+  eyebrow: "For militaria dealers",
+  title: "Open your shop. Built for unique items.",
+  intro:
+    "Every piece listed once, reserved while someone checks out, sold everywhere at the same moment. Certificates with QR code, per-country compliance rules and Mollie payments are built in.",
+  steps: [
+    { n: "01", title: "Apply", body: "tell us about your business. Takes 3 minutes." },
+    { n: "02", title: "We review", body: "usually within a few working days. Militaria is sensitive; every dealer is checked." },
+    { n: "03", title: "Set up in a guided wizard", body: "theme, payments, shipping, and import from WooCommerce, Shopify or Concept500." },
+  ],
+  formTitle: "Apply for a shop",
+  fields: {
+    applicantName: "Your name",
+    email: "Email",
+    shopName: "Shop name",
+    country: "Country",
+    cocNumber: "Chamber of Commerce no.",
+    cocHint: "Your company registration number (KvK, KBO, Handelsregister, …).",
+    currentPlatform: "Where do you sell now?",
+    description: "What do you sell?",
+    descriptionHint: "Periods, countries, types of items — and roughly how many pieces.",
+    legalConsent:
+      "I only sell legal items and follow the rules of the countries I ship to (deactivated weapons with certificate).",
+  },
+  submit: "Send application",
+  submitting: "Sending…",
+  footnote: "Protected by Turnstile. We email you once your application is reviewed.",
+  errors: {
+    invalid: "Please check the highlighted fields.",
+    rate_limited: "Too many applications from your connection. Please try again later.",
+    captcha: "The bot check failed or expired. Please try again.",
+    unexpected: "Something went wrong. Please try again.",
+  },
+  thanks: {
+    title: "Thanks — check your inbox",
+    body: [
+      "We sent you an email with a link to confirm your address. Your application is reviewed once your email is confirmed.",
+      "Every dealer is checked by hand, usually within a few working days. You hear from us by email either way.",
+    ],
+    noMail: "No email after a few minutes? Check your spam folder, or apply again with the same address to get a new link.",
+    back: "Back to Quartermaster",
+  },
+  verify: {
+    title: "Confirm your email",
+    body: "Confirm that this is your email address so we can review your application.",
+    button: "Confirm my email",
+    pending: "Confirming…",
+    invalidTitle: "This link is not valid",
+    invalidBody: "The link has expired or is not complete. Apply again with the same email address to get a new link.",
+    verified: "Thanks, your email address is confirmed. We review your application and email you the outcome.",
+    already_verified: "Your email address was already confirmed. We email you once your application has been reviewed.",
+    rate_limited: "Too many attempts. Please try again later.",
+    error: "Something went wrong. Please try again.",
+    applyAgain: "Apply again",
+  },
+} as const;

@@ -1,11 +1,20 @@
 "use client";
 
-import { ActionMessage, ActionToast, FormActions, SubmitButton, TextInput, useActionForm } from "@/components/admin/ui";
+import { ActionMessage, ActionToast, FormActions, SubmitButton, TextInput, useActionForm, type ActionResult, type ActionState } from "@/components/admin/ui";
 import { saveMollieKeyAction } from "../actions";
 
-/** Paste a test_/live_ key; it is verified with Mollie before it is stored (encrypted). */
-export function MollieKeyForm({ replacing }: { replacing: boolean }) {
-  const { state, formAction, error } = useActionForm(saveMollieKeyAction);
+/**
+ * Paste a test_/live_ key; it is verified with Mollie before it is stored (encrypted).
+ * `action` defaults to the payment-methods page action; the setup wizard passes its own (same service).
+ */
+export function MollieKeyForm({
+  replacing,
+  action = saveMollieKeyAction,
+}: {
+  replacing: boolean;
+  action?: (prev: ActionState, formData: FormData) => Promise<ActionResult>;
+}) {
+  const { state, formAction, error } = useActionForm(action);
   return (
     <form action={formAction} noValidate className="grid gap-3">
       <ActionMessage state={state} showSuccess={false} />

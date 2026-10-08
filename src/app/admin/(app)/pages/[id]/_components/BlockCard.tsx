@@ -18,6 +18,7 @@ function summary(data: BlockDraft): string {
     const v = data[k];
     if (typeof v === "string" && v.trim()) return k === "markdown" ? markdownToPlainText(v).slice(0, 120) : v.slice(0, 120);
   }
+  if (Array.isArray(data.items)) return `${data.items.length} question${data.items.length === 1 ? "" : "s"}`;
   return "";
 }
 

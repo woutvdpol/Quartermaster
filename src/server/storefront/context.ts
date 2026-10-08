@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getRequestScope, normalizeHost } from "@/server/tenant";
 import { getSettings } from "@/server/settings";
+import { getThemePreview } from "@/server/theme/preview";
 import { shopCache } from "./cache";
 
 /*
@@ -24,6 +25,8 @@ export type ShopContext = {
   /** general.shopName, falling back to the tenant name. */
   shopName: string;
   settings: PublicShopSettings;
+  /** Staff theme preview (Website → Theme): `settings.appearance` carries the unpublished draft. */
+  themePreview: { hasDraft: boolean } | null;
 };
 
 async function loadPublicSettings(tenantId: string) {
@@ -43,6 +46,9 @@ async function loadPublicSettings(tenantId: string) {
       contactEmail: general.contactEmail,
       phone: general.phone,
       address: general.address,
+      // Public business identifiers (shown on invoices; Organization structured data).
+      vatNumber: general.vatNumber,
+      cocNumber: general.cocNumber,
       displayCurrencies: general.displayCurrencies,
     },
     appearance,
@@ -99,13 +105,16 @@ export const getShopContext = cache(async (): Promise<ShopContext | null> => {
   const h = await headers();
   const host = normalizeHost(h.get("host")) ?? "";
   const t = scope.tenant;
-  const settings = await cachedPublicSettings(t.id);
+  const [cached, preview] = await Promise.all([cachedPublicSettings(t.id), getThemePreview(t.id)]);
+  // The draft is merged per request, never written to the shared cache.
+  const settings = preview?.draft ? { ...cached, appearance: { ...cached.appearance, ...preview.draft } } : cached;
   return {
     tenant: { id: t.id, slug: t.slug, name: t.name, currency: t.currency, timezone: t.timezone },
     host,
     origin: originForHost(host, h.get("x-forwarded-proto")),
     shopName: settings.general.shopName || t.name,
     settings,
+    themePreview: preview ? { hasDraft: preview.draft !== null } : null,
   };
 });
 

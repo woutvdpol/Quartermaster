@@ -4,7 +4,7 @@ import type { ServiceContext } from "@/server/context";
 import { createProduct } from "@/server/catalog/products";
 import { createCategory } from "@/server/catalog/categories";
 import { createTenantContext, resetDb } from "../../../tests/integration/helpers";
-import { listFacetValuesForSitemap, listProductsForSitemap, queryCategoryTiles, queryNewItems, queryProductsByIds, toProductCardData } from "./products";
+import { listFacetValuesForSitemap, queryCategoryTiles, queryNewItems, queryProductsByIds, toProductCardData } from "./products";
 
 const opts = { currency: "EUR", viewerSignedIn: false, blurSensitiveForGuests: true, showPriceWhenSold: false };
 
@@ -56,7 +56,7 @@ describe("storefront product reads", () => {
     expect(toProductCardData(row, opts).href).toBe(`/product/${p.stockCode}/${p.slug}`);
   });
 
-  it("category tiles default to active top-level categories; sitemap skips sensitive and sold", async () => {
+  it("category tiles default to active top-level categories", async () => {
     const helmets = await createCategory(a, { title: "Helmets" });
     await createCategory(a, { title: "German", parentId: helmets.id });
     const hidden = await createCategory(a, { title: "Hidden" });
@@ -64,13 +64,6 @@ describe("storefront product reads", () => {
     const tiles = await queryCategoryTiles(a.tenantId, []);
     expect(tiles.map((t) => t.title)).toEqual(["Helmets"]);
     expect(tiles[0].href).toBe(`/shop/category/${helmets.slug}`);
-
-    const ok = await createProduct(a, { title: "Ok", price: 100, status: "ACTIVE" });
-    await createProduct(a, { title: "Blurred", price: 100, status: "ACTIVE", blurred: true });
-    const sold = await createProduct(a, { title: "Sold", price: 100, status: "ACTIVE" });
-    await db.product.update({ where: { id: sold.id }, data: { status: "SOLD" } });
-    expect((await listProductsForSitemap(a.tenantId, false)).map((p) => p.stockCode)).toEqual([ok.stockCode]);
-    expect((await listProductsForSitemap(a.tenantId, true)).length).toBe(2);
   });
 
   it("category tiles count products in subcategories", async () => {

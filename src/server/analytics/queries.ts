@@ -1,4 +1,5 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { requireTenantDisplay } from "@/server/tenant-display";
@@ -27,16 +28,57 @@ export async function visitorsSummary(ctx: ServiceContext, input: z.input<typeof
   if (settings.provider === "matomo") {
     return matomoSummary({ matomoUrl: settings.matomoUrl, siteId: settings.matomoSiteId, days, timezone: tenant.timeZone });
   }
-  return ownSummary(tenant.id, tenant.timeZone, days);
+  return ownSummary(tenant.id, tenant.timeZone, days, { cached: true });
 }
 
-/** Own cookieless analytics over the last `days` local days (today included) in `tz`. */
-export async function ownSummary(tenantId: string, tz: string, days: number): Promise<AnalyticsSummary> {
+/** Dashboard aggregates may lag this much behind (the live-visitor count never does). */
+export const OWN_SUMMARY_CACHE_SECONDS = 300;
+
+/**
+ * Own cookieless analytics over the last `days` local days (today included) in `tz`.
+ *
+ * Performance (docs/perf/round2.md): the three range aggregations scan every page view of the period
+ * (linear in traffic: 10 + 6 + 2 ms at 11k rows, seconds at millions). With `cached` (the dashboard)
+ * they come from the data cache for OWN_SUMMARY_CACHE_SECONDS per tenant/timezone/period; only the
+ * live-visitor count (5-minute window, index range) runs per request. Without `cached` (tests,
+ * scripts — no Next cache there) everything is read live.
+ */
+export async function ownSummary(tenantId: string, tz: string, days: number, opts: { cached?: boolean } = {}): Promise<AnalyticsSummary> {
+  const aggregates = opts.cached
+    ? unstable_cache(() => ownAggregates(tenantId, tz, days), ["analytics-own-summary", tenantId, tz, String(days)], {
+        revalidate: OWN_SUMMARY_CACHE_SECONDS,
+        tags: [`tenant:${tenantId}:analytics`],
+      })
+    : () => ownAggregates(tenantId, tz, days);
+  const [{ series, topPages, topReferrers }, live] = await Promise.all([
+    aggregates(),
+    db.$queryRaw<{ live: number }[]>`
+      SELECT COUNT(DISTINCT "visitorHash")::int AS live
+      FROM page_views
+      WHERE "tenantId" = ${tenantId} AND "createdAt" >= (now() AT TIME ZONE 'UTC') - interval '5 minutes'`,
+  ]);
+
+  return {
+    provider: "own",
+    days,
+    timezone: tz,
+    // Hashes rotate per local day, so distinct-over-range equals the sum of daily uniques — derived
+    // from the series instead of a separate scan over page_views.
+    totals: series.reduce((t, d) => ({ pageviews: t.pageviews + d.pageviews, visitors: t.visitors + d.visitors }), { pageviews: 0, visitors: 0 }),
+    series,
+    topPages,
+    topReferrers,
+    liveVisitors: live[0]?.live ?? 0,
+  };
+}
+
+/** The range aggregations of ownSummary (plain JSON: safe for the data cache). */
+async function ownAggregates(tenantId: string, tz: string, days: number) {
   const back = days - 1;
   // Range start = local midnight `back` days ago in `tz`, converted back to the UTC wall clock that
   // `createdAt` (timestamp without time zone, written as UTC) uses. Repeated per query with bound params.
 
-  const [series, topPages, topReferrers, live] = await Promise.all([
+  const [series, topPages, topReferrers] = await Promise.all([
     db.$queryRaw<{ date: string; pageviews: number; visitors: number }[]>`
       WITH bounds AS (
         SELECT date_trunc('day', now() AT TIME ZONE ${tz}::text) AS today_local
@@ -66,24 +108,8 @@ export async function ownSummary(tenantId: string, tz: string, days: number): Pr
       WHERE "tenantId" = ${tenantId} AND "referrerHost" IS NOT NULL
         AND "createdAt" >= ((date_trunc('day', now() AT TIME ZONE ${tz}::text) - make_interval(days => ${back}::int)) AT TIME ZONE ${tz}::text) AT TIME ZONE 'UTC'
       GROUP BY 1 ORDER BY visitors DESC, pageviews DESC, host ASC LIMIT ${TOP_N}`,
-    db.$queryRaw<{ live: number }[]>`
-      SELECT COUNT(DISTINCT "visitorHash")::int AS live
-      FROM page_views
-      WHERE "tenantId" = ${tenantId} AND "createdAt" >= (now() AT TIME ZONE 'UTC') - interval '5 minutes'`,
   ]);
-
-  return {
-    provider: "own",
-    days,
-    timezone: tz,
-    // Hashes rotate per local day, so distinct-over-range equals the sum of daily uniques — derived
-    // from the series instead of a separate scan over page_views.
-    totals: series.reduce((t, d) => ({ pageviews: t.pageviews + d.pageviews, visitors: t.visitors + d.visitors }), { pageviews: 0, visitors: 0 }),
-    series,
-    topPages,
-    topReferrers,
-    liveVisitors: live[0]?.live ?? 0,
-  };
+  return { series, topPages, topReferrers };
 }
 
 /** Retention for the cron: deletes page views older than `days` in batches. Returns the number deleted. */

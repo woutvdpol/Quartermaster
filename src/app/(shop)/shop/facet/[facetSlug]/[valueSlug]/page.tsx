@@ -30,11 +30,14 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const shop = await requireShop();
   const { facetSlug, valueSlug } = await params;
   const { facet, value, path } = await loadValue(shop.tenant.id, facetSlug, valueSlug);
-  const query = parseCatalogParams(await searchParams, defaultSortFor(shop, "shop"));
+  const defaultSort = defaultSortFor(shop, "shop");
+  const query = parseCatalogParams(await searchParams, defaultSort);
   return catalogMetadata({
+    shop,
+    defaultSort,
     path: facetValueHref(facet.slug, value.slug),
     params: query,
-    title: copy.facet.title(path.join(" › ")),
+    title: copy.facet.metaTitle(facet.name, path.join(" › ")),
     description: copy.facet.metaDescription(facet.name, path.join(" › "), shop.shopName),
   });
 }

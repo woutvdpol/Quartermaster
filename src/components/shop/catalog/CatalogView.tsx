@@ -3,6 +3,8 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { permanentRedirect } from "next/navigation";
 import { complianceHideFilter, resolveCompliance, visitorCountry } from "@/server/compliance";
+import { JsonLd } from "@/components/shop/ui/JsonLd";
+import { collectionPageJsonLd } from "@/lib/seo/json-ld";
 import { Breadcrumbs, ButtonLink, Container, EmptyState, Pagination, ProductGrid, buttonClasses, currencyExponent, type Crumb } from "@/components/shop/ui";
 import { WishlistButton } from "@/components/shop/account/WishlistButton";
 import { SaveSearchButton } from "@/components/shop/alerts";
@@ -172,12 +174,26 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
     lockedFacets,
   };
 
+  // Structured data only on indexable views (no filters / search / re-sort; catalogMetadata noindexes those).
+  const indexable = !filtered && params.show === null && params.view === null && params.sort === defaultSort;
+  const listLd = indexable
+    ? collectionPageJsonLd({
+        origin: shop.origin,
+        path: params.page > 1 ? `${basePath}?page=${params.page}` : basePath,
+        name: title,
+        total: page.total,
+        // Sensitive items are not advertised; photos only where no rule blurs them.
+        items: page.items.filter((c) => !c.blurred).map((c) => ({ href: c.href, name: c.title, image: verdicts[c.id]?.blurred ? null : (c.cover?.card ?? null) })),
+      })
+    : null;
+
   const shown = params.show ? Math.min(params.show, page.total) : null;
   const nextShow = Math.min(MAX_SHOW, (params.show ?? PAGE_SIZE) + PAGE_SIZE);
 
   return (
     <Container className="py-6 sm:py-10">
       <Breadcrumbs items={crumbs} jsonLdBase={shop.origin} />
+      {listLd ? <JsonLd data={listLd} /> : null}
 
       <header className="mt-5 mb-8 flex flex-col gap-6 sm:mt-6 sm:mb-10 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">

@@ -87,4 +87,23 @@ describe("block schemas", () => {
     const p = parseBlock("TEXT_PRODUCT", { productId: "p1" });
     expect(p.ok && blockReferences(p.block).productIds).toEqual(["p1"]);
   });
+
+  it("FAQ: 1–30 items, question ≤ 200, answer Markdown ≤ 2000, no duplicate questions", () => {
+    const item = (q: string, a = "Answer") => ({ question: q, answer: a });
+    const ok = parseBlock("FAQ", { items: [item(" Shipping? ", " Yes ")] });
+    expect(ok).toEqual({ ok: true, block: { type: "FAQ", data: { title: "", items: [item("Shipping?", "Yes")] } } });
+    expect(parseBlock("FAQ", {}).ok).toBe(false);
+    expect(parseBlock("FAQ", { items: [] }).ok).toBe(false);
+    expect(parseBlock("FAQ", { items: Array.from({ length: 30 }, (_, i) => item(`Q${i}`)) }).ok).toBe(true);
+    expect(parseBlock("FAQ", { items: Array.from({ length: 31 }, (_, i) => item(`Q${i}`)) }).ok).toBe(false);
+    expect(parseBlock("FAQ", { items: [item("q".repeat(200))] }).ok).toBe(true);
+    expect(parseBlock("FAQ", { items: [item("q".repeat(201))] }).ok).toBe(false);
+    expect(parseBlock("FAQ", { items: [item("Q", "a".repeat(2000))] }).ok).toBe(true);
+    expect(parseBlock("FAQ", { items: [item("Q", "a".repeat(2001))] }).ok).toBe(false);
+    expect(parseBlock("FAQ", { items: [item("Q", "   ")] }).ok).toBe(false);
+    expect(parseBlock("FAQ", { items: [item("   ")] }).ok).toBe(false);
+    const dup = parseBlock("FAQ", { items: [item("Do you ship?"), item("do  you SHIP?")] });
+    expect(dup.ok).toBe(false);
+    expect(!dup.ok && dup.issues[0].path).toBe("items.1.question");
+  });
 });

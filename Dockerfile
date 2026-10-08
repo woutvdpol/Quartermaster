@@ -17,6 +17,9 @@
 #   (clients of an older build do a hard reload instead of calling unknown server actions during a
 #   rolling update). Use the same value for every target built from one commit.
 #   Optional: --build-arg NEXT_PUBLIC_TURNSTILE_SITE_KEY (fallback only; prefer runtime env TURNSTILE_SITE_KEY).
+#   Optional: --build-arg NEXT_COMPRESS=false for images behind an ingress that compresses (brotli,
+#   deploy/k8s/ingress-nginx/values.yaml). Default true: the Node server gzips (docker-compose, bare
+#   `next start`). Baked in at build time (standalone server config); see docs/perf/round2.md.
 #
 # Base image: Debian bookworm-slim (glibc) rather than Alpine (musl). `sharp` (image variants,
 # next/image optimisation) ships prebuilt libvips binaries for both, but glibc is its primary,
@@ -59,8 +62,10 @@ ARG NEXT_DEPLOYMENT_ID=""
 # running container has no effect. The Turnstile site key is public (not a secret); without it the
 # widget renders nothing and production DENIES every protected shop form (register, newsletter, …).
 ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=""
+ARG NEXT_COMPRESS="true"
 ENV DATABASE_URL="postgresql://build:build@localhost:5432/build" \
     NODE_ENV=production \
+    NEXT_COMPRESS=${NEXT_COMPRESS} \
     NEXT_DEPLOYMENT_ID=${NEXT_DEPLOYMENT_ID} \
     NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY}
 # The standalone tracer can pick up a local ./uploads dir; it must never ship in the image.

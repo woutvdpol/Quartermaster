@@ -3,7 +3,7 @@
  * Pure (client-safe). The schemas stay the source of truth for validation: the editor validates
  * drafts with `BLOCK_SCHEMAS[type].safeParse` and the service validates again on save.
  */
-import { BLOCK_DEFAULTS, BLOCK_SCHEMAS, type BlockIssue, type ContentBlockType } from "@/server/content/blocks";
+import { BLOCK_DEFAULTS, BLOCK_SCHEMAS, FAQ_LIMITS, type BlockIssue, type ContentBlockType } from "@/server/content/blocks";
 
 export type FieldSpec =
   | { key: string; kind: "text"; label: string; max: number; required?: boolean; hint?: string }
@@ -16,7 +16,8 @@ export type FieldSpec =
   | { key: string; kind: "position"; label: string }
   | { key: string; kind: "product"; label: string }
   | { key: string; kind: "categories"; label: string; max: number }
-  | { key: string; kind: "count"; label: string; min: number; max: number };
+  | { key: string; kind: "count"; label: string; min: number; max: number }
+  | { key: string; kind: "faq"; label: string; max: number; questionMax: number; answerMax: number };
 
 const title = (required = false): FieldSpec => ({ key: "title", kind: "text", label: "Title", max: 100, required });
 const markdown: FieldSpec = { key: "markdown", kind: "markdown", label: "Text" };
@@ -54,6 +55,7 @@ export const BLOCK_FIELDS: Record<ContentBlockType, FieldSpec[]> = {
   CATEGORIES: [title(), { key: "categoryIds", kind: "categories", label: "Categories", max: 24 }],
   NEW_ITEMS: [title(), { key: "count", kind: "count", label: "Number of items", min: 1, max: 24 }, cta],
   NEWSLETTER_SIGNUP: [title(true), { key: "text", kind: "textarea", label: "Text", max: 500, rows: 3 }],
+  FAQ: [title(), { key: "items", kind: "faq", label: "Questions", max: FAQ_LIMITS.items, questionMax: FAQ_LIMITS.question, answerMax: FAQ_LIMITS.answer }],
 };
 
 export type BlockDraft = Record<string, unknown>;
