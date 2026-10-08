@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
   compress: process.env.NEXT_COMPRESS !== "false",
   async headers() {
     return [
-      // Storefront fonts: content-hashed file names (scripts/fonts/sync-shop-fonts.ts) → cache forever.
+      // Self-hosted fonts (/fonts/shop, /fonts/admin): content-hashed file names (scripts/fonts/sync-fonts.ts) → cache forever.
       { source: "/fonts/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
     ];
   },

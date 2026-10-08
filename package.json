@@ -30,7 +30,7 @@
     "perf:lighthouse": "tsx scripts/perf/lighthouse.ts",
     "perf:netem": "tsx scripts/perf/netem-proxy.ts",
     "media:reprocess": "tsx --import ./scripts/server-only-shim.mjs scripts/media/reprocess.ts",
-    "fonts:sync": "tsx scripts/fonts/sync-shop-fonts.ts",
+    "fonts:sync": "tsx scripts/fonts/sync-fonts.ts",
     "search": "tsx scripts/search.ts",
     "tenant:delete": "tsx scripts/dev/delete-tenant.ts",
     "embedder": "node src/embedder/server.ts",

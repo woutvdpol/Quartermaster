@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { adminFontVariables } from "@/lib/admin-fonts";
+import { ADMIN_FONT_CSS, ADMIN_FONT_PRELOAD, adminFontVariables } from "@/lib/admin-fonts";
 import { ADMIN_THEME_COOKIE, adminThemeAttributes, parseAdminThemeCookie } from "@/lib/admin-theme";
 // Admin-only stylesheet (not in the root layout, so the storefront does not download it).
 import "../globals.css";
@@ -19,6 +19,11 @@ export default async function AdminRootLayout({ children }: LayoutProps<"/admin"
   const pref = parseAdminThemeCookie((await cookies()).get(ADMIN_THEME_COOKIE)?.value);
   return (
     <div {...adminThemeAttributes(pref)} className={`${adminFontVariables} min-h-dvh`}>
+      {/* Self-hosted fonts (src/lib/admin-fonts.ts); React hoists both into <head>. */}
+      <link rel="preload" href={ADMIN_FONT_PRELOAD} as="font" type="font/woff2" crossOrigin="anonymous" />
+      <style href="qm-admin-fonts" precedence="default">
+        {ADMIN_FONT_CSS}
+      </style>
       {children}
     </div>
   );

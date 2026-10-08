@@ -14,8 +14,8 @@
  * quartermaster-design-b.html (B "Field Ledger") and quartermaster-design-c.html (C "Naval Quiet").
  * Tokens marked "derived" have no direct counterpart in a mockup and were interpolated from it.
  *
- * Font variables (--font-barlow-condensed, …) come from next/font in src/lib/admin-fonts.ts and are
- * set as classes on the same admin root element.
+ * Font variables (--font-barlow-condensed, …) come from src/lib/admin-fonts.ts (self-hosted faces,
+ * inlined by the admin layout) and are set via the `qm-admin-fonts` class on the same admin root element.
  */
 
 /* ── Semantic tokens → Tailwind utilities ─────────────────────────────────── */
