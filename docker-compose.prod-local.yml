@@ -1,0 +1,18 @@
+# Try the production build locally, against the same database and photos as `npm run dev`.
+#   npm run prod:local        -> build app/worker/migrate images, migrate, start app + worker + embedder on :3000
+#   npm run prod:local:down   -> stop app + worker again (database and embedder keep running for dev)
+# Stop `npm run dev` first: both use port 3000. Shops open on their usual hosts, e.g.
+# http://concept.localhost:3000 and the admin at /admin.
+services:
+  app:
+    environment:
+      # Cloudflare's published Turnstile test keys (always pass, never usable on a real site), so the
+      # protected shop forms work in production mode. Real keys go in the cluster ConfigMap/Secret.
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-1x00000000000000000000AA}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-1x0000000000000000000000000000000AA}
+    volumes:
+      # The dev uploads folder instead of the empty `uploads` volume, so product photos show up.
+      - ./uploads:/app/uploads
+  worker:
+    volumes:
+      - ./uploads:/app/uploads

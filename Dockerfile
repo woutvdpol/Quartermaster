@@ -52,6 +52,8 @@ RUN apt-get update \
 # onnxruntime-node (smart-search embedder) must not download CUDA libraries on linux/x64: CPU only.
 ENV ONNXRUNTIME_NODE_INSTALL=skip
 COPY package.json package-lock.json ./
+# Local package stand-ins referenced from package.json `overrides` (vendor/node-fetch).
+COPY vendor ./vendor
 # Schema + config are needed by the `postinstall` hook (`prisma generate`).
 COPY prisma ./prisma
 COPY prisma.config.ts ./
@@ -115,6 +117,7 @@ ENV NODE_ENV=production \
     EMBEDDER_HOST=0.0.0.0 \
     EMBEDDER_PORT=3100
 COPY package.json package-lock.json ./
+COPY vendor ./vendor
 # --ignore-scripts: no `prisma generate`; sharp and onnxruntime-node ship prebuilt binaries. The server
 # only loads @huggingface/transformers (+ onnxruntime-node, sharp, tokenizers): drop the big app-only
 # packages and the binaries for other operating systems (image ≈ 1.2 GB → see docs/search.md § Ops).

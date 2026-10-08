@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prod:local": "docker compose -f docker-compose.yml -f docker-compose.prod-local.yml --profile app build app worker migrate && docker compose -f docker-compose.yml -f docker-compose.prod-local.yml --profile app up -d",
+    "prod:local:down": "docker compose -f docker-compose.yml -f docker-compose.prod-local.yml --profile app stop app worker",
     "build": "next build",
     "start": "next start",
     "preview": "next build && next start -p 3000",
@@ -71,5 +73,8 @@
     "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.0.3"
+  },
+  "overrides": {
+    "node-fetch": "file:./vendor/node-fetch"
   }
 }

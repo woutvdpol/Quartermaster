@@ -1,0 +1,15 @@
+{
+  "name": "node-fetch",
+  "version": "2.7.0-native.1",
+  "private": true,
+  "description": "Local stand-in for node-fetch v2 that delegates to Node's built-in fetch (see index.js).",
+  "main": "index.js",
+  "exports": {
+    ".": {
+      "import": "./index.mjs",
+      "require": "./index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "license": "MIT"
+}

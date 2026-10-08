@@ -107,6 +107,15 @@ docker compose --profile app down
 
 Startup order: `postgres` (healthy) → `migrate` (completes) → `app`. Uploads persist in the `uploads` named volume. Stop `npm run dev` first if it already uses port 3000.
 
+To try the production build against your dev data (same database, the dev `uploads/` folder for photos):
+
+```bash
+npm run prod:local        # build + migrate + app, worker, embedder on http://concept.localhost:3000
+npm run prod:local:down   # stop app + worker; then `npm run dev` again
+```
+
+This runs the same images with `NODE_ENV=production` as Kubernetes does. Differences from `npm run dev`: no hot reload, Turnstile is enforced (the override uses Cloudflare's always-pass test keys), and mail is written to `/tmp/qm-mail` in the worker unless `SMTP_URL` is set (`docker compose exec worker ls /tmp/qm-mail`).
+
 Seed inside Compose (optional): `docker compose --profile app run --rm migrate npx prisma db seed`.
 
 ## Kubernetes
