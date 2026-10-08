@@ -131,4 +131,5 @@ Volgorde: **themabuilder + startwizard** → **AI-plaatsingsassistent + slim zoe
 ## AI-plaatsingsassistent — akkoord eigenaar (08-10-2026)
 - Ontwerp goedgekeurd (`docs/design/ai-listing/`): concept uit foto's + notitie met herkomst per veld (gezien / notitie-historie / gok), "check before publishing", prijsvoorstel uit eigen verkopen, snelle flow op de telefoon, instellingen voor toon/regels. Publiceert nooit zelf.
 - **Lokaal model, geen externe AI-dienst, geen API-sleutel en geen kosten per concept.** Draait in een eigen container (Ollama) naast de embedder; alleen modellen met een licentie die commercieel gebruik toestaat.
+- **Geparkeerd (08-10-2026):** lokale vision-modellen op CPU zijn te traag en te onnauwkeurig (ministral-3 3b: ~4 min per concept, 3/7 op de testhelm; Duitse M40 herkend als KNIL-helm). Eigenaar: overslaan. Backend-werk bewaard op lokale branch `parked/ai-listing-assistant` (niet gepusht, migratie niet toegepast).
 - Testshops `demo-onboarding` en `concept500-import` verwijderd uit de dev-database (backup in `.local/backups/`); script `npm run tenant:delete` voor de toekomst.
