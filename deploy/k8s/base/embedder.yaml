@@ -1,0 +1,168 @@
+# Smart-search embedder (Dockerfile target `embedder`, src/embedder/server.ts): the local AI models
+# (multilingual-e5-small + SigLIP 2) behind an internal HTTP API for web (query/photo embeddings) and
+# worker (indexing). ClusterIP only — never routed through the ingress; NetworkPolicy admits only web
+# and worker pods, and every /embed call needs EMBEDDER_TOKEN (Secret quartermaster-secrets).
+#
+# Model cache: a PVC (default). The initContainer downloads missing model files (~650 MB, once) so the
+# server starts from disk; a restart is then ~3 s until /ready. RWO + `Recreate`: one replica (it is
+# CPU-bound; scale up vertically first). Alternative for several replicas without RWX storage: replace
+# the PVC with an emptyDir — every pod start then downloads the models again (≈ 1 min, needs egress to
+# huggingface.co). docs/deploy.md § Embedder.
+#
+# Resources from measurements (docs/search.md § Geheugen): RSS ≈ 1.3 GB right after loading all models,
+# ≈ 0.8–1.1 GB steady. CPU: a query ≈ 5–20 ms, a photo ≈ 60 ms on one batch; SEARCH_MODEL_THREADS
+# matches the CPU limit so onnxruntime does not oversubscribe (throttling would blow the 150 ms
+# query timeout of the web pods).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: quartermaster-models
+  labels:
+    app.kubernetes.io/component: embedder
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quartermaster-embedder
+  labels:
+    app.kubernetes.io/component: embedder
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  strategy:
+    type: Recreate # RWO model volume
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: quartermaster
+      app.kubernetes.io/component: embedder
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: quartermaster
+        app.kubernetes.io/component: embedder
+    spec:
+      serviceAccountName: quartermaster
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 15
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Downloads missing model files into the PVC and verifies they load; no-op when present.
+        - name: fetch-models
+          image: quartermaster-embedder
+          imagePullPolicy: IfNotPresent
+          command: ["node", "src/embedder/server.ts", "--fetch-only"]
+          env:
+            - name: MODEL_CACHE_DIR
+              value: /models
+          resources:
+            requests:
+              cpu: 250m
+              memory: 1536Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: models
+              mountPath: /models
+            - name: tmp
+              mountPath: /tmp
+      containers:
+        - name: embedder
+          image: quartermaster-embedder
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3100
+          env:
+            - name: MODEL_CACHE_DIR
+              value: /models
+            - name: EMBEDDER_HOST
+              value: 0.0.0.0
+            - name: EMBEDDER_PORT
+              value: "3100"
+            # Files were fetched by the initContainer; never download on the serving path.
+            - name: SEARCH_MODEL_DOWNLOAD
+              value: "0"
+            - name: SEARCH_MODEL_THREADS
+              value: "2"
+            - name: EMBEDDER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: quartermaster-secrets
+                  key: EMBEDDER_TOKEN
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1536Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            periodSeconds: 5
+            failureThreshold: 60 # up to 5 min to load the models
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: models
+              mountPath: /models
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: quartermaster-models
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: quartermaster-embedder
+  labels:
+    app.kubernetes.io/component: embedder
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: quartermaster
+    app.kubernetes.io/component: embedder
+  ports:
+    - name: http
+      port: 3100
+      targetPort: http

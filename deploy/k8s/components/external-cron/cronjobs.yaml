@@ -160,3 +160,23 @@ spec:
               env:
                 - name: CRON_TASK
                   value: rates.refresh
+---
+# Smart search safety net: queue embedding jobs for products whose index entry is missing/outdated
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: quartermaster-cron-search-sync
+  labels:
+    app.kubernetes.io/component: cron
+spec:
+  schedule: "*/10 * * * *"
+  timeZone: Etc/UTC
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: trigger
+              env:
+                - name: CRON_TASK
+                  value: search.sync

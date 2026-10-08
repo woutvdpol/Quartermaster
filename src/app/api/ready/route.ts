@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import { db } from "@/server/db";
+import { searchMetricsSnapshot } from "@/server/search/metrics";
 
 /**
  * Readiness probe. Returns 200 only when the database answers, so traffic is
@@ -12,7 +13,9 @@ export async function GET() {
   const headers = { "Cache-Control": "no-store" };
   try {
     await db.$queryRaw`SELECT 1`;
-    return Response.json({ status: "ready", checks: { database: "ok" } }, { headers });
+    // `search`: in-process smart-search counters (embedder calls, timeouts, lexical fallbacks) —
+    // informational only; the embedder being down never makes the web pod unready.
+    return Response.json({ status: "ready", checks: { database: "ok" }, search: searchMetricsSnapshot() }, { headers });
   } catch (error) {
     console.error("[ready] database check failed", error);
     return Response.json(

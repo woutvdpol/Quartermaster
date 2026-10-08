@@ -253,6 +253,11 @@ export type ListScope = {
   hide?: ComplianceHide | null;
   /** Facet tokens that are part of the page itself (SEO landing /shop/facet/x/y), ANDed with params.facets. */
   lockedFacets?: string[];
+  /**
+   * Restrict to these product ids (smart search: the fused result set, src/server/search). Used for
+   * facet counts over search results; null/undefined = no restriction.
+   */
+  ids?: string[] | null;
 };
 
 // ─── Facet taxonomy ────────────────────────────────────────────────────────
@@ -309,7 +314,7 @@ function escapeLike(s: string) {
   return s.replace(/[\\%_]/g, (m) => `\\${m}`);
 }
 
-type FilterParts = Pick<CatalogParams, "q" | "tags" | "min" | "max"> & {
+export type FilterParts = Pick<CatalogParams, "q" | "tags" | "min" | "max"> & {
   selection?: FacetSelection[];
 };
 
@@ -329,9 +334,10 @@ function hideSql(hide: ComplianceHide): Prisma.Sql | null {
 
 /**
  * WHERE parts. `omit` leaves out one dimension (for facet counts of that dimension): "category",
- * "price", or a facet id ("facet:<id>").
+ * "price", or a facet id ("facet:<id>"). Exported for the smart search (src/server/search), which
+ * applies exactly these visibility/compliance/facet/price filters with `q: null`.
  */
-function whereSql(
+export function whereSql(
   tenantId: string,
   scope: ListScope,
   f: FilterParts,
@@ -341,6 +347,7 @@ function whereSql(
     Prisma.sql`p."tenantId" = ${tenantId}`,
     visibleSql(scope.mode),
   ];
+  if (scope.ids) parts.push(Prisma.sql`p.id = ANY(${scope.ids}::text[])`);
   if (scope.hide) {
     const h = hideSql(scope.hide);
     if (h) parts.push(h);
@@ -393,10 +400,10 @@ function whereSql(
 
 const LISTED_AT = Prisma.sql`coalesce(p."publishedAt", p."createdAt")`;
 
-function orderSql(sort: CatalogSort, mode: CatalogMode): Prisma.Sql {
+export function orderSql(sort: CatalogSort, mode: CatalogMode): Prisma.Sql {
   if (
     mode === "archive" &&
-    (sort === "newest" || sort === "featured" || sort === "updated")
+    (sort === "newest" || sort === "featured" || sort === "updated" || sort === "relevance")
   ) {
     return Prisma.sql`p."soldAt" DESC NULLS LAST, p.id DESC`;
   }
@@ -411,7 +418,9 @@ function orderSql(sort: CatalogSort, mode: CatalogMode): Prisma.Sql {
       return Prisma.sql`p.importance DESC, ${LISTED_AT} DESC, p.id DESC`;
     case "updated":
       return Prisma.sql`p."updatedAt" DESC, p.id DESC`;
+    // "relevance" is ordered by the smart search itself (src/server/search); as SQL it means newest.
     case "newest":
+    case "relevance":
     default:
       return Prisma.sql`${LISTED_AT} DESC, p.id DESC`;
   }

@@ -50,6 +50,7 @@ export const catalogCopy = {
       price_desc: "Price: high to low",
       featured: "Featured",
       updated: "Recently updated",
+      relevance: "Best match",
     } as Record<string, string>,
     archiveNewest: "Recently sold",
     apply: "Apply",

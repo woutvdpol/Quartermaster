@@ -10,14 +10,16 @@
  *   tag      tag slug, repeatable (AND: every selected tag must match) — for tags not (yet) mapped
  *            to a facet
  *   min,max  price bounds in whole units of the shop currency
- *   sort     newest | oldest | price_asc | price_desc | featured | updated
+ *   sort     newest | oldest | price_asc | price_desc | featured | updated | relevance
+ *            (relevance = smart-search ranking, src/server/search; the default whenever q is set,
+ *            ignored without q)
  *   page     1-based page
  *   show     "load more" mode: number of items to show from the start (multiple of the page size)
  *   view     grid | list (overrides settings.catalog.layout for this visitor)
  * The category lives in the path (/shop/category/{slug}), never in the query.
  */
 
-export const CATALOG_SORTS = ["newest", "oldest", "price_asc", "price_desc", "featured", "updated"] as const;
+export const CATALOG_SORTS = ["newest", "oldest", "price_asc", "price_desc", "featured", "updated", "relevance"] as const;
 export type CatalogSort = (typeof CATALOG_SORTS)[number];
 export type CatalogView = "grid" | "list";
 
@@ -92,13 +94,24 @@ export function parseCatalogParams(raw: RawSearchParams, defaultSort: CatalogSor
   if (min !== null && max !== null && min > max) [min, max] = [max, min];
   if (min === 0) min = null;
   const sortRaw = first(raw.sort);
-  const sort = (CATALOG_SORTS as readonly string[]).includes(sortRaw ?? "") ? (sortRaw as CatalogSort) : defaultSort;
+  let sort = (CATALOG_SORTS as readonly string[]).includes(sortRaw ?? "") ? (sortRaw as CatalogSort) : defaultSort;
+  // Relevance only exists for a search; without q fall back to the listing default.
+  if (sort === "relevance" && !q) sort = defaultSort === "relevance" ? "newest" : defaultSort;
   const page = Math.max(1, positiveInt(first(raw.page), MAX_PAGE) ?? 1);
   const showRaw = positiveInt(first(raw.show), MAX_SHOW);
   const show = showRaw && showRaw > PAGE_SIZE ? Math.min(MAX_SHOW, Math.ceil(showRaw / PAGE_SIZE) * PAGE_SIZE) : null;
   const viewRaw = first(raw.view);
   const view = viewRaw === "grid" || viewRaw === "list" ? viewRaw : null;
   return { q, facets, facetValueIds, tags, min, max, sort, page, show, view };
+}
+
+/**
+ * Default sort of a catalog view: "relevance" while searching (so `?q=` URLs stay clean), else the
+ * listing default. Parse twice: `parseCatalogParams(raw, searchDefaultSort(raw, listingDefault))`.
+ */
+export function searchDefaultSort(raw: RawSearchParams, listingDefault: CatalogSort): CatalogSort {
+  const q = (first(raw.q) ?? "").trim();
+  return q ? "relevance" : listingDefault;
 }
 
 /** Filters that narrow the result set (used for "active filters", noindex and clear-all). */

@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "Embedder service sources: run directly by Node (type stripping). See server.ts."
+}

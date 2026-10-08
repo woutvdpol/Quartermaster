@@ -37,17 +37,19 @@ spec:
       enableServiceLinks: false
       terminationGracePeriodSeconds: 60
       securityContext:
-        # uid/gid of the `postgres` user in the Alpine image.
+        # uid/gid of the `postgres` user in the Debian-based pgvector image (the Alpine image used 70).
         runAsNonRoot: true
-        runAsUser: 70
-        runAsGroup: 70
-        fsGroup: 70
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
         fsGroupChangePolicy: OnRootMismatch
         seccompProfile:
           type: RuntimeDefault
       containers:
         - name: postgres
-          image: postgres:18-alpine
+          # Postgres 18 + pgvector (smart search, docs/search.md). Switching an existing volume from
+          # postgres:18-alpine: chown the PVC to 999 and REINDEX once (musl vs glibc collation).
+          image: pgvector/pgvector:pg18
           imagePullPolicy: IfNotPresent
           ports:
             - name: postgres

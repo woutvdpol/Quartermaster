@@ -5,6 +5,7 @@ import { ALERT_JOBS } from "@/server/alerts/jobs";
 import { invoiceIssueJob, invoiceRenderJob } from "@/server/invoices/job";
 import { passwordResetRequestJob } from "@/server/auth/jobs";
 import { importImagesJob, importRunJob } from "@/server/import/jobs";
+import { SEARCH_JOBS } from "@/server/search/jobs";
 import { defineJob } from "./registry";
 import { CRON_TASKS, runCronTask, type CronTaskName } from "./cron";
 
@@ -28,6 +29,7 @@ export const CRON_JOBS = {
   "cron.offers.expire": cronJob("offers.expire"),
   "cron.cart.abandoned": cronJob("cart.abandoned"),
   "cron.rates.refresh": cronJob("rates.refresh"),
+  "cron.search.sync": cronJob("search.sync"),
 } satisfies { [K in CronTaskName as `cron.${K}`]: unknown };
 
 export const JOBS = {
@@ -39,6 +41,7 @@ export const JOBS = {
   "invoices.render": invoiceRenderJob,
   "import.run": importRunJob,
   "import.images": importImagesJob,
+  ...SEARCH_JOBS, // search.embed-product, search.reindex-tenant
   ...CRON_JOBS,
 };
 

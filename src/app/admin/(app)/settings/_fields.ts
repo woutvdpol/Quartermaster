@@ -4,6 +4,7 @@
  * group's settings object and doubles as the form field name and the Zod error key.
  */
 import { DISPLAY_CURRENCIES, FONT_ALLOWLIST, type SettingsGroup } from "@/server/settings/schema";
+import { MAX_SYNONYM_TEXT } from "@/server/search/synonyms";
 
 type Base = { path: string; label: string; description?: string };
 type Option = { value: string; label: string; description?: string };
@@ -117,6 +118,21 @@ export const SETTINGS_FORMS: Record<SettingsGroup, GroupMeta> = {
           { kind: "switch", path: "featuredRanking", label: "Featured ranking", description: "Rank products to control the “Featured” sort." },
           { kind: "switch", path: "stolenStatus", label: "Stolen-item status", description: "Mark items reported stolen." },
           { kind: "switch", path: "purchaseRecords", label: "Purchase records", description: "Track purchase price and provenance (needed for margins)." },
+        ],
+      },
+      {
+        title: "Search",
+        description:
+          "Smart search understands words like “Duitse helm onder 500 euro”. One line per entry: word: alias, alias. When the word is the name of a filter value (e.g. Germany, WW2, Helmets), its aliases select that filter; other lines are words that mean the same (veldfles: canteen, Feldflasche). Lines starting with # are notes.",
+        fields: [
+          {
+            kind: "textarea",
+            path: "searchSynonyms",
+            label: "Search synonyms",
+            rows: 14,
+            maxLength: MAX_SYNONYM_TEXT,
+            description: "Changes apply to the shop search within a minute. Clear a line to drop a default.",
+          },
         ],
       },
     ],

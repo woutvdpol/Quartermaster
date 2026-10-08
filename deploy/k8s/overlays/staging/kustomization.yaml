@@ -29,6 +29,9 @@ images:
   - name: quartermaster-migrate
     newName: ghcr.io/CHANGE-ME/quartermaster-migrate
     newTag: "0.0.0"
+  - name: quartermaster-embedder
+    newName: ghcr.io/CHANGE-ME/quartermaster-embedder
+    newTag: "0.0.0"
 
 configMapGenerator:
   - name: quartermaster-config

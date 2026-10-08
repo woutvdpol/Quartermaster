@@ -27,6 +27,7 @@ import {
   hasActiveFilters,
   liveReservedIds,
   parseCatalogParams,
+  searchDefaultSort,
   selectedFacetValueIds,
   sortFromSetting,
   subtreeIds,
@@ -37,7 +38,8 @@ import {
   type ListScope,
   type RawSearchParams,
 } from "@/server/storefront-catalog";
-import type { FacetValueOption, PublicCategory } from "@/server/storefront-catalog/types";
+import type { CatalogFacets, CatalogPage, FacetValueOption, PublicCategory } from "@/server/storefront-catalog/types";
+import { searchProducts } from "@/server/search";
 import { ActiveFilters } from "./ActiveFilters";
 import { CatalogList } from "./CatalogList";
 import { FacetPanel } from "./FacetPanel";
@@ -77,7 +79,9 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
   const tenantId = shop.tenant.id;
   const currency = shop.tenant.currency;
   const settings = shop.settings.catalog;
-  const defaultSort = defaultSortFor(shop, mode);
+  // While searching (?q=) the default order is "relevance" (smart search, src/server/search).
+  const listingSort = defaultSortFor(shop, mode);
+  const defaultSort = searchDefaultSort(searchParams, listingSort);
   const params = parseCatalogParams(searchParams, defaultSort);
 
   // Visitor country (edge geo header) → per-country compliance rules; unknown country = no geo rules.
@@ -92,9 +96,22 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
     lockedFacets,
   };
 
-  const [page, facets, selectedTags, viewer, display] = await Promise.all([
-    getCatalogPage(tenantId, scope, params),
-    getFacets(tenantId, scope, params),
+  // Search goes through the hybrid engine (per request, not data-cached: results depend on the query
+  // and on models warming up); plain listings keep the cached catalog reads.
+  const results: Promise<{ page: CatalogPage; facets: CatalogFacets }> = params.q
+    ? searchProducts(tenantId, {
+        q: params.q,
+        filters: { facets: params.facets, facetValueIds: params.facetValueIds, tags: params.tags, min: params.min, max: params.max },
+        sort: params.sort,
+        fallbackSort: listingSort,
+        page: params.page,
+        show: params.show,
+        scope,
+        currency,
+      }).then((r) => ({ page: { items: r.items, total: r.total }, facets: r.facets! }))
+    : Promise.all([getCatalogPage(tenantId, scope, params), getFacets(tenantId, scope, params)]).then(([page, facets]) => ({ page, facets }));
+  const [{ page, facets }, selectedTags, viewer, display] = await Promise.all([
+    results,
     getTagsBySlug(tenantId, params.tags),
     getShopViewer(tenantId),
     // Visitor's indicative display currency (cookie) — read here, outside the cached catalog reads.
@@ -151,14 +168,15 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
   const currentPath = category && tree ? categoryPath(tree, category.id).map((n) => n.id) : [];
   const activeCount = params.facets.length + params.tags.length + (params.q ? 1 : 0) + (params.min !== null || params.max !== null ? 1 : 0);
 
-  const sortOptions = (
-    mode === "archive"
+  const sortOptions: { value: CatalogSort; label: string }[] = [
+    ...(params.q ? [{ value: "relevance" as const, label: copy.toolbar.sorts.relevance }] : []),
+    ...(mode === "archive"
       ? (["newest", "price_desc", "price_asc"] as const).map((v) => ({ value: v, label: v === "newest" ? copy.toolbar.archiveNewest : copy.toolbar.sorts[v] }))
-      : (["newest", "oldest", "price_asc", "price_desc", "updated", ...(defaultSort === "featured" ? (["featured"] as const) : [])] as const).map((v) => ({
+      : (["newest", "oldest", "price_asc", "price_desc", "updated", ...(listingSort === "featured" ? (["featured"] as const) : [])] as const).map((v) => ({
           value: v,
           label: copy.toolbar.sorts[v],
-        }))
-  ).sort((a, b) => (a.value === defaultSort ? -1 : b.value === defaultSort ? 1 : 0));
+        }))),
+  ].sort((a, b) => (a.value === defaultSort ? -1 : b.value === defaultSort ? 1 : 0));
 
   const facetProps = {
     basePath,

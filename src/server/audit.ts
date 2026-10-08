@@ -2,6 +2,7 @@ import "server-only";
 import { requestClientIp } from "@/server/request-meta";
 import { db } from "@/server/db";
 import { invalidateShopForAction } from "@/server/storefront/cache";
+import { onAudited as updateSearchIndex } from "@/server/search/hooks";
 import type { Prisma } from "@/generated/prisma/client";
 
 type AuditEntry = {
@@ -28,4 +29,6 @@ export async function audit(entry: AuditEntry) {
     },
   });
   invalidateShopForAction(entry.tenantId, entry.action);
+  // Product/taxonomy changes → (debounced) search index jobs (src/server/search/hooks.ts). Never throws.
+  await updateSearchIndex(entry);
 }

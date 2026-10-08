@@ -84,6 +84,8 @@ model Tenant {
   coupons               Coupon[]
   couponRedemptions     CouponRedemption[]
   leads                 Lead[]
+  productEmbeddings     ProductEmbedding[]
+  searchIndexRun        SearchIndexRun?
 
   @@map("tenants")
 }
@@ -371,10 +373,13 @@ model Product {
   createdAt                DateTime      @default(now())
   updatedAt                DateTime      @updatedAt
 
-  // Search: the shop and the admin search with `ILIKE '%word%'` on title / description / sku
-  // (src/server/storefront-catalog/queries.ts, src/server/catalog/products.ts). pg_trgm GIN indexes
-  // (migration 20261008120000_search_trigram_indexes) make those substring matches index scans.
-  // A tsvector column (ranking, stemming) can still be added later.
+  // Search: the admin search uses `ILIKE '%word%'` on title / description / sku (pg_trgm GIN indexes,
+  // migration 20261008120000_search_trigram_indexes). The shop search (src/server/search, docs/search.md)
+  // ranks with full-text search on `searchVector` — a STORED generated column (title + sku weight A,
+  // description weight C, text search config `qm_search` = simple + unaccent; migration
+  // 20261008160000_smart_search). Never written by the app. The dbgenerated() text is the generation
+  // expression exactly as Postgres reports it — keep it identical or `migrate dev` sees drift.
+  searchVector Unsupported("tsvector")? @default(dbgenerated("((setweight(to_tsvector('qm_search'::regconfig, COALESCE(title, ''::text)), 'A'::\"char\") || setweight(to_tsvector('qm_search'::regconfig, COALESCE(sku, ''::text)), 'A'::\"char\")) || setweight(to_tsvector('qm_search'::regconfig, COALESCE(description, ''::text)), 'C'::\"char\"))"))
 
   tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   category           Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
@@ -389,6 +394,7 @@ model Product {
   orderLines         OrderLine[]
   wishlistItems      WishlistItem[]
   productFacetValues ProductFacetValue[]
+  embeddings         ProductEmbedding[]
   alertDeliveries    AlertDelivery[]
   productDocuments   ProductDocument[]
   certificates       Certificate[]
@@ -404,7 +410,62 @@ model Product {
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_title_trgm_idx")
   @@index([description(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_description_trgm_idx")
   @@index([sku(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_sku_trgm_idx")
+  @@index([searchVector], type: Gin, map: "products_search_vector_idx")
   @@map("products")
+}
+
+// ─── Smart search (src/server/search, docs/search.md) ───────────────────────
+
+enum EmbeddingKind {
+  TEXT  @map("text") // title + category + facets + tags + description (multilingual-e5-small, 384-d)
+  IMAGE @map("image") // main photo (SigLIP 2, 768-d)
+
+  @@map("embedding_kind")
+}
+
+// One vector per product and kind (pgvector). Written and read only with raw SQL (Prisma cannot
+// model `vector`). `contentHash` = sha256 of the embedded input + model id: the indexing job skips
+// unchanged products. HNSW indexes (cosine) are partial expression indexes per kind with a fixed
+// dimension — `embedding::vector(384)` / `embedding::vector(768)` — created in the migration, so
+// queries must use exactly that cast. Changing a model's dimension needs a new migration.
+model ProductEmbedding {
+  tenantId    String
+  productId   String
+  kind        EmbeddingKind
+  model       String
+  dim         Int
+  embedding   Unsupported("vector")
+  contentHash String
+  updatedAt   DateTime              @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([productId, kind])
+  @@index([tenantId, kind])
+  @@map("product_embeddings")
+}
+
+// Latest "Rebuild search index" run per tenant (admin progress card; job `search.reindex-tenant`).
+model SearchIndexRun {
+  tenantId      String    @id
+  status        String // queued | running | done | failed
+  force         Boolean   @default(false)
+  total         Int       @default(0)
+  done          Int       @default(0)
+  textEmbedded  Int       @default(0)
+  imageEmbedded Int       @default(0)
+  failed        Int       @default(0)
+  error         String?
+  requestedById String?
+  createdAt     DateTime  @default(now())
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  updatedAt     DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("search_index_runs")
 }
 
 // Images live on local storage via the StorageDriver (no Cloudflare).

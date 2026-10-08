@@ -19,6 +19,7 @@ resources:
   - web-service.yaml
   - web-pdb.yaml
   - worker-deployment.yaml
+  - embedder.yaml
   - migrate-job.yaml
   - ingress.yaml
   - backup-cronjob.yaml
@@ -48,6 +49,8 @@ configMapGenerator:
       # Worker: drain time on SIGTERM; keep terminationGracePeriodSeconds (40 s) above this + 5 s.
       - WORKER_SHUTDOWN_TIMEOUT_MS=25000
       - JOBS_LOG_CRON=0
+      # Smart search: internal embedder service (deploy/k8s/base/embedder.yaml). Token in the Secret.
+      - EMBEDDER_URL=http://quartermaster-embedder:3100
       # Optional (add in an overlay only when needed; unset = default behaviour):
       #   MOLLIE_WEBHOOK_BASE_URL — webhook base for Mollie (default: APP_URL)
       #   MATOMO_URL              — Matomo analytics base URL (token lives in the Secret)
@@ -58,3 +61,4 @@ configMapGenerator:
 #   quartermaster          → Dockerfile target `runner`
 #   quartermaster-worker   → Dockerfile target `worker`
 #   quartermaster-migrate  → Dockerfile target `migrate`
+#   quartermaster-embedder → Dockerfile target `embedder`

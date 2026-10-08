@@ -1,0 +1,17 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-10-08T12:00:00Z" },
+  "title": "Smart search",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1440, "h": 860, "title": "1 · Search-as-you-type (try the example queries)", "expand": "fill", "is_interactive": true },
+    "Results.dc.html": { "x": 1520, "y": 0, "w": 1440, "h": 1100, "title": "2 · Results — understood as + similar", "expand": "fill" },
+    "Photo.dc.html": { "x": 3040, "y": 0, "w": 390, "h": 844, "title": "3 · Mobile — search by photo" }
+  },
+  "order": ["Main.dc.html", "Results.dc.html", "Photo.dc.html"],
+  "notes": {
+    "heading": { "x": 0, "y": -320, "text": "Smart search — natural language + photo", "kind": "title1", "maxW": 3440 }
+  },
+  "designSystems": []
+}

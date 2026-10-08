@@ -27,9 +27,13 @@
     "perf:lighthouse": "tsx scripts/perf/lighthouse.ts",
     "perf:netem": "tsx scripts/perf/netem-proxy.ts",
     "media:reprocess": "tsx --import ./scripts/server-only-shim.mjs scripts/media/reprocess.ts",
-    "fonts:sync": "tsx scripts/fonts/sync-shop-fonts.ts"
+    "fonts:sync": "tsx scripts/fonts/sync-shop-fonts.ts",
+    "search": "tsx scripts/search.ts",
+    "embedder": "node src/embedder/server.ts",
+    "models:fetch": "node src/embedder/server.ts --fetch-only"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.3.1",
     "@mollie/api-client": "^4.6.0",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",

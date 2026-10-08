@@ -47,6 +47,26 @@ test("catalog renders and a filter narrows the result", async ({ page }) => {
   expect((await productLinks(page)).length).toBeGreaterThan(0);
 });
 
+test("search: /shop?q= ranks results (lexical fallback without embedder) and is noindex", async ({ page }) => {
+  // The demo shop has Stahlhelme/helmets; "duitse helm" is understood as Country: Germany + Type: Helmets
+  // where those facets exist, and still finds helmets lexically otherwise.
+  const res = await page.goto("/shop?q=helm");
+  expect(res?.status()).toBe(200);
+  expect((await productLinks(page)).length).toBeGreaterThan(0);
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+});
+
+test("search suggest API answers with products", async ({ request }) => {
+  const res = await request.get("/api/search/suggest?q=helm");
+  expect(res.status()).toBe(200);
+  expect(res.headers()["cache-control"]).toContain("no-store");
+  const body = (await res.json()) as { products: { href: string; locked: boolean; image: { src: string } | null }[]; searchHref: string };
+  expect(body.products.length).toBeGreaterThan(0);
+  expect(body.searchHref).toBe("/shop?q=helm");
+  // Locked (sensitive) cards never carry a real image URL.
+  for (const p of body.products) if (p.locked) expect(p.image?.src ?? "").toBe("");
+});
+
 test("product page renders", async ({ page }) => {
   await page.goto("/shop");
   const [first] = await productLinks(page);

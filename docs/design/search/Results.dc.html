@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Search results</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=Instrument+Serif:ital@0;1&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFFFF}
+a{color:#141414;text-decoration:none}a:hover{color:#1F4D3A}
+button{font:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #FFFFFF; color: #141414; font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 15px">
+  <header style="border-bottom: 1px solid #ECECEA">
+    <div style="max-width: 1360px; margin: 0 auto; padding: 18px 32px; display: flex; align-items: center; gap: 28px">
+      <a href="#" style="font-weight: 700; font-size: 20px; letter-spacing: -0.02em">Concept Militaria</a>
+      <nav aria-label="Categories" style="display: flex; gap: 20px; font-weight: 500; color: #3D3D3A"><a href="#">Shop</a><a href="#">Helmets</a><a href="#">Uniforms</a><a href="#">Insignia</a></nav>
+      <span style="margin-left: auto; background: #141414; color: #FFFFFF; border-radius: 999px; padding: 10px 16px; font-weight: 600; font-size: 14px">Cart · 1</span>
+    </div>
+  </header>
+
+  <main style="max-width: 1360px; margin: 0 auto; padding: 28px 32px 64px; display: flex; flex-direction: column; gap: 20px">
+    <div style="display: flex; flex-wrap: wrap; align-items: end; gap: 16px; justify-content: space-between">
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 14px; color: #6A6862">Search</span>
+        <h1 style="margin: 0; font-size: 40px; letter-spacing: -0.03em; font-weight: 600">“duitse helm ww2 <em style="font-family: 'Instrument Serif', serif; font-weight: 400">onder 500</em>”</h1>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; border: 1px solid #CFCDC6; border-radius: 999px; padding: 0 6px 0 16px; height: 46px; min-width: 360px">
+        <label style="flex-grow: 1; display: flex"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search</span><input type="search" value="duitse helm ww2 onder 500" style="border: 0; outline: none; font: inherit; width: 100%"></label>
+        <button type="button" aria-label="Search by photo" style="width: 36px; height: 36px; border-radius: 999px; border: 0; background: #F3F3F1; display: grid; place-items: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"></path><circle cx="12" cy="13" r="3.5"></circle></svg></button>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px; background: #F3F3F1; border-radius: 6px">
+      <span style="font-size: 14px; color: #3D3D3A; margin-right: 4px">We searched for <strong>helm</strong> with</span>
+      <button type="button" aria-label="Remove filter Country: Germany" style="display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border: 1px solid #CFCDC6; border-radius: 999px; padding: 6px 8px 6px 12px; font-size: 14px; font-weight: 600">Country: Germany <span aria-hidden="true">×</span></button>
+      <button type="button" aria-label="Remove filter Period: WW2" style="display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border: 1px solid #CFCDC6; border-radius: 999px; padding: 6px 8px 6px 12px; font-size: 14px; font-weight: 600">Period: WW2 <span aria-hidden="true">×</span></button>
+      <button type="button" aria-label="Remove filter Price up to 500" style="display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border: 1px solid #CFCDC6; border-radius: 999px; padding: 6px 8px 6px 12px; font-size: 14px; font-weight: 600">Price ≤ €500 <span aria-hidden="true">×</span></button>
+      <a href="#" style="margin-left: auto; font-size: 14px; text-decoration: underline; text-underline-offset: 3px">Search the words literally instead</a>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px">
+      <span style="font-size: 14px; color: #6A6862">9 items · best matches first</span>
+      <div style="display: flex; gap: 8px"><span style="border: 1px solid #CFCDC6; border-radius: 999px; padding: 8px 14px; font-size: 14px">Sort: Best match</span><span style="border: 1px solid #CFCDC6; border-radius: 999px; padding: 8px 14px; font-size: 14px">Filters</span></div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 32px 20px">
+      <sc-for list="{{items}}" as="p" hint-placeholder-count="4">
+        <a href="#" style="display: flex; flex-direction: column; gap: 8px">
+          <div style="aspect-ratio: 4 / 5; background: #F3F3F1; border-radius: 6px; position: relative">
+            <sc-if value="{{p.badge}}" hint-placeholder-val="{{false}}"><span style="position: absolute; top: 12px; left: 12px; background: #FFFFFF; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600">{{p.badge}}</span></sc-if>
+          </div>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6A6862"><span style="color: #7A2420">No. {{p.code}}</span> · {{p.cat}}</span>
+          <span style="display: flex; justify-content: space-between; gap: 12px"><span style="font-weight: 500">{{p.title}}</span><strong>{{p.price}}</strong></span>
+        </a>
+      </sc-for>
+    </div>
+
+    <section aria-label="Close matches" style="border-top: 1px solid #ECECEA; padding-top: 24px; display: flex; flex-direction: column; gap: 14px">
+      <h2 style="margin: 0; font-size: 24px; letter-spacing: -0.02em; font-weight: 600">Close, but not all filters match</h2>
+      <p style="margin: 0; color: #6A6862; font-size: 14px">German helmets just above €500, and WW2 helmets from other countries.</p>
+      <div style="display: flex; gap: 16px; overflow-x: auto; padding-bottom: 4px">
+        <sc-for list="{{close}}" as="c" hint-placeholder-count="4">
+          <a href="#" style="flex: 0 0 200px; display: flex; flex-direction: column; gap: 6px">
+            <span style="aspect-ratio: 4 / 5; background: #F3F3F1; border-radius: 6px; display: block"></span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #7A2420">No. {{c.code}}</span>
+            <span style="font-size: 14px; font-weight: 500">{{c.title}}</span>
+            <span style="font-size: 12px; color: #6A6862">{{c.why}}</span>
+          </a>
+        </sc-for>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+renderVals() {
+return {
+  items: [
+    { code: '50170', cat: 'Steel helmets', title: 'Stahlhelm M35, Heer, single decal', price: '€485', badge: 'Certificate' },
+    { code: '50171', cat: 'Steel helmets', title: 'Stahlhelm M40, camouflage traces', price: '€420', badge: false },
+    { code: '50176', cat: 'Steel helmets', title: 'Luftschutz Gladiator helmet', price: '€165', badge: false },
+    { code: '50178', cat: 'Field caps', title: 'Feldmütze M38, Heer', price: '€310', badge: 'Make an offer' }
+  ],
+  close: [
+    { code: '50169', title: 'Stahlhelm M42, Luftwaffe', why: '€640 — above your €500' },
+    { code: '50174', title: 'British Brodie Mk II, 1940', why: 'WW2 · Britain' },
+    { code: '50175', title: 'US M1 helmet, front seam', why: 'WW2 · USA' }
+  ]
+};
+}
+}
+</script>
+</body>
+</html>

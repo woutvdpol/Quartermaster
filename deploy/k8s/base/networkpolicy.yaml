@@ -1,7 +1,8 @@
 # NetworkPolicies (only enforced by a CNI that supports them: Cilium, Calico, …).
 #
 # Ingress: everything in the namespace is denied, except web:3000 from the ingress-nginx
-#          controller (namespace `ingress-nginx`) and from cron trigger pods in this namespace.
+#          controller (namespace `ingress-nginx`) and from cron trigger pods in this namespace, and
+#          embedder:3100 from web and worker pods only.
 # Egress:  quartermaster pods may reach DNS, Postgres (5432), HTTPS (Mollie, Turnstile, ECB rates,
 #          Matomo, S3 backups) and SMTP submission (465/587). Adjust the ports when your managed
 #          Postgres or SMTP provider uses non-standard ones (e.g. 25060 on DigitalOcean).
@@ -42,6 +43,30 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
+  name: quartermaster-embedder-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: quartermaster
+      app.kubernetes.io/component: embedder
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: quartermaster
+              app.kubernetes.io/component: web
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: quartermaster
+              app.kubernetes.io/component: worker
+      ports:
+        - port: 3100
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
   name: quartermaster-egress
 spec:
   podSelector:
@@ -66,6 +91,15 @@ spec:
       ports:
         - port: 5432
           protocol: TCP
+    # Web/worker → embedder (smart search).
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: quartermaster
+              app.kubernetes.io/component: embedder
+      ports:
+        - port: 3100
+          protocol: TCP
     # Cron trigger pods → web service.
     - to:
         - podSelector:
@@ -75,7 +109,7 @@ spec:
       ports:
         - port: 3000
           protocol: TCP
-    # Managed Postgres, HTTPS APIs, SMTP.
+    # Managed Postgres, HTTPS APIs (incl. huggingface.co for the embedder's model download), SMTP.
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0

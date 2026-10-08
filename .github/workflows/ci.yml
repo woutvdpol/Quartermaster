@@ -20,7 +20,8 @@ jobs:
 
     services:
       postgres:
-        image: postgres:18-alpine
+        # pgvector: product embeddings for smart search (docs/search.md).
+        image: pgvector/pgvector:pg18
         env:
           POSTGRES_USER: quartermaster
           POSTGRES_PASSWORD: quartermaster
@@ -38,6 +39,8 @@ jobs:
       DATABASE_URL_TEST: postgresql://quartermaster:quartermaster@localhost:5432/quartermaster_test
       PLATFORM_HOST: localhost:3000
       NEXT_TELEMETRY_DISABLED: "1"
+      # onnxruntime-node (smart-search embedder dependency) would fetch CUDA libraries on linux/x64.
+      ONNXRUNTIME_NODE_INSTALL: skip
 
     steps:
       - uses: actions/checkout@v4
@@ -143,6 +146,17 @@ jobs:
           target: worker
           push: false
           tags: quartermaster-worker:ci
+          cache-from: type=gha
+
+      # Smart-search models service. No models are baked in or downloaded here (they are fetched into
+      # the model volume at first start / by the k8s initContainer).
+      - name: Build embedder image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: embedder
+          push: false
+          tags: quartermaster-embedder:ci
           cache-from: type=gha
 
   k8s:

@@ -3,7 +3,10 @@
 #   docker compose --profile app up -d --build -> database + migrations + containerised app
 services:
   postgres:
-    image: postgres:18-alpine
+    # Postgres 18 + pgvector (smart search: product embeddings, docs/search.md). Debian-based, unlike the
+    # former postgres:18-alpine: a data volume created by the alpine (musl) image must be REINDEXed once
+    # after switching (text collation differs between musl and glibc) — see docs/search.md § Ops.
+    image: pgvector/pgvector:pg18
     container_name: quartermaster-postgres
     environment:
       POSTGRES_USER: quartermaster
@@ -50,6 +53,9 @@ services:
       DATABASE_URL: postgresql://quartermaster:quartermaster@postgres:5432/quartermaster
       PORT: "3000"
       HOSTNAME: 0.0.0.0
+      # Smart search models (service `embedder`); without it search falls back to lexical.
+      EMBEDDER_URL: http://embedder:3100
+      EMBEDDER_TOKEN: ${EMBEDDER_TOKEN:-dev-embedder-token}
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
@@ -77,6 +83,8 @@ services:
       DATABASE_URL: postgresql://quartermaster:quartermaster@postgres:5432/quartermaster
       # Without SMTP_URL, mails are written as .eml files here: `docker compose exec worker ls /tmp/qm-mail`
       MAIL_OUTBOX_DIR: /tmp/qm-mail
+      EMBEDDER_URL: http://embedder:3100
+      EMBEDDER_TOKEN: ${EMBEDDER_TOKEN:-dev-embedder-token}
     volumes:
       - uploads:/app/uploads
     stop_signal: SIGTERM
@@ -88,6 +96,28 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  # Smart search AI models (docs/search.md): `docker compose up -d embedder`, then run the app on the host
+  # with EMBEDDER_URL=http://127.0.0.1:3100 and EMBEDDER_TOKEN=dev-embedder-token (or use --profile app).
+  # First start downloads the model files (~650 MB) into the `models` volume; /ready turns 200 when loaded.
+  embedder:
+    profiles: ["app", "embedder"]
+    build:
+      context: .
+      target: embedder
+    image: quartermaster-embedder:dev
+    environment:
+      EMBEDDER_TOKEN: ${EMBEDDER_TOKEN:-dev-embedder-token}
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - models:/models
+    read_only: true
+    tmpfs:
+      - /tmp
+    stop_signal: SIGTERM
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   uploads:
+  models:

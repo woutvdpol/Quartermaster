@@ -8,10 +8,13 @@
 #                       Kubernetes Job). Also able to run `prisma db seed` and the ETL (`npm run etl`).
 #   worker            – pg-boss background worker (mail, PDFs, newsletter fan-out, cron); same
 #                       contents as `migrate`, different command.
+#   embedder          – smart-search AI models (e5 + SigLIP 2) behind a small internal HTTP API
+#                       (src/embedder/server.ts). Model files live in a volume at /models.
 #
 #   docker build -t quartermaster:dev .
 #   docker build --target migrate -t quartermaster-migrate:dev .
 #   docker build --target worker  -t quartermaster-worker:dev .
+#   docker build --target embedder -t quartermaster-embedder:dev .
 #
 #   Optional: --build-arg NEXT_DEPLOYMENT_ID=<git sha> enables Next.js version-skew protection
 #   (clients of an older build do a hard reload instead of calling unknown server actions during a
@@ -46,6 +49,8 @@ FROM base AS deps
 RUN apt-get update \
  && apt-get install -y --no-install-recommends openssl ca-certificates \
  && rm -rf /var/lib/apt/lists/*
+# onnxruntime-node (smart-search embedder) must not download CUDA libraries on linux/x64: CPU only.
+ENV ONNXRUNTIME_NODE_INSTALL=skip
 COPY package.json package-lock.json ./
 # Schema + config are needed by the `postinstall` hook (`prisma generate`).
 COPY prisma ./prisma
@@ -97,6 +102,37 @@ CMD ["prisma", "migrate", "deploy"]
 FROM migrate AS worker
 STOPSIGNAL SIGTERM
 CMD ["tsx", "scripts/worker.ts"]
+
+# ─── embedder: smart-search models (internal HTTP service) ────────────────────
+# Production dependencies only, no build step: Node 24 runs src/embedder/*.ts directly (type stripping).
+# No models in the image: they are fetched into the /models volume on first start (or beforehand with
+# `node src/embedder/server.ts --fetch-only`, e.g. a Kubernetes initContainer). Runs with a read-only
+# root filesystem; only /models (and /tmp) must be writable. docs/search.md § Ops.
+FROM base AS embedder
+ENV NODE_ENV=production \
+    NPM_CONFIG_UPDATE_NOTIFIER=false \
+    MODEL_CACHE_DIR=/models \
+    EMBEDDER_HOST=0.0.0.0 \
+    EMBEDDER_PORT=3100
+COPY package.json package-lock.json ./
+# --ignore-scripts: no `prisma generate`; sharp and onnxruntime-node ship prebuilt binaries. The server
+# only loads @huggingface/transformers (+ onnxruntime-node, sharp, tokenizers): drop the big app-only
+# packages and the binaries for other operating systems (image ≈ 1.2 GB → see docs/search.md § Ops).
+# onnxruntime-web is bundled inside transformers.js' node build, the package itself is unused.
+RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev --ignore-scripts --no-audit --no-fund \
+ && rm -rf node_modules/onnxruntime-node/bin/napi-v*/darwin node_modules/onnxruntime-node/bin/napi-v*/win32 \
+      node_modules/next node_modules/@next node_modules/@prisma node_modules/prisma node_modules/onnxruntime-web \
+      node_modules/@react-pdf node_modules/@react-email node_modules/effect node_modules/@electric-sql
+COPY src/embedder ./src/embedder
+RUN mkdir -p /models && chown nextjs:nodejs /models
+VOLUME ["/models"]
+USER nextjs
+EXPOSE 3100
+STOPSIGNAL SIGTERM
+# Healthy = every model loaded (the first start may download ~650 MB of model files).
+HEALTHCHECK --interval=15s --timeout=5s --start-period=300s --retries=3 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:'+(process.env.EMBEDDER_PORT||3100)+'/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+CMD ["node", "src/embedder/server.ts"]
 
 # ─── runner: production server ───────────────────────────────────────────────
 FROM base AS runner

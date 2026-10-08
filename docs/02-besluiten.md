@@ -122,3 +122,8 @@ Volgorde: **themabuilder + startwizard** → **AI-plaatsingsassistent + slim zoe
 - **Themabuilder:** preset (Gallery/Archive/Field Kit/Vault) + afstemmen (kleuren, lettertypes, hoekafronding, knopvorm, dichtheid, logo). Concept → live preview → publiceren.
 - **Imports in de wizard:** WooCommerce-CSV, Shopify-CSV en Concept500 (onze ETL).
 - **Sneller:** hele app (shop Core Web Vitals, admin-schermen, zoeken), met meetrapport vooraf en achteraf.
+
+## Slim zoeken — akkoord eigenaar (08-10-2026)
+- Ontwerp goedgekeurd (`docs/design/search/`): zoeken-terwijl-je-typt met "begrepen als"-chips, resultatenpagina met verwijderbare filters + "bijna-matches", zoeken op foto (mobiel), "Lijkt hierop" op productpagina.
+- Hybride zoeken: Postgres full-text + pg_trgm (tikfouten) + facet-herkenning uit de zoekzin + semantische vectoren (pgvector).
+- **Lokale AI-modellen (geen externe API) in een eigen Docker-container** (`embedder`-service: multilingual-e5-small voor tekst, SigLIP 2 base (Apache-2.0) voor foto's en foto-tekst; CLIP bleek alleen Engels te begrijpen). Intern bereikbaar met token; web/worker vallen terug op tekstzoeken als de embedder niet draait.

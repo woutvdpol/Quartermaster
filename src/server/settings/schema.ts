@@ -5,6 +5,7 @@
 //
 // Zod v4 note: nested objects use `.prefault({})` rather than `.default({})`. `.default()` returns the
 // default value as-is (skipping inner defaults); `.prefault()` parses it, so inner defaults apply.
+import { DEFAULT_SYNONYMS, MAX_SYNONYM_TEXT } from "@/server/search/synonyms";
 import { z } from "zod";
 
 // ─── Shared primitives ──────────────────────────────────────────────────────
@@ -152,6 +153,9 @@ export const catalogSchema = z.object({
   featuredRanking: z.boolean().default(false),
   stolenStatus: z.boolean().default(false),
   purchaseRecords: z.boolean().default(false),
+  // Smart search (src/server/search/synonyms.ts, docs/search.md): "word: alias, alias" per line. A word
+  // that is a facet value name turns its aliases into that filter; other lines are equivalent words.
+  searchSynonyms: z.string().max(MAX_SYNONYM_TEXT).default(DEFAULT_SYNONYMS),
 });
 
 export const checkoutSchema = z.object({

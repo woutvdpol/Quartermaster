@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Search by photo</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFFFF}
+a{color:#141414;text-decoration:none}a:hover{color:#1F4D3A}
+button{font:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #FFFFFF; color: #141414; font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 15px; display: flex; flex-direction: column; overflow: hidden">
+  <header style="display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #ECECEA">
+    <button type="button" aria-label="Close" style="width: 44px; height: 44px; border: 0; background: transparent; display: grid; place-items: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+    <span style="font-weight: 600">Search by photo</span>
+    <span style="width: 44px"></span>
+  </header>
+
+  <div style="padding: 16px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid #ECECEA">
+    <span style="width: 84px; height: 104px; border-radius: 6px; background: #E3E1DA; flex-shrink: 0; display: grid; place-items: center; font-size: 11px; color: #55534C; text-align: center">[your photo]</span>
+    <div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+      <span style="font-weight: 600">Looks like a steel helmet</span>
+      <span style="font-size: 13px; color: #6A6862">Matched on shape and colour. Your photo is not stored.</span>
+      <div style="display: flex; gap: 6px; flex-wrap: wrap">
+        <button type="button" style="height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #CFCDC6; background: #FFFFFF; font-size: 13px">Retake</button>
+        <button type="button" style="height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #CFCDC6; background: #FFFFFF; font-size: 13px">Add words…</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding: 14px 16px 8px; display: flex; justify-content: space-between; align-items: baseline">
+    <span style="font-weight: 600">Most similar</span><span style="font-size: 13px; color: #6A6862">12 items</span>
+  </div>
+  <div style="padding: 0 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 12px; overflow: hidden; flex-grow: 1">
+    <sc-for list="{{items}}" as="p" hint-placeholder-count="4">
+      <a href="#" style="display: flex; flex-direction: column; gap: 5px">
+        <span style="aspect-ratio: 4 / 5; background: #F3F3F1; border-radius: 6px; display: block; position: relative"><span style="position: absolute; left: 8px; bottom: 8px; background: #FFFFFF; border-radius: 999px; padding: 3px 8px; font-size: 11px; font-weight: 600">{{p.match}}</span></span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #7A2420">No. {{p.code}}</span>
+        <span style="display: flex; justify-content: space-between; gap: 8px; font-size: 13px"><span style="font-weight: 500">{{p.title}}</span><strong>{{p.price}}</strong></span>
+      </a>
+    </sc-for>
+  </div>
+
+  <div style="padding: 12px 16px 20px; border-top: 1px solid #ECECEA; display: flex; gap: 8px">
+    <button type="button" style="flex: 1; height: 48px; border-radius: 999px; border: 1px solid #CFCDC6; background: #FFFFFF; font-weight: 600">Choose photo</button>
+    <button type="button" style="flex: 1; height: 48px; border-radius: 999px; border: 0; background: #1F4D3A; color: #FFFFFF; font-weight: 600">Take photo</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+return { items: [
+  { code: '50170', title: 'Stahlhelm M35', price: '€485', match: 'Very close' },
+  { code: '50172', title: 'M56 Stahlhelm', price: '€45', match: 'Close' },
+  { code: '50171', title: 'Stahlhelm M40', price: '€420', match: 'Close' },
+  { code: '50176', title: 'Luftschutz helmet', price: '€165', match: 'Similar' }
+] };
+}
+}
+</script>
+</body>
+</html>

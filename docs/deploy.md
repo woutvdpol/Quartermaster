@@ -14,7 +14,7 @@ Productie-inrichting van Quartermaster op een generiek Kubernetes-cluster (beslu
 8. [Migraties](#8-migraties)
 9. [Proxy-, IP- en Host-contract](#9-proxy--ip--en-host-contract)
 10. [Uploads-opslag](#10-uploads-opslag)
-11. [Schalen](#11-schalen)
+11. [Schalen](#11-schalen) — 11b. [Embedder (slim zoeken)](#11b-embedder-slim-zoeken)
 12. [Postgres](#12-postgres)
 13. [Backups & restore](#13-backups--restore)
 14. [Cron](#14-cron)
@@ -67,7 +67,7 @@ Eén installatie bedient alle tenants: de app bepaalt de tenant op basis van de 
 
 | Pad | Inhoud |
 |---|---|
-| `deploy/k8s/base/` | Omgevings-onafhankelijke basis: web, worker, migrate-Job, Service, Ingress, PDB, PVC's, ConfigMap, backup-CronJob, NetworkPolicies, ServiceAccount |
+| `deploy/k8s/base/` | Omgevings-onafhankelijke basis: web, worker, embedder (slim zoeken), migrate-Job, Service, Ingress, PDB, PVC's, ConfigMap, backup-CronJob, NetworkPolicies, ServiceAccount |
 | `deploy/k8s/overlays/production/` | Managed Postgres, RWX-uploads, 2 web-replica's, eigen hosts |
 | `deploy/k8s/overlays/staging/` | In-cluster Postgres, RWO-uploads op één node, 1 replica, LE-staging-certificaten |
 | `deploy/k8s/components/uploads-rwo` | Alles op één node met een ReadWriteOnce-volume (zie §10) |
@@ -84,7 +84,7 @@ Renderen/valideren zonder cluster: `kubectl kustomize deploy/k8s/overlays/produc
 
 ## 3. Images bouwen
 
-Eén `Dockerfile`, drie targets — bouw ze uit dezelfde commit en tag ze gelijk (bijv. de git-SHA):
+Eén `Dockerfile`, vier targets — bouw ze uit dezelfde commit en tag ze gelijk (bijv. de git-SHA):
 
 ```bash
 SHA=$(git rev-parse --short HEAD); REG=ghcr.io/<org>
@@ -94,7 +94,8 @@ docker build --build-arg NEXT_DEPLOYMENT_ID=$SHA \
   -t $REG/quartermaster:$SHA .
 docker build --target worker  -t $REG/quartermaster-worker:$SHA .
 docker build --target migrate -t $REG/quartermaster-migrate:$SHA .
-docker push … (alle drie)
+docker build --target embedder -t $REG/quartermaster-embedder:$SHA .
+docker push … (alle vier)
 ```
 
 | Target | Inhoud | Gebruikt door |
@@ -102,6 +103,7 @@ docker push … (alle drie)
 | `runner` (default) | Next.js standalone, ~335 MB, `node server.js` | Deployment web |
 | `worker` | Volledige dependency-tree + `src/` + `scripts/`, `tsx scripts/worker.ts` | Deployment worker |
 | `migrate` | Idem, `prisma migrate deploy`; kan ook `prisma db seed` en `npm run etl` | Job migrate, ETL-Job |
+| `embedder` | Slim zoeken: e5-small + SigLIP 2 achter een interne HTTP-API (`node src/embedder/server.ts`), ~510 MB, **zonder** modellen (die komen in een volume, zie § Embedder) | Deployment embedder |
 
 Belangrijk:
 
@@ -137,6 +139,11 @@ Alles is runtime-config (behalve de build-args hierboven); één image gaat door
 | `TURNSTILE_SECRET_KEY` | Secret | ja (prod) | Leeg = beschermde formulieren geweigerd in productie. |
 | `CRON_SECRET` | Secret | alleen met external-cron | ≥ 16 tekens; leeg = `/api/cron/*` uit. |
 | `MATOMO_TOKEN` | Secret | nee | Alleen naar `MATOMO_URL` gestuurd. |
+| `EMBEDDER_TOKEN` | Secret | ja (slim zoeken) | Gedeeld geheim web/worker ↔ embedder (Bearer-header), ≥ 32 tekens. Ontbreekt het bij de embedder, dan start die niet; web/worker vallen dan terug op lexicaal zoeken. |
+| `EMBEDDER_URL` | ConfigMap | nee | Interne URL van de embedder, k8s `http://quartermaster-embedder:3100`, compose `http://embedder:3100`. Leeg = slim zoeken alleen lexicaal + facetten (semantisch en foto-zoeken uit). |
+| `EMBEDDER_TIMEOUT_QUERY_MS`, `EMBEDDER_TIMEOUT_IMAGE_MS`, `EMBEDDER_TIMEOUT_PASSAGE_MS` | ConfigMap | nee (150 / 2000 / 60000) | Time-outs van de embedder-client. Bij een time-out/fout gaat het circuit 15 s open: zoeken draait dan lexicaal (`/api/ready` → `search.timeouts`, `lexicalFallbacks`). |
+| `SEARCH_SEMANTIC` | ConfigMap | nee | `off` = dit proces gebruikt de embedder niet. |
+| `MODEL_CACHE_DIR`, `SEARCH_MODEL_DOWNLOAD`, `SEARCH_MODEL_THREADS`, `EMBEDDER_PORT`, `EMBEDDER_HOST`, `EMBEDDER_MAX_INFLIGHT` | Deployment embedder | — | Alleen de embedder: modelmap (`/models`), downloaden toegestaan (`0` = nooit, de initContainer haalt ze), onnxruntime-threads (= CPU-limit), poort 3100, bind-adres, max. gelijktijdige requests (64). |
 | `PLATFORM_HOST` | ConfigMap | ja | Superadmin-host, bijv. `platform.example.nl` (zonder schema; met poort alleen als die in de URL staat). |
 | `APP_URL` | ConfigMap | ja | `https://<platform-host>`; basis voor maillinks zonder shopdomein en voor de Mollie-webhook-URL. |
 | `SHOP_SUBDOMAIN_BASE` | ConfigMap | ja (onboarding) | Basis-host voor platform-subdomeinen van nieuwe shops: bij goedkeuring van een aanmelding krijgt de shop `<slug>.<SHOP_SUBDOMAIN_BASE>` als primair domein, bijv. `quartermaster.nl` → `dealer.quartermaster.nl`. Zonder schema, met poort alleen in dev. Default (dev) `localhost:3000` → `<slug>.localhost:3000` (browsers resolven `*.localhost` naar 127.0.0.1). Vereist wildcard-DNS + wildcard-certificaat, zie §15. |
@@ -264,11 +271,23 @@ Uploads komen niet in het image (`.dockerignore`, en de build verwijdert een eve
 - **Worker**: 1 is genoeg; meer replica's mogen (jobs via `SKIP LOCKED`, cron-schedules gededupliceerd door pg-boss).
 - **Resources** (startwaarden, bijstellen na metingen): web 250m/512Mi request, 2 CPU/1Gi limit (`--max-old-space-size=640`; sharp/libvips alloceert buiten de V8-heap); worker 100m/256Mi, 1 CPU/768Mi.
 
+## 11b. Embedder (slim zoeken)
+
+De AI-modellen van slim zoeken (docs/search.md) draaien in een **eigen container** (`embedder`), niet in web of worker:
+
+- **Wat**: `deploy/k8s/base/embedder.yaml` — PVC `quartermaster-models` (2 Gi, RWO), Deployment (1 replica, `Recreate`), Service `quartermaster-embedder` (ClusterIP, poort 3100). Nooit via de ingress; de NetworkPolicy `quartermaster-embedder-ingress` laat alleen web- en worker-pods toe, en elke `/embed`-call vraagt `Authorization: Bearer $EMBEDDER_TOKEN`.
+- **Modellen**: niet in het image. De initContainer `fetch-models` (`node src/embedder/server.ts --fetch-only`) downloadt ontbrekende bestanden (~650 MB, eenmalig, egress naar huggingface.co:443) in de PVC; daarna start de server van schijf (~3 s tot `/ready`). De hoofdcontainer downloadt nooit (`SEARCH_MODEL_DOWNLOAD=0`). Air-gapped: vul de PVC vooraf met `npm run models:fetch` (`MODEL_CACHE_DIR` naar de mount).
+- **PVC vs emptyDir**: PVC (default) = snelle herstart, maar RWO → één replica en `Recreate` (korte onderbreking bij een rollout; zoeken valt dan terug op lexicaal). emptyDir = meerdere replica's zonder RWX-opslag, maar elke podstart downloadt opnieuw (~1 min, netwerk nodig). Meer capaciteit eerst verticaal (CPU) schalen.
+- **Probes**: startup/readiness op `/ready` (200 pas als alle modellen geladen en opgewarmd zijn), liveness op `/health`.
+- **Resources** (gemeten, docs/search.md § Geheugen): RSS ≈ 1,3 GB direct na laden, 0,8–1,2 GB stabiel → request 1,5 Gi, limit 2 Gi; CPU request 500m, limit 2 met `SEARCH_MODEL_THREADS=2`. Web en worker hebben géén extra geheugen nodig (ze praten alleen HTTP).
+- **Uitval**: web gebruikt korte time-outs (150 ms tekst, 2 s foto) en valt terug op lexicaal zoeken + facetten; foto-zoeken geeft dan 503. De worker herhaalt indexeerjobs (pg-boss-retries) en de cron `search.sync` haalt gemiste producten in.
+- **Compose**: `docker compose up -d embedder` (profiel `embedder`, ook in `--profile app`), volume `models`, poort `127.0.0.1:3100`; app/worker krijgen `EMBEDDER_URL=http://embedder:3100`.
+
 ## 12. Postgres
 
-**Aanbevolen: managed Postgres 18** (automatische backups + PITR, failover, minor-upgrades, monitoring). Zet `DATABASE_URL` met `sslmode=require` (of `verify-full` + CA) in het Secret. Pas de egress-NetworkPolicy aan als de provider een andere poort dan 5432 gebruikt (bijv. 25060). Liefst in dezelfde regio als het cluster.
+**Aanbevolen: managed Postgres 18** (automatische backups + PITR, failover, minor-upgrades, monitoring). **Vereist de extensie `pgvector` (≥ 0.8)** voor slim zoeken: de migratie `20261008160000_smart_search` doet `CREATE EXTENSION IF NOT EXISTS vector` (en `unaccent`). Bij de meeste providers moet `vector` eerst op de allow-list van de database/het parameter-profiel (AWS RDS/Aurora, Azure Flexible Server: `azure.extensions`, Google Cloud SQL, DigitalOcean, Supabase, Neon: standaard beschikbaar); de migratie-gebruiker moet de extensie mogen aanmaken. Zonder pgvector faalt de migratie. Zet `DATABASE_URL` met `sslmode=require` (of `verify-full` + CA) in het Secret. Pas de egress-NetworkPolicy aan als de provider een andere poort dan 5432 gebruikt (bijv. 25060). Liefst in dezelfde regio als het cluster.
 
-**Optioneel: in-cluster** (`components/postgres-in-cluster`, gebruikt door staging): één `postgres:18-alpine`-StatefulSet met PVC, non-root, readiness via `pg_isready`, NetworkPolicy die alleen Quartermaster-pods toelaat. Bewust simpel: geen replicatie, geen failover, geen PITR — de nachtelijke pg_dump is de enige backup. Voor productie in-cluster liever een operator (CloudNativePG) dan deze StatefulSet. Secret: `quartermaster-postgres` (`POSTGRES_PASSWORD`) en `DATABASE_URL=postgresql://quartermaster:<pw>@quartermaster-postgres:5432/quartermaster`.
+**Optioneel: in-cluster** (`components/postgres-in-cluster`, gebruikt door staging): één `pgvector/pgvector:pg18`-StatefulSet met PVC (Debian-image, UID 999; was `postgres:18-alpine` — een bestaand volume eenmalig chownen naar 999 en `REINDEX DATABASE` draaien, want musl en glibc sorteren tekst anders), non-root, readiness via `pg_isready`, NetworkPolicy die alleen Quartermaster-pods toelaat. Bewust simpel: geen replicatie, geen failover, geen PITR — de nachtelijke pg_dump is de enige backup. Voor productie in-cluster liever een operator (CloudNativePG) dan deze StatefulSet. Secret: `quartermaster-postgres` (`POSTGRES_PASSWORD`) en `DATABASE_URL=postgresql://quartermaster:<pw>@quartermaster-postgres:5432/quartermaster`.
 
 ## 13. Backups & restore
 

@@ -2,7 +2,7 @@
 # Quartermaster rollout: migrations first, then the app. Needs only kubectl (≥ 1.27, built-in kustomize).
 #
 #   deploy/k8s/rollout.sh overlays/staging              # deploy the tags pinned in the overlay
-#   deploy/k8s/rollout.sh overlays/production 1a2b3c4   # override the image tag (all three images)
+#   deploy/k8s/rollout.sh overlays/production 1a2b3c4   # override the image tag (all four images)
 #   DRY_RUN=1 deploy/k8s/rollout.sh overlays/production # render + server-side dry run only
 #
 # Order (docs/deploy.md "Rollouts"):
@@ -29,11 +29,11 @@ RENDERED="$WORK/rendered.yaml"
 kubectl kustomize "$OVERLAY" > "$RENDERED"
 
 if [[ -n "$TAG" ]]; then
-  # Re-render through a wrapper kustomization that only changes the tag of our three images.
+  # Re-render through a wrapper kustomization that only changes the tag of our four images.
   {
     echo "resources: [\"../${OVERLAY#"$K8S_DIR"/}\"]"
     echo "images:"
-    grep -oE 'image: [^ ]*quartermaster(-worker|-migrate)?(:[^ ]+)?$' "$RENDERED" \
+    grep -oE 'image: [^ ]*quartermaster(-worker|-migrate|-embedder)?(:[^ ]+)?$' "$RENDERED" \
       | sed -E 's/^image: //; s/:[^:/]+$//' | sort -u \
       | while read -r repo; do echo "  - {name: \"$repo\", newTag: \"$TAG\"}"; done
   } > "$WORK/kustomization.yaml"
@@ -81,4 +81,6 @@ echo "→ 3/3 application"
 kubectl apply -f "$RENDERED" --selector "app.kubernetes.io/component!=migrate"
 kubectl -n "$NS" rollout status deployment/quartermaster-web --timeout=600s
 kubectl -n "$NS" rollout status deployment/quartermaster-worker --timeout=300s
+# Applied with the infrastructure (no DB dependency); the first start downloads the models (~650 MB).
+kubectl -n "$NS" rollout status deployment/quartermaster-embedder --timeout=900s
 echo "✓ rollout complete"
