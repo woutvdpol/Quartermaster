@@ -17,6 +17,7 @@
     "db:generate": "prisma generate",
     "db:seed": "prisma db seed",
     "db:seed:demo": "tsx --import ./scripts/server-only-shim.mjs scripts/seed-demo.ts",
+    "db:seed:facets": "tsx --import ./scripts/server-only-shim.mjs scripts/seed-facets-demo.ts",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
     "test:integration": "vitest run --config vitest.integration.config.ts",

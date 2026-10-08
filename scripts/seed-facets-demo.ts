@@ -1,6 +1,6 @@
 // Demo facets + compliance for "concept-militaria" (run after db:seed and db:seed:demo):
 //
-//   npx tsx --import ./scripts/server-only-shim.mjs scripts/seed-facets-demo.ts
+//   npm run db:seed:facets
 //
 //  1. seedDefaultFacets: Period / Country / Branch / Unit / Type / Maker with starter values.
 //  2. Converts the demo tags into facet values (convertTagsToFacet, tags deleted afterwards):
@@ -26,6 +26,9 @@ async function main() {
   const { db } = await import("../src/server/db");
   const facets = await import("../src/server/facets");
   const compliance = await import("../src/server/compliance");
+  // Catalog changes are audited, and audit() queues search-index jobs in pg-boss: stop it at the end
+  // or its connections keep the process alive.
+  const { stopBoss } = await import("../src/server/jobs/boss");
 
   const tenant = await db.tenant.findUnique({ where: { slug: TENANT } });
   if (!tenant) throw new Error(`Tenant "${TENANT}" not found — run npm run db:seed first.`);
@@ -73,6 +76,7 @@ async function main() {
     await compliance.createComplianceRule(ctx, { name: ruleName, match: "RESTRICTED_SYMBOLS", countries: ["DE", "AT"], action: "HIDE_PRODUCT", note: "§86a StGB / §3 VerbotsG" });
     console.log("Compliance: example rule created");
   }
+  await stopBoss().catch(() => undefined);
   await db.$disconnect();
 }
 
