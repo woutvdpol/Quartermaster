@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>New product with AI</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ECECE5}
+a{color:#7E5416}a:hover{color:#1E2119}
+button{font:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #ECECE5; color: #1E2119; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; display: flex; flex-wrap: wrap">
+  <nav aria-label="Admin" style="flex: 1 1 220px; max-width: 232px; background: #2F3526; color: #D9DCCB; padding: 18px 14px; display: flex; flex-direction: column; gap: 4px; box-sizing: border-box">
+    <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: 0.04em; padding: 4px 10px 16px">QUARTERMASTER</span>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px">Dashboard</a>
+    <a href="#" aria-current="page" style="color: #FFFFFF; background: #3E4532; padding: 8px 10px; border-radius: 4px; font-weight: 600">Inventory</a>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px">Orders</a>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px">Customers</a>
+  </nav>
+
+  <main style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; border-bottom: 1px solid #D7D8CC; background: #FAFAF6">
+      <div>
+        <span style="font-size: 12px; color: #666A5A">Inventory › New product</span>
+        <h1 style="margin: 2px 0 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px">New product <span style="font-family: 'IBM Plex Mono', monospace; font-size: 15px; color: #7A2420; font-weight: 500">No. 50241</span></h1>
+      </div>
+      <div style="display: flex; gap: 8px">
+        <button type="button" style="height: 36px; padding: 0 14px; border: 1px solid #D7D8CC; background: #FAFAF6; border-radius: 4px">Regenerate</button>
+        <button type="button" style="height: 36px; padding: 0 14px; border: 1px solid #D7D8CC; background: #FAFAF6; border-radius: 4px">Save as draft</button>
+        <button type="button" style="height: 36px; padding: 0 16px; border: 0; background: #7E5416; color: #FFFFFF; border-radius: 4px; font-weight: 600">Review &amp; publish</button>
+      </div>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 20px 24px">
+      <section aria-label="Photos" style="flex: 1 1 320px; max-width: 380px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+          <span style="grid-column: span 3; aspect-ratio: 4 / 3; background: #C9C7B6; border-radius: 4px; display: grid; place-items: center; color: #4A4D40; font-size: 12px">[Photo 1 — helmet, left side]</span>
+          <span style="aspect-ratio: 1 / 1; background: #B7B49F; border-radius: 4px"></span>
+          <span style="aspect-ratio: 1 / 1; background: #C9C7B6; border-radius: 4px; position: relative"><span style="position: absolute; left: 4px; bottom: 4px; background: #FAFAF6; border-radius: 3px; padding: 1px 5px; font-size: 10px">Stamp read</span></span>
+          <span style="aspect-ratio: 1 / 1; border: 1px dashed #B7B49F; border-radius: 4px; display: grid; place-items: center; color: #666A5A; font-size: 12px">+ Add</span>
+        </div>
+        <div style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px">
+          <strong style="font-size: 13px">What the assistant looked at</strong>
+          <span style="font-size: 13px; color: #4A4D40">3 photos · your note “M40 from the Utrecht fair, liner 57” · 12 similar items you sold</span>
+          <span style="font-size: 12px; color: #666A5A">Draft in 6 s · it never publishes on its own</span>
+        </div>
+        <div style="background: #F5E7C4; border: 1px solid #E5D3A3; border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px">
+          <strong style="font-size: 13px; color: #6E4A00">Check before publishing (2)</strong>
+          <span style="font-size: 13px; color: #6E4A00">• Possible restricted symbol on photo 1 → “Restricted symbols” flag set; hidden in DE/AT by your compliance rule.</span>
+          <span style="font-size: 13px; color: #6E4A00">• Maker stamp partly unreadable: “ET” or “EF”? Confirm in Markings.</span>
+        </div>
+      </section>
+
+      <section aria-label="Draft" style="flex: 999 1 520px; min-width: 0; background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px">
+          <span style="font-size: 12px; letter-spacing: 0.12em; color: #666A5A; font-weight: 600">AI DRAFT · EDIT ANYTHING</span>
+          <span style="display: flex; gap: 12px; font-size: 12px; color: #666A5A"><span><span style="color: #2F6B3A">●</span> seen on photo</span><span><span style="color: #2C5873">●</span> from your note / history</span><span><span style="color: #946200">●</span> best guess</span></span>
+        </div>
+        <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #666A5A">Title <span style="color: #2F6B3A">● seen</span>
+          <input type="text" value="Stahlhelm M40 Heer, ET64, single decal" style="height: 38px; border: 1px solid #B7B49F; border-radius: 4px; padding: 0 10px; font: inherit; font-size: 15px; color: #1E2119; background: #FFFFFF">
+        </label>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+          <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #666A5A">Category <span style="color: #2F6B3A">● seen</span><select style="height: 36px; border: 1px solid #B7B49F; border-radius: 4px; font: inherit; color: #1E2119; background: #FFFFFF"><option>Helmets › Steel helmets</option></select></label>
+          <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #666A5A">Price <span style="color: #946200">● suggestion</span><input type="text" value="€ 1,350" style="height: 36px; border: 1px solid #B7B49F; border-radius: 4px; padding: 0 10px; font: inherit; color: #1E2119; background: #FFFFFF"></label>
+        </div>
+        <div style="font-size: 12px; color: #666A5A; margin-top: -6px">Price range from your sales: €1,150–1,520 (8 comparable M40/M42 helmets, median 34 days to sell)</div>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <span style="font-size: 12px; color: #666A5A">Facets</span>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px">
+            <span style="background: #DCEBD9; color: #2F6B3A; border-radius: 999px; padding: 4px 10px; font-size: 13px">Period: WW2</span>
+            <span style="background: #DCEBD9; color: #2F6B3A; border-radius: 999px; padding: 4px 10px; font-size: 13px">Country: Germany</span>
+            <span style="background: #DCEBD9; color: #2F6B3A; border-radius: 999px; padding: 4px 10px; font-size: 13px">Branch: Army › Heer</span>
+            <span style="background: #D8E5EE; color: #2C5873; border-radius: 999px; padding: 4px 10px; font-size: 13px">Maker: Eisenhüttenwerke Thale (ET)</span>
+            <button type="button" style="border: 1px dashed #B7B49F; background: transparent; border-radius: 999px; padding: 4px 10px; font-size: 13px">+ Facet</button>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+          <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #666A5A">Markings <span style="color: #946200">● check</span><input type="text" value="ET64, lot 3721" style="height: 36px; border: 1px solid #D9A93C; border-radius: 4px; padding: 0 10px; font: inherit; color: #1E2119; background: #FFFFFF"></label>
+          <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #666A5A">Size <span style="color: #2C5873">● note</span><input type="text" value="64 shell, 57 liner" style="height: 36px; border: 1px solid #B7B49F; border-radius: 4px; padding: 0 10px; font: inherit; color: #1E2119; background: #FFFFFF"></label>
+          <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #666A5A">Condition <span style="color: #946200">● guess</span><select style="height: 36px; border: 1px solid #B7B49F; border-radius: 4px; font: inherit; color: #1E2119; background: #FFFFFF"><option>Very good</option></select></label>
+        </div>
+        <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #666A5A">Description · in your shop's voice
+          <textarea rows="6" style="border: 1px solid #B7B49F; border-radius: 4px; padding: 10px; font: inherit; font-size: 14px; line-height: 1.5; color: #1E2119; background: #FFFFFF; resize: vertical">Original M40 steel helmet of the Heer, maker-marked ET64 with lot number 3721. The single Heer decal is around 80% present; paint shows honest age-appropriate wear with no repaint. Leather liner (size 57) complete with all fingers and chinstrap.
+
+Comes from a Dutch collection. Please study the photos — they are part of the description.</textarea>
+        </label>
+        <details style="border-top: 1px solid #D7D8CC; padding-top: 10px">
+          <summary style="cursor: pointer; font-weight: 600">SEO title &amp; description (generated)</summary>
+          <p style="margin: 8px 0 0; color: #4A4D40; font-size: 13px">Stahlhelm M40 Heer ET64 — original WW2 German helmet · Concept Militaria</p>
+        </details>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

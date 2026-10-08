@@ -127,3 +127,8 @@ Volgorde: **themabuilder + startwizard** → **AI-plaatsingsassistent + slim zoe
 - Ontwerp goedgekeurd (`docs/design/search/`): zoeken-terwijl-je-typt met "begrepen als"-chips, resultatenpagina met verwijderbare filters + "bijna-matches", zoeken op foto (mobiel), "Lijkt hierop" op productpagina.
 - Hybride zoeken: Postgres full-text + pg_trgm (tikfouten) + facet-herkenning uit de zoekzin + semantische vectoren (pgvector).
 - **Lokale AI-modellen (geen externe API) in een eigen Docker-container** (`embedder`-service: multilingual-e5-small voor tekst, SigLIP 2 base (Apache-2.0) voor foto's en foto-tekst; CLIP bleek alleen Engels te begrijpen). Intern bereikbaar met token; web/worker vallen terug op tekstzoeken als de embedder niet draait.
+
+## AI-plaatsingsassistent — akkoord eigenaar (08-10-2026)
+- Ontwerp goedgekeurd (`docs/design/ai-listing/`): concept uit foto's + notitie met herkomst per veld (gezien / notitie-historie / gok), "check before publishing", prijsvoorstel uit eigen verkopen, snelle flow op de telefoon, instellingen voor toon/regels. Publiceert nooit zelf.
+- **Lokaal model, geen externe AI-dienst, geen API-sleutel en geen kosten per concept.** Draait in een eigen container (Ollama) naast de embedder; alleen modellen met een licentie die commercieel gebruik toestaat.
+- Testshops `demo-onboarding` en `concept500-import` verwijderd uit de dev-database (backup in `.local/backups/`); script `npm run tenant:delete` voor de toekomst.

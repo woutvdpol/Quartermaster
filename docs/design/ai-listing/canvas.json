@@ -1,0 +1,17 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-10-08T14:00:00Z" },
+  "title": "AI listing assistant",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1440, "h": 1000, "title": "1 · Admin — draft from photos (desktop)", "expand": "fill" },
+    "Phone.dc.html": { "x": 1520, "y": 0, "w": 390, "h": 844, "title": "2 · Phone — list at a fair in 2 minutes", "is_interactive": true },
+    "Settings.dc.html": { "x": 1990, "y": 0, "w": 900, "h": 760, "title": "3 · Settings — voice, rules, usage" }
+  },
+  "order": ["Main.dc.html", "Phone.dc.html", "Settings.dc.html"],
+  "notes": {
+    "heading": { "x": 0, "y": -320, "text": "AI listing assistant — photos in, draft out", "kind": "title1", "maxW": 2890 }
+  },
+  "designSystems": []
+}

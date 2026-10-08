@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AI assistant settings</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ECECE5}
+button{font:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 900px; height: 760px; box-sizing: border-box; background: #ECECE5; color: #1E2119; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; padding: 24px; display: flex; flex-direction: column; gap: 16px">
+  <h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px">Settings · AI listing assistant</h1>
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+    <section style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #666A5A">VOICE</h2>
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 13px">Language of drafts<select style="height: 36px; border: 1px solid #B7B49F; border-radius: 4px; font: inherit; background: #FFFFFF"><option>English</option></select></label>
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 13px">Tone<select style="height: 36px; border: 1px solid #B7B49F; border-radius: 4px; font: inherit; background: #FFFFFF"><option>Factual, collector-to-collector</option></select></label>
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 13px">Learn from these listings<span style="font-size: 12px; color: #666A5A">The assistant copies structure and wording from your best descriptions.</span>
+        <span style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px"><span style="background: #ECECE5; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-family: 'IBM Plex Mono', monospace">No. 50185</span><span style="background: #ECECE5; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-family: 'IBM Plex Mono', monospace">No. 50181</span><span style="background: #ECECE5; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-family: 'IBM Plex Mono', monospace">No. 50212</span></span>
+      </label>
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 13px">Always add (closing text)<textarea rows="2" style="border: 1px solid #B7B49F; border-radius: 4px; padding: 8px; font: inherit; background: #FFFFFF">Please study the photos — they are part of the description.</textarea></label>
+    </section>
+    <section style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #666A5A">RULES</h2>
+      <label style="display: flex; gap: 10px; align-items: flex-start"><input type="checkbox" checked style="margin-top: 3px"><span>Never claim originality or a maker without a visible stamp or my note</span></label>
+      <label style="display: flex; gap: 10px; align-items: flex-start"><input type="checkbox" checked style="margin-top: 3px"><span>Flag restricted symbols and set the compliance flag</span></label>
+      <label style="display: flex; gap: 10px; align-items: flex-start"><input type="checkbox" checked style="margin-top: 3px"><span>Suggest a price from my own sales only (never publish it unchecked)</span></label>
+      <label style="display: flex; gap: 10px; align-items: flex-start"><input type="checkbox" style="margin-top: 3px"><span>Allow "Publish now" from the phone without opening the full form</span></label>
+    </section>
+    <section style="grid-column: span 2; background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+      <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #666A5A">USAGE THIS MONTH</h2>
+      <div style="display: flex; gap: 28px; flex-wrap: wrap">
+        <span><span style="display: block; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 30px">[N]</span><span style="color: #666A5A; font-size: 12px">drafts made</span></span>
+        <span><span style="display: block; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 30px">[N]%</span><span style="color: #666A5A; font-size: 12px">published with few edits</span></span>
+        <span><span style="display: block; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 30px">€[X]</span><span style="color: #666A5A; font-size: 12px">AI cost (limit €[Y])</span></span>
+      </div>
+      <div style="height: 8px; background: #ECECE5; border-radius: 999px; overflow: hidden"><span style="display: block; width: 32%; height: 100%; background: #9C6B22"></span></div>
+      <span style="font-size: 12px; color: #666A5A">Photos are sent to the AI provider only to make the draft and are not used for training.</span>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":900,"height":760}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

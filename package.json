@@ -30,6 +30,7 @@
     "media:reprocess": "tsx --import ./scripts/server-only-shim.mjs scripts/media/reprocess.ts",
     "fonts:sync": "tsx scripts/fonts/sync-shop-fonts.ts",
     "search": "tsx scripts/search.ts",
+    "tenant:delete": "tsx scripts/dev/delete-tenant.ts",
     "embedder": "node src/embedder/server.ts",
     "models:fetch": "node src/embedder/server.ts --fetch-only"
   },
