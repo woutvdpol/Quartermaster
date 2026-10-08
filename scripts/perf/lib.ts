@@ -1,7 +1,9 @@
 /* Shared helpers for scripts/perf (measure.ts, lighthouse.ts). */
 import type { BrowserContext, Page } from "@playwright/test";
 
-export const BASE = (process.env.PERF_BASE_URL ?? "http://localhost:3001").replace(/\/$/, "");
+export const BASE = (
+  process.env.PERF_BASE_URL ?? (process.env.PERF_LH_THROTTLING === "packet" ? "https://localhost:3001" : "http://localhost:3001")
+).replace(/\/$/, "");
 
 export async function cookieHeader(ctx: BrowserContext): Promise<string> {
   return (await ctx.cookies(BASE)).map((c) => `${c.name}=${c.value}`).join("; ");

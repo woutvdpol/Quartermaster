@@ -62,9 +62,8 @@ let setStatus!: typeof import("../src/server/catalog/products").setStatus;
 let addProductImages!: typeof import("../src/server/media/product-images").addProductImages;
 let deleteProductMedia!: typeof import("../src/server/media/product-images").deleteProductMedia;
 let deleteProductImage!: typeof import("../src/server/media/product-images").deleteProductImage;
-let variantKey!: typeof import("../src/server/media/product-images").variantKey;
+let storeContentImageFiles!: typeof import("../src/server/media/store").storeContentImage;
 let processImage!: typeof import("../src/server/media/images").processImage;
-let VARIANT_NAMES!: typeof import("../src/server/media/images").VARIANT_NAMES;
 let getStorage!: typeof import("../src/server/media/storage").getStorage;
 let allocatePurchaseRecordCost!: typeof import("../src/server/purchasing").allocatePurchaseRecordCost;
 let createPurchaseRecord!: typeof import("../src/server/purchasing").createPurchaseRecord;
@@ -99,8 +98,9 @@ async function loadServices() {
   ({ createCategory } = await import("../src/server/catalog/categories"));
   ({ createTag } = await import("../src/server/catalog/tags"));
   ({ createProduct, setStatus } = await import("../src/server/catalog/products"));
-  ({ addProductImages, deleteProductImage, deleteProductMedia, variantKey } = await import("../src/server/media/product-images"));
-  ({ processImage, VARIANT_NAMES } = await import("../src/server/media/images"));
+  ({ addProductImages, deleteProductImage, deleteProductMedia } = await import("../src/server/media/product-images"));
+  ({ storeContentImage: storeContentImageFiles } = await import("../src/server/media/store"));
+  ({ processImage } = await import("../src/server/media/images"));
   ({ getStorage } = await import("../src/server/media/storage"));
   ({ allocatePurchaseRecordCost, createPurchaseRecord, createSupplier, setPurchasePrices } = await import("../src/server/purchasing"));
   ({ createZone } = await import("../src/server/shipping/zones"));
@@ -1279,9 +1279,7 @@ async function storeContentImage(tenantId: string, name: string, bytes: Uint8Arr
   const key = `${tenantId}/content/home/${name}-${createHash("sha256").update(bytes).digest("hex").slice(0, 12)}.jpg`;
   const storage = getStorage();
   if (await storage.head(key)) return key;
-  const processed = await processImage(bytes);
-  for (const v of VARIANT_NAMES) await storage.put(variantKey(key, v), processed.variants[v].data, processed.variants[v].mimeType);
-  await storage.put(key, processed.original.data, processed.mimeType);
+  await storeContentImageFiles(storage, key, await processImage(bytes));
   return key;
 }
 

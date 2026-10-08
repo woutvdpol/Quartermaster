@@ -26,6 +26,10 @@ beforeAll(async () => {
   setStorageForTests(driver);
   await driver.put("t1/products/p1/i1/thumb.webp", new TextEncoder().encode("webp-bytes"), "image/webp");
   await driver.put("t1/products/p1/i1.jpg", new TextEncoder().encode("jpg"), "image/jpeg");
+  await driver.put("t1/products/p1/i1/w480.avif", new TextEncoder().encode("avif-bytes"), "image/avif");
+  await driver.put("t1/content/p1/c0123456789abcdef01234567/w1080.avif", new TextEncoder().encode("avif"), "image/avif");
+  await driver.put("t1/content/p1/c0123456789abcdef01234567/manifest.json", new TextEncoder().encode("{}"), "application/json");
+  await driver.put("t1/products/p9/i9/card.avif", new TextEncoder().encode("sharp-avif"), "image/avif");
   await driver.put("t1/branding/logo.png", new TextEncoder().encode("png"), "image/png");
   await driver.put("t1/branding/logo-0123456789ab.webp", new TextEncoder().encode("logo"), "image/webp");
   await driver.put("t1/content/home/hero-c2b3177b2456.jpg", new TextEncoder().encode("hero"), "image/jpeg");
@@ -60,6 +64,22 @@ describe("GET /uploads/[...path]", () => {
     expect(res.headers.get("content-length")).toBe("10");
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
     expect(await res.text()).toBe("webp-bytes");
+  });
+
+  it("serves AVIF and the new width variants as immutable image/avif", async () => {
+    for (const segments of [
+      ["t1", "products", "p1", "i1", "w480.avif"],
+      ["t1", "content", "p1", "c0123456789abcdef01234567", "w1080.avif"],
+    ]) {
+      const res = await get(segments);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("image/avif");
+      expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    }
+  });
+
+  it("never serves content manifests", async () => {
+    expect((await get(["t1", "content", "p1", "c0123456789abcdef01234567", "manifest.json"])).status).toBe(404);
   });
 
   it("serves hash-suffixed content images and logos as immutable", async () => {
@@ -128,9 +148,13 @@ describe("GET /uploads/[...path]", () => {
     blurred.add("p9");
     viewer = null;
     expect((await get(["t1", "products", "p9", "i9", "card.webp"])).status).toBe(404);
+    expect((await get(["t1", "products", "p9", "i9", "card.avif"])).status).toBe(404);
     expect((await get(["t1", "products", "p9", "i9", "blur.webp"])).status).toBe(200);
     viewer = { role: "CUSTOMER", tenantId: "t1" };
     expect((await get(["t1", "products", "p9", "i9", "card.webp"])).status).toBe(200);
+    const avif = await get(["t1", "products", "p9", "i9", "card.avif"]);
+    expect(avif.status).toBe(200);
+    expect(avif.headers.get("cache-control")).toBe("private, no-store");
     viewer = null;
     blurred.clear();
   });

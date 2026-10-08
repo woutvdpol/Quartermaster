@@ -5,6 +5,7 @@ import { readCartToken } from "@/server/cart/cookie";
 import { Prisma } from "@/generated/prisma/client";
 import { imageUrl } from "@/server/media/product-images";
 import { VARIANT_NAMES, type VariantName } from "@/server/media/images";
+import { sourcesFromManifest, type ManifestLike } from "@/lib/media/variants";
 import {
   buildValueTree,
   valuePaths,
@@ -102,6 +103,7 @@ export function toPublicImage(row: ImageRow): PublicImage {
     large: urls.large,
     blur: urls.blur,
     blurDataUrl: manifest.blur?.dataUrl ?? null,
+    sources: processed ? sourcesFromManifest(manifest as ManifestLike) : null,
   };
 }
 

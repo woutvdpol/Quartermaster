@@ -10,6 +10,7 @@ import { addBlock, deletePage, getPage, moveBlock, removeBlock, updateBlock, upd
 import { SYSTEM_PAGE_KEYS, type SystemPageKey } from "@/server/content/rules";
 import { ImageProcessingError, processImage } from "@/server/media/images";
 import { assertValidKey, getStorage } from "@/server/media/storage";
+import { storeContentImage } from "@/server/media/store";
 import { copy } from "../_copy";
 import { failFrom } from "../_lib/errors";
 import { searchPickerProducts, searchProductImages, type PickerImage, type PickerProduct } from "./_data";
@@ -168,7 +169,7 @@ const MAX_CONTENT_UPLOAD = 25 * 1024 * 1024;
 
 /**
  * Stores an image for this page under `{tenantId}/content/{pageId}/{imageId}.{ext}` with WebP
- * variants at `{…}/{imageId}/{variant}.webp` (same layout as product images). Returns the key; the
+ * WebP/AVIF variants at `{…}/{imageId}/{variant}.{webp,avif}` plus `manifest.json` (same layout as product images). Returns the key; the
  * block references it once saved. Not counted in tenant storage usage yet (no content-media table).
  */
 export async function uploadBlockImageAction(_prev: ActionState, formData: FormData): Promise<ActionResult<string, { key: string }>> {
@@ -183,11 +184,7 @@ export async function uploadBlockImageAction(_prev: ActionState, formData: FormD
     const base = `${ctx.tenantId}/content/${pageId}/c${randomBytes(12).toString("hex")}`;
     const key = `${base}.${img.ext}`;
     assertValidKey(key);
-    const storage = getStorage();
-    await storage.put(key, img.original.data, img.mimeType);
-    for (const [name, variant] of Object.entries(img.variants)) {
-      await storage.put(`${base}/${name}.webp`, variant.data, "image/webp");
-    }
+    await storeContentImage(getStorage(), key, img);
     return actionOk("Image uploaded.", { key });
   } catch (err) {
     if (err instanceof ImageProcessingError) return failed(actionFail(err.message, { file: [err.message] }));

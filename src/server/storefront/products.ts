@@ -2,6 +2,7 @@ import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 import { imageUrl } from "@/server/media/product-images";
+import { sourcesFromManifest, type ManifestLike } from "@/lib/media/variants";
 import { categoryHref } from "@/server/content/rules";
 import type { ProductAvailability, ProductCardData, ShopImage } from "@/components/shop/ui/types";
 import { shopCache } from "./cache";
@@ -63,6 +64,7 @@ export function toShopImage(img: ImageRow, fallbackAlt: string): ShopImage {
   return {
     src: processed ? url("card") : imageUrl(img.storageKey),
     srcSet: processed ? `${url("thumb")} 320w, ${url("card")} 800w, ${url("large")} 2000w` : undefined,
+    sources: processed ? sourcesFromManifest(img.variants as ManifestLike) : null,
     blurDataUrl: manifestEntry(img.variants, "blur")?.dataUrl ?? null,
     alt: img.alt ?? fallbackAlt,
     width: img.width,

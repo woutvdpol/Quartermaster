@@ -16,8 +16,8 @@ const H2 = "text-[1.75rem] leading-[1.08] tracking-[-0.025em] text-shop-ink sm:t
  * holds title, subtitle and button. Without an image the frame is a sunken panel. (`shopName` is
  * kept in the props for callers; the gallery card shows no eyebrow.)
  */
-export function HeroBlock({ data, fallbackImage, isFirst }: { data: BlockData<"HERO">; fallbackImage: string | null; shopName: string; isFirst: boolean }) {
-  const img = data.imageKey ? contentImage(data.imageKey) : fallbackImage ? { src: fallbackImage, blurDataUrl: null, alt: "" } : null;
+export async function HeroBlock({ data, fallbackImage, isFirst }: { data: BlockData<"HERO">; fallbackImage: string | null; shopName: string; isFirst: boolean }) {
+  const img = data.imageKey ? await contentImage(data.imageKey) : fallbackImage ? { src: fallbackImage, blurDataUrl: null, alt: "" } : null;
   const H = isFirst ? "h1" : "h2";
   return (
     <section className="pt-4 sm:pt-6">
@@ -28,7 +28,7 @@ export function HeroBlock({ data, fallbackImage, isFirst }: { data: BlockData<"H
             img ? "min-h-[440px] sm:min-h-[560px]" : "min-h-[340px] sm:min-h-[460px]",
           )}
         >
-          {img ? <ShopImg image={img} fill priority={isFirst} sizes="(min-width: 1360px) 1300px, 100vw" className="-z-10" /> : null}
+          {img ? <ShopImg image={img} profile="wide" fill priority={isFirst} sizes="(min-width: 1360px) 1296px, (min-width: 1024px) calc(100vw - 64px), (min-width: 640px) calc(100vw - 48px), calc(100vw - 32px)" className="-z-10" /> : null}
           <div className="m-3 flex max-w-[520px] flex-col gap-3.5 rounded-shop bg-shop-surface p-6 text-shop-ink sm:m-6 sm:px-8 sm:py-7">
             <H className="text-[clamp(2.1rem,4.2vw,3.5rem)] leading-[1.02] tracking-[-0.03em]">{emphasis(data.title)}</H>
             {data.subtitle ? <p className="text-base text-shop-muted sm:text-[1.0625rem]">{data.subtitle}</p> : null}
@@ -64,12 +64,13 @@ export function TextHorizontalBlock({ data }: { data: BlockData<"TEXT_HORIZONTAL
 }
 
 /** Rendered inside a full-bleed sunken band (see BlockRenderer): image and text side by side. */
-export function TextImageBlock({ data }: { data: BlockData<"TEXT_IMAGE"> }) {
+export async function TextImageBlock({ data }: { data: BlockData<"TEXT_IMAGE"> }) {
   const right = data.imagePosition === "right";
+  const img = data.imageKey ? await contentImage(data.imageKey, stripEmphasis(data.title ?? "")) : null;
   return (
     <Container className="grid items-center gap-8 md:grid-cols-2 md:gap-12">
       <div className={cn("relative aspect-[3/2] overflow-hidden rounded-shop bg-shop-line", right && "md:order-2")}>
-        {data.imageKey ? <ShopImg image={contentImage(data.imageKey, stripEmphasis(data.title ?? ""))} fill sizes="(min-width: 1360px) 650px, (min-width: 768px) 50vw, 100vw" /> : null}
+        {img ? <ShopImg image={img} profile="wide" fill sizes="(min-width: 1360px) 616px, (min-width: 768px) calc(50vw - 48px), calc(100vw - 32px)" /> : null}
       </div>
       <div className="flex flex-col gap-4">
         {data.title ? <h2 className="text-[2rem] leading-[1.05] tracking-[-0.03em] text-shop-ink sm:text-[clamp(2rem,3.4vw,2.875rem)]">{emphasis(data.title)}</h2> : null}
@@ -80,8 +81,9 @@ export function TextImageBlock({ data }: { data: BlockData<"TEXT_IMAGE"> }) {
   );
 }
 
-export function TextCarouselBlock({ data, blockId }: { data: BlockData<"TEXT_CAROUSEL">; blockId: string }) {
+export async function TextCarouselBlock({ data, blockId }: { data: BlockData<"TEXT_CAROUSEL">; blockId: string }) {
   const n = data.imageKeys.length;
+  const images = await Promise.all(data.imageKeys.map((k) => contentImage(k)));
   return (
     <Container className="grid items-center gap-8 md:grid-cols-12 md:gap-12">
       <div className="md:col-span-5">
@@ -93,7 +95,7 @@ export function TextCarouselBlock({ data, blockId }: { data: BlockData<"TEXT_CAR
           <ul id={`carousel-${blockId}`} aria-label={blocksCopy.carouselLabel} tabIndex={0} className="shop-rail auto-cols-[85%] gap-3 pb-3 sm:auto-cols-[70%]">
             {data.imageKeys.map((k, i) => (
               <li key={k} aria-label={blocksCopy.slide(i + 1, n)} className="relative aspect-[4/3] overflow-hidden rounded-shop bg-shop-sunken">
-                <ShopImg image={contentImage(k)} fill sizes="(min-width: 768px) 40vw, 85vw" />
+                <ShopImg image={images[i]} profile="wide" fill sizes="(min-width: 768px) 40vw, 85vw" />
               </li>
             ))}
           </ul>
@@ -119,12 +121,12 @@ export function QuoteBlock({ data }: { data: BlockData<"QUOTE"> }) {
   );
 }
 
-export function CtaBlock({ data }: { data: BlockData<"CTA"> }) {
-  const img = data.imageKey ? contentImage(data.imageKey) : null;
+export async function CtaBlock({ data }: { data: BlockData<"CTA"> }) {
+  const img = data.imageKey ? await contentImage(data.imageKey) : null;
   return (
     <Container>
       <div className={cn("relative isolate overflow-hidden rounded-shop bg-shop-sunken", img ? "flex min-h-[380px] items-end sm:min-h-[460px]" : "px-6 py-14 text-center sm:px-12 sm:py-18")}>
-        {img ? <ShopImg image={img} fill sizes="(min-width: 1360px) 1300px, 100vw" className="-z-10" /> : null}
+        {img ? <ShopImg image={img} profile="wide" fill sizes="(min-width: 1360px) 1296px, (min-width: 1024px) calc(100vw - 64px), (min-width: 640px) calc(100vw - 48px), calc(100vw - 32px)" className="-z-10" /> : null}
         <div className={cn(img && "m-3 max-w-[520px] rounded-shop bg-shop-surface p-6 sm:m-6 sm:px-8 sm:py-7")}>
           <h2 className={cn(H2, !img && "mx-auto max-w-2xl")}>{emphasis(data.title)}</h2>
           {data.text ? <p className={cn("mt-3 text-[1.0625rem] text-shop-muted", !img && "mx-auto max-w-xl")}>{data.text}</p> : null}
@@ -135,16 +137,17 @@ export function CtaBlock({ data }: { data: BlockData<"CTA"> }) {
   );
 }
 
-export function GalleryBlock({ data }: { data: BlockData<"GALLERY"> }) {
+export async function GalleryBlock({ data }: { data: BlockData<"GALLERY"> }) {
   if (!data.imageKeys.length) return null;
+  const images = await Promise.all(data.imageKeys.map((k) => contentImage(k)));
   return (
     <Container>
       {data.title ? <h2 className={cn(H2, "mb-6 sm:mb-8")}>{emphasis(data.title)}</h2> : null}
       <ul aria-label={data.title ? stripEmphasis(data.title) : blocksCopy.galleryLabel} className="columns-2 gap-3 sm:columns-3 lg:columns-4 [&>li]:mb-3">
-        {data.imageKeys.map((k) => (
+        {data.imageKeys.map((k, i) => (
           <li key={k} className="break-inside-avoid overflow-hidden rounded-shop bg-shop-sunken">
             <a href={`/uploads/${k}`} className="block" target="_blank" rel="noopener">
-              <ShopImg image={contentImage(k)} sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw" className="transition-transform duration-500 hover:scale-[1.02]" />
+              <ShopImg image={images[i]} sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw" className="transition-transform duration-500 hover:scale-[1.02]" />
             </a>
           </li>
         ))}

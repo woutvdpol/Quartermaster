@@ -8,11 +8,15 @@ import { getSettings } from "@/server/settings";
 import type { Prisma } from "@/generated/prisma/client";
 import { ImageProcessingError, MAX_UPLOAD_BYTES, VARIANT_NAMES, processImage, type VariantName } from "./images";
 import { assertValidKey, getStorage } from "./storage";
+import { manifestBytes, stripExt, storeProcessedImage, variantKey, type VariantManifest } from "./store";
+
+export { contentManifestKey, manifestBytes, storeContentImage, storeProcessedImage, variantKey } from "./store";
+export type { ContentManifest, ManifestEntry, VariantManifest } from "./store";
 
 /**
  * Product image services. Storage layout (docs/schema.md):
  *   original  `{tenantId}/products/{productId}/{imageId}.{ext}`        (= ProductImage.storageKey)
- *   variants  `{tenantId}/products/{productId}/{imageId}/{variant}.webp`
+ *   variants  `{tenantId}/products/{productId}/{imageId}/{variant}.webp` (+ `.avif` for the srcset widths)
  * Public URL = `/uploads/{key}` (served by src/app/uploads/[...path]/route.ts).
  *
  * Storage accounting: `byteSize` = bytes of the stored original; each manifest entry carries its
@@ -24,9 +28,6 @@ export const HARD_MAX_IMAGES_PER_PRODUCT = 100;
 export const MAX_FILES_PER_UPLOAD = 50;
 
 export type ImageVariant = VariantName | "original";
-
-export type ManifestEntry = { key: string; width: number; height: number; bytes: number; dataUrl?: string };
-export type VariantManifest = Partial<Record<VariantName, ManifestEntry>>;
 
 export type ProductImageDto = {
   id: string;
@@ -55,22 +56,11 @@ export function productImageKey(tenantId: string, productId: string, imageId: st
   return key;
 }
 
-/** Key of a variant, derived by convention from the original's storageKey. */
-export function variantKey(storageKey: string, variant: ImageVariant): string {
-  if (variant === "original") return storageKey;
-  return `${stripExt(storageKey)}/${variant}.webp`;
-}
-
 /** Public URL of an image (variant) — `/uploads/{key}`. */
 export function imageUrl(storageKey: string, variant: ImageVariant = "original"): string {
   return `/uploads/${variantKey(storageKey, variant)}`;
 }
 
-function stripExt(key: string): string {
-  const slash = key.lastIndexOf("/");
-  const dot = key.lastIndexOf(".");
-  return dot > slash ? key.slice(0, dot) : key;
-}
 
 function newImageId(): string {
   // cuid-like: leading letter, 96 random bits, safe key charset.
@@ -92,7 +82,7 @@ function toDto(row: ImageRow): ProductImageDto {
   for (const name of VARIANT_NAMES) {
     urls[name] = manifest[name]?.key ? `/uploads/${manifest[name]!.key}` : imageUrl(row.storageKey, name);
   }
-  const variantBytes = Object.values(manifest).reduce((sum, e) => sum + (Number(e?.bytes) || 0), 0);
+  const variantBytes = manifestBytes(manifest);
   return {
     id: row.id,
     productId: row.productId,
@@ -143,9 +133,12 @@ export async function tenantStorageUsage(tenantId: string, client: Prisma.Transa
   const [row] = await client.$queryRaw<{ used: bigint | null }[]>`
     SELECT COALESCE(SUM(
       COALESCE(pi."byteSize", 0) + COALESCE((
-        SELECT SUM((v.value->>'bytes')::bigint)
+        SELECT SUM(
+          CASE WHEN (v.value->>'bytes') ~ '^[0-9]+$' THEN (v.value->>'bytes')::bigint ELSE 0 END
+          + CASE WHEN (v.value->'avif'->>'bytes') ~ '^[0-9]+$' THEN (v.value->'avif'->>'bytes')::bigint ELSE 0 END
+        )
         FROM jsonb_each(CASE WHEN jsonb_typeof(pi."variants") = 'object' THEN pi."variants" ELSE '{}'::jsonb END) v
-        WHERE jsonb_typeof(v.value) = 'object' AND (v.value->>'bytes') ~ '^[0-9]+$'
+        WHERE jsonb_typeof(v.value) = 'object'
       ), 0)
     ), 0)::bigint AS used
     FROM "product_images" pi
@@ -252,20 +245,8 @@ export async function addProductImages(
         totalBytes: processed.original.bytes,
       };
       prepared.push(entry); // before writing, so a partial write is cleaned up too
-      await storage.put(storageKey, processed.original.data, processed.mimeType);
-      for (const name of VARIANT_NAMES) {
-        const v = processed.variants[name];
-        const key = variantKey(storageKey, name);
-        await storage.put(key, v.data, v.mimeType);
-        entry.manifest[name] = {
-          key,
-          width: v.width,
-          height: v.height,
-          bytes: v.bytes,
-          ...(name === "blur" ? { dataUrl: processed.blurDataUrl } : {}),
-        };
-        entry.totalBytes += v.bytes;
-      }
+      entry.manifest = await storeProcessedImage(storage, storageKey, processed);
+      entry.totalBytes += manifestBytes(entry.manifest);
     }
 
     const addedBytes = prepared.reduce((sum, p) => sum + p.totalBytes, 0);

@@ -27,7 +27,12 @@ export function ProductGrid({
   headingLevel?: 2 | 3 | 4;
   className?: string;
 }) {
-  const sizes = columns === 4 ? "(min-width: 1024px) 280px, (min-width: 768px) 33vw, 50vw" : "(min-width: 1024px) 380px, (min-width: 768px) 33vw, 50vw";
+  // Measured card widths: 171/182 css px on 390/412 phones (2 columns minus padding and gap), 224 on a
+  // 768 tablet (3 columns), 228–300 on desktop depending on the catalog sidebar.
+  const sizes =
+    columns === 4
+      ? "(min-width: 1024px) 280px, (min-width: 768px) calc(33vw - 32px), calc(50vw - 24px)"
+      : "(min-width: 1024px) 380px, (min-width: 768px) calc(33vw - 32px), calc(50vw - 24px)";
   return (
     <ul
       role="list"

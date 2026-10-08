@@ -12,6 +12,9 @@
  * names, e.g. "home,product"), PERF_LH_KEEP (directory to keep every full report in),
  * PERF_LH_THROTTLING=devtools (applied throttling — the page really loads over a slowed network/CPU —
  * instead of Lighthouse's default simulation; see docs/perf/round2.md for why both are reported).
+ * PERF_LH_THROTTLING=packet: no browser-side network throttling (CPU still 4× on mobile); the network is
+ * emulated by scripts/perf/netem-proxy.ts (`npm run perf:netem`, https + HTTP/2 on :3001, next on :3002)
+ * — see docs/perf/round3.md. The base URL then defaults to https://localhost:3001.
  */
 import "dotenv/config";
 import { execFileSync } from "node:child_process";
@@ -24,6 +27,7 @@ import { BASE, adminLogin, cookieHeader, productLinks } from "./lib";
 const RUNS = Number(process.env.PERF_LH_RUNS ?? 3);
 const OUT_DIR = process.env.PERF_OUT_DIR ?? ".local/perf";
 const LABEL = process.env.PERF_LABEL ?? new Date().toISOString().replace(/[:.]/g, "-");
+const THROTTLING = process.env.PERF_LH_THROTTLING ?? "simulate";
 const FORM_FACTORS = (process.env.PERF_LH_FORM_FACTORS ?? "mobile,desktop").split(",") as Array<"mobile" | "desktop">;
 
 type Row = {
@@ -77,9 +81,19 @@ function lighthouse(url: string, formFactor: "mobile" | "desktop", cookie?: stri
     "--only-categories=performance",
     "--output=json",
     `--output-path=${out}`,
-    "--chrome-flags=--headless=new",
+    `--chrome-flags=--headless=new${THROTTLING === "packet" ? " --ignore-certificate-errors" : ""}`,
     ...(formFactor === "desktop" ? ["--preset=desktop"] : []),
-    ...(process.env.PERF_LH_THROTTLING === "devtools" ? ["--throttling-method=devtools"] : []),
+    ...(THROTTLING === "devtools" ? ["--throttling-method=devtools"] : []),
+    // Packet-level: the proxy shapes the network; Lighthouse only slows the CPU (mobile 4×, desktop 1×).
+    ...(THROTTLING === "packet"
+      ? [
+          "--throttling-method=devtools",
+          "--throttling.requestLatencyMs=0",
+          "--throttling.downloadThroughputKbps=0",
+          "--throttling.uploadThroughputKbps=0",
+          `--throttling.cpuSlowdownMultiplier=${formFactor === "desktop" ? 1 : 4}`,
+        ]
+      : []),
     ...(cookie ? [`--extra-headers=${JSON.stringify({ Cookie: cookie })}`] : []),
   ];
   try {
@@ -118,10 +132,15 @@ function lighthouse(url: string, formFactor: "mobile" | "desktop", cookie?: stri
 
 async function main() {
   const browser = await chromium.launch();
-  const ctx = await browser.newContext();
+  const ctx = await browser.newContext({ ignoreHTTPSErrors: true });
   const page = await ctx.newPage();
   await page.goto(`${BASE}/shop`);
   const product = (await productLinks(page))[0];
+  const category = await page
+    .locator('a[href^="/shop/category/"]')
+    .first()
+    .getAttribute("href")
+    .catch(() => null);
   await adminLogin(page);
   const adminCookie = await cookieHeader(ctx);
   await browser.close();
@@ -131,6 +150,7 @@ async function main() {
     { page: "shop", path: "/shop" },
     { page: "shop + q", path: "/shop?q=helmet" },
     { page: "product", path: product },
+    ...(category ? [{ page: "category", path: category }] : []),
     { page: "cms page", path: "/shipping" },
     { page: "admin dashboard", path: "/admin/dashboard", cookie: adminCookie },
     { page: "admin inventory", path: "/admin/inventory", cookie: adminCookie },
@@ -155,7 +175,7 @@ async function main() {
 
   console.log(
     [
-      `Base ${BASE} · Lighthouse 13 · mediaan van ${RUNS} runs · throttling ${process.env.PERF_LH_THROTTLING === "devtools" ? "devtools (toegepast)" : "simulate (standaard)"} · ${new Date().toISOString()}`,
+      `Base ${BASE} · Lighthouse 13 · mediaan van ${RUNS} runs · throttling ${THROTTLING === "devtools" ? "devtools (toegepast)" : THROTTLING === "packet" ? "packet (netem-proxy)" : "simulate (standaard)"} · ${new Date().toISOString()}`,
       "",
       "| pagina | vorm | score | FCP (ms) | LCP (ms) | CLS | TBT (ms) | Speed Index (ms) | transfer (kB) | JS (kB) | CSS (kB) | fonts (kB) |",
       "|---|---|---|---|---|---|---|---|---|---|---|---|",

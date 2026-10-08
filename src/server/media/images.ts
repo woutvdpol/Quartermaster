@@ -1,5 +1,6 @@
 import "server-only";
 import sharp, { type Metadata, type Sharp } from "sharp";
+import { SRCSET_WIDTHS } from "@/lib/media/variants";
 
 /**
  * Image processing for uploads.
@@ -9,25 +10,47 @@ import sharp, { type Metadata, type Sharp } from "sharp";
  *    auto-rotated by EXIF and stripped of all metadata (phone photos carry GPS). Re-encoding at
  *    high quality keeps a faithful master for future reprocessing / feeds that want JPEG.
  *    HEIC is not decodable by the prebuilt libvips (no HEVC) and is rejected with a clear message.
- *  - Variants are WebP q80, resized by width without upscaling:
- *      thumb 320w · card 800w · large 2000w · blur 24w (low-quality placeholder; also returned
- *      as a base64 data URL so the UI can inline it without a request).
- *  - The variant set is defined here (VARIANTS); the stored manifest records what was produced,
- *    so a changed set can be detected and reprocessed later.
+ *  - Variants (docs/perf/round3.md): WebP q72 at the srcset widths of src/lib/media/variants.ts
+ *    (thumb 320 · w480 · w640 · card 800 · w1080 · w1440 · large 2000) plus AVIF q50 (effort 3) at the
+ *    same widths, resized by width without upscaling; the optional widths (w480/w640/w1080/w1440) are
+ *    skipped when the source is not wider (no duplicate files). blur 24w WebP q50 is the low-quality
+ *    placeholder, also returned as a base64 data URL so the UI can inline it without a request.
+ *    The source is decoded once into a ≤2000 px sRGB master that every variant is resized from.
+ *  - The variant set is defined here (VARIANTS); the stored manifest records what was produced, so a
+ *    changed set can be detected and completed later (`npm run media:reprocess`).
  */
 
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 export const MAX_PIXELS = 40_000_000;
 
+/** WebP / AVIF quality (round 3: AVIF q50 ≈ WebP q72 visually at ~55–65 % of the bytes). */
+export const WEBP_QUALITY = 72;
+export const AVIF_QUALITY = 50;
+const AVIF_EFFORT = 3; // effort 4 (sharp's default) is ~3× slower for <1 % smaller files
+
+type VariantSpec = { width: number; quality: number; avif: boolean; optional: boolean };
 export const VARIANTS = {
-  thumb: { width: 320, quality: 80 },
-  card: { width: 800, quality: 80 },
-  large: { width: 2000, quality: 80 },
-  blur: { width: 24, quality: 50 },
-} as const;
+  thumb: { width: SRCSET_WIDTHS.thumb, quality: WEBP_QUALITY, avif: true, optional: false },
+  w480: { width: SRCSET_WIDTHS.w480, quality: WEBP_QUALITY, avif: true, optional: true },
+  w640: { width: SRCSET_WIDTHS.w640, quality: WEBP_QUALITY, avif: true, optional: true },
+  card: { width: SRCSET_WIDTHS.card, quality: WEBP_QUALITY, avif: true, optional: false },
+  w1080: { width: SRCSET_WIDTHS.w1080, quality: WEBP_QUALITY, avif: true, optional: true },
+  w1440: { width: SRCSET_WIDTHS.w1440, quality: WEBP_QUALITY, avif: true, optional: true },
+  large: { width: SRCSET_WIDTHS.large, quality: WEBP_QUALITY, avif: true, optional: false },
+  blur: { width: 24, quality: 50, avif: false, optional: false },
+} as const satisfies Record<string, VariantSpec>;
 
 export type VariantName = keyof typeof VARIANTS;
 export const VARIANT_NAMES = Object.keys(VARIANTS) as VariantName[];
+/** Variants every processed image has (linked by convention: admin thumbs, cart, mails …). */
+export type RequiredVariant = { [K in VariantName]: (typeof VARIANTS)[K]["optional"] extends true ? never : K }[VariantName];
+export const REQUIRED_VARIANTS = VARIANT_NAMES.filter((n) => !VARIANTS[n].optional) as RequiredVariant[];
+
+/** Is `name` produced for a source `sourceWidth` px wide? Optional widths only when strictly narrower. */
+export function variantApplies(name: VariantName, sourceWidth: number): boolean {
+  const spec = VARIANTS[name];
+  return !spec.optional || spec.width < sourceWidth;
+}
 
 export type SourceFormat = "jpeg" | "png" | "webp" | "avif";
 
@@ -39,6 +62,7 @@ export const FORMAT_INFO: Record<SourceFormat, { ext: string; mime: string }> = 
 };
 
 export type ProcessedFile = { data: Buffer; width: number; height: number; bytes: number };
+export type ProcessedVariant = ProcessedFile & { mimeType: "image/webp"; avif?: ProcessedFile & { mimeType: "image/avif" } };
 
 export type ProcessedImage = {
   format: SourceFormat;
@@ -46,7 +70,8 @@ export type ProcessedImage = {
   mimeType: string;
   /** Re-encoded original (rotated, metadata stripped). */
   original: ProcessedFile;
-  variants: Record<VariantName, ProcessedFile & { mimeType: "image/webp" }>;
+  /** Produced variants (optional widths are absent for narrow sources); `avif` per srcset width. */
+  variants: Partial<Record<VariantName, ProcessedVariant>> & Record<RequiredVariant, ProcessedVariant>;
   /** `data:image/webp;base64,…` of the blur variant. */
   blurDataUrl: string;
 };
@@ -126,25 +151,58 @@ export async function processImage(input: Uint8Array): Promise<ProcessedImage> {
 
   try {
     const original = await render(encodeOriginal(base.clone(), format));
-    const variants = {} as ProcessedImage["variants"];
+    const all = Object.fromEntries(VARIANT_NAMES.map((n) => [n, { webp: true, avif: true }]));
+    const rendered = (await renderVariants(base, all)).variants;
+    const variants: Partial<Record<VariantName, ProcessedVariant>> = {};
     for (const name of VARIANT_NAMES) {
-      const spec = VARIANTS[name];
-      const file = await render(
-        base.clone().resize({ width: spec.width, withoutEnlargement: true }).webp({ quality: spec.quality }),
-      );
-      variants[name] = { ...file, mimeType: "image/webp" };
+      const r = rendered[name];
+      if (!r?.webp) continue;
+      variants[name] = { ...r.webp, mimeType: "image/webp", ...(r.avif ? { avif: { ...r.avif, mimeType: "image/avif" as const } } : {}) };
     }
     return {
       format,
       ext: FORMAT_INFO[format].ext,
       mimeType: FORMAT_INFO[format].mime,
       original,
-      variants,
-      blurDataUrl: `data:image/webp;base64,${variants.blur.data.toString("base64")}`,
+      variants: variants as ProcessedImage["variants"],
+      blurDataUrl: `data:image/webp;base64,${variants.blur!.data.toString("base64")}`,
     };
   } catch (error) {
     if (error instanceof ImageProcessingError) throw error;
     console.warn("[media] image decode failed:", (error as Error).message);
     throw new ImageProcessingError("CORRUPT", "Image could not be decoded");
   }
+}
+
+export type RenderedVariant = { webp?: ProcessedFile; avif?: ProcessedFile };
+
+/**
+ * Renders variants from an (auto-oriented) pipeline: one decode into a ≤2000 px sRGB master, then every
+ * width resized from it. `want` says per variant which formats to encode (AVIF only where the spec has
+ * it); optional widths that do not apply to the source are skipped. Used by uploads and the reprocess
+ * script (which only asks for the files that are missing).
+ */
+export async function renderVariants(
+  source: Sharp,
+  want: Partial<Record<VariantName, { webp: boolean; avif: boolean }>>,
+): Promise<{ sourceWidth: number; variants: Partial<Record<VariantName, RenderedVariant>> }> {
+  const { data, info } = await source
+    .clone()
+    .resize({ width: VARIANTS.large.width, withoutEnlargement: true })
+    .toColourspace("srgb")
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const raw = { width: info.width, height: info.height, channels: info.channels };
+  const variants: Partial<Record<VariantName, RenderedVariant>> = {};
+  for (const name of VARIANT_NAMES) {
+    const formats = want[name];
+    if (!formats || !variantApplies(name, raw.width)) continue;
+    const spec: VariantSpec = VARIANTS[name];
+    const resized = () => sharp(data, { raw }).resize({ width: spec.width, withoutEnlargement: true });
+    const entry: RenderedVariant = {};
+    if (formats.webp) entry.webp = await render(resized().webp({ quality: spec.quality }));
+    if (formats.avif && spec.avif) entry.avif = await render(resized().avif({ quality: AVIF_QUALITY, effort: AVIF_EFFORT }));
+    variants[name] = entry;
+  }
+  return { sourceWidth: raw.width, variants };
 }

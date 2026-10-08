@@ -31,7 +31,7 @@ export function CatalogList({
                   image={p.image}
                   fill
                   priority={i < 2}
-                  sizes="160px"
+                  sizes="(min-width: 640px) 160px, 112px"
                   className={cn("transition-transform duration-500 ease-out group-hover:scale-[1.03]", sold && "opacity-60 grayscale-[40%]")}
                 />
               ) : null}

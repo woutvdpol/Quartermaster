@@ -7,7 +7,7 @@ function solid(width: number, height: number) {
 }
 
 describe("processImage", () => {
-  it("produces the original plus webp variants without upscaling", async () => {
+  it("produces the original plus webp + avif variants without upscaling", async () => {
     const input = await solid(3000, 1500).jpeg().toBuffer();
     const out = await processImage(input);
 
@@ -18,20 +18,33 @@ describe("processImage", () => {
     expect((await sharp(out.original.data).metadata()).format).toBe("jpeg");
 
     expect(out.variants.thumb).toMatchObject({ width: 320, height: 160, mimeType: "image/webp" });
+    expect(out.variants.w480).toMatchObject({ width: 480, height: 240 });
+    expect(out.variants.w640?.width).toBe(640);
     expect(out.variants.card).toMatchObject({ width: 800, height: 400 });
+    expect(out.variants.w1080?.width).toBe(1080);
+    expect(out.variants.w1440?.width).toBe(1440);
     expect(out.variants.large).toMatchObject({ width: 2000, height: 1000 });
     expect(out.variants.blur.width).toBe(24);
-    for (const v of Object.values(out.variants)) {
+    for (const [name, v] of Object.entries(out.variants)) {
       expect((await sharp(v.data).metadata()).format).toBe("webp");
       expect(v.bytes).toBe(v.data.length);
+      if (name === "blur") {
+        expect(v.avif).toBeUndefined();
+      } else {
+        expect(v.avif).toMatchObject({ width: v.width, height: v.height, mimeType: "image/avif" });
+        expect((await sharp(v.avif!.data).metadata()).compression).toBe("av1");
+      }
     }
     expect(out.blurDataUrl).toMatch(/^data:image\/webp;base64,/);
   });
 
-  it("does not enlarge small images", async () => {
+  it("does not enlarge small images and skips optional widths it would duplicate", async () => {
     const out = await processImage(await solid(500, 400).png().toBuffer());
     expect(out.format).toBe("png");
     expect(out.variants.thumb.width).toBe(320);
+    expect(out.variants.w480?.width).toBe(480);
+    expect(out.variants.w640).toBeUndefined();
+    expect(out.variants.w1080).toBeUndefined();
     expect(out.variants.card.width).toBe(500);
     expect(out.variants.large.width).toBe(500);
   });

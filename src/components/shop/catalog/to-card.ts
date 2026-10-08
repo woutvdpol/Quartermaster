@@ -12,6 +12,7 @@ export function toShopImage(img: PublicImage, alt: string): ShopImage {
   return {
     src: img.card,
     srcSet: `${img.thumb} 320w, ${img.card} 800w, ${img.large} 2000w`,
+    sources: img.sources,
     blurDataUrl: img.blurDataUrl,
     alt: img.alt ?? alt,
     width: img.width,

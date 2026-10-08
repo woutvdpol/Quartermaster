@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useRef, useState, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
+import { preload } from "react-dom";
 import { cn } from "@/components/shop/ui/cn";
+import { pickSources, srcSets, type ImageSource } from "@/lib/media/variants";
 import { catalogCopy } from "../_copy";
 import { IDENTITY, MAX_SCALE, panBy, zoomAt, type ZoomState } from "./zoom";
 
@@ -14,7 +16,17 @@ export type GalleryImage = {
   card: string;
   large: string;
   blurDataUrl: string | null;
+  /** WebP/AVIF widths (null for unprocessed images: card/large WebP only). */
+  sources?: ImageSource[] | null;
+  /** AVIF of the smallest (320 px) variant, for the thumbnail strip. */
+  thumbAvif?: string | null;
 };
+
+/**
+ * Rendered width of the main image (measured: 358 css px at 390, 720 at 768, 699 at 1440): the page
+ * column minus padding on phones/tablets, the 1.35fr grid column next to the details on desktop.
+ */
+const MAIN_SIZES = "(min-width: 1360px) 700px, (min-width: 1024px) calc(57vw - 70px), (min-width: 640px) calc(100vw - 48px), calc(100vw - 32px)";
 
 const t = catalogCopy.gallery;
 
@@ -60,20 +72,7 @@ export function ProductGallery({ images, title }: { images: GalleryImage[]; titl
           aria-label={t.open(index + 1, count)}
           aria-haspopup="dialog"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element -- pre-generated WebP variants */}
-          <img
-            key={current.id}
-            src={current.large}
-            srcSet={`${current.card} 800w, ${current.large} 2000w`}
-            sizes="(min-width: 1024px) 640px, 100vw"
-            alt={alt(current, index)}
-            width={current.width ?? undefined}
-            height={current.height ?? undefined}
-            fetchPriority={index === 0 ? "high" : undefined}
-            decoding="async"
-            style={current.blurDataUrl ? { backgroundImage: `url("${current.blurDataUrl}")`, backgroundSize: "cover" } : undefined}
-            className="aspect-[4/3] w-full object-contain"
-          />
+          <MainImage key={current.id} image={current} alt={alt(current, index)} first={index === 0} />
           <span className="pointer-events-none absolute right-4 bottom-4 grid size-10 place-items-center rounded-shop-control bg-shop-surface/90 text-shop-ink shadow-shop opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 max-lg:opacity-90">
             <ZoomIcon />
           </span>
@@ -103,8 +102,7 @@ export function ProductGallery({ images, title }: { images: GalleryImage[]; titl
                   i === index ? "outline-2 outline-shop-ink" : "opacity-70 hover:opacity-100",
                 )}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={img.thumb} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                <Thumb image={img} />
               </button>
             </li>
           ))}
@@ -113,6 +111,56 @@ export function ProductGallery({ images, title }: { images: GalleryImage[]; titl
 
       <Lightbox ref={dialog} images={images} index={index} onIndex={setIndex} alt={alt} />
     </section>
+  );
+}
+
+/**
+ * The visible photo. Server-rendered with the first image, so it is in the initial HTML (never hidden
+ * until hydration). With AVIF variants it is a <picture>; the first photo is the LCP candidate:
+ * `fetchpriority=high` plus a head preload of the AVIF srcset (React does not preload images inside
+ * <picture> by itself). No fade-in: the image paints as soon as it is decoded.
+ */
+function MainImage({ image, alt, first }: { image: GalleryImage; alt: string; first: boolean }) {
+  const sets = image.sources?.length ? srcSets(pickSources(image.sources, "wide")) : null;
+  if (first && sets?.avif) {
+    preload(image.card, { as: "image", imageSrcSet: sets.avif, imageSizes: MAIN_SIZES, type: "image/avif", fetchPriority: "high" });
+  }
+  const img = (
+    // eslint-disable-next-line @next/next/no-img-element -- pre-generated WebP/AVIF variants
+    <img
+      src={image.card}
+      srcSet={sets?.webp ?? `${image.card} 800w, ${image.large} 2000w`}
+      sizes={MAIN_SIZES}
+      alt={alt}
+      width={image.width ?? undefined}
+      height={image.height ?? undefined}
+      fetchPriority={first ? "high" : undefined}
+      decoding="async"
+      style={image.blurDataUrl ? { backgroundImage: `url("${image.blurDataUrl}")`, backgroundSize: "cover" } : undefined}
+      className="aspect-[4/3] w-full object-contain"
+    />
+  );
+  if (!sets?.avif) return img;
+  return (
+    <picture className="contents">
+      <source type="image/avif" srcSet={sets.avif} sizes={MAIN_SIZES} />
+      {img}
+    </picture>
+  );
+}
+
+/** Strip thumbnail (rendered ≤ 110 css px): the 320 px variant, AVIF when available. */
+function Thumb({ image }: { image: GalleryImage }) {
+  const img = (
+    // eslint-disable-next-line @next/next/no-img-element -- pre-generated variants
+    <img src={image.thumb} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+  );
+  if (!image.thumbAvif) return img;
+  return (
+    <picture className="contents">
+      <source type="image/avif" srcSet={image.thumbAvif} />
+      {img}
+    </picture>
   );
 }
 
@@ -298,6 +346,10 @@ function Lightbox({
               key={img.id}
               src={img.large}
               alt={alt(img, index)}
+              // Lazy: the dialog is closed (not rendered) until opened, so the 2000w file is only
+              // fetched on open. Without it React preloaded it in <head> on every product page,
+              // competing with the LCP photo.
+              loading="lazy"
               draggable={false}
               decoding="async"
               style={{

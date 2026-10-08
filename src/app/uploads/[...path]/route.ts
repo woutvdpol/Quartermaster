@@ -4,13 +4,15 @@ import { db } from "@/server/db";
 import { canAccessTenant, currentUser } from "@/server/auth/guards";
 import { shopCache } from "@/server/storefront/cache";
 
-// Product image keys are immutable (a new upload always gets a new image id), so they can be cached forever.
-const IMMUTABLE_KEY = /^[A-Za-z0-9_-]+\/products\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+(\.[a-z0-9]+|\/[a-z]+\.webp)$/;
+// Product image keys are immutable (a new upload always gets a new image id; variants are only ever
+// added, never rewritten — src/server/media/reprocess.ts), so they can be cached forever. Variants are
+// `{imageId}/{name}.webp|avif` (thumb, w480, card, …).
+const IMMUTABLE_KEY = /^[A-Za-z0-9_-]+\/products\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+(\.[a-z0-9]+|\/[a-z0-9]+\.(?:webp|avif))$/;
 // Content-block images and logos get a random or content-hash suffix on every upload
 // (`{tenant}/content/{page}/c<24 hex>.jpg`, `…/hero-<12 hex>.jpg`, `{tenant}/branding/logo-<12 hex>.webp`,
-// plus `{base}/{variant}.webp`), so a key never changes content either. Keys without such a suffix keep
+// plus `{base}/{variant}.webp|avif`), so a key never changes content either. Keys without such a suffix keep
 // the short cache.
-const IMMUTABLE_HASHED_KEY = /^[A-Za-z0-9_-]+\/(content|branding)\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]*[a-f0-9]{12}(\.[a-z0-9]+|\/[a-z]+\.webp)$/;
+const IMMUTABLE_HASHED_KEY = /^[A-Za-z0-9_-]+\/(content|branding)\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]*[a-f0-9]{12}(\.[a-z0-9]+|\/[a-z0-9]+\.(?:webp|avif))$/;
 const SERVABLE_EXT = /\.(webp|jpe?g|png|avif|gif)$/i;
 // Served by their own access-checked routes (/api/documents, /api/certificates) — never here.
 const PRIVATE_KEY = /^[A-Za-z0-9_-]+\/(products\/[A-Za-z0-9_-]+\/docs|certificates)\//;

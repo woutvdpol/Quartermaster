@@ -11,13 +11,14 @@ import { getShopViewer } from "@/server/storefront/viewer";
 import { SHOP_PATH, categoryHref, facetValueHref, getRelated, liveReservedIds, tagHref, withLiveStatus } from "@/server/storefront-catalog";
 import { resolveCompliance } from "@/server/compliance";
 import { countryName } from "@/server/shipping/countries";
-import type { PublicProduct, PublicStatus } from "@/server/storefront-catalog/types";
+import type { PublicImage, PublicProduct, PublicStatus } from "@/server/storefront-catalog/types";
 import { applyGeoBlur, toCardData } from "../to-card";
 import { catalogCopy as copy } from "../_copy";
 import { LockedPanel } from "./LockedPanel";
 import { ProductBuyBox } from "./ProductBuyBox";
 import { OfferButton } from "@/components/shop/offers/OfferButton";
-import { ProductGallery } from "./ProductGallery";
+import { ProductGallery, type GalleryImage } from "./ProductGallery";
+import { pickSources } from "@/lib/media/variants";
 import { ShippingHint } from "./ShippingHint";
 
 /** Visitor-country compliance for this product (src/server/compliance); null/absent = nothing applies. */
@@ -84,7 +85,7 @@ export function ProductDetail({
               <figcaption className="mt-3 text-sm text-shop-muted">{copy.product.geoBlurred}</figcaption>
             </figure>
           ) : (
-            <ProductGallery images={product.images} title={product.title} />
+            <ProductGallery images={galleryImages(product.images)} title={product.title} />
           )}
         </div>
 
@@ -315,4 +316,23 @@ async function RelatedProducts({
       <ProductGrid products={cards} columns={4} display={display} showStockCode={shop.settings.catalog.showStockCode} headingLevel={3} wishlistSlot={(p) => <WishlistButton productId={p.id} />} />
     </section>
   );
+}
+
+/**
+ * Gallery props are serialised into the RSC payload: send only the widths the gallery can use (the
+ * "wide" profile) instead of every stored variant.
+ */
+function galleryImages(images: PublicImage[]): GalleryImage[] {
+  return images.map(({ id, alt, width, height, thumb, card, large, blurDataUrl, sources }) => ({
+    id,
+    alt,
+    width,
+    height,
+    thumb,
+    card,
+    large,
+    blurDataUrl,
+    sources: sources?.length ? pickSources(sources, "wide") : null,
+    thumbAvif: sources?.[0]?.avif ?? null,
+  }));
 }

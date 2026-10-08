@@ -64,8 +64,8 @@ export function productFixture(over: Partial<PublicProduct> = {}): PublicProduct
     ],
     requiresDeactivationCert: false,
     images: [
-      { id: "i1", alt: null, width: 3000, height: 2000, thumb: "/uploads/a/thumb.webp", card: "/uploads/a/card.webp", large: "/uploads/a/large.webp", blur: "/uploads/a/blur.webp", blurDataUrl: null },
-      { id: "i2", alt: "Liner", width: 1600, height: 1200, thumb: "/uploads/b/thumb.webp", card: "/uploads/b/card.webp", large: "/uploads/b/large.webp", blur: "/uploads/b/blur.webp", blurDataUrl: null },
+      { id: "i1", alt: null, width: 3000, height: 2000, thumb: "/uploads/a/thumb.webp", card: "/uploads/a/card.webp", large: "/uploads/a/large.webp", blur: "/uploads/a/blur.webp", blurDataUrl: null, sources: null },
+      { id: "i2", alt: "Liner", width: 1600, height: 1200, thumb: "/uploads/b/thumb.webp", card: "/uploads/b/card.webp", large: "/uploads/b/large.webp", blur: "/uploads/b/blur.webp", blurDataUrl: null, sources: null },
     ],
     relatedIds: [],
     ...over,

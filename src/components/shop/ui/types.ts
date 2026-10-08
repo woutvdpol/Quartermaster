@@ -3,10 +3,17 @@
  * (see `toProductCardData` in src/server/storefront/products.ts) so no Prisma type reaches the client.
  */
 
-/** A responsive image. `src` is the default (card-size) URL; `srcSet` lists width variants. */
+import type { ImageSource } from "@/lib/media/variants";
+
+/**
+ * A responsive image. `src` is the default (card-size) URL. `sources` lists the stored width variants
+ * (WebP + AVIF, src/lib/media/variants.ts) — ShopImg picks the ones that fit its context; `srcSet` is
+ * the plain WebP fallback for images without a manifest.
+ */
 export type ShopImage = {
   src: string;
   srcSet?: string;
+  sources?: ImageSource[] | null;
   /** Inline LQIP (data: URL of the 24px blur variant) shown while loading; null if unprocessed. */
   blurDataUrl: string | null;
   alt: string;

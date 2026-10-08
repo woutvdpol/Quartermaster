@@ -1,3 +1,5 @@
+import type { ImageSource } from "@/lib/media/variants";
+
 /**
  * Public, serialisable catalog DTOs (safe for the client and for the data cache: no Dates, no Prisma
  * types). They never carry purchase prices, internal notes, legacyData or other tenants' data.
@@ -21,6 +23,8 @@ export type PublicImage = {
   blur: string;
   /** Inline LQIP, null for unprocessed images */
   blurDataUrl: string | null;
+  /** Responsive WebP/AVIF widths (src/lib/media/variants.ts); null for unprocessed images. */
+  sources: ImageSource[] | null;
 };
 
 export type CatalogCard = {

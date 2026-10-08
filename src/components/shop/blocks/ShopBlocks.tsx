@@ -72,7 +72,7 @@ export async function CategoriesBlock({ data, ctx }: { data: BlockData<"CATEGORI
             <Link href={c.href} className="group flex flex-col gap-2.5">
               <span className="relative block aspect-square overflow-hidden rounded-shop bg-shop-sunken">
                 {c.image ? (
-                  <ShopImg image={{ ...c.image, alt: "" }} fill sizes="(min-width: 1024px) 220px, (min-width: 768px) 25vw, (min-width: 640px) 33vw, 42vw" className="transition duration-500 group-hover:scale-[1.04]" />
+                  <ShopImg image={{ ...c.image, alt: "" }} fill sizes="(min-width: 1024px) 210px, (min-width: 768px) calc(25vw - 24px), (min-width: 640px) calc(33vw - 24px), calc(42vw - 14px)" className="transition duration-500 group-hover:scale-[1.04]" />
                 ) : null}
               </span>
               <span className="flex flex-col">

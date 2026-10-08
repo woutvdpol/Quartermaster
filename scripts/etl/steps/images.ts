@@ -1,5 +1,6 @@
 import type { PrismaClient } from "../../../src/generated/prisma/client";
-import { VARIANT_NAMES, processImage } from "../../../src/server/media/images";
+import { processImage } from "../../../src/server/media/images";
+import { storeProcessedImage } from "../../../src/server/media/store";
 import { assertValidKey, type StorageDriver } from "../../../src/server/media/storage";
 import { json, type EtlContext } from "../context";
 import type { ImageDownloader } from "../images";
@@ -124,15 +125,7 @@ export async function downloadPendingImages(opts: {
         const processed = await processImage(file.bytes);
         const storageKey = `${tenantId}/products/${img.productId}/${img.id}.${processed.ext}`;
         assertValidKey(storageKey);
-        const base = storageKey.slice(0, storageKey.lastIndexOf("."));
-        await storage.put(storageKey, processed.original.data, processed.mimeType);
-        const manifest: Record<string, unknown> = {};
-        for (const name of VARIANT_NAMES) {
-          const v = processed.variants[name];
-          const key = `${base}/${name}.webp`;
-          await storage.put(key, v.data, v.mimeType);
-          manifest[name] = { key, width: v.width, height: v.height, bytes: v.bytes, ...(name === "blur" ? { dataUrl: processed.blurDataUrl } : {}) };
-        }
+        const manifest = await storeProcessedImage(storage, storageKey, processed);
         await prisma.productImage.update({
           where: { id: img.id },
           data: {
