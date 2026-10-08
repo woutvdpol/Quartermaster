@@ -6,7 +6,7 @@ import { visitorCountry } from "@/server/storefront-catalog/country";
 import { catalogCopy as copy } from "../_copy";
 
 /**
- * "Shipping to Netherlands from €12.50" for the visitor's country (cf-ipcountry → Accept-Language →
+ * "Shipping to Netherlands from €12.50" for the visitor's country (edge header / IP → Accept-Language →
  * shop country). Per request (reads headers), so render it inside <Suspense>. Quietly renders nothing
  * when the quote fails.
  */
@@ -26,7 +26,7 @@ export async function ShippingHint({
   freeShippingThreshold: number;
 }) {
   const h = await headers();
-  const country = visitorCountry({ cfIpCountry: h.get("cf-ipcountry"), acceptLanguage: h.get("accept-language") }, shopCountry || "NL");
+  const country = visitorCountry(h, shopCountry || "NL");
   // Zones come from the data cache (identical for every visitor); only the country is per request.
   const quote = await estimateShopShipping(tenantId, {
     countryCode: country,

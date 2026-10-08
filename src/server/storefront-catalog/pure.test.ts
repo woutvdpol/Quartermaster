@@ -87,10 +87,10 @@ describe("facet params", () => {
 
 describe("visitorCountry", () => {
   it("prefers cf-ipcountry, then accept-language region, then the fallback", () => {
-    expect(visitorCountry({ cfIpCountry: "de", acceptLanguage: "nl-NL" })).toBe("DE");
-    expect(visitorCountry({ cfIpCountry: "XX", acceptLanguage: "en, fr-BE;q=0.8" })).toBe("BE");
-    expect(visitorCountry({ acceptLanguage: "en" }, "NL")).toBe("NL");
-    expect(visitorCountry({})).toBe("NL");
+    expect(visitorCountry(new Headers({ "cf-ipcountry": "de", "accept-language": "nl-NL" }))).toBe("DE");
+    expect(visitorCountry(new Headers({ "cf-ipcountry": "XX", "accept-language": "en, fr-BE;q=0.8" }))).toBe("BE");
+    expect(visitorCountry(new Headers({ "accept-language": "en" }), "NL")).toBe("NL");
+    expect(visitorCountry(new Headers())).toBe("NL");
   });
 });
 

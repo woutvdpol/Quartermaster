@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // Loaded at runtime from node_modules instead of being bundled (native/large server deps).
   serverExternalPackages: ["pg-boss", "sharp", "@react-pdf/renderer"],
+  // Read with fs at runtime (src/server/geo/ip-country.ts), so the tracer can't see it: ship it explicitly.
+  outputFileTracingIncludes: {
+    "/**": ["./node_modules/@ip-location-db/geo-whois-asn-country-mmdb/geo-whois-asn-country.mmdb"],
+  },
   // AI answer engines (GPTBot, ClaudeBot, PerplexityBot …) mostly read raw HTML: give them blocking
   // metadata in <head> like Next does for classic crawlers (Next's default list + AI bots; src/lib/seo/bots.ts).
   htmlLimitedBots: htmlLimitedBotsPattern(HTML_LIMITED_BOT_UA_RE.source),

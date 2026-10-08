@@ -13,6 +13,7 @@ import { calculateShippingQuote, type QuoteResult, type ShippingOption } from "@
 import { loadQuoteZones } from "@/server/shipping/quote";
 import { countryName, isCountryCode, type CountryCode } from "@/server/shipping/countries";
 import { resolveCompliance } from "@/server/compliance";
+import { requestVisitorCountry } from "@/server/compliance/country";
 import { getCart, getTenantCurrency, lockCart, loadCartLinesTx, summarize, type CartView, type ShopViewer } from "@/server/cart";
 import type { Prisma } from "@/generated/prisma/client";
 import { parseCheckoutInput, type FieldErrors } from "./schema";
@@ -118,7 +119,9 @@ export async function getCheckoutContext(
     getTenantCurrency(tenantId),
   ]);
   const countries = deliverableCountries(zones);
-  const preferred = [cart?.countryCode, general.address.country].find((c): c is CountryCode => !!c && isCountryCode(c) && countries.includes(c));
+  // Visitor's own earlier choice, then where they appear to be (edge header / IP), then the shop's country.
+  const visitor = await requestVisitorCountry();
+  const preferred = [cart?.countryCode, visitor, general.address.country].find((c): c is CountryCode => !!c && isCountryCode(c) && countries.includes(c));
   const buyable = (cart?.lines ?? []).filter((l) => l.state === "held" || l.state === "lapsed");
   return {
     cart,
