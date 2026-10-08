@@ -37,7 +37,7 @@ export function Header({
   return (
     <StickyHeader>
       <Container className="flex min-h-16 items-center gap-1.5 py-2.5 transition-[padding] duration-200 sm:gap-3 lg:min-h-20 lg:gap-x-6 lg:py-4 lg:group-data-[scrolled]/header:py-2.5 xl:gap-x-8">
-        <MobileNav items={menu} shopName={shopName} search={<SearchBox id="shop-search-mobile" />} />
+        <MobileNav items={menu} shopName={shopName} search={<SearchBox id="shop-search-mobile" variant="sheet" />} />
         <Link href="/" className="mr-auto flex min-w-0 shrink-0 items-center gap-3 xl:mr-0" aria-label={`${shopName} ${t.homeLabel}`}>
           {logoPath ? (
             // eslint-disable-next-line @next/next/no-img-element -- stored branding asset, already sized
@@ -86,7 +86,7 @@ export function Header({
         </nav>
 
         <div className="ml-auto flex min-w-0 items-center justify-end gap-1 sm:gap-2.5 lg:flex-1">
-          <HeaderSearch className="hidden w-full max-w-[260px] min-w-[150px] lg:block" />
+          <HeaderSearch />
           <Suspense fallback={null}>
             <CurrencySwitcherSlot tenantId={tenantId} className="hidden sm:block" />
           </Suspense>

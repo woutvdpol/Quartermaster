@@ -15,7 +15,8 @@ import type { ParsedQuery } from "./parser";
  *    text tower is easily fooled by typos ("stahlhem" → a medal photo).
  */
 
-export type ScoredId = { id: string; score: number };
+/** `fuzzy`: a lexical hit found by trigram similarity (typo tolerance), not by full-text. */
+export type ScoredId = { id: string; score: number; fuzzy?: true };
 
 export const TEXT_FLOOR = 0.81;
 export const TEXT_MARGIN = 0.025;

@@ -8,6 +8,7 @@ export function HiddenParams({ params, keep, defaultSort }: { params: CatalogPar
   return (
     <>
       {k.has("q") && params.q ? <input type="hidden" name="q" value={params.q} /> : null}
+      {k.has("q") && params.q && params.literal ? <input type="hidden" name="literal" value="1" /> : null}
       {k.has("facets") ? params.facets.map((f) => <input key={`f:${f}`} type="hidden" name="f" value={f} />) : null}
       {k.has("tags") ? params.tags.map((t) => <input key={t} type="hidden" name="tag" value={t} />) : null}
       {k.has("min") && params.min !== null ? <input type="hidden" name="min" value={params.min} /> : null}

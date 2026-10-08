@@ -90,6 +90,9 @@ jobs:
         run: |
           npm run db:seed
           npm run db:seed:demo
+          # Product vectors for "Looks like this" without the models (CI has no embedder; search
+          # itself stays lexical): deterministic stand-in vectors, docs/search.md § UI.
+          npm run search -- reindex --all --fake
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium

@@ -2,6 +2,7 @@ import { take } from "@/server/auth/rate-limit";
 import { clientIpFromHeaders, isSameOrigin } from "@/server/request-meta";
 import { SEARCH_IMAGE_MAX_BYTES, SearchImageError, SearchUnavailableError, decodeSearchImage, searchByImage, searchRequestContext, toPublicCards } from "@/server/search";
 import type { ImageSearchResponse, SearchErrorResponse } from "@/server/search/api-types";
+import { matchLevel } from "@/server/search/ui-labels";
 import { MAX_QUERY_LENGTH, parseCatalogParams } from "@/server/storefront-catalog";
 
 /*
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
       currency: ctx.shop.tenant.currency,
     });
     const body: ImageSearchResponse = {
-      items: await toPublicCards(ctx, res.items),
+      items: (await toPublicCards(ctx, res.items)).map((c) => ({ ...c, match: matchLevel(res.scores?.[c.id]) })),
       total: res.total,
       page: res.page,
       pageSize: res.pageSize,

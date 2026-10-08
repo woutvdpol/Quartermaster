@@ -16,6 +16,15 @@ describe("parseCatalogParams", () => {
     expect(hasActiveFilters(p)).toBe(false);
   });
 
+  it("keeps the literal-search flag only together with q", () => {
+    const p = parseCatalogParams({ q: "duitse helm", literal: "1" });
+    expect(p.literal).toBe(true);
+    expect(catalogQueryString(p)).toBe("?q=duitse+helm&literal=1");
+    expect(catalogQueryString(p, { literal: false })).toBe("?q=duitse+helm");
+    expect(catalogQueryString(p, { q: null })).toBe("");
+    expect(parseCatalogParams({ literal: "1" }).literal).toBeUndefined();
+  });
+
   it("rounds load-more counts to page multiples and caps them", () => {
     expect(parseCatalogParams({ show: "30" }).show).toBe(PAGE_SIZE * 2);
     expect(parseCatalogParams({ show: "100000" }).show).toBe(null);

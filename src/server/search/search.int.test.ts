@@ -14,6 +14,7 @@ import { indexProducts, indexStatus, reindexTenant, toRgb } from "./indexing";
 import { invalidateShopDictionary } from "./dictionary";
 import { productVectors, vectorSearch } from "./retrieval";
 import { clearQueryEmbeddingCache, searchByImage, searchProducts, similarProducts, suggest } from "./service";
+import { clearSearchHintsCache, searchHints } from "./hints";
 import { whereSql } from "@/server/storefront-catalog/queries";
 
 /*
@@ -227,6 +228,33 @@ describe("smart search (integration)", () => {
       expect(ids(r)).toEqual([p.bluse.id]);
     });
 
+    it("near-misses: re-runs without the most restrictive understood filter (capped, not in the results)", async () => {
+      const r = await searchProducts(tenantId, { q: "helm onder 1000 euro", nearMisses: true });
+      expect(r.interpretation.chips.map((c) => c.kind)).toEqual(["price", "facet"]);
+      expect(ids(r)).not.toContain(p.m40.id); // €1,450
+      expect(r.nearMisses?.dropped.label).toBe("Max €1,000");
+      expect(r.nearMisses?.items.map((i) => i.id)).toEqual([p.m40.id]);
+      expect(r.nearMisses?.total).toBe(1);
+      // Not asked for, nothing understood, explicit filters or a later page: none.
+      expect((await searchProducts(tenantId, { q: "helm onder 1000 euro" })).nearMisses).toBeUndefined();
+      expect((await searchProducts(tenantId, { q: "stahlhelm", nearMisses: true })).nearMisses).toBeNull();
+      expect((await searchProducts(tenantId, { q: "helm", filters: { max: 1000 }, nearMisses: true })).nearMisses).toBeNull();
+      expect((await searchProducts(tenantId, { q: "helm onder 1000 euro", page: 2, nearMisses: true })).nearMisses).toBeNull();
+    });
+
+    it("interpret: false (literal search) understands no filters", async () => {
+      const r = await searchProducts(tenantId, { q: "duitse helm", interpret: false });
+      expect(r.interpretation.chips).toEqual([]);
+      expect(r.interpretation.facets).toEqual([]);
+    });
+
+    it("did-you-mean from the shop's own words, never from draft titles", async () => {
+      clearSearchHintsCache();
+      expect((await searchHints(tenantId, "duitse stahlhem")).didYouMean).toBe("duitse stahlhelm");
+      expect((await searchHints(tenantId, "draftt")).didYouMean).toBeNull();
+      expect((await searchHints(tenantId, "feldbluse")).didYouMean).toBeNull();
+    });
+
     it("sorts search results by price on request; filters-only queries list in the fallback order", async () => {
       const r = await searchProducts(tenantId, { q: "helm", sort: "price_asc" });
       const prices = r.items.map((i) => i.price);
@@ -257,6 +285,20 @@ describe("smart search (integration)", () => {
       expect(h.products.map((x) => x.id)).toContain(p.m40.id);
       expect(h.products.map((x) => x.id)).not.toContain(p.sold.id);
       expect(h.products.length).toBeLessThanOrEqual(5);
+      expect(h.reasons[p.m40.id]).toBe("lexical");
+      expect(h.total).toBeGreaterThanOrEqual(h.products.length);
+      expect(h.totalCapped).toBe(false);
+    });
+
+    it("explains why: exact stock numbers, typos, filter-only listings", async () => {
+      const exact = await suggest(tenantId, `#${p.m34.stockCode}`);
+      expect(exact.reasons[p.m34.id]).toBe("exact");
+      const typo = await suggest(tenantId, "stahlhem");
+      expect(typo.reasons[p.m40.id]).toBe("typo");
+      const listing = await suggest(tenantId, "duits");
+      expect(listing.products.length).toBeGreaterThan(0);
+      expect(Object.values(listing.reasons).every((r) => r === "filters")).toBe(true);
+      expect(listing.total).toBe(4); // German items for sale: m40, bluse, restricted, blurred
     });
   });
 
@@ -264,6 +306,7 @@ describe("smart search (integration)", () => {
     it("finds the products whose main photo looks like the upload", async () => {
       const red = await searchByImage(tenantId, await rgbOf({ r: 210, g: 15, b: 25 }));
       expect(red.items[0].id).toBe(p.m40.id);
+      expect(red.scores?.[p.m40.id]).toBeGreaterThan(0.9);
       expect(red.items.map((i) => i.id)).not.toContain(p.sold.id); // sold: not in the shop scope
       expect(red.items.map((i) => i.id)).not.toContain(p.other.id);
       const blue = await searchByImage(tenantId, await rgbOf({ r: 10, g: 30, b: 220 }));

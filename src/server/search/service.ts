@@ -11,6 +11,7 @@ import { getShopDictionary, parseWith, type ShopDictionary } from "./dictionary"
 import { TtlLru } from "./lru";
 import { STOPWORDS, fold, lexemes } from "./normalize";
 import type { InterpretationChip, ParsedQuery } from "./parser";
+import type { SuggestReason } from "./ui-labels";
 import { exactMatches, lexicalSearch, orderIds, productVectors, vectorSearch, type ScoredId } from "./retrieval";
 import { rrf, type RankedList } from "./rrf";
 import { FUSION_K, IMAGE_MARGIN, IMAGE_MIN_SIMILARITY, IMAGE_TEXT_LIMIT, SIMILAR_MIN_Z, WEIGHTS, keepImageText, keepSemantic, semanticText, zScores } from "./ranking";
@@ -72,6 +73,11 @@ export type SearchInput = {
   facets?: boolean;
   /** Include per-retriever hits in the result (tuning / admin diagnostics). */
   explain?: boolean;
+  /**
+   * Also look for "close, but not all filters match" items (results page, page 1): when the query
+   * was understood as filters and the result is small, re-run without the most restrictive one.
+   */
+  nearMisses?: boolean;
 };
 
 export type SearchInterpretation = {
@@ -115,7 +121,21 @@ export type SearchResult = {
   facets: CatalogFacets | null;
   timing: SearchTiming;
   explain?: SearchExplain;
+  /** Only with `nearMisses: true` (null when not applicable or nothing extra was found). */
+  nearMisses?: NearMisses | null;
+  /** Photo search: visual similarity (cosine) per returned item id. */
+  scores?: Record<string, number>;
 };
+
+/**
+ * Items that match everything except one understood filter — the most restrictive one (the filter
+ * whose removal adds the most items). `dropped` is that filter's chip (remove it to see them all).
+ */
+export type NearMisses = { dropped: InterpretationChip; items: CatalogCard[]; total: number };
+
+/** Near-misses are only looked for when the exact result is at most this big (one page). */
+export const NEAR_MISS_BELOW = PAGE_SIZE;
+export const NEAR_MISS_LIMIT = 8;
 
 // ─── Query embeddings (warm-or-skip, cached) ────────────────────────────────
 
@@ -177,6 +197,24 @@ function relaxFacets(p: ParsedQuery): ParsedQuery {
   const text = [p.text, ...words].filter(Boolean).join(" ");
   const terms = [...new Set([...p.terms, ...words.flatMap((w) => lexemes(w))].filter((w) => !STOPWORDS.has(w)))].slice(0, 8);
   return { ...p, text, terms, facets: [], chips: p.chips.filter((c) => c.kind !== "facet") };
+}
+
+/**
+ * One query variant per understood filter (facet chips, and the price bounds as one), each without
+ * that filter. Explicit URL filters are the visitor's own choice and are never dropped.
+ */
+export function nearMissVariants(p: ParsedQuery, explicit: SearchFilters = {}): { dropped: InterpretationChip; parsed: ParsedQuery }[] {
+  const out: { dropped: InterpretationChip; parsed: ParsedQuery }[] = [];
+  for (const chip of p.chips) {
+    if (chip.kind !== "facet" || !chip.token || (explicit.facets ?? []).includes(chip.token)) continue;
+    out.push({ dropped: chip, parsed: { ...p, facets: p.facets.filter((t) => t !== chip.token), chips: p.chips.filter((c) => c !== chip) } });
+  }
+  const price = p.chips.filter((c) => c.kind === "price");
+  if (price.length && (explicit.min ?? null) === null && (explicit.max ?? null) === null) {
+    const dropped = price.length === 1 ? price[0] : { ...price[0], label: price.map((c) => c.label).join(", ") };
+    out.push({ dropped, parsed: { ...p, min: null, max: null, chips: p.chips.filter((c) => c.kind !== "price") } });
+  }
+  return out.slice(0, 4);
 }
 
 function interpretationOf(p: ParsedQuery, relaxed: boolean): SearchInterpretation {
@@ -299,6 +337,27 @@ export async function searchProducts(tenantId: string, input: SearchInput): Prom
     r = await run(parsed, plan);
   }
 
+  // "Close, but not all filters match": drop one understood filter at a time (in parallel), keep the
+  // variant that adds the most items. Query embeddings are cached, so each variant costs SQL only.
+  const nearMissesP = (async (): Promise<NearMisses | null> => {
+    if (!input.nearMisses || relaxed || (input.page ?? 1) > 1 || r.fused.length >= NEAR_MISS_BELOW) return null;
+    const variants = nearMissVariants(parsed, filters);
+    if (!variants.length) return null;
+    const have = new Set(r.fused);
+    const runs = await Promise.all(
+      variants.map(async (v) => {
+        const res = await run(v.parsed, planFor(v.parsed));
+        const extra = res.fused.filter((id) => !have.has(id));
+        return { dropped: v.dropped, extra };
+      }),
+    );
+    const best = runs.reduce<(typeof runs)[number] | null>((a, b) => (b.extra.length > (a?.extra.length ?? 0) ? b : a), null);
+    if (!best) return null;
+    let extra = best.extra;
+    if (sort !== "relevance") extra = await orderIds(extra, orderSql(sort, scope.mode));
+    return { dropped: best.dropped, total: extra.length, items: await loadCards(tenantId, extra.slice(0, NEAR_MISS_LIMIT)) };
+  })();
+
   // Order + page.
   let ids = r.fused;
   if (!r.listing && sort !== "relevance") ids = await orderIds(ids, orderSql(sort, scope.mode));
@@ -331,7 +390,7 @@ export async function searchProducts(tenantId: string, input: SearchInput): Prom
     const facets = await getCatalogFacets(tenantId, { ...scope, lockedFacets: [], ids: candidates }, params);
     return { facets, ms: ms(t) };
   })();
-  const [items, facetRes] = await Promise.all([loadCards(tenantId, slice), facetsP]);
+  const [items, facetRes, nearMisses] = await Promise.all([loadCards(tenantId, slice), facetsP, nearMissesP]);
   const cardsMs = ms(tCards);
 
   return {
@@ -344,6 +403,7 @@ export async function searchProducts(tenantId: string, input: SearchInput): Prom
     interpretation: interpretationOf(parsed, relaxed),
     facets: facetRes.facets,
     ...(input.explain && r.explain ? { explain: r.explain } : {}),
+    ...(input.nearMisses ? { nearMisses } : {}),
     timing: {
       totalMs: ms(started),
       parseMs,
@@ -368,14 +428,29 @@ export type FacetSuggestion = {
   label: string;
 };
 
+/** Why a suggested product matched (the dropdown's "why" line: ./ui-labels.ts). */
+export type { SuggestReason } from "./ui-labels";
+
 export type Suggestions = {
   query: string;
   interpretation: SearchInterpretation;
   /** Facet values matching the words typed so far (prefix of the last word, or understood words). */
   facets: FacetSuggestion[];
   products: CatalogCard[];
+  /** Per product id. */
+  reasons: Record<string, SuggestReason>;
+  /**
+   * Matches found while suggesting (exact + lexical + kept semantic hits, or the filtered listing):
+   * the "See all N results" count. `totalCapped`: there are at least this many (the suggest
+   * retrievers stop early); the results page may find a few more through the language model.
+   */
+  total: number;
+  totalCapped: boolean;
   timing: { totalMs: number; semantic: RetrieverState };
 };
+
+/** Lexical candidates the suggest count is based on (= its rank cap: costs no extra ranking). */
+const SUGGEST_COUNT_CAP = 300;
 
 /** Words of ≥ 2 letters; the last one is matched as a prefix. */
 function facetSuggestions(dict: ShopDictionary, q: string, understood: string[]): FacetSuggestion[] {
@@ -420,7 +495,7 @@ export async function suggest(tenantId: string, q: string, opts: { scope?: Parti
   const limit = opts.limit ?? 5;
   const hasText = parsed.text.trim().length > 0 && parsed.terms.length > 0;
   // Suggestions rank a smaller sample of the matches (300): a dropdown needs 5 good items, fast.
-  const [lex, exact] = await Promise.all([hasText ? lexicalSearch(where, parsed, limit * 4, 300) : Promise.resolve([] as ScoredId[]), exactMatches(where, parsed)]);
+  const [lex, exact] = await Promise.all([hasText ? lexicalSearch(where, parsed, SUGGEST_COUNT_CAP, SUGGEST_COUNT_CAP) : Promise.resolve([] as ScoredId[]), exactMatches(where, parsed)]);
   let semanticState: RetrieverState = "skipped";
   let semantic: ScoredId[] = [];
   const words = parsed.text.split(" ").filter(Boolean).length;
@@ -430,20 +505,36 @@ export async function suggest(tenantId: string, q: string, opts: { scope?: Parti
     semanticState = state;
     if (vector && embedder) semantic = keepSemantic(await vectorSearch(tenantId, where, vector, { kind: "text", dim: embedder.textDim, limit: 60 }), new Set(lex.map((h) => h.id)));
   }
-  let ids = rrf(
+  const all = rrf(
     [
       { name: "lexical", ids: lex.map((h) => h.id) },
       { name: "semantic", ids: semantic.map((h) => h.id) },
     ],
-    { pinned: exact, limit, k: FUSION_K },
+    { pinned: exact, limit: SUGGEST_COUNT_CAP * 2, k: FUSION_K },
   ).map((h) => h.id);
-  if (!ids.length && !hasText && parsed.facets.length) ids = await listIds(where, orderSql("newest", scope.mode)).then((x) => x.slice(0, limit));
+  let ids = all.slice(0, limit);
+  let total = all.length;
+  let totalCapped = lex.length >= SUGGEST_COUNT_CAP;
+  const reasons: Record<string, SuggestReason> = {};
+  const exactSet = new Set(exact);
+  const lexById = new Map(lex.map((h) => [h.id, h]));
+  for (const id of ids) reasons[id] = exactSet.has(id) ? "exact" : lexById.has(id) ? (lexById.get(id)!.fuzzy ? "typo" : "lexical") : "semantic";
+  if (!ids.length && !hasText && (parsed.facets.length || parsed.min !== null || parsed.max !== null)) {
+    const listed = await listIds(where, orderSql("newest", scope.mode));
+    ids = listed.slice(0, limit);
+    total = listed.length;
+    totalCapped = listed.length >= MAX_RESULTS;
+    for (const id of ids) reasons[id] = "filters";
+  }
   const products = await loadCards(tenantId, ids);
   return {
     query: parsed.original,
     interpretation: interpretationOf(parsed, false),
     facets: facetSuggestions(dict, q, parsed.facets),
     products,
+    reasons,
+    total,
+    totalCapped,
     timing: { totalMs: ms(started), semantic: semanticState },
   };
 }
@@ -511,8 +602,12 @@ export async function searchByImage(tenantId: string, image: RgbImage, input: Im
   const pageSize = input.pageSize ?? PAGE_SIZE;
   const page = Math.max(1, input.page ?? 1);
   const tCards = performance.now();
-  const items = await loadCards(tenantId, ids.slice((page - 1) * pageSize, page * pageSize));
+  const pageIds = ids.slice((page - 1) * pageSize, page * pageSize);
+  const items = await loadCards(tenantId, pageIds);
+  const visualScore = new Map(candidates.map((h) => [h.id, h.score]));
+  const scores = Object.fromEntries(pageIds.flatMap((id) => (visualScore.has(id) ? [[id, visualScore.get(id)!]] : [])));
   return {
+    scores,
     items,
     total: ids.length,
     page,

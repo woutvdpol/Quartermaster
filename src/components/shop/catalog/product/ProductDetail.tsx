@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { Badge, Breadcrumbs, Container, LockedImg, Markdown, Price, ProductGrid, SectionHeading } from "@/components/shop/ui";
+import { Badge, Breadcrumbs, Container, LockedImg, Markdown, Price, ProductCard, ProductGrid, SectionHeading } from "@/components/shop/ui";
+import { getSimilarProducts } from "@/server/search";
+import { searchCopy } from "@/components/shop/search/_copy";
 import { WishlistButton } from "@/components/shop/account/WishlistButton";
 import { NotifyMeButton } from "@/components/shop/alerts";
 import { ProvenanceBlock } from "@/components/shop/provenance/ProvenanceBlock";
@@ -255,6 +257,13 @@ export function ProductDetail({
         </div>
       ) : null}
 
+      {/* Below the fold and streamed: neither rail delays the product itself. */}
+      {!locked ? (
+        <Suspense fallback={null}>
+          <SimilarProducts shop={shop} product={product} country={geo?.country ?? null} display={display} />
+        </Suspense>
+      ) : null}
+
       <Suspense fallback={null}>
         <RelatedProducts shop={shop} product={product} country={geo?.country ?? null} display={display} />
       </Suspense>
@@ -314,6 +323,53 @@ async function RelatedProducts({
     <section className="mt-20 border-t border-shop-line pt-12" aria-labelledby="pd-related">
       <SectionHeading title={<span id="pd-related">{copy.product.related}</span>} />
       <ProductGrid products={cards} columns={4} display={display} showStockCode={shop.settings.catalog.showStockCode} headingLevel={3} wishlistSlot={(p) => <WishlistButton productId={p.id} />} />
+    </section>
+  );
+}
+
+/** Fewer neighbours than this and the "Looks like this" rail is not shown. */
+const SIMILAR_MIN = 3;
+
+/**
+ * "Looks like this" (smart search, docs/search.md): neighbours by photo and text embeddings, data-cached
+ * per product (getSimilarProducts) — on a cache hit this costs the reservation/compliance lookups only.
+ * Hidden when the shop has no embeddings yet or fewer than three items clearly look alike.
+ */
+async function SimilarProducts({ shop, product, country, display }: { shop: ShopContext; product: PublicProduct; country: string | null; display: DisplayCurrency | null }) {
+  const tenantId = shop.tenant.id;
+  const candidates = await getSimilarProducts(tenantId, product.id).catch(() => []);
+  if (candidates.length < SIMILAR_MIN) return null;
+  const ids = candidates.map((c) => c.id);
+  const [reserved, viewer, verdicts] = await Promise.all([
+    liveReservedIds(tenantId, ids),
+    getShopViewer(tenantId),
+    country ? resolveCompliance(tenantId, ids, country) : Promise.resolve({} as Awaited<ReturnType<typeof resolveCompliance>>),
+  ]);
+  const visible = candidates.filter((c) => !verdicts[c.id]?.hidden);
+  if (visible.length < SIMILAR_MIN) return null;
+  const cards = withLiveStatus(visible, reserved).map((c) =>
+    applyGeoBlur(
+      toCardData(c, { currency: shop.tenant.currency, showPriceWhenSold: shop.settings.catalog.showPriceWhenSold, lockSensitive: shop.settings.legal.blurSensitiveForGuests && !viewer }),
+      c,
+      verdicts[c.id]?.blurred ?? false,
+    ),
+  );
+  return (
+    <section className="mt-20 border-t border-shop-line pt-12" aria-labelledby="pd-similar" data-testid="similar-rail">
+      <SectionHeading title={<span id="pd-similar">{searchCopy.similar.title}</span>} intro={searchCopy.similar.intro} />
+      <div className="-mx-1 flex snap-x gap-4 overflow-x-auto px-1 pb-2 sm:gap-5 [scrollbar-width:thin]">
+        {cards.map((p) => (
+          <ProductCard
+            key={p.id}
+            product={p}
+            display={display}
+            showStockCode={shop.settings.catalog.showStockCode}
+            headingLevel={3}
+            sizes="(min-width: 640px) 15rem, 11.5rem"
+            className="w-[11.5rem] flex-none snap-start sm:w-[15rem]"
+          />
+        ))}
+      </div>
     </section>
   );
 }

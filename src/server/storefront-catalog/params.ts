@@ -3,6 +3,8 @@
  * `#[Url]` state, made readable). Pure — used by pages, client filter components and tests.
  *
  *   q        search text (title / description / stock code "#50231")
+ *   literal  "1" = take q literally: no facet/price/sort understanding (smart search, docs/search.md
+ *            § API) — the results page's "Search the words literally instead"; ignored without q
  *   f        facet value "<facetSlug>.<valueSlug>", repeatable — OR within a facet, AND across
  *            facets; a value also matches its descendants (e.g. f=country.germany&f=period.ww2).
  *            Also accepted: f=<facetValueId> (cuid; used by saved-search links) — the shop page
@@ -45,6 +47,8 @@ export type CatalogParams = {
   /** Set in load-more mode; overrides paging (offset 0, limit = show). */
   show: number | null;
   view: CatalogView | null;
+  /** Search q literally (no filters understood from the words). Only meaningful with q. */
+  literal?: boolean;
 };
 
 export type RawSearchParams = Record<string, string | string[] | undefined>;
@@ -102,7 +106,8 @@ export function parseCatalogParams(raw: RawSearchParams, defaultSort: CatalogSor
   const show = showRaw && showRaw > PAGE_SIZE ? Math.min(MAX_SHOW, Math.ceil(showRaw / PAGE_SIZE) * PAGE_SIZE) : null;
   const viewRaw = first(raw.view);
   const view = viewRaw === "grid" || viewRaw === "list" ? viewRaw : null;
-  return { q, facets, facetValueIds, tags, min, max, sort, page, show, view };
+  const literal = Boolean(q) && first(raw.literal) === "1";
+  return { q, facets, facetValueIds, tags, min, max, sort, page, show, view, ...(literal ? { literal } : {}) };
 }
 
 /**
@@ -128,6 +133,7 @@ export function catalogQueryString(p: CatalogParams, patch: Partial<CatalogParam
   const next: CatalogParams = { ...p, ...(resetsPaging ? { page: 1, show: null } : {}), ...patch };
   const sp = new URLSearchParams();
   if (next.q) sp.set("q", next.q);
+  if (next.q && next.literal) sp.set("literal", "1");
   for (const f of next.facets) sp.append("f", f);
   for (const f of next.facetValueIds) sp.append("f", f);
   for (const t of next.tags) sp.append("tag", t);

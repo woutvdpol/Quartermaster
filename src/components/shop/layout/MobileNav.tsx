@@ -12,7 +12,7 @@ const t = layoutCopy.header;
 
 /**
  * Phone navigation: a modal <dialog> drawer (focus trap, Esc to close and inert background come
- * from the platform). Closes on navigation. `search` is the server-rendered SearchBox.
+ * from the platform). Closes on navigation. `search` is the search field (suggestions flow below it in the drawer).
  */
 export function MobileNav({ items, shopName, search }: { items: PublicMenuItem[]; shopName: string; search: React.ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null);

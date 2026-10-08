@@ -65,7 +65,8 @@ export async function lexicalSearch(where: Prisma.Sql, q: Pick<ParsedQuery, "ter
     WHERE ${where} AND (${Prisma.join(tri.map((t) => Prisma.sql`${t} <% p.title`), " OR ")})
     ORDER BY score DESC, p.id
     LIMIT ${limit}`;
-  return [...rows, ...fuzzy.filter((r) => !seen.has(r.id))].slice(0, limit);
+  // `fuzzy` marks typo-tolerant hits (the UI says "close spelling" for those).
+  return [...rows, ...fuzzy.filter((r) => !seen.has(r.id)).map((r) => ({ ...r, fuzzy: true as const }))].slice(0, limit);
 }
 
 /** Exact stock number / SKU hits (pinned to the top of the results). */

@@ -33,13 +33,17 @@ import {
   subtreeIds,
   withLiveStatus,
   categoryPath,
+  categoryHref,
   type CatalogMode,
   type CatalogSort,
   type ListScope,
   type RawSearchParams,
 } from "@/server/storefront-catalog";
 import type { CatalogFacets, CatalogPage, FacetValueOption, PublicCategory } from "@/server/storefront-catalog/types";
-import { searchProducts } from "@/server/search";
+import { searchHints, searchProducts, type NearMisses, type SearchInterpretation } from "@/server/search";
+import { matchCategories } from "@/server/search/ui-labels";
+import { InterpretationBar, NearMissRail, SearchHeading, SearchZeroState } from "@/components/shop/search/results";
+import { ProductCard } from "@/components/shop/ui/ProductCard";
 import { ActiveFilters } from "./ActiveFilters";
 import { CatalogList } from "./CatalogList";
 import { FacetPanel } from "./FacetPanel";
@@ -50,6 +54,7 @@ import { SortSelect } from "./SortSelect";
 import { ViewToggle } from "./ViewToggle";
 import { applyGeoBlur, toCardData } from "./to-card";
 import { catalogCopy as copy } from "./_copy";
+import { searchCopy } from "@/components/shop/search/_copy";
 
 export type CatalogViewProps = {
   shop: ShopContext;
@@ -98,7 +103,8 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
 
   // Search goes through the hybrid engine (per request, not data-cached: results depend on the query
   // and on models warming up); plain listings keep the cached catalog reads.
-  const results: Promise<{ page: CatalogPage; facets: CatalogFacets }> = params.q
+  type Results = { page: CatalogPage; facets: CatalogFacets; interpretation: SearchInterpretation | null; nearMisses: NearMisses | null };
+  const results: Promise<Results> = params.q
     ? searchProducts(tenantId, {
         q: params.q,
         filters: { facets: params.facets, facetValueIds: params.facetValueIds, tags: params.tags, min: params.min, max: params.max },
@@ -108,9 +114,13 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
         show: params.show,
         scope,
         currency,
-      }).then((r) => ({ page: { items: r.items, total: r.total }, facets: r.facets! }))
-    : Promise.all([getCatalogPage(tenantId, scope, params), getFacets(tenantId, scope, params)]).then(([page, facets]) => ({ page, facets }));
-  const [{ page, facets }, selectedTags, viewer, display] = await Promise.all([
+        // "Search the words literally instead" (?literal=1): no filters understood from the words.
+        interpret: !params.literal,
+        // "Close, but not all filters match" — first page only.
+        nearMisses: params.page === 1 && !params.show,
+      }).then((r) => ({ page: { items: r.items, total: r.total }, facets: r.facets!, interpretation: r.interpretation, nearMisses: r.nearMisses ?? null }))
+    : Promise.all([getCatalogPage(tenantId, scope, params), getFacets(tenantId, scope, params)]).then(([page, facets]) => ({ page, facets, interpretation: null, nearMisses: null }));
+  const [{ page, facets, interpretation, nearMisses }, selectedTags, viewer, display] = await Promise.all([
     results,
     getTagsBySlug(tenantId, params.tags),
     getShopViewer(tenantId),
@@ -133,7 +143,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
       permanentRedirect(`${basePath}${catalogQueryString(params, { tags, facets: facetsNext, facetValueIds: [] }, defaultSort)}`);
     }
   }
-  const ids = page.items.map((i) => i.id);
+  const ids = [...page.items, ...(nearMisses?.items ?? [])].map((i) => i.id);
   const [reserved, verdicts, saveFacetValueIds] = await Promise.all([
     mode === "shop" ? liveReservedIds(tenantId, ids) : Promise.resolve(new Set<string>()),
     country ? resolveCompliance(tenantId, ids, country) : Promise.resolve({} as Awaited<ReturnType<typeof resolveCompliance>>),
@@ -153,7 +163,23 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
     showPriceWhenSold: settings.showPriceWhenSold,
     lockSensitive: shop.settings.legal.blurSensitiveForGuests && !viewer,
   };
-  const cards = withLiveStatus(page.items, reserved).map((c) => applyGeoBlur(toCardData(c, cardCtx), c, verdicts[c.id]?.blurred ?? false));
+  const toCards = (items: CatalogPage["items"]) => withLiveStatus(items, reserved).map((c) => applyGeoBlur(toCardData(c, cardCtx), c, verdicts[c.id]?.blurred ?? false));
+  const cards = toCards(page.items);
+  const nearCards = nearMisses ? toCards(nearMisses.items) : [];
+
+  // Smart search: interpretation chips (remove = the query without that chip's words), literal toggle,
+  // and help for empty results. Links only — no client JS.
+  const qs = (patch: Partial<typeof params>) => `${basePath}${catalogQueryString(params, patch, defaultSort)}`;
+  const chipLinks = (interpretation?.chips ?? []).map((c) => ({ label: c.label, href: qs({ q: c.removeQuery || null }) }));
+  const hints = params.q && cards.length === 0 ? await searchHints(tenantId, params.q, { currency }) : null;
+  const zeroCategories =
+    params.q && cards.length === 0 && tree
+      ? (() => {
+          const matching = matchCategories(tree, params.q, categoryHref, 4);
+          const top = tree.filter((n) => n.total > 0 && !matching.some((m) => m.id === n.id)).map((n) => ({ id: n.id, label: n.title, href: categoryHref(n.slug), count: n.total }));
+          return [...matching, ...top].slice(0, 6);
+        })()
+      : [];
 
   const view = params.view ?? settings.layout;
   const filtered = hasActiveFilters(params);
@@ -214,14 +240,29 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
       {listLd ? <JsonLd data={listLd} /> : null}
 
       <header className="mt-5 mb-8 flex flex-col gap-6 sm:mt-6 sm:mb-10 lg:flex-row lg:items-end lg:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-[2.1rem] leading-[1.05] tracking-[-0.03em] text-shop-ink sm:text-[2.6rem]">{title}</h1>
-          {intro ? <div className="mt-3 max-w-2xl text-[1.05rem] text-shop-muted">{intro}</div> : null}
-        </div>
+        {params.q ? (
+          <SearchHeading query={params.q} matched={(interpretation?.chips ?? []).filter((c) => !interpretation!.text.toLowerCase().includes(c.matched.toLowerCase())).map((c) => c.matched)} scope={category ? title : mode === "archive" ? title : lockedFacets.length ? title : null} />
+        ) : (
+          <div className="min-w-0">
+            <h1 className="text-[2.1rem] leading-[1.05] tracking-[-0.03em] text-shop-ink sm:text-[2.6rem]">{title}</h1>
+            {intro ? <div className="mt-3 max-w-2xl text-[1.05rem] text-shop-muted">{intro}</div> : null}
+          </div>
+        )}
         <div className="w-full lg:max-w-md">
           <SearchBox action={basePath} params={params} defaultSort={defaultSort} />
         </div>
       </header>
+
+      {params.q && interpretation ? (
+        <div className="-mt-2 mb-8 sm:-mt-4">
+          <InterpretationBar
+            text={interpretation.text}
+            chips={chipLinks}
+            relaxed={interpretation.relaxed}
+            literal={{ on: Boolean(params.literal), q: params.q, href: qs({ literal: !params.literal }) }}
+          />
+        </div>
+      ) : null}
 
       <div className="grid gap-8 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-12">
         <aside className="hidden lg:block" aria-label={copy.filters.heading}>
@@ -238,6 +279,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
               </MobileFilters>
               <p className="text-sm text-shop-muted tabular-nums" aria-live="polite">
                 {copy.toolbar.results(page.total)}
+                {params.q && params.sort === "relevance" && page.total > 1 ? ` · ${searchCopy.results.bestFirst}` : null}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -263,7 +305,16 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
             />
           </div>
 
-          {cards.length === 0 ? (
+          {cards.length === 0 && params.q ? (
+            <SearchZeroState
+              q={params.q}
+              didYouMean={hints?.didYouMean ? { text: hints.didYouMean, href: qs({ q: hints.didYouMean, literal: false }) } : null}
+              without={params.literal ? [] : chipLinks}
+              literalHref={!params.literal && chipLinks.length ? qs({ literal: true }) : null}
+              categories={zeroCategories}
+              wholeShop={basePath !== SHOP_PATH && mode === "shop" ? { label: searchCopy.results.wholeShop, href: `${SHOP_PATH}${catalogQueryString({ ...params, facets: [], tags: [], min: null, max: null }, { page: 1, show: null }, defaultSort)}` } : null}
+            />
+          ) : cards.length === 0 ? (
             <EmptyState
               title={copy.empty.title}
               className="border-0 bg-shop-sunken py-16 sm:py-20"
@@ -323,6 +374,18 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
                 hrefFor={(p) => `${basePath}${catalogQueryString(params, { page: p, show: null }, defaultSort)}`}
               />
             )
+          ) : null}
+
+          {nearMisses && nearCards.length ? (
+            <NearMissRail
+              dropped={nearMisses.dropped.label}
+              total={nearMisses.total}
+              allHref={qs({ q: nearMisses.dropped.removeQuery || null })}
+            >
+              {nearCards.map((p) => (
+                <ProductCard key={p.id} product={p} showStockCode={settings.showStockCode} display={display} headingLevel={3} sizes="12.5rem" className="w-[12.5rem] flex-none snap-start" />
+              ))}
+            </NearMissRail>
           ) : null}
         </div>
       </div>

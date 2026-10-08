@@ -1,6 +1,9 @@
 // Smart search CLI (docs/search.md § Ops).
 //
-//   npm run search -- reindex <tenant-slug>|--all [--force]
+//   npm run search -- reindex <tenant-slug>|--all [--force] [--fake]
+//        --fake: deterministic stand-in vectors (src/server/search/fake-embedder.ts) instead of the
+//        embedder — CI only (e2e "looks like this" without models). It uses the real model keys, so
+//        on a real database re-run with --force against the real embedder afterwards.
 //   npm run search -- status <tenant-slug>
 //   npm run search -- query <tenant-slug> "<query>" [--sold]
 //   npm run search -- image <tenant-slug> <photo-file> ["<refinement>"]
@@ -37,10 +40,13 @@ async function main() {
   try {
     if (cmd === "reindex") {
       const { reindexTenant } = await import("../src/server/search/indexing");
+      const fake = process.argv.includes("--fake") ? (await import("../src/server/search/fake-embedder")).createFakeEmbedder() : undefined;
+      if (fake) console.warn("--fake: indexing with deterministic stand-in vectors (CI only).");
       const tenants = a1 === "--all" ? await db.tenant.findMany({ select: { id: true, slug: true } }) : [await tenantBySlug(a1)];
       for (const t of tenants) {
         const started = performance.now();
         const res = await reindexTenant(t.id, {
+          ...(fake ? { embedder: fake } : {}),
           force: process.argv.includes("--force"),
           onProgress: (p) => void process.stdout.write(`\r${t.slug}: ${p.done}/${p.total} (text ${p.textEmbedded}, image ${p.imageEmbedded}, failed ${p.failed})   `),
         });

@@ -18,6 +18,7 @@ AI-dienst, geen LLM. Code: `src/server/search` (app), `src/embedder` (modelservi
 10. [Geheugen](#10-geheugen)
 11. [Ops](#11-ops)
 12. [Afwijkingen van het ontwerp en open punten](#12-afwijkingen-van-het-ontwerp-en-open-punten)
+13. [UI](#13-ui)
 
 ---
 
@@ -181,7 +182,8 @@ Serverfuncties (`import { … } from "@/server/search"`):
 | `searchProducts(tenantId, { q, filters?, sort?, fallbackSort?, page?, pageSize?, show?, scope?, currency?, interpret?, facets?, explain? })` | → `{ items: CatalogCard[], total, page, pageSize, sort, mode, interpretation, facets: CatalogFacets, timing }`. `interpretation.chips` voor "begrepen als"-chips, `relaxed` als de filters versoepeld zijn. `timing.semantic`/`imageText`: `used` / `cold` (embedder weg of traag) / `off` / `skipped`. |
 | `suggest(tenantId, q, { scope?, currency?, limit? })` | → `{ query, interpretation, facets: FacetSuggestion[], products: CatalogCard[] (≤ 5), timing }` |
 | `searchByImage(tenantId, rgb, { q?, filters?, page?, scope?, currency? })` | → zelfde vorm als `searchProducts` (zonder facetten). Eerst `decodeSearchImage(bytes)`. Gooit `SearchUnavailableError` (geen embedder) en `SearchImageError` (te groot/ongeldig). |
-| `similarProducts(tenantId, productId, { limit?, scope? })` | → `CatalogCard[]` (leeg als niets duidelijk lijkt) |
+| `similarProducts(tenantId, productId, { limit?, scope? })` | → `CatalogCard[]` (leeg als niets duidelijk lijkt). `getSimilarProducts(tenantId, productId)`: dezelfde, via de shop-datacache (tag `catalog`, 10 min) — voor de productpagina. |
+| `searchHints(tenantId, q, { currency? })` | → `{ didYouMean }`: de zoekopdracht met onbekende woorden vervangen door het dichtstbijzijnde woord dat de shop kent (titelwoorden van zichtbare/verkochte items + facetnamen/synoniemen; edit-afstand ≤ 1, ≤ 2 vanaf 6 letters). Alleen bij nul resultaten; vocabulaire 10 min gecachet per tenant. |
 | `searchRequestContext()` / `toPublicCards(ctx, cards)` | shop, scope (landenregels) en kaartmapping (reserveringen, blur) voor route handlers |
 
 Route handlers (contracten in `src/server/search/api-types.ts`, client-veilig te importeren):
@@ -197,7 +199,25 @@ Route handlers (contracten in `src/server/search/api-types.ts`, client-veilig te
 
 `/shop?q=` (en categorie/archief met `q`) gebruikt de engine al (`CatalogView`); URL's, facetten, paginering en
 `noindex` blijven zoals ze waren. Nieuw: sorteeroptie `relevance` ("Best match", standaard bij een zoekopdracht).
-De chips, de dropdown in de header en de fotoknop bouwt de UI.
+
+Toevoegingen voor de UI (§13):
+
+- **`literal=1`** (URL, alleen samen met `q`) → `searchProducts(…, { interpret: false })`: de woorden letterlijk,
+  zonder facet-/prijs-/sorteerherkenning ("Search the words literally instead"). `parseCatalogParams` /
+  `catalogQueryString` / `HiddenParams` dragen de vlag mee; een nieuwe zoekopdracht zet hem weer uit.
+- **Bijna-treffers**: `searchProducts(…, { nearMisses: true })` → `nearMisses: { dropped, items (≤ 8), total } | null`.
+  Alleen op pagina 1, als er filters uit de tekst begrepen zijn (facetchips; prijsgrenzen samen als één), het
+  resultaat kleiner is dan één pagina (< 24) en niet versoepeld is. Per begrepen filter (max. 4) draait dezelfde
+  zoekopdracht zonder dat filter (parallel; query-embeddings gecachet → alleen SQL); het filter dat de meeste
+  nieuwe items oplevert ("meest beperkend") wint. Expliciete URL-filters vallen nooit weg. Test:
+  `search.int.test.ts` ("near-misses …").
+- **Suggest**: `reasons` per product (`exact` / `lexical` / `typo` (trigram) / `semantic` / `filters`) en `total` +
+  `totalCapped` (de lexicale lijst wordt toch al tot 300 gerankt, dus tellen kost niets extra). De route maakt er
+  `products[].why` van ("Matches: helm · Germany", "Close spelling: stahlhem", "Exact item number" —
+  `src/server/search/ui-labels.ts`), plus `categories[]` (categorieën waarvan een woord met een getypt woord begint,
+  met aantal) en `total`/`totalCapped` voor "See all N results".
+- **Foto-zoeken**: `searchByImage` geeft `scores` (cosine per item); de route zet ze om naar `items[].match`
+  (`very_close` ≥ 0,93, `close` ≥ 0,88, anders `similar`).
 
 ## 8. Indexeren
 
@@ -310,3 +330,76 @@ Open punten:
 - Synoniemen per taal/shop verder uitbreiden met de eigenaar; aangepaste lijsten krijgen nieuwe standaardregels
   niet automatisch.
 - Zoekstatistieken (zoekopdrachten zonder resultaat) bestaan nog niet; nuttig om synoniemen te verbeteren.
+
+## 13. UI
+
+Ontwerp: `docs/design/search/{Main,Results,Photo}.dc.html`. Code: `src/components/shop/search/`.
+
+**Zoekveld** (`SearchField.tsx`, client): een GET-formulier naar `/shop` (zonder JS een gewone submit; met JS
+navigeert `next/form` client-side) met een WAI-ARIA 1.2-combobox (`role=combobox`, `aria-expanded`,
+`aria-controls`, `aria-activedescendant`, `aria-autocomplete=list`). Alleen deze schil zit in de paginabundel; de
+dropdown (`SuggestPanel.tsx`) laadt bij de eerste focus/aanwijzer boven het veld en de fotodialoog
+(`PhotoSearchDialog.tsx`) bij de eerste aanwijzer/klik op de camera (beide `next/dynamic`, `ssr: false`).
+Varianten: `header` (dropdown 34rem breed, rechts uitgelijnd), `catalog` (zo breed als het veld, met knop;
+de zoekbalk naast de kop van de catalogus, draagt de filters mee via `HiddenParams`), `sheet` (telefoon: dropdown
+loopt onder het veld door, volle breedte). In de header: veld vanaf `lg`; daaronder een zoekknop die een
+schermvullend `<dialog>` met hetzelfde veld opent, en het veld in het menu. Op catalogus-/zoekpagina's verbergt de
+header zijn veld (zoals het ontwerp: de resultatenpagina heeft haar eigen zoekbalk).
+
+- **Toetsenbord** (`combobox.ts`, puur, getest): ↓/↑ openen en lopen door de opties (van de laatste terug naar het
+  invoerveld), Enter opent de actieve optie (`router.push`) of verstuurt het formulier, Esc sluit (tekst blijft;
+  nog een Esc wist via de browser), Tab sluit. Focus blijft altijd in het invoerveld; de popup slikt `mousedown`.
+  Een live region meldt "N suggestions available".
+- **Ophalen** (`suggest-client.ts`, getest): debounce 120 ms, één request tegelijk (`AbortController`), cache per
+  tab (40 queries, genormaliseerd), vanaf 2 tekens. Een fout of 429 laat het formulier gewoon werken.
+- **Inhoud**: "Understood as"-chips (+ resttekst), "Categories & filters" (categorieën met aantal, daarna facetten
+  die nog niet begrepen zijn), "Items" (foto 44 px, `No.` in mono/accent, titel, why-regel, prijs), "See all N
+  results". Alleen `--shop-*`-tokens; gecontroleerd in Gallery, Archive, Field Kit (donkere header) en Vault.
+
+**Resultatenpagina** (`CatalogView` met `q`; `results.tsx`, server components, geen JS): kop met de zoekopdracht
+waarin de als filter begrepen woorden in het accentfont staan (`highlight.ts`), balk "We searched for **helm** with
+[chip ×] … — Search the words literally instead" (chip = link naar `q = removeQuery`; letterlijk = `literal=1`; terug
+via "Let the search understand the words"), "N items · best matches first", het raster, en de rail "Close, but not
+all filters match" (horizontaal, ≤ 8, met link "Show all N without this filter"). Bij versoepeling een zin
+daarover. **Nul resultaten**: "Did you mean …?" (`searchHints`), "Try without “Max €500”" per begrepen filter,
+letterlijk zoeken, "Search the whole shop" (op categorie-/landingspagina's), categorieën die op de woorden lijken
+plus de hoofdcategorieën. `noindex` + canonical blijven via `catalogMetadata` (elke `q` is noindex).
+
+**Foto-zoeken**: desktop een modale dialoog, telefoon schermvullend. "Choose photo" en (telefoon) "Take photo"
+(`<input type=file accept=image/* capture=environment>`), slepen en plakken (Ctrl/⌘+V) op desktop. In de browser
+verkleind tot ≤ 768 px JPEG (`photo-image.ts`; EXIF-oriëntatie gerespecteerd; formaten die de server niet leest,
+zoals AVIF, worden altijd omgezet; HEIC buiten Safari gaat ongewijzigd en geeft dan een nette fout). Resultaten met
+label "Very close/Close/Similar", "Looks like: <categorie>" als de top 3 het eens is, "Add words…" verfijnt met
+tekst (zelfde foto opnieuw met `q`). 503 (embedder weg) → "Photo search is not available right now" + tekstzoekveld.
+Tekst "Your photo is not stored." staat in elke stap.
+
+**Lijkt hierop** (productpagina, `ProductDetail.tsx`): `getSimilarProducts` (datacache) onder de vouw in een eigen
+`<Suspense>`, horizontale rail "Looks like this", verborgen bij < 3 items, bij vergrendelde (gevoelige) items en als
+er nog geen embeddings zijn. Reserveringen en landenregels worden per bezoeker toegepast (zoals "You may also like").
+
+**CI zonder embedder**: e2e (`e2e/search.spec.ts`) gebruikt de lexicale terugval. Voor de rail indexeert CI de
+demo-shop met `npm run search -- reindex --all --fake` (deterministische vervangvectoren,
+`fake-embedder.ts`; 30 van de 32 te-koop-items krijgen zo ≥ 3 buren). **Niet lokaal op een echte database
+gebruiken** zonder daarna `reindex --all --force` met de echte embedder: de nep-vectoren dragen dezelfde modelsleutel.
+
+**Metingen** (productiebuild, `next start`, demo-shop, gzip van alle `<script src>` van de pagina):
+
+| pagina | vóór | na | verschil |
+|---|---|---|---|
+| `/` | 183,7 kB | 184,6 kB | +0,9 kB |
+| `/shop`, `/shop?q=helm`, categorie | 188,3 kB | 189,2 kB | +0,9 kB |
+| product | 199,4 kB | 200,3 kB | +0,9 kB |
+
+Lui geladen: dropdown-chunk ≈ 6,0 kB gzip, fotodialoog ≈ 5,4 kB gzip (plus gedeelde kleine modules); geen van beide
+in de eerste HTML. Suggest-round-trip in de browser (productiebuild, zonder embedder, 15 typische prefixen, warm):
+p50 8–13 ms, p95 ≈ 30 ms; eerste request na start (koude caches) ~100–125 ms. Met embedder (dev-server): de
+dropdown verschijnt bij normaal typen binnen ~150 ms na de laatste toets (120 ms debounce + request).
+
+Open punten UI:
+
+- "See all N" telt wat suggest vond (lexicaal ≤ 300 + exact + semantisch); de resultatenpagina kan via het
+  taalmodel een paar items meer vinden.
+- Met de embedder geeft een onzinzoekopdracht soms toch 1 semantische treffer (drempel 0,81 is absoluut; zie §5) —
+  dan verschijnt de nul-resultatenhulp niet.
+- Het thema "Vault" met de Gallery-kleuren (alleen via `data-shop-theme` getest) geeft weinig contrast voor gedempte
+  tekst in de dropdown; met de Vault-kleuren van de themabouwer is dat het gewone contrast van het thema.
