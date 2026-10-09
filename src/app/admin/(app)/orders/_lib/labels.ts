@@ -129,7 +129,8 @@ export function describeEvent(e: EventLike): {
     const status = e.type.slice("payment.".length);
     const provider = str("provider");
     const via = provider === "MANUAL" ? "marked as paid by staff" : provider === "MOLLIE" ? "via Mollie" : null;
-    const detail = [via, str("paymentId"), str("note") && `“${str("note")}”`].filter(Boolean).join(" · ");
+    // Only Mollie ids ("tr_…") mean something to staff; a manual payment's id is an internal cuid.
+    const detail = [via, provider === "MOLLIE" && str("paymentId"), str("note") && `“${str("note")}”`].filter(Boolean).join(" · ");
     return {
       title: STATUS_WORD[status] ?? `Payment ${status}`,
       detail: detail || undefined,

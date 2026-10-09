@@ -428,6 +428,11 @@ function ItemScreen({
           inputMode="decimal"
           value={priceText}
           onChange={(e) => setPriceText(e.target.value)}
+          // Select the suggested price on tap, so typing replaces it instead of appending (iOS needs the tick).
+          onFocus={(e) => {
+            const el = e.currentTarget;
+            setTimeout(() => el.select(), 0);
+          }}
           aria-invalid={!valid || (below && !override) || undefined}
           className={cx(controlClass, "h-[52px] text-[22px] font-semibold text-ink", (!valid || (below && !override)) && "border-crit")}
         />
