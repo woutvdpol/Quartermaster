@@ -5,7 +5,8 @@ import { requestPasswordResetEmail } from "@/server/mail";
 import { getOpenShopTenant as getRequestTenant } from "@/server/storefront/launch";
 import { clientIp } from "@/server/customer-auth";
 import { turnstileTokenFrom, verifyTurnstile } from "@/server/turnstile";
-import { accountCopy } from "@/components/shop/account/_copy";
+import { shopCopy } from "@/server/i18n/locale";
+import { accountCopies } from "@/components/shop/account/_copy";
 
 export type ForgotState = { sent?: boolean; error?: string; email?: string } | undefined;
 
@@ -15,12 +16,13 @@ export type ForgotState = { sent?: boolean; error?: string; email?: string } | u
  * a failed Turnstile check is the only visible error (it says nothing about the address).
  */
 export async function forgotPasswordAction(_prev: ForgotState, formData: FormData): Promise<ForgotState> {
+  const copy = await shopCopy(accountCopies);
   const raw = formData.get("email");
   const email = typeof raw === "string" ? raw.trim().slice(0, 254) : "";
-  if (!email) return { error: accountCopy.forgot.missing };
+  if (!email) return { error: copy.forgot.missing };
   if (formData.get("website")) return { sent: true }; // honeypot
   const captcha = await verifyTurnstile(turnstileTokenFrom(formData), await clientIp(), { action: "forgot_password" });
-  if (!captcha.ok) return { error: accountCopy.common.captcha, email };
+  if (!captcha.ok) return { error: copy.common.captcha, email };
   try {
     const tenant = await getRequestTenant();
     if (tenant) await requestPasswordResetEmail(tenant.id, email, "customer");

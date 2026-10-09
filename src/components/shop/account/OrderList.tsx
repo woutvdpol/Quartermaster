@@ -1,15 +1,17 @@
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { Badge, type BadgeTone } from "@/components/shop/ui/Badge";
 import { formatMoney } from "@/components/shop/ui/money";
 import { orderStatusLabel, type CustomerOrderRow, type OrderStatusLabel } from "@/server/customer-auth/orders";
-import { accountCopy } from "./_copy";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import type { ShopLocale } from "@/lib/i18n/shop-locales";
+import { accountCopies } from "./_copy";
 import { formatDate } from "./format";
 
 const TONE: Record<OrderStatusLabel["tone"], BadgeTone> = { neutral: "neutral", success: "ok", warning: "warn", danger: "warn" };
 
 /** Orders as a card list (phone) / table-like rows (desktop), each linking to the public status page. */
-export function OrderList({ orders, timeZone }: { orders: CustomerOrderRow[]; timeZone: string }) {
-  const t = accountCopy.orders;
+export function OrderList({ orders, timeZone, locale }: { orders: CustomerOrderRow[]; timeZone: string; locale: ShopLocale }) {
+  const t = pickCopy(accountCopies, locale).orders;
   return (
     <ul className="divide-y divide-shop-line overflow-hidden rounded-shop border border-shop-line bg-shop-surface">
       {orders.map((o) => {
@@ -23,13 +25,13 @@ export function OrderList({ orders, timeZone }: { orders: CustomerOrderRow[]; ti
               <span className="font-semibold text-shop-ink tabular-nums">
                 <span className="sr-only">{t.number} </span>#{o.number}
               </span>
-              <span className="text-right font-semibold text-shop-ink tabular-nums sm:order-3">{formatMoney(o.total, o.currency)}</span>
+              <span className="text-right font-semibold text-shop-ink tabular-nums sm:order-3">{formatMoney(o.total, o.currency, locale)}</span>
               <span className="min-w-0 text-sm text-shop-muted sm:order-2">
-                <time dateTime={o.placedAt.toISOString()}>{formatDate(o.placedAt, timeZone)}</time> · {t.items(o.itemCount)}
+                <time dateTime={o.placedAt.toISOString()}>{formatDate(o.placedAt, timeZone, locale)}</time> · {t.items(o.itemCount)}
                 {o.firstItemTitle ? <span className="block truncate text-shop-ink-2">{o.firstItemTitle}</span> : null}
               </span>
               <span className="justify-self-end sm:order-4">
-                <Badge tone={TONE[status.tone]}>{status.label}</Badge>
+                <Badge tone={TONE[status.tone]}>{t.statuses[status.key]}</Badge>
               </span>
             </Link>
           </li>

@@ -1,14 +1,14 @@
 "use client";
 
 import { useActionState } from "react";
-import { accountCopy } from "@/components/shop/account/_copy";
+import { accountCopies } from "@/components/shop/account/_copy";
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
 import { Alert, Field, SubmitButton } from "@/components/shop/account/form";
 import { Button } from "@/components/shop/ui/Button";
 import { cancelTotpAction, shopVerifyTotpAction } from "../actions";
 
-const t = accountCopy.twoFactor;
-
 export function TotpForm({ next }: { next: string }) {
+  const t = useShopCopy(accountCopies).twoFactor;
   const [state, action] = useActionState(shopVerifyTotpAction, undefined);
   return (
     <div className="grid gap-4">

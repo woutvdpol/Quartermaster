@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import type { PublicMenuItem } from "@/server/content/menus";
 import type { LegalLink } from "@/server/storefront/content";
 import type { ShopContext } from "@/server/storefront/context";
@@ -6,15 +6,15 @@ import { Container } from "@/components/shop/ui/Container";
 import { ARCHIVE_PATH } from "@/server/storefront-catalog/urls";
 import { MenuLink } from "./MenuLink";
 import { NewsletterForm } from "./NewsletterForm";
-import { layoutCopy } from "./_copy";
-
-const t = layoutCopy.footer;
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { layoutCopies } from "./_copy";
 
 /**
  * Footer ("gallery"): thin top rule, optional newsletter strip, then columns: brand + business
  * details, one column per FOOTER menu root, legal links. Below: the footer disclaimer and credits.
  */
 export function Footer({ shop, menu, legalLinks }: { shop: ShopContext; menu: PublicMenuItem[]; legalLinks: LegalLink[] }) {
+  const t = pickCopy(layoutCopies, shop.locale).footer;
   const { general, legal, features } = shop.settings;
   const addressLines = [general.address.line1, general.address.line2, [general.address.postalCode, general.address.city].filter(Boolean).join(" ")].filter(Boolean);
   const year = new Date().getFullYear();
@@ -75,7 +75,7 @@ export function Footer({ shop, menu, legalLinks }: { shop: ShopContext; menu: Pu
         </div>
 
         {columns.length ? (
-          <nav aria-label="Footer" className="grid grid-cols-2 gap-x-6 gap-y-8 md:grid-cols-3">
+          <nav aria-label={t.navLabel} className="grid grid-cols-2 gap-x-6 gap-y-8 md:grid-cols-3">
             {columns.map(({ item, links }) => (
               <div key={item.id}>
                 <p className={heading}>{item.label}</p>

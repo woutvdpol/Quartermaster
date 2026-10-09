@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { useActionState, useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 import { Alert, Field, Honeypot, SubmitButton } from "@/components/shop/account/form";
 import { ButtonLink, buttonClasses } from "@/components/shop/ui/Button";
@@ -8,14 +8,18 @@ import { cn } from "@/components/shop/ui/cn";
 import { checkClasses, textareaClasses } from "@/components/shop/ui/Field";
 import { Turnstile } from "@/components/shop/turnstile/Turnstile";
 import { submitLeadAction } from "@/app/(shop)/sell/actions";
-import { leadsCopy } from "./_copy";
+import { useShopCopy, useShopLocale } from "@/components/shop/i18n/ShopLocale";
+import { localizePath } from "@/lib/i18n/shop-locales";
+import { leadsCopies } from "./_copy";
 import type { LeadUploadResponse } from "./types";
 
-const t = leadsCopy;
 const MAX_PHOTOS = 10;
 const MAX_MB = 15;
 const ACCEPT = "image/jpeg,image/png,image/webp";
 const UPLOAD_URL = "/sell/upload";
+
+/** Client-side key of a photo in the list (event handlers only). */
+const newLocalId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 type PhotoItem = {
   localId: string;
@@ -56,6 +60,9 @@ function TextArea({ id, label, hint, error, ...rest }: { id: string; label: stri
  *  - privacyHref: link to the privacy page, if the shop has one.
  */
 export function SellForm({ draft, shopName, privacyHref }: { draft: string; shopName: string; privacyHref?: string | null }) {
+  const t = useShopCopy(leadsCopies);
+  // Localised so the route handler answers in the visitor's language (the proxy sets the language header).
+  const uploadUrl = localizePath(UPLOAD_URL, useShopLocale());
   const [state, action] = useActionState(submitLeadAction, undefined);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
@@ -85,7 +92,7 @@ export function SellForm({ draft, shopName, privacyHref }: { draft: string; shop
     body.set("draft", draft);
     body.set("file", file);
     try {
-      const res = await fetch(UPLOAD_URL, { method: "POST", body });
+      const res = await fetch(uploadUrl, { method: "POST", body });
       const data = (await res.json().catch(() => null)) as LeadUploadResponse | null;
       if (data?.ok) update(item.localId, { status: "done", file: data.photo.file });
       else update(item.localId, { status: "error", error: data?.message ?? t.errors.uploadFailed(item.name) });
@@ -117,7 +124,7 @@ export function SellForm({ draft, shopName, privacyHref }: { draft: string; shop
       }
       accepted.push({
         file,
-        item: { localId: `${Date.now()}-${Math.random().toString(36).slice(2)}`, name: file.name, preview: URL.createObjectURL(file), status: "uploading" },
+        item: { localId: newLocalId(), name: file.name, preview: URL.createObjectURL(file), status: "uploading" },
       });
     }
     if (problems.length) setPhotoError(problems.join(" "));
@@ -135,7 +142,7 @@ export function SellForm({ draft, shopName, privacyHref }: { draft: string; shop
     URL.revokeObjectURL(item.preview);
     setPhotos((list) => list.filter((p) => p.localId !== item.localId));
     if (item.file) {
-      void fetch(UPLOAD_URL, {
+      void fetch(uploadUrl, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ draft, file: item.file }),

@@ -45,6 +45,15 @@ describe("suggest client", () => {
     expect(f.fn).toHaveBeenCalledTimes(1);
   });
 
+  it("passes a non-English shop language as &locale=", async () => {
+    const f = fakeFetch();
+    const client = createSuggestClient({ fetchFn: f.fn as unknown as typeof fetch, locale: "de" });
+    const p = client.get("helm");
+    f.flush();
+    await p;
+    expect(f.calls[0].url).toBe("/api/search/suggest?q=helm&locale=de");
+  });
+
   it("returns null on HTTP errors (rate limit) without caching", async () => {
     const fn = vi.fn(async () => new Response("{}", { status: 429 }));
     const client = createSuggestClient({ fetchFn: fn as unknown as typeof fetch });

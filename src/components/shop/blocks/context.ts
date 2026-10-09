@@ -1,5 +1,6 @@
 import type { CardOptions } from "@/server/storefront/products";
 import type { ShopContext } from "@/server/storefront/context";
+import type { ShopLocale } from "@/lib/i18n/shop-locales";
 
 /** What every block may need besides its own data. Built once per page by `blockContext()`. */
 export type BlockContext = {
@@ -13,6 +14,8 @@ export type BlockContext = {
   /** Fallback hero image (appearance.bannerPath) — only when the page shows the banner. */
   bannerPath: string | null;
   newsletterEnabled: boolean;
+  /** Visitor language (UI copy, money). */
+  locale: ShopLocale;
 };
 
 export function blockContext(shop: ShopContext, opts: { viewerSignedIn: boolean; withBanner: boolean }): BlockContext {
@@ -30,5 +33,6 @@ export function blockContext(shop: ShopContext, opts: { viewerSignedIn: boolean;
     showStockCode: s.catalog.showStockCode,
     bannerPath: opts.withBanner ? s.appearance.bannerPath : null,
     newsletterEnabled: s.features.newsletter,
+    locale: shop.locale,
   };
 }

@@ -2,7 +2,8 @@ import { deleteDraftPhoto, uploadLeadPhoto, LEAD_PHOTO_MAX_BYTES } from "@/serve
 // Not while the shop is "coming soon" (src/server/storefront/launch.ts).
 import { getOpenShopTenant as getRequestTenant } from "@/server/storefront/launch";
 import { clientIpFromHeaders, isSameOrigin } from "@/server/request-meta";
-import { leadsCopy } from "@/components/shop/leads/_copy";
+import { leadsCopies } from "@/components/shop/leads/_copy";
+import { shopCopy } from "@/server/i18n/locale";
 import type { LeadUploadResponse } from "@/components/shop/leads/types";
 
 /*
@@ -11,16 +12,17 @@ import type { LeadUploadResponse } from "@/components/shop/leads/types";
  * Security: same-origin check (no built-in CSRF for route handlers), shop host only, signed draft
  * token (src/server/leads/draft.ts), rate limits per IP and per draft, magic-byte check + sharp
  * re-encode (src/server/leads/photos.ts). DELETE (JSON `{draft, file}`) removes an unsent photo.
+ * Messages follow the request language (the form posts to the localised path, e.g. /de/sell/upload).
  */
 
 const MB = LEAD_PHOTO_MAX_BYTES / 1024 / 1024;
-const t = leadsCopy.errors;
 
 function json(body: LeadUploadResponse, status: number) {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
+  const t = (await shopCopy(leadsCopies)).errors;
   if (!isSameOrigin(request)) return json({ ok: false, message: t.unexpected }, 403);
   const tenant = await getRequestTenant();
   if (!tenant) return json({ ok: false, message: t.unexpected }, 404);
@@ -29,7 +31,7 @@ export async function POST(request: Request) {
   const lengthHeader = request.headers.get("content-length");
   const length = Number(lengthHeader);
   if (!lengthHeader || !Number.isFinite(length) || length < 0) return json({ ok: false, message: t.unexpected }, 411);
-  if (length > LEAD_PHOTO_MAX_BYTES + 64 * 1024) return json({ ok: false, message: t.tooLarge("The photo", MB) }, 413);
+  if (length > LEAD_PHOTO_MAX_BYTES + 64 * 1024) return json({ ok: false, message: t.tooLarge(t.thePhoto, MB) }, 413);
 
   let form: FormData;
   try {

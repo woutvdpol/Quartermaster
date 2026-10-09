@@ -28,6 +28,7 @@ export const en = {
     },
     items: {
       dashboard: "Dashboard",
+      insights: "Insights",
       inventory: "Inventory",
       categories: "Categories",
       facets: "Facets",
@@ -43,6 +44,7 @@ export const en = {
       pages: "Pages",
       theme: "Theme",
       menus: "Menus",
+      translations: "Translations",
       redirects: "Redirects",
       newsletter: "Newsletter",
       shipping: "Shipping",

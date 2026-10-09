@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
@@ -10,15 +10,16 @@ import { checkClasses, inputClasses, Select, textareaClasses } from "@/component
 import { formatMoney } from "@/components/shop/ui/money";
 import type { CheckoutQuote, PaymentMethodOption } from "@/server/checkout";
 import { loginHref } from "@/server/customer-auth/redirect";
-import { describeSurchargeRule } from "@/server/payments/surcharge";
+import { formatBps } from "@/server/payments/surcharge";
+import { useShopCopy, useShopLocale } from "@/components/shop/i18n/ShopLocale";
+import type { ShopLocale } from "@/lib/i18n/shop-locales";
 import { checkoutQuoteAction, placeOrderAction, type CheckoutFormState } from "@/app/(shop)/checkout/actions";
 import { saveCheckoutContactAction } from "./actions";
 import { CartLineItem, type CartLineData } from "./CartLineItem";
 import { FreeShippingBar } from "./FreeShippingBar";
 import type { CountryOption } from "./CartSummary";
-import { cartCopy } from "./_copy";
-
-const t = cartCopy.checkout;
+import { cartCopies } from "./_copy";
+import { localizeServerMessage } from "./server-messages";
 
 /** Radio card (shipping option, payment method): panel radius, ink border + ring when selected. */
 const radioCardClass =
@@ -43,6 +44,21 @@ export type CheckoutFormProps = {
   /** Contact remembered on the cart (abandoned-cart reminder). */
   contact?: { email: string | null; reminderConsent: boolean };
 };
+
+/** A payment surcharge rule in the shop language: "2,5% + € 0,25 (max. € 5,00)". */
+function describeSurcharge(
+  rule: { percentBps: number; fixed: number; cap: number | null },
+  money: (minor: number) => string,
+  locale: ShopLocale,
+  max: (amount: string) => string,
+): string {
+  const parts: string[] = [];
+  if (rule.percentBps > 0) parts.push(`${locale === "en" ? formatBps(rule.percentBps) : formatBps(rule.percentBps).replace(".", ",")}%`);
+  if (rule.fixed > 0) parts.push(money(rule.fixed));
+  let out = parts.join(" + ");
+  if (rule.cap !== null && out) out += ` (${max(money(rule.cap))})`;
+  return out;
+}
 
 const idOf = (name: string) => `co-${name.replace(/\./g, "-")}`;
 
@@ -123,6 +139,7 @@ function CountrySelect({
   countries: CountryOption[];
   error?: string;
 }) {
+  const t = useShopCopy(cartCopies).checkout;
   const id = idOf(name);
   return (
     <div className="flex flex-col gap-1.5 sm:col-span-2">
@@ -172,6 +189,7 @@ function AddressFields({
   onCountry?: (code: string) => void;
   defaults?: { firstName?: string; lastName?: string; countryCode?: string };
 }) {
+  const t = useShopCopy(cartCopies).checkout;
   const ac = prefix === "billing" ? "billing" : "shipping";
   const f = (n: string) => `${prefix}.${n}`;
   return (
@@ -215,6 +233,7 @@ function Section({ title, children, n }: { title: string; children: ReactNode; n
 
 function SubmitButton({ disabled, label }: { disabled: boolean; label: string }) {
   const { pending } = useFormStatus();
+  const t = useShopCopy(cartCopies).checkout;
   return (
     <button type="submit" disabled={disabled || pending} aria-busy={pending || undefined} className={buttonClasses("primary", "lg", "w-full")}>
       {pending ? t.placing : label}
@@ -235,6 +254,9 @@ function splitName(name: string | null | undefined) {
  */
 export function CheckoutForm(props: CheckoutFormProps) {
   const { currency, countries, payment, viewer } = props;
+  const locale = useShopLocale();
+  const copy = useShopCopy(cartCopies);
+  const t = copy.checkout;
   const router = useRouter();
   const [state, formAction] = useActionState<CheckoutFormState, FormData>(placeOrderAction, { status: "idle" });
   const [country, setCountry] = useState(props.defaultCountry ?? "");
@@ -249,7 +271,8 @@ export function CheckoutForm(props: CheckoutFormProps) {
   const countryLabel = (code: string) => props.countries.find((c) => c.code === code)?.name ?? code;
   const errors = state.errors;
   const values = state.values;
-  const fmt = (n: number) => formatMoney(n, currency);
+  const fmt = (n: number) => formatMoney(n, currency, locale);
+  const unavailableReason = quote?.unavailableReason ? localizeServerMessage(quote.unavailableReason, locale) : null;
   const names = splitName(viewer?.name);
 
   useEffect(() => {
@@ -365,10 +388,10 @@ export function CheckoutForm(props: CheckoutFormProps) {
                 }}
                 className={cn(checkClasses, "mt-0.5")}
               />
-              <label htmlFor="co-reminderConsent">{cartCopy.reminder.consent}</label>
+              <label htmlFor="co-reminderConsent">{copy.reminder.consent}</label>
             </div>
             <p id="co-reminderConsent-hint" className="pl-7 text-xs text-shop-muted">
-              {cartCopy.reminder.hint}
+              {copy.reminder.hint}
             </p>
           </div>
         </Section>
@@ -410,11 +433,11 @@ export function CheckoutForm(props: CheckoutFormProps) {
             {quote && quote.restrictedItems.length > 0 && quote.options.length > 0 ? (
               // Compliance: some items can't be shipped to this country; only pickup remains.
               <p role="note" className="mb-3 rounded-shop border border-shop-warn/30 bg-shop-warn-soft px-3 py-2 text-sm text-shop-warn">
-                {quote.unavailableReason}
+                {unavailableReason}
               </p>
             ) : null}
             {!quote || quote.options.length === 0 ? (
-              <p className={quote?.unavailableReason ? "text-sm text-shop-crit" : "text-sm text-shop-muted"}>{quote?.unavailableReason ?? t.noOptions}</p>
+              <p className={unavailableReason ? "text-sm text-shop-crit" : "text-sm text-shop-muted"}>{unavailableReason ?? t.noOptions}</p>
             ) : (
               <div className={cn("flex flex-col gap-2", quoting && "opacity-60")}>
                 {quote.options.map((o) => (
@@ -440,10 +463,10 @@ export function CheckoutForm(props: CheckoutFormProps) {
                       {o.freeShipping ? (
                         <>
                           <s className="mr-2 font-normal text-shop-muted">{fmt(o.basePrice)}</s>
-                          {cartCopy.cart.free}
+                          {copy.cart.free}
                         </>
                       ) : o.price === 0 ? (
-                        cartCopy.cart.free
+                        copy.cart.free
                       ) : (
                         fmt(o.price)
                       )}
@@ -509,7 +532,7 @@ export function CheckoutForm(props: CheckoutFormProps) {
                     <span className="flex min-w-0 flex-col">
                       <span className="font-medium">{m.label}</span>
                       {m.surcharge ? (
-                        <span className="text-xs text-shop-muted">{t.methodSurcharge(m.surcharge.label, describeSurchargeRule(m.surcharge, fmt))}</span>
+                        <span className="text-xs text-shop-muted">{t.methodSurcharge(m.surcharge.label, describeSurcharge(m.surcharge, fmt, locale, t.surchargeMax))}</span>
                       ) : null}
                     </span>
                   </label>
@@ -577,17 +600,18 @@ export function CheckoutForm(props: CheckoutFormProps) {
             <CartLineItem
               key={l.productId}
               line={l}
+              locale={locale}
               compact
-              notice={quote?.restrictedItems.some((r) => r.productId === l.productId) ? cartCopy.checkout.notShippable(countryLabel(quote.countryCode)) : null}
+              notice={quote?.restrictedItems.some((r) => r.productId === l.productId) ? t.notShippable(countryLabel(quote.countryCode)) : null}
             />
           ))}
         </ul>
         <dl className={cn("flex flex-col gap-3 border-t border-shop-line pt-4 text-[0.95rem]", quoting && "opacity-60")} aria-live="polite" aria-busy={quoting || undefined}>
           <Row label={t.subtotal} value={quote ? fmt(quote.totals.subtotal) : "—"} />
           {quote && quote.totals.discount > 0 ? (
-            <Row label={`${cartCopy.coupon.discount}${quote.coupon ? ` · ${quote.coupon.code}` : ""}`} value={`−${fmt(quote.totals.discount)}`} />
+            <Row label={`${copy.coupon.discount}${quote.coupon ? ` · ${quote.coupon.code}` : ""}`} value={`−${fmt(quote.totals.discount)}`} />
           ) : null}
-          <Row label={t.shipping} value={quote && selected ? (quote.totals.shipping === 0 ? cartCopy.cart.free : fmt(quote.totals.shipping)) : "—"} />
+          <Row label={t.shipping} value={quote && selected ? (quote.totals.shipping === 0 ? copy.cart.free : fmt(quote.totals.shipping)) : "—"} />
           {quote && quote.totals.insurance > 0 ? <Row label={t.insuranceLine} value={fmt(quote.totals.insurance)} /> : null}
           {quote && quote.totals.surcharge > 0 ? <Row label={quote.totals.surchargeLabel ?? t.surchargeLine} value={fmt(quote.totals.surcharge)} /> : null}
           <div className="flex items-baseline justify-between gap-4 border-t border-shop-line-strong/40 pt-4">
@@ -597,15 +621,15 @@ export function CheckoutForm(props: CheckoutFormProps) {
         </dl>
         {quote?.coupon && !quote.coupon.ok ? (
           <p role="alert" className="rounded-shop bg-shop-crit-soft px-4 py-2.5 text-sm text-shop-crit">
-            {cartCopy.coupon.notApplied(quote.coupon.code, quote.coupon.message)}{" "}
+            {copy.coupon.notApplied(quote.coupon.code, localizeServerMessage(quote.coupon.message, locale))}{" "}
             <Link href="/cart" className="underline">
               {t.backToCart}
             </Link>
           </p>
         ) : null}
-        {quote?.freeShipping && !quote.freeShipping.reached ? <FreeShippingBar progress={quote.freeShipping} currency={currency} /> : null}
+        {quote?.freeShipping && !quote.freeShipping.reached ? <FreeShippingBar progress={quote.freeShipping} currency={currency} locale={locale} /> : null}
         {quote && quote.minimumShortfall > 0 ? (
-          <p className="rounded-shop bg-shop-warn-soft px-4 py-2.5 text-sm text-shop-warn">{cartCopy.cart.minimumOrder(fmt(quote.minimumShortfall))}</p>
+          <p className="rounded-shop bg-shop-warn-soft px-4 py-2.5 text-sm text-shop-warn">{copy.cart.minimumOrder(fmt(quote.minimumShortfall))}</p>
         ) : null}
         <SubmitButton disabled={!canPlace || quoting} label={submitLabel} />
         <p className="text-center text-xs text-shop-muted">

@@ -1,3 +1,8 @@
+import { localized } from "@/lib/i18n/shop-copy";
+import { leadsCopyDe } from "./_copy.de";
+import { leadsCopyNl } from "./_copy.nl";
+
+/** English copy for "Sell your collection" (Dutch/German: ./_copy.nl.ts, ./_copy.de.ts). */
 export const leadsCopy = {
   title: "Sell your collection",
   metaDescription: "Selling militaria? Describe your items, add a few photos and we will get back to you with an offer.",
@@ -48,5 +53,8 @@ export const leadsCopy = {
     tooLarge: (name: string, mb: number) => `${name} is larger than ${mb} MB.`,
     wrongType: (name: string) => `${name} is not a JPEG, PNG or WebP image.`,
     uploadFailed: (name: string) => `${name} could not be uploaded.`,
+    thePhoto: "The photo",
   },
 } as const;
+
+export const leadsCopies = localized({ en: leadsCopy, nl: leadsCopyNl, de: leadsCopyDe });

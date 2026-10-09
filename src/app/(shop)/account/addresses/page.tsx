@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { Suspense } from "react";
-import { accountCopy } from "@/components/shop/account/_copy";
+import { accountCopies } from "@/components/shop/account/_copy";
+import { getRequestLocale, shopCopy } from "@/server/i18n/locale";
 import { AccountShell } from "@/components/shop/account/AccountShell";
 import { AddressLines } from "@/components/shop/account/AddressCard";
 import { ConfirmSubmit } from "@/components/shop/account/ConfirmSubmit";
@@ -12,11 +13,13 @@ import { Skeleton } from "@/components/shop/ui/Skeleton";
 import { listAddresses, MAX_ADDRESSES, requireShopCustomer } from "@/server/customer-auth";
 import { deleteAddressAction, setDefaultAddressAction } from "../actions";
 
-const t = accountCopy.addresses;
+export async function generateMetadata(): Promise<Metadata> {
+  const t = (await shopCopy(accountCopies)).addresses;
+  return { title: t.title, robots: { index: false, follow: false } };
+}
 
-export const metadata: Metadata = { title: t.title, robots: { index: false, follow: false } };
-
-export default function AddressesPage() {
+export default async function AddressesPage() {
+  const t = (await shopCopy(accountCopies)).addresses;
   return (
     <AccountShell active="addresses" title={t.title}>
       <Suspense fallback={<Skeleton className="h-64 w-full" />}>
@@ -29,6 +32,8 @@ export default function AddressesPage() {
 async function Addresses() {
   const c = await requireShopCustomer("/account/addresses");
   const addresses = await listAddresses({ tenantId: c.tenant.id, customerId: c.customer.id });
+  const locale = await getRequestLocale();
+  const t = (await shopCopy(accountCopies)).addresses;
   const add = (
     <ButtonLink href="/account/addresses/new" variant="primary">
       {t.add}
@@ -45,7 +50,7 @@ async function Addresses() {
               <Badge tone="neutral" className="bg-shop-sunken shadow-none">{a.type === "SHIPPING" ? t.shipping : t.billing}</Badge>
               {a.isDefault ? <Badge tone="primary">{t.default}</Badge> : null}
             </div>
-            <AddressLines a={a} />
+            <AddressLines a={a} locale={locale} />
             <div className="mt-auto flex flex-wrap items-center gap-x-5 pt-3">
               <Link href={`/account/addresses/${a.id}`} className={small}>
                 {t.edit}

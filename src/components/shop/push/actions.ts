@@ -5,6 +5,8 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { ServiceError } from "@/server/context";
 import { getShopCustomer } from "@/server/customer-auth";
+import { shopCopy } from "@/server/i18n/locale";
+import { pushUiCopies } from "./_copy";
 import { updateCustomerSearch } from "@/server/alerts";
 import { getPushPrefs, removePushSubscription, savePushSubscription, updatePushPrefs, vapidPublicKey, type PushPrefs } from "@/server/push";
 
@@ -31,10 +33,14 @@ export async function getPushStateAction(endpoint?: string | null): Promise<Push
   return { loggedIn: true, publicKey: prefs.available ? vapidPublicKey() : null, ...prefs };
 }
 
-function fail(err: unknown, what: string): PushActionResult {
+async function fail(err: unknown, what: string): Promise<PushActionResult> {
   if (err instanceof ServiceError) return { ok: false, message: err.message };
   console.error(`${what} failed`, err);
-  return { ok: false, message: "Something went wrong. Please try again." };
+  return { ok: false, message: (await shopCopy(pushUiCopies)).error };
+}
+
+async function loggedOut(): Promise<PushActionResult> {
+  return { ok: false, message: (await shopCopy(pushUiCopies)).loginAgain };
 }
 
 /**
@@ -43,7 +49,7 @@ function fail(err: unknown, what: string): PushActionResult {
  */
 export async function subscribePushAction(subscription: unknown, opts: { searchId?: string | null } = {}): Promise<PushActionResult> {
   const o = await owner();
-  if (!o) return { ok: false, message: "Please log in again." };
+  if (!o) return loggedOut();
   try {
     const ua = (await headers()).get("user-agent");
     await savePushSubscription(o, subscription, { userAgent: ua });
@@ -59,7 +65,7 @@ export async function subscribePushAction(subscription: unknown, opts: { searchI
 /** "E-mail" chosen after saving a search: push off for that search (frequency stays as saved). */
 export async function keepEmailAction(searchId: string): Promise<PushActionResult> {
   const o = await owner();
-  if (!o) return { ok: false, message: "Please log in again." };
+  if (!o) return loggedOut();
   try {
     await updateCustomerSearch(o, z.string().min(1).max(64).parse(searchId), { push: false });
     return { ok: true };
@@ -71,7 +77,7 @@ export async function keepEmailAction(searchId: string): Promise<PushActionResul
 /** "Turn off push on this device" (endpoint) — or every device (`all`). */
 export async function unsubscribePushAction(endpoint: string | null, opts: { all?: boolean } = {}): Promise<PushActionResult> {
   const o = await owner();
-  if (!o) return { ok: false, message: "Please log in again." };
+  if (!o) return loggedOut();
   const ep = endpointSchema.catch(null).parse(endpoint);
   if (!ep && !opts.all) return { ok: true };
   try {
@@ -85,11 +91,11 @@ export async function unsubscribePushAction(endpoint: string | null, opts: { all
 
 export async function updatePushPrefsAction(patch: unknown): Promise<PushActionResult> {
   const o = await owner();
-  if (!o) return { ok: false, message: "Please log in again." };
+  if (!o) return loggedOut();
   try {
     await updatePushPrefs(o, patch);
     revalidatePath("/account/alerts");
-    return { ok: true, message: "Saved." };
+    return { ok: true, message: (await shopCopy(pushUiCopies)).settings.saved };
   } catch (err) {
     return fail(err, "updatePushPrefsAction");
   }

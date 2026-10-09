@@ -1,16 +1,16 @@
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { Badge, Markdown } from "@/components/shop/ui";
 import { getShopContext } from "@/server/storefront/context";
 import { getShopViewer } from "@/server/storefront/viewer";
 import { getPublicProvenance } from "@/server/provenance/public";
-import { provenanceCopy } from "@/server/provenance/copy";
-import { provenanceShopCopy } from "./_copy";
+import { provenanceCopies } from "@/server/provenance/copy";
+import { INTL_LOCALE, type ShopLocale } from "@/lib/i18n/shop-locales";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { provenanceShopCopies } from "./_copy";
 
-const t = provenanceShopCopy.block;
-
-function formatBytes(n: number): string {
+function formatBytes(n: number, locale: ShopLocale): string {
   if (n < 1024 * 1024) return `${Math.max(1, Math.round(n / 1024))} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  return `${new Intl.NumberFormat(INTL_LOCALE[locale], { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n / 1024 / 1024)} MB`;
 }
 
 /**
@@ -30,6 +30,8 @@ export async function ProvenanceBlock({ productId }: { productId: string }) {
 
   const badge = data.certificateIncluded || data.authenticityGuaranteed;
   if (!data.provenance && !data.documents.length && !badge) return null;
+  const t = pickCopy(provenanceShopCopies, shop.locale).block;
+  const provenanceCopy = pickCopy(provenanceCopies, shop.locale);
 
   return (
     <section className="rounded-shop bg-shop-sunken p-6 sm:p-8" aria-labelledby="pd-provenance">
@@ -75,7 +77,7 @@ export async function ProvenanceBlock({ productId }: { productId: string }) {
                     <span className="text-xs text-shop-muted">{t.kinds[d.kind]}</span>
                   </span>
                   <span className="shrink-0 font-shop-mono text-xs text-shop-muted">
-                    {d.mimeType === "application/pdf" ? "PDF" : d.mimeType.replace("image/", "").toUpperCase()} · {formatBytes(d.byteSize)}
+                    {d.mimeType === "application/pdf" ? "PDF" : d.mimeType.replace("image/", "").toUpperCase()} · {formatBytes(d.byteSize, shop.locale)}
                   </span>
                 </a>
               </li>

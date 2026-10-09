@@ -1,4 +1,12 @@
-/** English copy for cart, checkout and order status (multi-language later). */
+import { localized } from "@/lib/i18n/shop-copy";
+import { cartCopyNl } from "./_copy.nl";
+import { cartCopyDe } from "./_copy.de";
+
+/**
+ * Copy for cart, checkout and order status. English source; Dutch and German in _copy.nl.ts / _copy.de.ts
+ * (`cartCopies`). `errors` translates the English messages of the cart/checkout services
+ * (see ./server-messages.ts).
+ */
 export const cartCopy = {
   add: {
     add: "Add to cart",
@@ -119,6 +127,7 @@ export const cartCopy = {
     unexpected: "Something went wrong. Please try again.",
     rateLimited: "Too many attempts. Please wait a few minutes and try again.",
     currencyNote: (currency: string) => `You pay in ${currency}.`,
+    surchargeMax: (amount: string) => `max ${amount}`,
   },
   coupon: {
     label: "Discount code",
@@ -151,6 +160,7 @@ export const cartCopy = {
     done: "Your cart has been restored.",
   },
   order: {
+    statusMetaTitle: "Order status",
     metaTitle: (n: number) => `Order #${n}`,
     title: (n: number) => `Order #${n}`,
     placedOn: (d: string) => `Placed on ${d}`,
@@ -189,4 +199,58 @@ export const cartCopy = {
     refreshing: "Checking…",
     privacyNote: "Keep this link private — anyone with it can see this order's status.",
   },
+  /** Messages returned by the cart, checkout, coupon and payment services (English originals there). */
+  errors: {
+    itemNotFound: "This item could not be found",
+    itemUnavailable: "This item is no longer available",
+    loginToBuy: "Log in to buy this item",
+    reservedByOther: (mins: number) => `Someone else has this in their cart — try again in ${mins} min`,
+    enterCode: "Enter a code",
+    cartEmpty: "Your cart is empty",
+    checkFields: "Please check the highlighted fields",
+    maxChars: (n: number) => `Use at most ${n} characters`,
+    firstName: "Enter your first name",
+    lastName: "Enter your last name",
+    street: "Enter your street",
+    city: "Enter your city",
+    postalCode: "Enter your postal code",
+    chooseCountry: "Choose a country",
+    email: "Enter a valid email address",
+    phone: "Enter your phone number",
+    phoneTooLong: "Phone number is too long",
+    phoneInvalid: "Enter a valid phone number",
+    chooseShipping: "Choose a shipping option",
+    chooseShippingForCountry: "Choose one of the shipping options for your country",
+    acceptTerms: "Please accept the terms and conditions",
+    paymentsNotConfigured: "Payments are not configured for this shop yet. Please contact us.",
+    choosePaymentMethod: "Choose a payment method",
+    paymentMethodUnavailable: "This payment method is not available",
+    noShipping: "We don't ship to this country",
+    overweight: "Your order is too heavy to ship to this country — contact us for a quote",
+    loginSensitive: "Your cart contains items that require an account. Please log in.",
+    loginRequired: "Please log in to check out.",
+    age: (age: number) => `Please confirm you are at least ${age} years old`,
+    noLongerAvailable: (titles: string, many: boolean) => `No longer available: ${titles}. Remove ${many ? "them" : "it"} from your cart to continue.`,
+    restricted: (country: string, titles: string, many: boolean) =>
+      `Can't be shipped to ${country} (local regulations): ${titles}. Remove ${many ? "them" : "it"} from your cart or choose pickup.`,
+    couponRefused: (message: string, code: string) => `${message} (${code}). Remove the code in your cart to continue.`,
+    minimumNotReached: "The minimum order amount is not reached yet",
+    totalZero: "Your order total must be more than zero",
+    couponInvalid: "This code is not valid",
+    couponInactive: "This code is no longer active",
+    couponNotYet: "This code is not valid yet",
+    couponExpired: "This code has expired",
+    couponMinSubtotal: (amount: string) => `This code needs a subtotal of at least ${amount}`,
+    couponUsedUp: "This code has been fully used",
+    couponAlreadyUsed: "You have already used this code",
+    couponNotApplicable: "This code doesn't apply to the items in your cart",
+    orderNotFound: "Order not found",
+    orderNotPayable: "This order can no longer be paid",
+    orderTooOld: "This order is too old to pay. Please place a new order.",
+    paymentStartFailed: "We couldn't start the payment. Please try again in a moment.",
+    retryUnavailable: (titles: string, many: boolean) => `Sorry — ${titles} ${many ? "are" : "is"} no longer available, so this order can't be paid.`,
+    rateLimitedShort: "Too many attempts. Please wait a moment.",
+  },
 } as const;
+
+export const cartCopies = localized({ en: cartCopy, nl: cartCopyNl, de: cartCopyDe });

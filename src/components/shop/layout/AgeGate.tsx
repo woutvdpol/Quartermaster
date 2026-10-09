@@ -3,15 +3,15 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/shop/ui/Button";
 import { confirmAge } from "./age-action";
-import { layoutCopy } from "./_copy";
-
-const t = layoutCopy.ageGate;
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { layoutCopies } from "./_copy";
 
 /**
  * Modal age confirmation (legal.ageVerification = "popup"). Rendered by the layout only when the
  * server found no valid confirmation cookie. Cannot be dismissed with Esc; "No" shows a refusal.
  */
 export function AgeGate({ shopName, minimumAge }: { shopName: string; minimumAge: number }) {
+  const t = useShopCopy(layoutCopies).ageGate;
   const ref = useRef<HTMLDialogElement>(null);
   const [denied, setDenied] = useState(false);
   const [done, setDone] = useState(false);

@@ -1,4 +1,8 @@
-// Storefront copy for web push alerts (docs/push.md). English; keep all strings here for later translation.
+// Storefront copy for web push alerts (docs/push.md). English; Dutch and German in _copy.nl.ts / _copy.de.ts (bundle `pushUiCopies`).
+import { localized } from "@/lib/i18n/shop-copy";
+import { pushUiCopyNl } from "./_copy.nl";
+import { pushUiCopyDe } from "./_copy.de";
+
 export const pushUiCopy = {
   choice: {
     title: "Search saved",
@@ -26,6 +30,7 @@ export const pushUiCopy = {
   denied: "Notifications are blocked for this site. Allow them in your browser settings and try again.",
   unsupported: "This browser can't receive push alerts. We'll keep e-mailing you.",
   error: "Something went wrong. Please try again.",
+  loginAgain: "Please log in again.",
   close: "Close",
   settings: {
     title: "Push alerts",
@@ -49,3 +54,5 @@ export const pushUiCopy = {
     push: "Push alert (right away)",
   },
 } as const;
+
+export const pushUiCopies = localized({ en: pushUiCopy, nl: pushUiCopyNl, de: pushUiCopyDe });

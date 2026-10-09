@@ -301,6 +301,28 @@ export const SETTINGS_FORMS: Record<SettingsGroup, GroupMeta> = {
       },
     ],
   },
+  i18n: {
+    label: "Languages",
+    description: "English is the main language of the shop. Switch on extra languages to serve the shop under /nl and /de.",
+    sections: [
+      {
+        title: "Shop languages",
+        description:
+          "Texts are translated on your own server and stay hidden in a language until you approve them (Inventory → Translations). Until then visitors see English.",
+        fields: [
+          {
+            kind: "multicheck",
+            path: "locales",
+            label: "Also serve the shop in",
+            options: [
+              { value: "nl", label: "Dutch (Nederlands)" },
+              { value: "de", label: "German (Deutsch)" },
+            ],
+          },
+        ],
+      },
+    ],
+  },
   platform: {
     label: "Platform",
     description: "Plan and limits for this shop. Only Quartermaster admins can see and change these.",
@@ -326,7 +348,7 @@ export const SETTINGS_FORMS: Record<SettingsGroup, GroupMeta> = {
 };
 
 /** Order in the sub-navigation (platform last, SUPERADMIN only). */
-export const SHOP_GROUPS: SettingsGroup[] = ["general", "catalog", "checkout", "content", "legal", "mail", "analytics"];
+export const SHOP_GROUPS: SettingsGroup[] = ["general", "catalog", "checkout", "content", "i18n", "legal", "mail", "analytics"];
 
 export function groupFields(group: SettingsGroup): SettingField[] {
   return SETTINGS_FORMS[group].sections.flatMap((s) => s.fields);

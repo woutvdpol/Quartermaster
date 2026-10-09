@@ -1,7 +1,9 @@
 import { Badge, LockedImg, Price, ShopImg, cn, type DisplayCurrency, type ProductCardData } from "@/components/shop/ui";
 import { IntentLink } from "@/components/shop/ui/IntentLink";
-import { uiCopy } from "@/components/shop/ui/_copy";
-import { catalogCopy as copy } from "./_copy";
+import { uiCopies } from "@/components/shop/ui/_copy";
+import type { ShopLocale } from "@/lib/i18n/shop-locales";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { catalogCopies } from "./_copy";
 
 /**
  * List layout (settings.catalog.layout = "list"): image left, details right. Server component.
@@ -12,11 +14,15 @@ export function CatalogList({
   products,
   showStockCode,
   display = null,
+  locale,
 }: {
   products: ProductCardData[];
   showStockCode?: boolean;
   display?: DisplayCurrency | null;
+  locale: ShopLocale;
 }) {
+  const copy = pickCopy(catalogCopies, locale);
+  const uiCopy = pickCopy(uiCopies, locale);
   return (
     <ul role="list" className="flex flex-col divide-y divide-shop-line border-b border-shop-line">
       {products.map((p, i) => {
@@ -63,7 +69,7 @@ export function CatalogList({
               </div>
               <div className="mt-auto pt-1 sm:mt-0 sm:shrink-0 sm:pt-0 sm:text-right">
                 {p.showPrice ? (
-                  <Price cents={p.priceCents} currency={p.currency} display={display} size="lg" className={cn("[&>span:first-child]:font-bold", sold && "opacity-60")} />
+                  <Price cents={p.priceCents} currency={p.currency} display={display} locale={locale} size="lg" className={cn("[&>span:first-child]:font-bold", sold && "opacity-60")} />
                 ) : sold && p.soldLabel ? null : (
                   <span className="text-sm text-shop-muted">{copy.product.priceHidden}</span>
                 )}

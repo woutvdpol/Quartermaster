@@ -64,3 +64,44 @@ describe("proxy CSP", () => {
     expect(res.headers.get("content-security-policy-report-only")).toContain("frame-ancestors 'none'");
   });
 });
+
+describe("proxy shop languages", () => {
+  it("rewrites /de/x to /x with the locale request header, keeping the query", () => {
+    const res = run("/de/shop?q=helm");
+    expect(res.headers.get("x-middleware-rewrite")).toBe("http://shop.test/shop?q=helm");
+    expect(forwarded(res, "x-qm-locale")).toBe("de");
+    // CSP/nonce still forwarded on rewritten requests.
+    expect(forwarded(res, "x-nonce")).toBeTruthy();
+  });
+
+  it("rewrites the bare prefix to the home page", () => {
+    const res = run("/nl");
+    expect(res.headers.get("x-middleware-rewrite")).toBe("http://shop.test/");
+    expect(forwarded(res, "x-qm-locale")).toBe("nl");
+  });
+
+  it("serves English without prefix and never trusts a client-supplied locale header", () => {
+    const res = run("/shop", { headers: { "x-qm-locale": "de" } });
+    expect(res.headers.get("x-middleware-rewrite")).toBeNull();
+    expect(forwarded(res, "x-qm-locale")).toBeNull();
+  });
+
+  it("redirects the English prefix to the unprefixed URL", () => {
+    const res = run("/en/cart?x=1");
+    expect(res.status).toBe(308);
+    expect(res.headers.get("location")).toBe("http://shop.test/cart?x=1");
+  });
+
+  it("does not localise admin, API or file paths", () => {
+    for (const path of ["/de/admin", "/de/api/health", "/nl/uploads/a.jpg", "/de/sitemap.xml"]) {
+      const res = run(path);
+      expect(res.headers.get("x-middleware-rewrite")).toBeNull();
+      expect(forwarded(res, "x-qm-locale")).toBeNull();
+    }
+  });
+
+  it("does not touch look-alike first segments", () => {
+    const res = run("/design");
+    expect(res.headers.get("x-middleware-rewrite")).toBeNull();
+  });
+});

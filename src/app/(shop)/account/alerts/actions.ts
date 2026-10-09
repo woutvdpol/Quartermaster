@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { deleteCustomerSearch, updateCustomerSearch } from "@/server/alerts";
 import { ServiceError } from "@/server/context";
 import { getShopCustomer } from "@/server/customer-auth";
+import { shopCopy } from "@/server/i18n/locale";
+import { alertsCopies } from "@/components/shop/alerts/_copy";
 
 export type AccountAlertResult = { ok: boolean; message?: string };
 
@@ -25,8 +27,9 @@ function deliveryPatch(name: string, value: string) {
 
 /** Edit name / frequency, pause (`op=pause`) or resume (`op=resume`) one of the customer's alerts. */
 export async function updateAccountAlertAction(_prev: AccountAlertResult | null, formData: FormData): Promise<AccountAlertResult> {
+  const copy = await shopCopy(alertsCopies);
   const o = await owner();
-  if (!o) return { ok: false, message: "Please log in again." };
+  if (!o) return { ok: false, message: copy.account.loginAgain };
   const id = str(formData.get("id"));
   const op = str(formData.get("op"));
   try {
@@ -38,11 +41,11 @@ export async function updateAccountAlertAction(_prev: AccountAlertResult | null,
           : deliveryPatch(str(formData.get("name")), str(formData.get("frequency")));
     const ok = await updateCustomerSearch(o, id, patch);
     revalidatePath("/account/alerts");
-    return ok ? { ok: true, message: "Saved." } : { ok: false, message: "Alert not found." };
+    return ok ? { ok: true, message: copy.account.saved } : { ok: false, message: copy.account.notFound };
   } catch (err) {
     if (err instanceof ServiceError) return { ok: false, message: err.message };
     console.error("updateAccountAlertAction failed", err);
-    return { ok: false, message: "Something went wrong. Please try again." };
+    return { ok: false, message: copy.result.error };
   }
 }
 

@@ -1,20 +1,23 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
-import { accountCopy } from "@/components/shop/account/_copy";
+import { accountCopies } from "@/components/shop/account/_copy";
 import { AuthPanel } from "@/components/shop/account/AuthPanel";
 import { Alert } from "@/components/shop/account/form";
 import { FormSkeleton } from "@/components/shop/account/FormSkeleton";
-import { getShopCustomer, safeShopRedirect } from "@/server/customer-auth";
+import { DEFAULT_AFTER_LOGIN, getShopCustomer, safeShopRedirect } from "@/server/customer-auth";
+import { localeHref, shopCopy } from "@/server/i18n/locale";
 import { getRequestTenant } from "@/server/tenant";
 import { LoginForm } from "./LoginForm";
 
-const t = accountCopy.login;
+export async function generateMetadata(): Promise<Metadata> {
+  const t = (await shopCopy(accountCopies)).login;
+  return { title: t.title, robots: { index: false, follow: true } };
+}
 
-export const metadata: Metadata = { title: t.title, robots: { index: false, follow: true } };
-
-export default function LoginPage({ searchParams }: PageProps<"/login">) {
+export default async function LoginPage({ searchParams }: PageProps<"/login">) {
+  const t = (await shopCopy(accountCopies)).login;
   return (
     <AuthPanel
       title={t.title}
@@ -38,7 +41,9 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
 async function LoginContent({ searchParams }: { searchParams: PageProps<"/login">["searchParams"] }) {
   const sp = await searchParams;
   if (!(await getRequestTenant())) notFound();
-  const next = safeShopRedirect(sp.next);
+  const t = (await shopCopy(accountCopies)).login;
+  // `next` already carries its language prefix; the fallback is the account page in this language.
+  const next = safeShopRedirect(sp.next, await localeHref(DEFAULT_AFTER_LOGIN));
   if (await getShopCustomer()) redirect(next);
   return (
     <div className="grid gap-4">

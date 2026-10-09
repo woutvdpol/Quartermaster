@@ -1,9 +1,12 @@
 import { ButtonLink } from "@/components/shop/ui";
 import { loginHref } from "@/server/customer-auth/redirect";
-import { catalogCopy as copy } from "../_copy";
+import type { ShopLocale } from "@/lib/i18n/shop-locales";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { catalogCopies } from "../_copy";
 
 /** Shown instead of the product details to guests for sensitive (blurred) items. */
-export function LockedPanel({ returnTo }: { returnTo: string }) {
+export function LockedPanel({ returnTo, locale }: { returnTo: string; locale: ShopLocale }) {
+  const copy = pickCopy(catalogCopies, locale);
   return (
     <div className="rounded-shop bg-shop-sunken p-6 sm:p-8">
       <div className="mb-4 grid size-11 place-items-center rounded-shop-control bg-shop-surface text-shop-ink" aria-hidden="true">

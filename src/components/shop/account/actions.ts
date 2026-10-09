@@ -1,8 +1,8 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { logout } from "@/server/auth/service";
 import { getShopCustomer } from "@/server/customer-auth";
+import { localeRedirect } from "@/server/i18n/locale";
 import { toggleWishlist, wishlistProductIds } from "@/server/wishlist";
 
 /*
@@ -13,7 +13,7 @@ import { toggleWishlist, wishlistProductIds } from "@/server/wishlist";
 /** Logs out the shop customer. A staff session on the same host is left alone. */
 export async function logoutCustomerAction(): Promise<void> {
   if (await getShopCustomer()) await logout();
-  redirect("/");
+  await localeRedirect("/");
 }
 
 export type WishlistState = { loggedIn: boolean; productIds: string[] };

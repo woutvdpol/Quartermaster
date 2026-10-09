@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
-import { accountCopy } from "./_copy";
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { accountCopies } from "./_copy";
 import { Alert, Field, SubmitButton } from "./form";
 
 type State = { ok?: boolean; message?: string; error?: string; fieldErrors?: Record<string, string> } | undefined;
@@ -14,22 +15,24 @@ function Feedback({ state }: { state: State }) {
 }
 
 export function ProfileForm({ action, name, phone }: { action: Action; name: string; phone: string }) {
+  const copy = useShopCopy(accountCopies);
   const [state, formAction] = useActionState(action, undefined);
   const fe = state?.fieldErrors ?? {};
   return (
     <form action={formAction} className="grid gap-4" noValidate>
       <Feedback state={state} />
-      <Field id="name" label={accountCopy.common.name} autoComplete="name" required maxLength={200} defaultValue={name} error={fe.name} />
-      <Field id="phone" label={accountCopy.common.phone} type="tel" autoComplete="tel" maxLength={40} defaultValue={phone} error={fe.phone} />
+      <Field id="name" label={copy.common.name} autoComplete="name" required maxLength={200} defaultValue={name} error={fe.name} />
+      <Field id="phone" label={copy.common.phone} type="tel" autoComplete="tel" maxLength={40} defaultValue={phone} error={fe.phone} />
       <div>
-        <SubmitButton pendingLabel={accountCopy.common.saving}>{accountCopy.common.save}</SubmitButton>
+        <SubmitButton pendingLabel={copy.common.saving}>{copy.common.save}</SubmitButton>
       </div>
     </form>
   );
 }
 
 export function EmailForm({ action, email }: { action: Action; email: string }) {
-  const t = accountCopy.profile;
+  const copy = useShopCopy(accountCopies);
+  const t = copy.profile;
   const [state, formAction] = useActionState(action, undefined);
   return (
     <form action={formAction} className="grid gap-4" noValidate>
@@ -40,14 +43,15 @@ export function EmailForm({ action, email }: { action: Action; email: string }) 
       <Field id="new-email" name="email" label={t.newEmail} type="email" autoComplete="email" inputMode="email" required maxLength={254} />
       <Field id="email-password" name="password" label={t.currentPassword} type="password" autoComplete="current-password" required />
       <div>
-        <SubmitButton pendingLabel={accountCopy.common.saving}>{t.changeEmail}</SubmitButton>
+        <SubmitButton pendingLabel={copy.common.saving}>{t.changeEmail}</SubmitButton>
       </div>
     </form>
   );
 }
 
 export function PasswordForm({ action, email, minPasswordLength }: { action: Action; email: string; minPasswordLength: number }) {
-  const t = accountCopy.profile;
+  const copy = useShopCopy(accountCopies);
+  const t = copy.profile;
   const [state, formAction] = useActionState(action, undefined);
   return (
     <form action={formAction} className="grid gap-4" noValidate key={state?.ok ? "done" : "form"}>
@@ -61,11 +65,11 @@ export function PasswordForm({ action, email, minPasswordLength }: { action: Act
         autoComplete="new-password"
         required
         minLength={minPasswordLength}
-        hint={accountCopy.register.passwordHint(minPasswordLength)}
+        hint={copy.register.passwordHint(minPasswordLength)}
       />
       <Field id="confirm" label={t.confirmPassword} type="password" autoComplete="new-password" required minLength={minPasswordLength} />
       <div>
-        <SubmitButton pendingLabel={accountCopy.common.saving}>{t.changePassword}</SubmitButton>
+        <SubmitButton pendingLabel={copy.common.saving}>{t.changePassword}</SubmitButton>
       </div>
     </form>
   );

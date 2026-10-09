@@ -1,13 +1,14 @@
 import { Button } from "@/components/shop/ui";
 import { TextInput } from "@/components/shop/ui/Field";
-import { provenanceShopCopy } from "./_copy";
-
-const t = provenanceShopCopy.verify;
+import { localizePath, type ShopLocale } from "@/lib/i18n/shop-locales";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { provenanceShopCopies } from "./_copy";
 
 /** Read-only GET form → /verify?code=… (the page normalises and redirects to /verify/[code]). */
-export function VerifyForm({ defaultValue, error }: { defaultValue?: string; error?: string | null }) {
+export function VerifyForm({ defaultValue, error, locale }: { defaultValue?: string; error?: string | null; locale: ShopLocale }) {
+  const t = pickCopy(provenanceShopCopies, locale).verify;
   return (
-    <form method="get" action="/verify" role="search" className="flex flex-col gap-1.5">
+    <form method="get" action={localizePath("/verify", locale)} role="search" className="flex flex-col gap-1.5">
       <label htmlFor="verify-code" className="text-sm font-medium text-shop-ink">
         {t.label}
       </label>

@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { accountCopy } from "@/components/shop/account/_copy";
+import Link from "@/components/shop/ui/Link";
+import { accountCopies } from "@/components/shop/account/_copy";
+import { shopCopy } from "@/server/i18n/locale";
 import { AuthPanel } from "@/components/shop/account/AuthPanel";
 import { ForgotForm } from "./ForgotForm";
 
-const t = accountCopy.forgot;
+export async function generateMetadata(): Promise<Metadata> {
+  const t = (await shopCopy(accountCopies)).forgot;
+  return { title: t.title, robots: { index: false, follow: true } };
+}
 
-export const metadata: Metadata = { title: t.title, robots: { index: false, follow: true } };
-
-export default function ForgotPasswordPage() {
+export default async function ForgotPasswordPage() {
+  const t = (await shopCopy(accountCopies)).forgot;
   return (
     <AuthPanel
       title={t.title}

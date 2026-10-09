@@ -1,6 +1,6 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { localeRedirect } from "@/server/i18n/locale";
 import { stopFromManageLink } from "@/server/alerts";
 import { getRequestTenant } from "@/server/tenant";
 
@@ -19,6 +19,6 @@ export async function stopManagedAlertAction(formData: FormData): Promise<void> 
   } catch (error) {
     console.error("stopManagedAlertAction failed", error);
   }
-  if (!ok) redirect("/alerts?status=invalid");
-  redirect(`/alerts/manage?${new URLSearchParams({ t: tenantId, s: savedSearchId, sig })}`);
+  if (!ok) await localeRedirect("/alerts?status=invalid");
+  await localeRedirect(`/alerts/manage?${new URLSearchParams({ t: tenantId, s: savedSearchId, sig })}`);
 }

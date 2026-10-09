@@ -1,6 +1,8 @@
-import Link from "next/link";
+import Link from "./Link";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { localizedUrl, type ShopLocale } from "@/lib/i18n/shop-locales";
 import { cn } from "./cn";
-import { uiCopy } from "./_copy";
+import { uiCopies } from "./_copy";
 
 export type Crumb = { label: string; href?: string | null };
 
@@ -8,7 +10,8 @@ export type Crumb = { label: string; href?: string | null };
  * Breadcrumb trail. The last item is the current page (no link, aria-current).
  * Also emits BreadcrumbList JSON-LD when `jsonLdBase` (absolute origin, e.g. "https://shop.nl") is given.
  */
-export function Breadcrumbs({ items, className, jsonLdBase }: { items: Crumb[]; className?: string; jsonLdBase?: string }) {
+export function Breadcrumbs({ items, className, jsonLdBase, locale }: { items: Crumb[]; className?: string; jsonLdBase?: string; locale: ShopLocale }) {
+  const uiCopy = pickCopy(uiCopies, locale);
   const all: Crumb[] = [{ label: uiCopy.breadcrumbs.home, href: "/" }, ...items];
   const ld = jsonLdBase
     ? {
@@ -18,7 +21,7 @@ export function Breadcrumbs({ items, className, jsonLdBase }: { items: Crumb[]; 
           "@type": "ListItem",
           position: i + 1,
           name: c.label,
-          ...(c.href ? { item: new URL(c.href, jsonLdBase).toString() } : {}),
+          ...(c.href ? { item: localizedUrl(jsonLdBase, c.href, locale) } : {}),
         })),
       }
     : null;

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "./Link";
 import { Fragment, type ReactNode } from "react";
 import { parseMarkdown, type MdBlock, type MdInline } from "@/server/content/markdown";
 import { cn } from "./cn";

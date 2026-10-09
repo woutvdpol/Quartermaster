@@ -4,6 +4,8 @@ import { searchRequestContext, suggest, toPublicCards } from "@/server/search";
 import type { SearchErrorResponse, SuggestResponse } from "@/server/search/api-types";
 import { allowSuggest } from "@/server/search/throttle";
 import { suggestWhy, matchCategories } from "@/server/search/ui-labels";
+import { servedLocaleParam } from "@/lib/i18n/shop-locales";
+import { translateCards, translateCategoryTree } from "@/server/storefront/translate";
 import { MAX_QUERY_LENGTH, SHOP_PATH, catalogQueryString, categoryHref, getCategoryTree, parseCatalogParams } from "@/server/storefront-catalog";
 
 /*
@@ -12,6 +14,8 @@ import { MAX_QUERY_LENGTH, SHOP_PATH, catalogQueryString, categoryHref, getCateg
  * Per-visitor results (compliance by country, sensitive items locked for guests) → private, no-store.
  * Throttled per IP in memory (30 requests / 10 s) — a DB-backed limiter would cost more than the
  * query itself; abuse beyond that is the ingress rate limit's job.
+ * `&locale=nl|de` (the shop UI's language): approved translated titles and category names
+ * (docs/i18n.md § Shop-routing); hrefs stay unprefixed — the client localises them.
  */
 
 const headers = { "Cache-Control": "private, no-store" };
@@ -31,9 +35,13 @@ export async function GET(request: NextRequest) {
     return Response.json({ query: q, interpretation: { ...empty, original: q }, facets: [], categories: [], products: [], total: 0, totalCapped: false, searchHref: SHOP_PATH, timing: { totalMs: 0, semantic: "skipped" } } satisfies SuggestResponse, { headers });
   }
   const tenantId = ctx.shop.tenant.id;
-  const [res, tree] = await Promise.all([suggest(tenantId, q, { scope: ctx.scope, currency: ctx.shop.tenant.currency }), getCategoryTree(tenantId)]);
+  const locale = servedLocaleParam(request.nextUrl.searchParams.get("locale"), ctx.shop.locales);
+  const [res, tree] = await Promise.all([
+    suggest(tenantId, q, { scope: ctx.scope, currency: ctx.shop.tenant.currency }),
+    getCategoryTree(tenantId).then((t) => translateCategoryTree(tenantId, locale, t)),
+  ]);
   const base = parseCatalogParams({ q });
-  const cards = await toPublicCards(ctx, res.products);
+  const cards = await toPublicCards(ctx, await translateCards(tenantId, locale, res.products));
   const body: SuggestResponse = {
     query: res.query,
     interpretation: res.interpretation,

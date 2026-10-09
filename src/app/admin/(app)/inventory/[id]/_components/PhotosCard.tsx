@@ -1,11 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition, type ReactNode } from "react";
 import { Card, ConfirmDialog, Dropzone, TextInput, Thumb, toast, type DropzoneItem } from "@/components/admin/ui";
 import { deleteImageAction, reorderImagesAction, updateImageAltAction } from "../actions";
 import { copy } from "../_copy";
 import type { UploadResponse } from "../_lib/limits";
+import { checkDuplicatesAction, type DuplicateCandidateView } from "../_ext/duplicates/actions";
+import { DuplicatePanel } from "../_ext/duplicates/DuplicatePanel";
 
 export type PhotoDto = { id: string; url: string; name: string; alt: string | null };
 
@@ -29,17 +31,21 @@ export function PhotosCard({
   limit,
   transportMaxBytes,
   serviceMaxBytes,
+  lineage,
 }: {
   productId: string;
   photos: PhotoDto[];
   limit: number;
   transportMaxBytes: number;
   serviceMaxBytes: number;
+  /** Earlier / later listings of the same piece (duplicate check, _ext/duplicates). */
+  lineage?: ReactNode;
 }) {
   const router = useRouter();
   const [items, setItems] = useState<DropzoneItem[]>(() => photos.map(toItem));
   const [, startTransition] = useTransition();
   const rowsRef = useRef<HTMLUListElement>(null);
+  const [duplicates, setDuplicates] = useState<DuplicateCandidateView[]>([]);
 
   // Re-sync with the server list after a refresh, keeping files that are still in flight / failed.
   const [lastPhotos, setLastPhotos] = useState(photos);
@@ -64,6 +70,7 @@ export function PhotosCard({
       }
     }
     let uploaded = 0;
+    const uploadedIds: string[] = [];
     // Sequential: the server processes images one by one anyway, and errors stay per file.
     for (const { file, item } of queue) {
       const body = new FormData();
@@ -79,6 +86,7 @@ export function PhotosCard({
         const img = result.images[0];
         setItems((list) => list.map((i) => (i.id === item.id ? toItem(img) : i)));
         uploaded++;
+        uploadedIds.push(img.id);
       } else {
         const message = result.ok ? t.uploadFailed : result.message;
         patchItem(item.id, { status: "error", error: message });
@@ -88,6 +96,8 @@ export function PhotosCard({
     if (uploaded) {
       toast.ok(t.uploaded(uploaded));
       router.refresh();
+      // Duplicate check: after the upload, async and best effort (never delays or blocks saving).
+      void checkDuplicatesAction(productId, uploadedIds).then(setDuplicates, () => {});
     }
   }
 
@@ -134,6 +144,7 @@ export function PhotosCard({
   return (
     <Card title={copy.cards.photos} aside={copy.cards.photosAside(storedCount, limit)}>
       <div className="grid gap-4">
+        {lineage}
         <Dropzone
           label={t.label}
           hint={t.hint(Math.floor(Math.min(transportMaxBytes, serviceMaxBytes) / 1024 / 1024))}
@@ -145,6 +156,8 @@ export function PhotosCard({
           accept="image/*,.heic,.heif"
           maxFiles={limit}
         />
+
+        {duplicates.length > 0 && <DuplicatePanel productId={productId} candidates={duplicates} onClose={() => setDuplicates([])} />}
 
         {photos.length > 0 && (
           <section aria-labelledby="photo-alt-title" className="grid gap-2">

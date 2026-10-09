@@ -1,13 +1,12 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { cn } from "@/components/shop/ui/cn";
 import { BagIcon, HeartIcon, UserIcon } from "./icons";
 import { useHeaderCounts } from "./HeaderCounts";
 import { MiniCart } from "./MiniCart";
-import { layoutCopy } from "./_copy";
-
-const t = layoutCopy.header;
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { layoutCopies } from "./_copy";
 
 function CountBadge({ n }: { n: number }) {
   if (n <= 0) return null;
@@ -28,6 +27,7 @@ function CountBadge({ n }: { n: number }) {
  */
 export function HeaderActions({ className }: { className?: string }) {
   const { counts } = useHeaderCounts();
+  const t = useShopCopy(layoutCopies).header;
   const item =
     "relative grid size-11 place-items-center rounded-shop-control text-shop-ink transition-colors hover:bg-shop-sunken";
   return (

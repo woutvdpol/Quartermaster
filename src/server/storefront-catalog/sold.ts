@@ -9,8 +9,9 @@
  * Shop-wide, settings.catalog.publicArchive switches the whole archive (list page, indexing) on or off.
  */
 
-import { SHOP_LOCALE } from "@/components/shop/ui/money";
-import { catalogCopy } from "@/components/shop/catalog/_copy";
+import { INTL_LOCALE, type ShopLocale } from "@/lib/i18n/shop-locales";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { catalogCopies } from "@/components/shop/catalog/_copy";
 
 type StatusLike = { status: string; showSoldPrice: boolean };
 
@@ -35,20 +36,22 @@ export function soldPageNoindex(item: { status: string; archiveHidden: boolean; 
   return isSold(item.status) && !inSoldArchive(item, archiveEnabled);
 }
 
-/** "Oct 2026" (shop locale) for an ISO date; null when missing or invalid. */
-export function soldMonth(iso: string | null | undefined, timeZone = "UTC"): string | null {
+/** "Oct 2026" ("okt 2026", "Okt. 2026" in `locale`) for an ISO date; null when missing or invalid. */
+export function soldMonth(iso: string | null | undefined, timeZone = "UTC", locale: ShopLocale = "en"): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
+  const intl = INTL_LOCALE[locale];
   try {
-    return new Intl.DateTimeFormat(SHOP_LOCALE, { month: "short", year: "numeric", timeZone }).format(d);
+    return new Intl.DateTimeFormat(intl, { month: "short", year: "numeric", timeZone }).format(d);
   } catch {
-    return new Intl.DateTimeFormat(SHOP_LOCALE, { month: "short", year: "numeric", timeZone: "UTC" }).format(d);
+    return new Intl.DateTimeFormat(intl, { month: "short", year: "numeric", timeZone: "UTC" }).format(d);
   }
 }
 
-/** "Sold Oct 2026", or "Sold" without a date. */
-export function soldLabel(iso: string | null | undefined, timeZone?: string): string {
-  const month = soldMonth(iso, timeZone);
-  return month ? catalogCopy.product.soldIn(month) : catalogCopy.product.status.sold;
+/** "Sold Oct 2026", or "Sold" without a date (in `locale`). */
+export function soldLabel(iso: string | null | undefined, timeZone?: string, locale: ShopLocale = "en"): string {
+  const copy = pickCopy(catalogCopies, locale);
+  const month = soldMonth(iso, timeZone, locale);
+  return month ? copy.product.soldIn(month) : copy.product.status.sold;
 }

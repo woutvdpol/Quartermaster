@@ -1,15 +1,15 @@
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { cn } from "@/components/shop/ui/cn";
 import { Badge } from "@/components/shop/ui/Badge";
 import { formatIndicative, formatMoney } from "@/components/shop/ui/money";
 import type { DisplayCurrency } from "@/components/shop/ui/types";
-import { uiCopy } from "@/components/shop/ui/_copy";
+import { uiCopies } from "@/components/shop/ui/_copy";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import type { ShopLocale } from "@/lib/i18n/shop-locales";
 import { ReservationCountdown } from "./ReservationCountdown";
 import { PendingButton } from "./PendingButton";
 import { reReserveAction, removeFromCartAction } from "./actions";
-import { cartCopy } from "./_copy";
-
-const t = cartCopy.cart;
+import { cartCopies } from "./_copy";
 
 export type CartLineData = {
   productId: string;
@@ -35,21 +35,26 @@ export type CartLineData = {
   takenMinutes: number | null;
 };
 
-/** One cart row (server component; remove / re-add are plain forms → work without JS). */
+/** One cart row (server component; remove / re-add are plain forms → work without JS). Also rendered by CheckoutForm (client), hence `locale`. */
 export function CartLineItem({
   line,
+  locale,
   compact = false,
   display = null,
   notice = null,
 }: {
   line: CartLineData;
+  locale: ShopLocale;
   compact?: boolean;
   display?: DisplayCurrency | null;
   /** Extra per-line warning (e.g. "can't be shipped to Germany"). */
   notice?: string | null;
 }) {
+  const copy = pickCopy(cartCopies, locale);
+  const t = copy.cart;
+  const ui = pickCopy(uiCopies, locale);
   const dim = line.state === "unavailable" || line.state === "taken";
-  const indicative = display && !dim && display.currency !== line.currency ? formatIndicative(line.price, line.currency, display.currency, display.rate) : null;
+  const indicative = display && !dim && display.currency !== line.currency ? formatIndicative(line.price, line.currency, display.currency, display.rate, locale) : null;
   return (
     <li className={cn("flex gap-4 sm:gap-5", compact ? "py-3" : "py-5 sm:py-6")}>
       <Link
@@ -75,7 +80,7 @@ export function CartLineItem({
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         {line.stockCode !== null ? (
           <p className="font-shop-mono text-xs text-shop-accent">
-            {uiCopy.product.stockCode} {line.stockCode}
+            {ui.product.stockCode} {line.stockCode}
           </p>
         ) : null}
         <div className="flex items-start justify-between gap-3">
@@ -86,21 +91,21 @@ export function CartLineItem({
             {line.title}
           </Link>
           <span className={cn("shrink-0 font-bold tabular-nums", compact && "text-sm", dim ? "font-medium text-shop-muted line-through" : "text-shop-ink")}>
-            {formatMoney(line.price, line.currency)}
+            {formatMoney(line.price, line.currency, locale)}
           </span>
         </div>
         {indicative ? (
-          <p className="self-end text-xs text-shop-muted tabular-nums" title={uiCopy.price.indicativeTitle}>
-            ≈ {indicative} · {uiCopy.price.indicative}
+          <p className="self-end text-xs text-shop-muted tabular-nums" title={ui.price.indicativeTitle}>
+            ≈ {indicative} · {ui.price.indicative}
           </p>
         ) : null}
         {line.offerApplied && line.listPrice !== undefined ? (
           <p className="flex flex-wrap items-center gap-2 text-xs">
-            <Badge tone="ok">{cartCopy.offerLine.agreed}</Badge>
-            <s className="text-shop-muted tabular-nums">{cartCopy.offerLine.listPrice(formatMoney(line.listPrice, line.currency))}</s>
+            <Badge tone="ok">{copy.offerLine.agreed}</Badge>
+            <s className="text-shop-muted tabular-nums">{copy.offerLine.listPrice(formatMoney(line.listPrice, line.currency, locale))}</s>
           </p>
         ) : null}
-        {line.offerExpired ? <p className="text-xs text-shop-warn">{cartCopy.offerLine.expired}</p> : null}
+        {line.offerExpired ? <p className="text-xs text-shop-warn">{copy.offerLine.expired}</p> : null}
         {notice ? <p className="text-xs text-shop-warn">{notice}</p> : null}
 
         {line.state === "held" && line.expiresAt ? <ReservationCountdown expiresAt={line.expiresAt} className="mt-1 self-start" /> : null}

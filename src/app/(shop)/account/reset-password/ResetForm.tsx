@@ -1,14 +1,15 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { useActionState } from "react";
-import { accountCopy } from "@/components/shop/account/_copy";
+import { accountCopies } from "@/components/shop/account/_copy";
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
 import { Alert, Field, SubmitButton } from "@/components/shop/account/form";
 import { resetPasswordAction } from "./actions";
 
-const t = accountCopy.reset;
-
 export function ResetForm({ token, minPasswordLength }: { token: string; minPasswordLength: number }) {
+  const copy = useShopCopy(accountCopies);
+  const t = copy.reset;
   const [state, action] = useActionState(resetPasswordAction, undefined);
   if (state?.invalidToken) {
     return (
@@ -33,7 +34,7 @@ export function ResetForm({ token, minPasswordLength }: { token: string; minPass
         autoComplete="new-password"
         required
         minLength={minPasswordLength}
-        hint={accountCopy.register.passwordHint(minPasswordLength)}
+        hint={copy.register.passwordHint(minPasswordLength)}
       />
       <Field id="confirm" label={t.confirm} type="password" autoComplete="new-password" required minLength={minPasswordLength} />
       <SubmitButton pendingLabel={t.submitting} fullWidth>

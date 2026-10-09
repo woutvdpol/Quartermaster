@@ -3,6 +3,7 @@ import { markdownToPlainText, renderMarkdown } from "@/server/content/markdown";
 import { REST_OF_WORLD, isCountryCode } from "@/server/shipping/countries";
 import { findTier, type QuoteZone } from "@/server/shipping/calc";
 import type { PublicProduct, PublicStatus } from "@/server/storefront-catalog/types";
+import { localizePath, type ShopLocale } from "@/lib/i18n/shop-locales";
 import { productSpecs } from "./markdown-alternate";
 import { squash, truncate } from "./text";
 
@@ -42,6 +43,8 @@ export const orgId = (origin: string) => `${origin}/#organization`;
 export const websiteId = (origin: string) => `${origin}/#website`;
 
 const abs = (origin: string, path: string) => new URL(path, origin).toString();
+/** Absolute URL of a shop path in a language ("/de/…"; English unprefixed). docs/i18n.md § Shop-routing. */
+const absIn = (origin: string, path: string, locale: ShopLocale = "en") => abs(origin, localizePath(path, locale));
 
 /** Minor units → "1450.00" (schema.org / Merchant Center decimal string). */
 export function decimalPrice(minor: number, currency: string): string {
@@ -110,7 +113,7 @@ export function organizationJsonLd(shop: SeoShop) {
 }
 
 /** WebSite + SearchAction (the catalog search). */
-export function websiteJsonLd(shop: Pick<SeoShop, "origin" | "name" | "description">) {
+export function websiteJsonLd(shop: Pick<SeoShop, "origin" | "name" | "description">, locale: ShopLocale = "en") {
   return {
     "@context": SCHEMA,
     "@type": "WebSite",
@@ -118,11 +121,11 @@ export function websiteJsonLd(shop: Pick<SeoShop, "origin" | "name" | "descripti
     name: shop.name,
     url: `${shop.origin}/`,
     ...(shop.description ? { description: shop.description } : {}),
-    inLanguage: "en",
+    inLanguage: locale,
     publisher: { "@id": orgId(shop.origin) },
     potentialAction: {
       "@type": "SearchAction",
-      target: { "@type": "EntryPoint", urlTemplate: `${shop.origin}/shop?q={search_term_string}` },
+      target: { "@type": "EntryPoint", urlTemplate: `${shop.origin}${localizePath("/shop", locale)}?q={search_term_string}` },
       "query-input": "required name=search_term_string",
     },
   };
@@ -131,8 +134,18 @@ export function websiteJsonLd(shop: Pick<SeoShop, "origin" | "name" | "descripti
 export type ListItemInput = { href: string; name: string; image?: string | null };
 
 /** CollectionPage (catalog / category / facet landing page) with its visible items as an ItemList. */
-export function collectionPageJsonLd(input: { origin: string; path: string; name: string; description?: string | null; items: ListItemInput[]; total: number }) {
-  const url = abs(input.origin, input.path);
+export function collectionPageJsonLd(input: {
+  origin: string;
+  path: string;
+  name: string;
+  description?: string | null;
+  items: ListItemInput[];
+  total: number;
+  /** Page language: localised URLs + inLanguage (default English). */
+  locale?: ShopLocale;
+}) {
+  const locale = input.locale ?? "en";
+  const url = absIn(input.origin, input.path, locale);
   return {
     "@context": SCHEMA,
     "@type": "CollectionPage",
@@ -140,6 +153,7 @@ export function collectionPageJsonLd(input: { origin: string; path: string; name
     url,
     name: input.name,
     ...(input.description ? { description: input.description } : {}),
+    inLanguage: locale,
     isPartOf: { "@id": websiteId(input.origin) },
     mainEntity: {
       "@type": "ItemList",
@@ -147,7 +161,7 @@ export function collectionPageJsonLd(input: { origin: string; path: string; name
       itemListElement: input.items.map((it, i) => ({
         "@type": "ListItem",
         position: i + 1,
-        url: abs(input.origin, it.href),
+        url: absIn(input.origin, it.href, locale),
         name: it.name,
         ...(it.image ? { image: abs(input.origin, it.image) } : {}),
       })),
@@ -204,6 +218,8 @@ function facetValue(p: PublicProduct, kind: string): string | null {
 }
 
 export type ProductJsonLdExtras = {
+  /** Page language: localised URL + inLanguage (default English). Pass the translated product. */
+  locale?: ShopLocale;
   shipping?: object[];
   returns?: ReturnPolicy | null;
   /** The visitor may see the price (sold items only with Product.showSoldPrice, docs/sold-archive.md). */
@@ -217,7 +233,8 @@ export type ProductJsonLdExtras = {
  * Offer says SoldOut (pass no shipping/returns for sold items).
  */
 export function productJsonLd(shop: Pick<SeoShop, "origin" | "name" | "currency">, p: PublicProduct, status: PublicStatus, extras: ProductJsonLdExtras) {
-  const url = abs(shop.origin, p.href);
+  const locale = extras.locale ?? "en";
+  const url = absIn(shop.origin, p.href, locale);
   const maker = facetValue(p, "MAKER");
   const country = facetValue(p, "COUNTRY");
   const description = p.description ? truncate(markdownToPlainText(p.description), 5000) : null;
@@ -249,6 +266,7 @@ export function productJsonLd(shop: Pick<SeoShop, "origin" | "name" | "currency"
     "@id": `${url}#product`,
     name: p.title,
     url,
+    inLanguage: locale,
     sku: p.sku ?? String(p.stockCode),
     productID: String(p.stockCode),
     ...(description ? { description } : {}),

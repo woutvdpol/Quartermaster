@@ -1,6 +1,8 @@
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
+import { pickCopy } from "@/lib/i18n/shop-copy";
 import type { ShopContext } from "@/server/storefront/context";
 import { NewsletterForm } from "./NewsletterForm";
+import { layoutCopies } from "./_copy";
 
 /**
  * Shown instead of every shop page while the shop is still being set up (src/server/storefront/launch.ts).
@@ -8,6 +10,7 @@ import { NewsletterForm } from "./NewsletterForm";
  * the shop has the newsletter feature — a sign-up so visitors hear when it opens.
  */
 export function OpeningSoon({ shop }: { shop: ShopContext }) {
+  const t = pickCopy(layoutCopies, shop.locale).openingSoon;
   const { appearance, general, features } = shop.settings;
   return (
     <main id="main" className="grid min-h-dvh place-items-center bg-shop-bg px-6 py-16 text-shop-ink">
@@ -16,18 +19,18 @@ export function OpeningSoon({ shop }: { shop: ShopContext }) {
           // eslint-disable-next-line @next/next/no-img-element -- tenant upload, sized by CSS
           <img src={appearance.logoPath} alt="" className="h-16 w-auto object-contain" />
         ) : null}
-        <p className="font-shop-mono text-xs tracking-[0.3em] text-shop-muted uppercase">Opening soon</p>
+        <p className="font-shop-mono text-xs tracking-[0.3em] text-shop-muted uppercase">{t.eyebrow}</p>
         <h1 className="font-shop-heading text-4xl leading-tight sm:text-5xl">{shop.shopName}</h1>
-        <p className="text-lg text-shop-muted">We are preparing our shop. Please come back soon.</p>
+        <p className="text-lg text-shop-muted">{t.body}</p>
         {features.newsletter ? (
           <div className="grid w-full gap-2">
-            <p className="text-sm text-shop-muted">Leave your email and we let you know when we open.</p>
+            <p className="text-sm text-shop-muted">{t.notify}</p>
             <NewsletterForm source="block" className="w-full" />
           </div>
         ) : null}
         {general.contactEmail ? (
           <p className="text-sm text-shop-muted">
-            Questions?{" "}
+            {t.questions}{" "}
             <a href={`mailto:${general.contactEmail}`} className="text-shop-ink underline underline-offset-2">
               {general.contactEmail}
             </a>
@@ -38,7 +41,7 @@ export function OpeningSoon({ shop }: { shop: ShopContext }) {
   );
 }
 
-/** Staff-only notice on a shop that is not live yet. Same bar as the theme-preview ribbon (never both). */
+/** Staff-only notice on a shop that is not live yet (English, like the admin). Same bar as the theme-preview ribbon (never both). */
 export function NotLiveRibbon() {
   return (
     <div

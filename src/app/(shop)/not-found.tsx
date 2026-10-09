@@ -1,11 +1,11 @@
 import { ButtonLink } from "@/components/shop/ui/Button";
 import { Container } from "@/components/shop/ui/Container";
-import { shopPageCopy } from "./_copy";
-
-const t = shopPageCopy.notFound;
+import { shopCopy } from "@/server/i18n/locale";
+import { shopPageCopies } from "./_copy";
 
 /** 404 inside the shop chrome (thrown by shop pages via notFound()). */
-export default function ShopNotFound() {
+export default async function ShopNotFound() {
+  const t = (await shopCopy(shopPageCopies)).notFound;
   return (
     <Container size="narrow" className="py-20 text-center sm:py-28">
       <p className="font-shop-mono text-sm text-shop-accent">{t.eyebrow}</p>

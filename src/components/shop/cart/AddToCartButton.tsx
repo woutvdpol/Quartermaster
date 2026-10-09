@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { usePathname } from "next/navigation";
 import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
@@ -10,12 +10,12 @@ import { useHeaderCounts } from "@/components/shop/layout/HeaderCounts";
 import { loginHref } from "@/server/customer-auth/redirect";
 import { addToCartFormAction, cartLineStatusAction, type AddToCartState, type CartLineStatus } from "./actions";
 import { ReservationCountdown } from "./ReservationCountdown";
-import { cartCopy } from "./_copy";
-
-const t = cartCopy.add;
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { cartCopies } from "./_copy";
 
 function SubmitButton({ className }: { className?: string }) {
   const { pending } = useFormStatus();
+  const t = useShopCopy(cartCopies).add;
   return (
     <button type="submit" aria-busy={pending || undefined} disabled={pending} className={buttonClasses("primary", "lg", cn("w-full", className))}>
       {pending ? t.adding : t.add}
@@ -24,6 +24,7 @@ function SubmitButton({ className }: { className?: string }) {
 }
 
 function InCart({ expiresAt, justAdded }: { expiresAt: string | null; justAdded: boolean }) {
+  const t = useShopCopy(cartCopies).add;
   return (
     <div className="flex flex-col gap-2" role="status" aria-live="polite">
       <div className="flex flex-wrap items-center gap-2 text-sm text-shop-ink">
@@ -53,6 +54,7 @@ function InCart({ expiresAt, justAdded }: { expiresAt: string | null; justAdded:
  * Works without JavaScript (plain form POST to the server action).
  */
 export function AddToCartButton({ productId, available }: { productId: string; available: boolean }) {
+  const t = useShopCopy(cartCopies).add;
   const pathname = usePathname();
   const { setCounts } = useHeaderCounts();
   const [state, formAction] = useActionState<AddToCartState | null, FormData>(addToCartFormAction, null);

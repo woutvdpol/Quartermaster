@@ -1,19 +1,22 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { accountCopy } from "@/components/shop/account/_copy";
+import { accountCopies, accountCopy } from "@/components/shop/account/_copy";
+import { shopCopy } from "@/server/i18n/locale";
 import { Alert } from "@/components/shop/account/form";
 import { ButtonLink } from "@/components/shop/ui/Button";
 import { Container } from "@/components/shop/ui/Container";
 import { Skeleton } from "@/components/shop/ui/Skeleton";
 
-const t = accountCopy.newsletter;
+export async function generateMetadata(): Promise<Metadata> {
+  const t = (await shopCopy(accountCopies)).newsletter;
+  return { title: t.title, robots: { index: false, follow: true } };
+}
 
-export const metadata: Metadata = { title: t.title, robots: { index: false, follow: true } };
-
-type StatusKey = keyof typeof t.status;
+type StatusKey = keyof typeof accountCopy.newsletter.status;
 
 /** Outcome page for confirm/unsubscribe links: `/newsletter?status=confirmed|expired|invalid|unsubscribed`. */
-export default function NewsletterStatusPage({ searchParams }: PageProps<"/newsletter">) {
+export default async function NewsletterStatusPage({ searchParams }: PageProps<"/newsletter">) {
+  const t = (await shopCopy(accountCopies)).newsletter;
   return (
     <Container size="narrow" className="py-12 sm:py-20">
       <div className="mx-auto max-w-md text-center">
@@ -30,6 +33,7 @@ export default function NewsletterStatusPage({ searchParams }: PageProps<"/newsl
 
 async function Status({ searchParams }: { searchParams: PageProps<"/newsletter">["searchParams"] }) {
   const raw = (await searchParams).status;
+  const t = (await shopCopy(accountCopies)).newsletter;
   const key: StatusKey = typeof raw === "string" && raw in t.status ? (raw as StatusKey) : "unknown";
   const s = t.status[key];
   return (

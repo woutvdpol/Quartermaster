@@ -4,15 +4,16 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { buttonClasses } from "@/components/shop/ui/Button";
 import { restoreCartAction } from "./actions";
-import { cartCopy } from "./_copy";
-
-const t = cartCopy.restore;
+import { useLocalizedHref, useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { cartCopies } from "./_copy";
 
 /**
  * Shown on /cart?restore=<token> (link from the abandoned-cart mail). Restoring changes the cart
  * cookie, so it is a button (POST), never automatic on GET.
  */
 export function RestoreCartPrompt({ token }: { token: string }) {
+  const t = useShopCopy(cartCopies).restore;
+  const href = useLocalizedHref();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState(false);
@@ -32,7 +33,7 @@ export function RestoreCartPrompt({ token }: { token: string }) {
             start(async () => {
               const res = await restoreCartAction(token);
               if (!res.ok) return setFailed(true);
-              router.replace("/cart");
+              router.replace(href("/cart"));
               router.refresh();
             })
           }

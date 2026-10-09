@@ -9,7 +9,11 @@
  *                         → {"model", "dim", "vectors": number[][]}
  *   POST /embed/image     body = photo bytes (image/jpeg|png|webp) or raw RGB
  *                         (application/x-rgb + X-Image-Width/X-Image-Height) → {"model", "dim", "vector"}
- *   Auth: `Authorization: Bearer <EMBEDDER_TOKEN>` on every /embed call.
+ *   POST /translate       {"target": "nl"|"de", "texts": string[]} (English sentences, already split
+ *                         and with protected tokens replaced by placeholders — src/server/translations)
+ *                         → {"model", "translations": string[]}. Translation models load lazily per
+ *                         language on first use and unload after TRANSLATE_IDLE_MINUTES (default 15).
+ *   Auth: `Authorization: Bearer <EMBEDDER_TOKEN>` on every /embed and /translate call.
  *
  * Models (docs/search.md § Modellen):
  *   text   Xenova/multilingual-e5-small (int8, 384-d, MIT) — "query: " / "passage: " prefixes
@@ -26,7 +30,27 @@ export const TEXT_KINDS: readonly TextKind[] = ["query", "passage", "image-query
 export type EmbedTextRequest = { kind: TextKind; texts: string[] };
 export type EmbedTextResponse = { model: string; dim: number; vectors: number[][] };
 export type EmbedImageResponse = { model: string; dim: number; vector: number[] };
-export type ReadyResponse = { ready: boolean; parts: Record<"text" | "imageText" | "image", "cold" | "loading" | "ready" | "failed">; rssMb: number };
+export type ReadyResponse = {
+  ready: boolean;
+  parts: Record<"text" | "imageText" | "image", "cold" | "loading" | "ready" | "failed">;
+  /** Translation models (lazy: "cold" until first use, back to "cold" after idle unload). Not part of `ready`. */
+  translate?: Record<TranslateTarget, "cold" | "loading" | "ready" | "failed">;
+  rssMb: number;
+};
+
+/**
+ * Machine translation EN → NL/DE: Opus-MT (Helsinki-NLP, MarianMT) as ONNX int8 via transformers.js.
+ * Licences: opus-mt-en-nl Apache-2.0, opus-mt-en-de CC-BY-4.0 (attribution: docs/i18n.md).
+ */
+export const TRANSLATE_MODELS = {
+  nl: { id: "Xenova/opus-mt-en-nl", dtype: "q8", key: "opus-mt-en-nl@q8" },
+  de: { id: "Xenova/opus-mt-en-de", dtype: "q8", key: "opus-mt-en-de@q8" },
+} as const;
+export type TranslateTarget = keyof typeof TRANSLATE_MODELS;
+export const TRANSLATE_TARGETS = Object.keys(TRANSLATE_MODELS) as TranslateTarget[];
+
+export type TranslateRequest = { target: TranslateTarget; texts: string[] };
+export type TranslateResponse = { model: string; translations: string[] };
 
 /** Request limits (enforced by the server; clients stay below them). */
 export const LIMITS = {
@@ -35,6 +59,9 @@ export const LIMITS = {
   maxTextBodyBytes: 512 * 1024,
   maxImageBytes: 10 * 1024 * 1024,
   maxImagePixels: 40_000_000,
+  /** /translate: sentences per request and characters per sentence (Opus-MT handles ≤ 512 tokens). */
+  maxTranslateTexts: 32,
+  maxTranslateChars: 600,
 } as const;
 
 /** SigLIP input size (the server resizes; clients may pre-shrink to save bandwidth). */

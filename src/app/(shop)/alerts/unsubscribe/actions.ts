@@ -1,6 +1,6 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { localeRedirect } from "@/server/i18n/locale";
 import { getRequestTenant } from "@/server/tenant";
 import { performUnsubscribe, readUnsubscribeTarget } from "../_links";
 
@@ -12,5 +12,5 @@ export async function unsubscribeAlertAction(formData: FormData): Promise<void> 
   } catch (error) {
     console.error("unsubscribeAlertAction failed", error);
   }
-  redirect(`/alerts?status=${ok ? "unsubscribed" : "invalid"}`);
+  await localeRedirect(`/alerts?status=${ok ? "unsubscribed" : "invalid"}`);
 }

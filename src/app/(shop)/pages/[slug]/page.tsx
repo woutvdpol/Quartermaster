@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { permanentRedirect } from "next/navigation";
 import { requireShop, getShopContext } from "@/server/storefront/context";
 import { getStorefrontPage } from "@/server/storefront/content";
+import { translatePage } from "@/server/storefront/translate";
 import { getShopViewer } from "@/server/storefront/viewer";
 import { markdownToPlainText } from "@/server/content/markdown";
 import { redirectOrNotFound } from "@/server/redirects/runtime";
@@ -9,7 +9,8 @@ import { BlockRenderer } from "@/components/shop/blocks/BlockRenderer";
 import { blockContext } from "@/components/shop/blocks/context";
 import { Breadcrumbs } from "@/components/shop/ui/Breadcrumbs";
 import { Container } from "@/components/shop/ui/Container";
-import { shopOgDefaults } from "@/lib/seo/metadata";
+import { shopAlternates, shopOgDefaults } from "@/lib/seo/metadata";
+import { localePermanentRedirect } from "@/server/i18n/locale";
 import { metaDescription, metaTitle } from "@/lib/seo/text";
 
 /*
@@ -25,7 +26,8 @@ const titleClass = "text-[2.25rem] leading-[1.05] tracking-[-0.03em] text-shop-i
 async function load(slugParam: string) {
   const shop = await getShopContext();
   if (!shop || !SLUG.test(slugParam)) return { shop, page: null };
-  return { shop, page: await getStorefrontPage(shop.tenant.id, slugParam) };
+  // Title + SEO texts in the shop language (approved translations; blocks stay as written).
+  return { shop, page: await translatePage(shop.tenant.id, shop.locale, await getStorefrontPage(shop.tenant.id, slugParam)) };
 }
 
 export async function generateMetadata({ params }: PageProps<"/pages/[slug]">): Promise<Metadata> {
@@ -44,8 +46,8 @@ export async function generateMetadata({ params }: PageProps<"/pages/[slug]">): 
     title,
     description,
     // Markdown alternate for AI assistants (/{slug}.md → src/app/md/page).
-    alternates: { canonical: page.href, types: { "text/markdown": `${page.href}.md` } },
-    openGraph: { ...shopOgDefaults(shop), type: "article", url: page.href, title, description, modifiedTime: page.updatedAt },
+    alternates: shopAlternates(shop, page.href, { "text/markdown": `${page.href}.md` }),
+    openGraph: { ...shopOgDefaults(shop), type: "article", url: shopAlternates(shop, page.href).canonical, title, description, modifiedTime: page.updatedAt },
   };
 }
 
@@ -55,7 +57,7 @@ export default async function CmsPage({ params, searchParams }: PageProps<"/page
   const { page } = await load(slug);
   // Unknown slug: `/{slug}` reaches this page through the fallback rewrite, so it may be an old URL.
   if (!page) return redirectOrNotFound(`/${slug}`, await searchParams);
-  if (page.systemKey === "HOME") permanentRedirect("/");
+  if (page.systemKey === "HOME") await localePermanentRedirect("/");
 
   const viewer = await getShopViewer(shop.tenant.id);
   const withBanner = shop.settings.content.bannerOnPages;
@@ -76,14 +78,14 @@ export default async function CmsPage({ params, searchParams }: PageProps<"/page
                 {/* eslint-disable-next-line @next/next/no-img-element -- stored branding asset */}
                 <img src={banner} alt="" className="absolute inset-0 -z-10 h-full w-full object-cover" />
                 <div className="m-3 max-w-[560px] rounded-shop bg-shop-surface p-6 sm:m-6 sm:px-8 sm:py-7">
-                  <Breadcrumbs items={[{ label: page.title }]} className="mb-3" jsonLdBase={shop.origin} />
+                  <Breadcrumbs items={[{ label: page.title }]} className="mb-3" jsonLdBase={shop.origin} locale={shop.locale} />
                   <h1 className={titleClass}>{page.title}</h1>
                 </div>
               </div>
             </Container>
           ) : (
             <Container size="narrow" className="pt-6 sm:pt-10">
-              <Breadcrumbs items={[{ label: page.title }]} className="mb-4" jsonLdBase={shop.origin} />
+              <Breadcrumbs items={[{ label: page.title }]} className="mb-4" jsonLdBase={shop.origin} locale={shop.locale} />
               <h1 className={titleClass}>{page.title}</h1>
             </Container>
           )}

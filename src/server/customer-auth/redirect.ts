@@ -7,6 +7,8 @@
  * business there and it would turn the login into an open-redirect helper).
  */
 
+import { splitLocalePath } from "@/lib/i18n/shop-locales";
+
 export const DEFAULT_AFTER_LOGIN = "/account";
 
 const MAX_LENGTH = 512;
@@ -17,7 +19,8 @@ export function safeShopRedirect(input: unknown, fallback: string = DEFAULT_AFTE
   if (!url || url.length > MAX_LENGTH) return fallback;
   if (!url.startsWith("/") || url.startsWith("//")) return fallback;
   if (url.includes("\\") || /[\u0000-\u001F\u007F\s]/.test(url)) return fallback;
-  const path = url.split(/[?#]/)[0].toLowerCase();
+  // Checked without the language prefix ("/de/login" is an auth page too).
+  const path = splitLocalePath(url.split(/[?#]/)[0]).path.toLowerCase();
   if (/^\/(admin|api)(\/|$)/.test(path)) return fallback;
   // Auth pages themselves are not useful destinations (avoid login → login loops).
   if (/^\/(login|register|forgot-password)(\/|$)/.test(path) || path === "/account/reset-password") return fallback;

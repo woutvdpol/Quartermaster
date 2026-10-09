@@ -1,7 +1,9 @@
 import { cn } from "./cn";
 import { formatIndicative, formatMoney } from "./money";
 import type { DisplayCurrency } from "./types";
-import { uiCopy } from "./_copy";
+import { uiCopies } from "./_copy";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import type { ShopLocale } from "@/lib/i18n/shop-locales";
 
 /**
  * A price in the shop currency, with an optional indicative conversion:
@@ -16,6 +18,7 @@ export function Price({
   compareAtCents,
   size = "md",
   className,
+  locale,
 }: {
   cents: number;
   currency: string;
@@ -24,16 +27,19 @@ export function Price({
   compareAtCents?: number | null;
   size?: "sm" | "md" | "lg" | "xl";
   className?: string;
+  /** Shop language: "€1,450.00" · "€ 1.450,00" · "1.450,00 €". */
+  locale: ShopLocale;
 }) {
-  const indicative = display && display.currency !== currency ? formatIndicative(cents, currency, display.currency, display.rate) : null;
+  const uiCopy = pickCopy(uiCopies, locale);
+  const indicative = display && display.currency !== currency ? formatIndicative(cents, currency, display.currency, display.rate, locale) : null;
   const sizes = { sm: "text-sm", md: "text-base", lg: "text-xl", xl: "text-[1.9rem] leading-none tracking-[-0.02em] sm:text-[2.2rem]" } as const;
   return (
     <span className={cn("inline-flex flex-wrap items-baseline gap-x-2 gap-y-0.5", className)}>
-      <span className={cn("font-semibold text-shop-ink tabular-nums", sizes[size], size === "xl" && "font-shop-heading")}>{formatMoney(cents, currency)}</span>
+      <span className={cn("font-semibold text-shop-ink tabular-nums", sizes[size], size === "xl" && "font-shop-heading")}>{formatMoney(cents, currency, locale)}</span>
       {compareAtCents && compareAtCents > cents ? (
         <s className="text-sm text-shop-muted tabular-nums">
           <span className="sr-only">{uiCopy.price.was} </span>
-          {formatMoney(compareAtCents, currency)}
+          {formatMoney(compareAtCents, currency, locale)}
         </s>
       ) : null}
       {indicative ? (

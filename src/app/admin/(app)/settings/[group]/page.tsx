@@ -13,6 +13,8 @@ import { SearchIndexCard } from "../_components/SearchIndexCard";
 import { getSearchIndexOverview } from "@/server/search";
 import { getNetworkMembership } from "@/server/network/admin";
 import { NetworkMembershipCard } from "../_components/NetworkMembershipCard";
+import { TranslateStockCard } from "../_components/TranslateStockCard";
+import { getTranslationOverview } from "@/server/translations/service";
 
 export async function generateMetadata({ params }: PageProps<"/admin/settings/[group]">): Promise<Metadata> {
   const { group } = await params;
@@ -27,11 +29,12 @@ export default async function SettingsGroupPage({ params }: PageProps<"/admin/se
   const isSuper = ctx.actor.role === "SUPERADMIN";
   if (!isSettingsGroup(group) || (PLATFORM_ONLY_GROUPS.has(group) && !isSuper)) notFound();
 
-  const [values, tenant, searchIndex, network] = await Promise.all([
+  const [values, tenant, searchIndex, network, translations] = await Promise.all([
     getSettings(ctx.tenantId, group),
     requireTenantDisplay(ctx.tenantId),
     group === "catalog" ? getSearchIndexOverview(ctx) : Promise.resolve(null),
     group === "general" ? getNetworkMembership(ctx) : Promise.resolve(null),
+    group === "i18n" ? getTranslationOverview(ctx) : Promise.resolve(null),
   ]);
   const meta = SETTINGS_FORMS[group];
   const formId = `settings-${group}`;
@@ -91,6 +94,7 @@ export default async function SettingsGroupPage({ params }: PageProps<"/admin/se
           {/* Outside the settings <form>: the card has its own actions. */}
           {searchIndex ? <SearchIndexCard initial={searchIndex} /> : null}
           {network ? <NetworkMembershipCard initial={network} /> : null}
+          {translations ? <TranslateStockCard overview={translations} /> : null}
         </div>
       </div>
     </>

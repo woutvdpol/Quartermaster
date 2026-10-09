@@ -1,6 +1,9 @@
+import { localized } from "@/lib/i18n/shop-copy";
 import { fieldCopy } from "./_copy-field";
+import { searchCopyDe } from "./_copy.de";
+import { searchCopyNl } from "./_copy.nl";
 
-/** English copy for smart search (header combobox, results page, photo search, "looks like this"). */
+/** English copy for smart search (header combobox, results page, photo search, "looks like this"; Dutch/German: ./_copy.nl.ts, ./_copy.de.ts). */
 export const searchCopy = {
   field: fieldCopy,
   panel: {
@@ -72,3 +75,5 @@ export const searchCopy = {
     intro: "Items that look or read alike.",
   },
 } as const;
+
+export const searchCopies = localized({ en: searchCopy, nl: searchCopyNl, de: searchCopyDe });

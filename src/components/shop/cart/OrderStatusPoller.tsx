@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { cartCopy } from "./_copy";
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { cartCopies } from "./_copy";
 
 /**
  * While the order waits for Mollie's webhook, re-reads the page from the server every few seconds
@@ -10,6 +11,7 @@ import { cartCopy } from "./_copy";
  * Backs off (3 s → 15 s) and stops after 15 minutes.
  */
 export function OrderStatusPoller({ active }: { active: boolean }) {
+  const t = useShopCopy(cartCopies).order;
   const router = useRouter();
   const [ticking, setTicking] = useState(false);
 
@@ -33,7 +35,7 @@ export function OrderStatusPoller({ active }: { active: boolean }) {
   if (!active) return null;
   return (
     <p aria-live="polite" className="text-xs text-shop-muted">
-      {ticking ? cartCopy.order.refreshing : " "}
+      {ticking ? t.refreshing : " "}
     </p>
   );
 }

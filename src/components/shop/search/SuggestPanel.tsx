@@ -5,14 +5,14 @@ import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type R
 import { cn } from "@/components/shop/ui/cn";
 import { IntentLink } from "@/components/shop/ui/IntentLink";
 import { formatMoney } from "@/components/shop/ui/money";
+import { useLocalizedHref, useShopCopy, useShopLocale } from "@/components/shop/i18n/ShopLocale";
+import type { ShopLocale } from "@/lib/i18n/shop-locales";
 import { LockedImg, ShopImg } from "@/components/shop/ui/ShopImg";
 import type { SuggestResponse } from "@/server/search/api-types";
 import { CLOSED, clampActive, comboKey, type ComboState } from "./combobox";
-import { SUGGEST_DEBOUNCE_MS, SUGGEST_MIN_CHARS, createSuggestClient, normalizeQuery } from "./suggest-client";
+import { SUGGEST_DEBOUNCE_MS, SUGGEST_MIN_CHARS, createSuggestClient, normalizeQuery, type SuggestClient } from "./suggest-client";
 import type { SearchFieldVariant } from "./SearchField";
-import { searchCopy } from "./_copy";
-
-const t = searchCopy.panel;
+import { searchCopies } from "./_copy";
 
 /** What the field shell renders on its input (aria-expanded / aria-activedescendant). */
 export type PanelUi = { expanded: boolean; active: string | undefined };
@@ -24,8 +24,16 @@ export type PanelHandlers = {
   keyDown(e: KeyboardEvent<HTMLInputElement>): void;
 };
 
-/** One client (request cache + abort) per tab, shared by every search field on the page. */
-const client = createSuggestClient();
+/** One client (request cache + abort) per tab and language, shared by every search field on the page. */
+const clients = new Map<ShopLocale, SuggestClient>();
+function suggestClient(locale: ShopLocale): SuggestClient {
+  let c = clients.get(locale);
+  if (!c) clients.set(locale, (c = createSuggestClient({ locale })));
+  return c;
+}
+
+/** "€1,450.00" → "€1,450", "1.450,00 €" → "1.450 €" (whole amounts without cents). */
+const dropZeroCents = (s: string) => s.replace(/[.,]00(?=\D*$)/, "");
 
 type Option = { id: string; href: string };
 
@@ -48,6 +56,10 @@ export function SuggestPanel({
   onUi: (ui: PanelUi) => void;
   register: (h: PanelHandlers | null) => void;
 }) {
+  const locale = useShopLocale();
+  const t = useShopCopy(searchCopies).panel;
+  const localizedHref = useLocalizedHref();
+  const client = suggestClient(locale);
   const router = useRouter();
   const pathname = usePathname();
   const idBase = useId();
@@ -67,7 +79,7 @@ export function SuggestPanel({
     ].slice(0, 5);
     const items = data.products.map((p) => ({ id: `${idBase}-p-${p.id}`, href: p.href, p }));
     return { filters, items, all: { id: `${idBase}-all`, href: data.searchHref } };
-  }, [data, idBase]);
+  }, [data, idBase, t]);
   const options: Option[] = useMemo(() => [...groups.filters, ...groups.items, ...(groups.all ? [groups.all] : [])], [groups]);
   const open = combo.open && data !== null;
   const active = open && combo.active >= 0 ? options[combo.active] : undefined;
@@ -142,7 +154,7 @@ export function SuggestPanel({
       const r = comboKey(open ? combo : { open: false, active: -1 }, e.key, data ? options.length : 0, { alt: e.altKey });
       if (r.preventDefault) e.preventDefault();
       if (r.effect === "select" && active) {
-        router.push(active.href);
+        router.push(localizedHref(active.href));
         inputRef.current?.blur();
       }
       if (r.effect === "submit" && timer.current) clearTimeout(timer.current);
@@ -234,7 +246,7 @@ export function SuggestPanel({
                       <span className="truncate text-[0.95rem] font-medium">{p.title}</span>
                       <span className="truncate text-xs text-shop-muted">{p.why}</span>
                     </span>
-                    <span className="shrink-0 text-[0.95rem] font-bold tabular-nums">{p.showPrice ? formatMoney(p.priceCents, p.currency).replace(/\.00$/, "") : t.sold}</span>
+                    <span className="shrink-0 text-[0.95rem] font-bold tabular-nums">{p.showPrice ? dropZeroCents(formatMoney(p.priceCents, p.currency, locale)) : t.sold}</span>
                   </IntentLink>
                 );
               })}

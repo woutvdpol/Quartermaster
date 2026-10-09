@@ -6,9 +6,9 @@ import { formatMoney } from "@/components/shop/ui/money";
 import type { CheckoutQuote } from "@/server/checkout";
 import { cartEstimateAction } from "./actions";
 import { FreeShippingBar } from "./FreeShippingBar";
-import { cartCopy } from "./_copy";
-
-const t = cartCopy.cart;
+import { useShopCopy, useShopLocale } from "@/components/shop/i18n/ShopLocale";
+import { cartCopies } from "./_copy";
+import { localizeServerMessage } from "./server-messages";
 
 export type CountryOption = { code: string; name: string };
 
@@ -29,6 +29,9 @@ export function CartSummary({
   initialCountry: string | null;
   initialQuote: CheckoutQuote | null;
 }) {
+  const locale = useShopLocale();
+  const copy = useShopCopy(cartCopies);
+  const t = copy.cart;
   const [country, setCountry] = useState(initialCountry ?? "");
   const [quote, setQuote] = useState<CheckoutQuote | null>(initialQuote);
   const [pending, startTransition] = useTransition();
@@ -47,7 +50,8 @@ export function CartSummary({
   const freeByCoupon = quote?.coupon?.ok === true && quote.coupon.freeShipping;
   const shipping = delivery ? (freeByCoupon ? 0 : delivery.price) : null;
   const discount = quote?.totals.discount ?? 0;
-  const fmt = (n: number) => formatMoney(n, currency);
+  const fmt = (n: number) => formatMoney(n, currency, locale);
+  const unavailableReason = quote?.unavailableReason ? localizeServerMessage(quote.unavailableReason, locale) : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -59,7 +63,7 @@ export function CartSummary({
         {discount > 0 ? (
           <div className="flex justify-between gap-4">
             <dt className="text-shop-ink-2">
-              {cartCopy.coupon.discount}
+              {copy.coupon.discount}
               {quote?.coupon ? <span className="text-shop-muted"> · {quote.coupon.code}</span> : null}
             </dt>
             <dd className="font-semibold tabular-nums text-shop-ok">−{fmt(discount)}</dd>
@@ -96,25 +100,25 @@ export function CartSummary({
                 </>
               ) : pickupOnly ? (
                 <span className="text-shop-muted">
-                  {quote.unavailableReason ? `${quote.unavailableReason} · ` : ""}
+                  {unavailableReason ? `${unavailableReason} · ` : ""}
                   {t.pickupOnly}
                 </span>
               ) : (
-                <span className="text-shop-crit">{quote.unavailableReason}</span>
+                <span className="text-shop-crit">{unavailableReason}</span>
               )}
             </p>
           </dd>
         </div>
       </dl>
 
-      {quote?.freeShipping ? <FreeShippingBar progress={quote.freeShipping} currency={currency} /> : null}
+      {quote?.freeShipping ? <FreeShippingBar progress={quote.freeShipping} currency={currency} locale={locale} /> : null}
       {quote && quote.minimumShortfall > 0 ? (
         <p className="rounded-shop bg-shop-warn-soft px-4 py-2.5 text-sm text-shop-warn">{t.minimumOrder(fmt(quote.minimumShortfall))}</p>
       ) : null}
 
       {shipping !== null && quote ? (
         <div className="flex items-baseline justify-between gap-4 border-t border-shop-line-strong/40 pt-4">
-          <span className="font-semibold">{cartCopy.checkout.total}</span>
+          <span className="font-semibold">{copy.checkout.total}</span>
           <span className="font-shop-heading text-2xl font-semibold tracking-tight tabular-nums">{fmt(quote.totals.subtotal - discount + shipping)}</span>
         </div>
       ) : null}

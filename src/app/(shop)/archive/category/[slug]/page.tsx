@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requireShop } from "@/server/storefront/context";
 import { CatalogView, defaultSortFor } from "@/components/shop/catalog/CatalogView";
-import { catalogCopy as copy } from "@/components/shop/catalog/_copy";
+import { catalogCopies } from "@/components/shop/catalog/_copy";
+import { pickCopy } from "@/lib/i18n/shop-copy";
 import { catalogMetadata } from "@/components/shop/catalog/metadata";
+import { translateCategory, translateCategoryTree } from "@/server/storefront/translate";
 import { ARCHIVE_PATH, archiveCategoryHref, categoryPath, getCategoryBySlug, getCategoryTree, parseCatalogParams, type RawSearchParams } from "@/server/storefront-catalog";
 
 // Spelled out (not PageProps<…>): the generated route types only learn this route on the next build.
@@ -15,16 +17,22 @@ async function load(rawSlug: string) {
   if (!shop.settings.catalog.publicArchive) notFound();
   const slug = decodeURIComponent(rawSlug).toLowerCase();
   if (!/^[a-z0-9-]{1,120}$/.test(slug)) notFound();
-  const [category, tree] = await Promise.all([getCategoryBySlug(shop.tenant.id, slug), getCategoryTree(shop.tenant.id)]);
-  if (!category) notFound();
-  const path = categoryPath(tree, category.id);
+  const [source, tree] = await Promise.all([
+    getCategoryBySlug(shop.tenant.id, slug),
+    // Titles in the shop language (approved translations; docs/i18n.md).
+    getCategoryTree(shop.tenant.id).then((t) => translateCategoryTree(shop.tenant.id, shop.locale, t)),
+  ]);
+  if (!source) notFound();
+  const path = categoryPath(tree, source.id);
   if (!path.length) notFound();
+  const { category } = await translateCategory(shop.tenant.id, shop.locale, source);
   return { shop, category, path };
 }
 
 /** Sold archive of one category (and its subcategories) — docs/sold-archive.md. */
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { shop, category } = await load((await params).slug);
+  const copy = pickCopy(catalogCopies, shop.locale);
   const defaultSort = defaultSortFor(shop, "archive");
   const query = parseCatalogParams(await searchParams, defaultSort);
   return catalogMetadata({
@@ -39,6 +47,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 
 export default async function ArchiveCategoryPage({ params, searchParams }: Props) {
   const { shop, category, path } = await load((await params).slug);
+  const copy = pickCopy(catalogCopies, shop.locale);
   return (
     <CatalogView
       shop={shop}

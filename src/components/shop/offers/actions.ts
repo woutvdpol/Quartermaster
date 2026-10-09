@@ -9,6 +9,12 @@ import { getShopViewer } from "@/server/cart";
 import { readCartToken, writeCartToken } from "@/server/cart/cookie";
 import { buyOffer, respondToCounter, submitOffer, OFFER_PATHS } from "@/server/offers";
 import { turnstileTokenFrom, verifyTurnstile } from "@/server/turnstile";
+import { getRequestLocale } from "@/server/i18n/locale";
+import { localizePath } from "@/lib/i18n/shop-locales";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { localizeFieldErrors, localizeServerMessage } from "@/components/shop/cart/server-messages";
+import { cartCopies } from "@/components/shop/cart/_copy";
+import { offerCopies } from "./_copy";
 
 /*
  * Offer flow server actions (product page dialog, /offer/<token>, /offer/counter/<token>).
@@ -44,14 +50,16 @@ export async function submitOfferAction(_prev: OfferFormState, form: FormData): 
     const v = form.get(k);
     return typeof v === "string" ? v : "";
   };
+  const locale = await getRequestLocale();
+  const t = pickCopy(offerCopies, locale);
   const values = { name: str("name"), email: str("email"), amount: str("amount"), message: str("message") };
   const amount = parseAmount(values.amount);
-  if (amount === null) return { ok: false, message: "Please check the highlighted fields", errors: { amount: "Enter an amount like 85 or 85.50" }, values };
+  if (amount === null) return { ok: false, message: t.errors.checkFields, errors: { amount: t.invalidAmount }, values };
   try {
     const tenantId = await requireTenantId();
     const ip = await clientIp();
     const captcha = await verifyTurnstile(turnstileTokenFrom(form), ip, { action: "offer" });
-    if (!captcha.ok) return { ok: false, message: "We could not verify that you are human. Please try again.", values };
+    if (!captcha.ok) return { ok: false, message: t.errors.captcha, values };
     const viewer = await getShopViewer(tenantId);
     const res = await submitOffer(
       tenantId,
@@ -67,10 +75,10 @@ export async function submitOfferAction(_prev: OfferFormState, form: FormData): 
       { ip },
     );
     if (res.ok) return { ok: true, message: "sent" };
-    return { ok: false, message: res.message, errors: res.errors, values };
+    return { ok: false, message: localizeServerMessage(res.message, locale), errors: localizeFieldErrors(res.errors, locale), values };
   } catch (err) {
     console.error("[offers] submit failed", err instanceof Error ? err.message : err);
-    return { ok: false, message: "Something went wrong. Please try again.", values };
+    return { ok: false, message: t.error, values };
   }
 }
 
@@ -78,26 +86,30 @@ const BUY_RULE = { limit: 30, windowMs: 10 * 60 * 1000 };
 
 /** "Buy now" on the personal offer page. Returns the next path (client navigates — see cart actions). */
 export async function buyOfferAction(token: unknown): Promise<{ ok: true; redirectTo: string } | { ok: false; message: string }> {
-  if (typeof token !== "string" || token.length > 120) return { ok: false, message: "This offer link is no longer valid" };
+  const locale = await getRequestLocale();
+  const t = pickCopy(offerCopies, locale);
+  if (typeof token !== "string" || token.length > 120) return { ok: false, message: t.errors.offerLinkInvalid };
   const tenantId = await requireTenantId();
   const key = `offer.buy:${tenantId}:${(await clientIp()) ?? "unknown"}`;
-  if (!(await take(key, BUY_RULE))) return { ok: false, message: "Too many attempts. Please wait a moment." };
+  if (!(await take(key, BUY_RULE))) return { ok: false, message: pickCopy(cartCopies, locale).errors.rateLimitedShort };
   const viewer = await getShopViewer(tenantId);
   const { token: newCartToken, result } = await buyOffer(tenantId, token, await readCartToken(), viewer);
   if (newCartToken) await writeCartToken(newCartToken);
   revalidatePath("/cart");
-  if (!result.ok) return { ok: false, message: result.message };
-  return { ok: true, redirectTo: "/checkout" };
+  if (!result.ok) return { ok: false, message: localizeServerMessage(result.message, locale) };
+  return { ok: true, redirectTo: localizePath("/checkout", locale) };
 }
 
 /** Accept / decline a counter offer. Accept → straight to the personal checkout page. */
 export async function respondToCounterAction(token: unknown, decision: unknown): Promise<{ ok: true; redirectTo: string | null } | { ok: false; message: string }> {
-  if (typeof token !== "string" || token.length > 120 || (decision !== "accept" && decision !== "decline")) return { ok: false, message: "This link is no longer valid" };
+  const locale = await getRequestLocale();
+  const t = pickCopy(offerCopies, locale);
+  if (typeof token !== "string" || token.length > 120 || (decision !== "accept" && decision !== "decline")) return { ok: false, message: t.errors.linkInvalid };
   const tenantId = await requireTenantId();
   const key = `offer.counter:${tenantId}:${(await clientIp()) ?? "unknown"}`;
-  if (!(await take(key, BUY_RULE))) return { ok: false, message: "Too many attempts. Please wait a moment." };
+  if (!(await take(key, BUY_RULE))) return { ok: false, message: pickCopy(cartCopies, locale).errors.rateLimitedShort };
   const res = await respondToCounter(tenantId, token, decision);
-  if (!res.ok) return res;
+  if (!res.ok) return { ok: false, message: localizeServerMessage(res.message, locale) };
   revalidatePath(OFFER_PATHS.counter(token));
-  return { ok: true, redirectTo: res.decision === "accept" ? OFFER_PATHS.checkout(res.checkoutToken) : null };
+  return { ok: true, redirectTo: res.decision === "accept" ? localizePath(OFFER_PATHS.checkout(res.checkoutToken), locale) : null };
 }

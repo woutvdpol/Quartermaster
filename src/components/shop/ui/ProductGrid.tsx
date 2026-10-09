@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { cn } from "./cn";
 import { ProductCard } from "./ProductCard";
 import type { DisplayCurrency, ProductCardData } from "./types";
+import type { ShopLocale } from "@/lib/i18n/shop-locales";
 
 /**
  * Responsive grid of ProductCards: 2 columns on phones, 3 on tablets, `columns` (3|4, from
@@ -17,6 +18,7 @@ export function ProductGrid({
   priorityCount = 0,
   headingLevel,
   className,
+  locale,
 }: {
   products: ProductCardData[];
   columns?: 3 | 4;
@@ -26,6 +28,7 @@ export function ProductGrid({
   priorityCount?: number;
   headingLevel?: 2 | 3 | 4;
   className?: string;
+  locale: ShopLocale;
 }) {
   // Measured card widths: 171/182 css px on 390/412 phones (2 columns minus padding and gap), 224 on a
   // 768 tablet (3 columns), 228–300 on desktop depending on the catalog sidebar.
@@ -48,6 +51,7 @@ export function ProductGrid({
             priority={i < priorityCount}
             headingLevel={headingLevel}
             sizes={sizes}
+            locale={locale}
             className="w-full"
           />
         </li>

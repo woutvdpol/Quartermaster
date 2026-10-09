@@ -19,7 +19,13 @@ export type NavItem = {
 };
 
 export const ADMIN_NAV: { group: NavGroupKey; items: NavItem[] }[] = [
-  { group: "overview", items: [{ key: "dashboard", slug: "dashboard", built: true }] },
+  {
+    group: "overview",
+    items: [
+      { key: "dashboard", slug: "dashboard", built: true },
+      { key: "insights", slug: "insights", built: true },
+    ],
+  },
   {
     group: "catalog",
     items: [
@@ -48,6 +54,7 @@ export const ADMIN_NAV: { group: NavGroupKey; items: NavItem[] }[] = [
       { key: "pages", slug: "pages", built: true },
       { key: "theme", slug: "theme", built: true },
       { key: "menus", slug: "menus", built: true },
+      { key: "translations", slug: "translations", built: true },
       { key: "redirects", slug: "redirects", built: true },
       { key: "newsletter", slug: "newsletter", built: true },
     ],

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { latest, parseSitemapFile, sitemapFileName, sitemapIndexXml, urlsetXml, w3cDate, xmlEscape } from "./sitemap-xml";
+import { latest, localizedSitemapUrls, parseSitemapFile, sitemapFileName, sitemapIndexXml, urlsetXml, w3cDate, xmlEscape } from "./sitemap-xml";
 
 describe("sitemap XML", () => {
   it("escapes XML", () => {
@@ -38,5 +38,25 @@ describe("sitemap XML", () => {
     expect(w3cDate("nope")).toBeNull();
     expect(latest(["2026-01-01T00:00:00Z", null, "2026-03-01T00:00:00Z"])).toBe("2026-03-01T00:00:00.000Z");
     expect(latest([])).toBeNull();
+  });
+});
+
+describe("localizedSitemapUrls", () => {
+  it("keeps entries as they were for English-only shops", () => {
+    const urls = localizedSitemapUrls("https://shop.nl", ["en"], [{ path: "/shop", images: ["https://shop.nl/a.jpg"] }]);
+    expect(urls).toEqual([{ loc: "https://shop.nl/shop", lastmod: undefined, images: ["https://shop.nl/a.jpg"] }]);
+    expect(urlsetXml(urls)).not.toContain("xhtml");
+  });
+
+  it("lists every language with hreflang alternates; images only on the English entry", () => {
+    const urls = localizedSitemapUrls("https://shop.nl", ["en", "de"], [{ path: "/product/1/helm", lastmod: "2026-10-01T00:00:00.000Z", images: ["https://shop.nl/a.jpg"] }]);
+    expect(urls.map((u) => u.loc)).toEqual(["https://shop.nl/product/1/helm", "https://shop.nl/de/product/1/helm"]);
+    expect(urls[1].alternates).toEqual({ en: "https://shop.nl/product/1/helm", de: "https://shop.nl/de/product/1/helm", "x-default": "https://shop.nl/product/1/helm" });
+    expect(urls[0].images).toHaveLength(1);
+    expect(urls[1].images).toBeUndefined();
+    const xml = urlsetXml(urls);
+    expect(xml).toContain('xmlns:xhtml="http://www.w3.org/1999/xhtml"');
+    expect(xml).toContain('<xhtml:link rel="alternate" hreflang="de" href="https://shop.nl/de/product/1/helm"/>');
+    expect(xml).toContain('hreflang="x-default"');
   });
 });

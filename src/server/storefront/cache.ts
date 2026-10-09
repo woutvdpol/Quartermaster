@@ -1,5 +1,6 @@
 import "server-only";
 import { revalidateTag, unstable_cache } from "next/cache";
+import { translationsTag } from "@/server/translations/read-pure";
 
 /*
  * Storefront caching (decision: `cacheComponents` stays OFF — it would force every request-time read in the admin behind Suspense; see next.config.ts).
@@ -83,6 +84,8 @@ export function shopTagsForAction(tenantId: string, action: string): string[] {
       return [shopTag(tenantId, "content")];
     case "redirect": // owner-managed + legacy redirects (src/server/redirects)
       return [shopTag(tenantId, "redirects")];
+    case "translation": // approved shop translations, all languages (src/server/translations/read.ts)
+      return [translationsTag(tenantId)];
     case "settings":
     case "shipping":
     case "payments":

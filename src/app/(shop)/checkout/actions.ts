@@ -11,6 +11,11 @@ import { readCartToken } from "@/server/cart/cookie";
 import { placeOrder, quoteCheckout, startOrderPayment, type CheckoutQuote, type FieldErrors } from "@/server/checkout";
 import { formDataToObject } from "@/server/checkout/schema";
 import { orderStatusPath } from "@/server/checkout/urls";
+import { getRequestLocale } from "@/server/i18n/locale";
+import { localizePath } from "@/lib/i18n/shop-locales";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { cartCopies } from "@/components/shop/cart/_copy";
+import { localizeFieldErrors, localizeServerMessage } from "@/components/shop/cart/server-messages";
 
 /*
  * Checkout server actions. Money, zone and availability are decided by src/server/checkout — the form
@@ -39,10 +44,12 @@ async function tenantId(): Promise<string> {
 
 export async function placeOrderAction(_prev: CheckoutFormState, form: FormData): Promise<CheckoutFormState> {
   const tid = await tenantId();
+  const locale = await getRequestLocale();
+  const t = pickCopy(cartCopies, locale).checkout;
   const raw = formDataToObject(form);
   const ipKey = `checkout.place:${tid}:${(await clientIp()) ?? "unknown"}`;
   if (!(await take(ipKey, PLACE_RULE))) {
-    return { status: "error", code: "RATE_LIMITED", message: "Too many attempts. Please wait a few minutes and try again.", values: raw };
+    return { status: "error", code: "RATE_LIMITED", message: t.rateLimited, values: raw };
   }
 
   let destination: string;
@@ -50,14 +57,22 @@ export async function placeOrderAction(_prev: CheckoutFormState, form: FormData)
     const viewer = await getShopViewer(tid);
     const result = await placeOrder(tid, await readCartToken(), raw, viewer);
     if (!result.ok) {
-      return { status: "error", code: result.code, message: result.message, errors: result.errors, values: raw, blockedProductIds: result.blockedProductIds };
+      return {
+        status: "error",
+        code: result.code,
+        message: localizeServerMessage(result.message, locale),
+        errors: localizeFieldErrors(result.errors, locale),
+        values: raw,
+        blockedProductIds: result.blockedProductIds,
+      };
     }
     const host = (await headers()).get("host") ?? "";
     const start = await startOrderPayment(tid, result.orderId, { host });
-    destination = start.kind === "redirect" ? start.url : orderStatusPath(result.uuid);
+    // Mollie redirect URLs stay as they are; the order page opens in the visitor's language.
+    destination = start.kind === "redirect" ? start.url : localizePath(orderStatusPath(result.uuid), locale);
   } catch (err) {
     console.error("[checkout] placing order failed", err instanceof Error ? err.message : err);
-    return { status: "error", code: "ERROR", message: "Something went wrong. Please try again.", values: raw };
+    return { status: "error", code: "ERROR", message: t.unexpected, values: raw };
   }
   // External (Mollie) → redirect. An app path is returned instead: redirecting to an app path from a
   // JS-invoked action renders it through an internal fetch to the server's own origin, which loses the

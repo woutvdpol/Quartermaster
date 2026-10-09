@@ -1,7 +1,9 @@
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { currencyExponent, formatMoney } from "@/components/shop/ui";
 import { catalogQueryString, type CatalogParams, type CatalogSort } from "@/server/storefront-catalog";
-import { catalogCopy as copy } from "./_copy";
+import type { ShopLocale } from "@/lib/i18n/shop-locales";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { catalogCopies } from "./_copy";
 
 /** Removable chips for every active filter + "Clear all". Renders nothing without filters. */
 export function ActiveFilters({
@@ -14,6 +16,7 @@ export function ActiveFilters({
   currency,
   category,
   shopPath,
+  locale,
 }: {
   basePath: string;
   params: CatalogParams;
@@ -27,7 +30,9 @@ export function ActiveFilters({
   /** The current category (a chip that goes back to the unscoped list). */
   category?: { title: string } | null;
   shopPath: string;
+  locale: ShopLocale;
 }) {
+  const copy = pickCopy(catalogCopies, locale);
   const chips: { key: string; label: string; href: string }[] = [];
   const qs = (patch: Partial<CatalogParams>) => catalogQueryString(params, patch, defaultSort);
   if (category) chips.push({ key: "cat", label: category.title, href: `${shopPath}${qs({ page: 1, show: null })}` });
@@ -44,7 +49,7 @@ export function ActiveFilters({
     chips.push({ key: `t:${t}`, label: tagNames[t] ?? t, href: `${basePath}${qs({ tags: params.tags.filter((x) => x !== t) })}` });
   }
   if (params.min !== null || params.max !== null) {
-    const fmt = (n: number | null) => (n === null ? null : formatMoney(n * 10 ** currencyExponent(currency), currency).replace(/[.,]00$/, ""));
+    const fmt = (n: number | null) => (n === null ? null : formatMoney(n * 10 ** currencyExponent(currency), currency, locale).replace(/[.,]00$/, ""));
     chips.push({ key: "price", label: copy.filters.priceRange(fmt(params.min), fmt(params.max)), href: `${basePath}${qs({ min: null, max: null })}` });
   }
   if (!chips.length) return null;

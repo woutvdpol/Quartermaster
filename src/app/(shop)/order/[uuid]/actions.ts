@@ -10,6 +10,10 @@ import { take } from "@/server/auth/rate-limit";
 import { retryOrderPayment, simulateDevPayment, startOrderPayment, isDevSimulationAllowed } from "@/server/checkout";
 import { DEV_OUTCOMES, type DevOutcome } from "@/server/checkout/payment";
 import { orderStatusPath } from "@/server/checkout/urls";
+import { getRequestLocale } from "@/server/i18n/locale";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { cartCopies } from "@/components/shop/cart/_copy";
+import { localizeServerMessage } from "@/components/shop/cart/server-messages";
 
 /*
  * Order page actions (POST only — the page itself never changes anything).
@@ -30,21 +34,23 @@ async function tenantId(): Promise<string> {
 }
 
 export async function payOrderAction(_prev: PayOrderState, form: FormData): Promise<PayOrderState> {
+  const locale = await getRequestLocale();
+  const t = pickCopy(cartCopies, locale);
   const uuid = form.get("uuid");
-  if (typeof uuid !== "string" || !uuidSchema.safeParse(uuid).success) return { message: "Order not found" };
+  if (typeof uuid !== "string" || !uuidSchema.safeParse(uuid).success) return { message: t.errors.orderNotFound };
   const tid = await tenantId();
   const key = `order.retry:${tid}:${(await clientIp()) ?? "unknown"}`;
-  if (!(await take(key, RETRY_RULE))) return { message: "Too many attempts. Please wait a few minutes and try again." };
+  if (!(await take(key, RETRY_RULE))) return { message: t.checkout.rateLimited };
 
   const retry = await retryOrderPayment(tid, uuid);
   if (!retry.ok) {
     revalidatePath(orderStatusPath(uuid));
-    return { message: retry.message };
+    return { message: localizeServerMessage(retry.message, locale) };
   }
   const start = await startOrderPayment(tid, retry.orderId, { host: (await headers()).get("host") ?? "" });
   if (start.kind === "redirect") redirect(start.url);
   revalidatePath(orderStatusPath(uuid));
-  if (start.kind === "error") return { message: start.message };
+  if (start.kind === "error") return { message: localizeServerMessage(start.message, locale) };
   return null;
 }
 

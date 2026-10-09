@@ -1,6 +1,8 @@
-import Link from "next/link";
+import Link from "./Link";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import type { ShopLocale } from "@/lib/i18n/shop-locales";
 import { cn } from "./cn";
-import { uiCopy } from "./_copy";
+import { uiCopies } from "./_copy";
 
 /**
  * Page links. `hrefFor(page)` builds each URL (keep the other search params there).
@@ -11,13 +13,16 @@ export function Pagination({
   pageCount,
   hrefFor,
   className,
+  locale,
 }: {
   page: number;
   pageCount: number;
   hrefFor: (page: number) => string;
   className?: string;
+  locale: ShopLocale;
 }) {
   if (pageCount <= 1) return null;
+  const uiCopy = pickCopy(uiCopies, locale);
   const pages = pageWindow(page, pageCount);
   const item = "inline-flex h-10 min-w-10 items-center justify-center rounded-shop-control px-3 text-sm font-medium tabular-nums transition-colors";
   return (

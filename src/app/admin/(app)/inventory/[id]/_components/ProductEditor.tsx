@@ -73,6 +73,8 @@ type Slots = {
   provenance?: ReactNode;
   /** Facet values (server card, saves immediately). */
   facets?: ReactNode;
+  /** Translations per shop language (server card, own actions; empty without extra languages). */
+  translations?: ReactNode;
 };
 
 /** Markdown → rough plain text for the SERP preview. */
@@ -310,6 +312,8 @@ export function ProductEditor({
             </Card>
 
             {slots.facets}
+
+            {slots.translations}
 
             {slots.danger}
           </div>

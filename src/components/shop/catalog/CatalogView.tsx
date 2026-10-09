@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { headers } from "next/headers";
 import { permanentRedirect } from "next/navigation";
 import { complianceHideFilter, resolveCompliance, visitorCountry } from "@/server/compliance";
@@ -43,7 +43,9 @@ import {
   type RawSearchParams,
 } from "@/server/storefront-catalog";
 import type { CatalogFacets, CatalogPage, FacetValueOption, PublicCategory } from "@/server/storefront-catalog/types";
+import { translateCards, translateCatalogFacets, translateCategoryTree } from "@/server/storefront/translate";
 import { searchHints, searchProducts, type NearMisses, type SearchInterpretation } from "@/server/search";
+import { recordShopSearchLater } from "@/server/insights/search-stats";
 import { matchCategories } from "@/server/search/ui-labels";
 import { InterpretationBar, NearMissRail, SearchHeading, SearchZeroState } from "@/components/shop/search/results";
 import { ProductCard } from "@/components/shop/ui/ProductCard";
@@ -56,8 +58,10 @@ import { SearchBox } from "./SearchBox";
 import { SortSelect } from "./SortSelect";
 import { ViewToggle } from "./ViewToggle";
 import { applyGeoBlur, toCardData } from "./to-card";
-import { catalogCopy as copy } from "./_copy";
-import { searchCopy } from "@/components/shop/search/_copy";
+import { catalogCopies } from "./_copy";
+import { searchCopies } from "@/components/shop/search/_copy";
+import { localizePath } from "@/lib/i18n/shop-locales";
+import { pickCopy } from "@/lib/i18n/shop-copy";
 
 export type CatalogViewProps = {
   shop: ShopContext;
@@ -87,15 +91,23 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
   const tenantId = shop.tenant.id;
   const currency = shop.tenant.currency;
   const settings = shop.settings.catalog;
+  const locale = shop.locale;
+  const copy = pickCopy(catalogCopies, locale);
+  const searchCopy = pickCopy(searchCopies, locale);
   // While searching (?q=) the default order is "relevance" (smart search, src/server/search).
   const listingSort = defaultSortFor(shop, mode);
   const defaultSort = searchDefaultSort(searchParams, listingSort);
   const params = parseCatalogParams(searchParams, defaultSort);
 
   // Visitor country (edge geo header) → per-country compliance rules; unknown country = no geo rules.
-  const country = visitorCountry(await headers());
+  const requestHeaders = await headers();
+  const country = visitorCountry(requestHeaders);
   // The archive uses the same category tree (structure only; its counts come from the archive facets).
-  const [tree, hide] = await Promise.all([getCategoryTree(tenantId), complianceHideFilter(tenantId, country)]);
+  // Category titles in the shop language (approved translations; docs/i18n.md § Shop-routing).
+  const [tree, hide] = await Promise.all([
+    getCategoryTree(tenantId).then((t) => translateCategoryTree(tenantId, locale, t)),
+    complianceHideFilter(tenantId, country),
+  ]);
   // Root of the list this view belongs to: category links and "clear" chips stay inside the archive.
   const rootPath = mode === "archive" ? ARCHIVE_PATH : SHOP_PATH;
   const node = category && tree ? (flattenTree(tree).find((n) => n.id === category.id) ?? null) : null;
@@ -128,13 +140,27 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
         archive: settings.publicArchive,
       }).then((r) => ({ page: { items: r.items, total: r.total }, facets: r.facets!, interpretation: r.interpretation, nearMisses: r.nearMisses ?? null }))
     : Promise.all([getCatalogPage(tenantId, scope, params), getFacets(tenantId, scope, params)]).then(([page, facets]) => ({ page, facets, interpretation: null, nearMisses: null }));
+  // Card titles and facet labels in the shop language (the English caches stay as they are).
+  const translatedResults = results.then(async (r) => {
+    const [items, near, facets] = await Promise.all([
+      translateCards(tenantId, locale, r.page.items),
+      r.nearMisses ? translateCards(tenantId, locale, r.nearMisses.items) : Promise.resolve(null),
+      translateCatalogFacets(tenantId, locale, r.facets),
+    ]);
+    return { ...r, page: { ...r.page, items }, facets, nearMisses: r.nearMisses && near ? { ...r.nearMisses, items: near } : r.nearMisses };
+  });
   const [{ page, facets, interpretation, nearMisses }, selectedTags, viewer, display] = await Promise.all([
-    results,
+    translatedResults,
     getTagsBySlug(tenantId, params.tags),
     getShopViewer(tenantId),
     // Visitor's indicative display currency (cookie) — read here, outside the cached catalog reads.
     getVisitorDisplayCurrency(tenantId),
   ]);
+  // Stock insights (docs/insights.md): count full shop searches (first page, not "load more" or the
+  // literal re-run) in the daily aggregate — after the response, never on the request path.
+  if (params.q && mode === "shop" && !category && lockedFacets.length === 0 && params.page === 1 && !params.show && !params.literal) {
+    recordShopSearchLater({ tenantId, timeZone: shop.tenant.timezone, query: params.q, results: page.total, userAgent: requestHeaders.get("user-agent") });
+  }
   // Canonical facet URLs: f=<valueId> (saved-search links) → f=<facet>.<value>; old tag links
   // (?tag=ww2) whose tag was converted to a facet value → the facet filter.
   const unknownTags = params.tags.filter((t) => !selectedTags.some((st) => st.slug === t));
@@ -148,7 +174,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
     if (mapped.length || params.facetValueIds.length) {
       const tags = params.tags.filter((t) => !mapped.some((m) => m.slug === t));
       const facetsNext = [...new Set([...params.facets, ...tokensForValueIds(tax, params.facetValueIds), ...mapped.map((m) => m.token)])];
-      permanentRedirect(`${basePath}${catalogQueryString(params, { tags, facets: facetsNext, facetValueIds: [] }, defaultSort)}`);
+      permanentRedirect(localizePath(`${basePath}${catalogQueryString(params, { tags, facets: facetsNext, facetValueIds: [] }, defaultSort)}`, locale));
     }
   }
   const ids = [...page.items, ...(nearMisses?.items ?? [])].map((i) => i.id);
@@ -170,6 +196,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
     currency,
     lockSensitive: shop.settings.legal.blurSensitiveForGuests && !viewer,
     timeZone: shop.tenant.timezone,
+    locale,
   };
   const toCards = (items: CatalogPage["items"]) => withLiveStatus(items, reserved).map((c) => applyGeoBlur(toCardData(c, cardCtx), c, verdicts[c.id]?.blurred ?? false));
   const cards = toCards(page.items);
@@ -225,6 +252,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
     currency,
     priceFilter: settings.priceFilter,
     lockedFacets,
+    locale,
   };
 
   // Structured data only on indexable views (no filters / search / re-sort; catalogMetadata noindexes those).
@@ -245,7 +273,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
 
   return (
     <Container className="py-6 sm:py-10">
-      <Breadcrumbs items={crumbs} jsonLdBase={shop.origin} />
+      <Breadcrumbs items={crumbs} jsonLdBase={shop.origin} locale={locale} />
       {listLd ? <JsonLd data={listLd} /> : null}
 
       <header className="mt-5 mb-8 flex flex-col gap-6 sm:mt-6 sm:mb-10 lg:flex-row lg:items-end lg:justify-between">
@@ -258,7 +286,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
           </div>
         )}
         <div className="w-full lg:max-w-md">
-          <SearchBox action={basePath} params={params} defaultSort={defaultSort} />
+          <SearchBox action={basePath} params={params} defaultSort={defaultSort} locale={locale} />
         </div>
       </header>
 
@@ -296,7 +324,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
               <SortSelect action={basePath} value={params.sort} options={sortOptions}>
                 <HiddenParams params={params} keep={["q", "facets", "tags", "min", "max", "view"]} defaultSort={defaultSort} />
               </SortSelect>
-              <ViewToggle basePath={basePath} params={params} view={view} defaultSort={defaultSort} />
+              <ViewToggle basePath={basePath} params={params} view={view} defaultSort={defaultSort} locale={locale} />
             </div>
           </div>
 
@@ -311,6 +339,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
               lockedFacets={lockedFacets}
               currency={currency}
               category={category && filtered ? category : null}
+              locale={locale}
             />
           </div>
 
@@ -348,13 +377,14 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
               {filtered ? copy.empty.filtered : mode === "archive" ? copy.empty.archiveNone : copy.empty.none}
             </EmptyState>
           ) : view === "list" ? (
-            <CatalogList products={cards} showStockCode={settings.showStockCode} display={display} />
+            <CatalogList products={cards} showStockCode={settings.showStockCode} display={display} locale={locale} />
           ) : (
             <ProductGrid
               products={cards}
               columns={settings.gridColumns === 3 ? 3 : 4}
               showStockCode={settings.showStockCode}
               display={display}
+              locale={locale}
               priorityCount={4}
               headingLevel={2}
               wishlistSlot={mode === "shop" ? (p) => (p.availability === "sold" ? null : <WishlistButton productId={p.id} />) : undefined}
@@ -380,6 +410,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
                 className="mt-14"
                 page={params.page}
                 pageCount={pageCount}
+                locale={locale}
                 hrefFor={(p) => `${basePath}${catalogQueryString(params, { page: p, show: null }, defaultSort)}`}
               />
             )
@@ -392,7 +423,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
               allHref={qs({ q: nearMisses.dropped.removeQuery || null })}
             >
               {nearCards.map((p) => (
-                <ProductCard key={p.id} product={p} showStockCode={settings.showStockCode} display={display} headingLevel={3} sizes="12.5rem" className="w-[12.5rem] flex-none snap-start" />
+                <ProductCard key={p.id} product={p} showStockCode={settings.showStockCode} display={display} locale={locale} headingLevel={3} sizes="12.5rem" className="w-[12.5rem] flex-none snap-start" />
               ))}
             </NearMissRail>
           ) : null}

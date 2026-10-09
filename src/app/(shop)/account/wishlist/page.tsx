@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation";
+import { localeRedirect } from "@/server/i18n/locale";
 
 /** Alias: the wishlist lives at /wishlist (the header links here). */
-export default function AccountWishlistAlias(): never {
-  redirect("/wishlist");
+export default async function AccountWishlistAlias(): Promise<never> {
+  return localeRedirect("/wishlist");
 }

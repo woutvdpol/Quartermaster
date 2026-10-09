@@ -1,4 +1,8 @@
-/* Storefront copy for provenance, documents and certificate verification (English). */
+import { localized } from "@/lib/i18n/shop-copy";
+import { provenanceShopCopyNl } from "./_copy.nl";
+import { provenanceShopCopyDe } from "./_copy.de";
+
+/* Storefront copy for provenance, documents and certificate verification (English; Dutch/German: ./_copy.nl.ts, ./_copy.de.ts). */
 
 export const provenanceShopCopy = {
   block: {
@@ -49,3 +53,5 @@ export const provenanceShopCopy = {
     photoAlt: (title: string) => `Photo of ${title} at the time of certification`,
   },
 } as const;
+
+export const provenanceShopCopies = localized({ en: provenanceShopCopy, nl: provenanceShopCopyNl, de: provenanceShopCopyDe });

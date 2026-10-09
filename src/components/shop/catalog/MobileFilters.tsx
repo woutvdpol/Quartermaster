@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, type ReactNode } from "react";
-import { catalogCopy as copy } from "./_copy";
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { catalogCopies } from "./_copy";
 
 /**
  * Mobile bottom sheet for the facet panel (native <dialog>: focus trap, Esc, backdrop for free).
@@ -10,6 +11,7 @@ import { catalogCopy as copy } from "./_copy";
  */
 export function MobileFilters({ activeCount, total, children }: { activeCount: number; total: number; children: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const copy = useShopCopy(catalogCopies);
   return (
     <>
       <button

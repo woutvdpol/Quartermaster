@@ -2,7 +2,8 @@
 
 import Form from "next/form";
 import { useId } from "react";
-import { catalogCopy as copy } from "./_copy";
+import { useLocalizedHref, useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { catalogCopies } from "./_copy";
 
 /**
  * Sort dropdown inside a GET form: changing it submits the form (the server re-renders from the URL).
@@ -20,8 +21,10 @@ export function SortSelect({
   children?: React.ReactNode;
 }) {
   const id = useId();
+  const copy = useShopCopy(catalogCopies);
+  const href = useLocalizedHref();
   return (
-    <Form action={action} scroll={false} className="flex items-center gap-2">
+    <Form action={href(action)} scroll={false} className="flex items-center gap-2">
       {children}
       <label htmlFor={id} className="sr-only text-sm whitespace-nowrap text-shop-muted sm:not-sr-only">
         {copy.toolbar.sort}

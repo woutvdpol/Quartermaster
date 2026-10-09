@@ -1,6 +1,6 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { localeRedirect } from "@/server/i18n/locale";
 import { confirmSavedSearch } from "@/server/alerts";
 import { getRequestTenant } from "@/server/tenant";
 
@@ -18,5 +18,5 @@ export async function confirmAlertAction(formData: FormData): Promise<void> {
   } catch (error) {
     console.error("confirmAlertAction failed", error);
   }
-  redirect(`/alerts?status=${status}`);
+  await localeRedirect(`/alerts?status=${status}`);
 }

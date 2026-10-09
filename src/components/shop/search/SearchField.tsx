@@ -5,9 +5,8 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/components/shop/ui/cn";
 import type { PanelHandlers, PanelUi } from "./SuggestPanel";
-import { fieldCopy } from "./_copy-field";
-
-const t = fieldCopy;
+import { useLocalizedHref, useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { fieldCopies } from "./_copy-field";
 
 // Code-split (performance budget, docs/search.md § UI): the suggestion dropdown loads on the first
 // focus/pointer over the field, the photo dialog on the first pointer over / click of the camera.
@@ -46,7 +45,7 @@ export function SearchField({
   action = "/shop",
   variant = "header",
   defaultValue,
-  placeholder = t.placeholder,
+  placeholder,
   autoFocus,
   className,
   children,
@@ -60,6 +59,8 @@ export function SearchField({
   className?: string;
   children?: ReactNode;
 }) {
+  const t = useShopCopy(fieldCopies);
+  const localizedHref = useLocalizedHref();
   const listId = useId();
   const input = useRef<HTMLInputElement>(null);
   const handlers = useRef<PanelHandlers | null>(null);
@@ -77,7 +78,7 @@ export function SearchField({
   const header = variant === "header";
   return (
     <>
-      <Form action={action} role="search" className={cn("relative", className)}>
+      <Form action={localizedHref(action)} role="search" className={cn("relative", className)}>
         {children}
         <label htmlFor={id} className="sr-only">
           {t.label}
@@ -105,7 +106,7 @@ export function SearchField({
             enterKeyHint="search"
             maxLength={100}
             defaultValue={defaultValue}
-            placeholder={placeholder}
+            placeholder={placeholder ?? t.placeholder}
             autoFocus={autoFocus}
             onPointerEnter={() => void loadPanel()}
             onFocus={() => {

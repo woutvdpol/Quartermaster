@@ -6,11 +6,13 @@ import { useFormStatus } from "react-dom";
 import { Button, buttonClasses } from "@/components/shop/ui/Button";
 import { inputClasses, textareaClasses } from "@/components/shop/ui/Field";
 import { submitOfferAction, type OfferFormState } from "./actions";
-import { offerCopy as t } from "./_copy";
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { offerCopies } from "./_copy";
 
 
 function Submit() {
   const { pending } = useFormStatus();
+  const t = useShopCopy(offerCopies);
   return (
     <button type="submit" disabled={pending} aria-busy={pending || undefined} className={buttonClasses("primary", "md")}>
       {pending ? t.sending : t.submit}
@@ -32,6 +34,7 @@ export function OfferDialog({
   currency: string;
   viewer: { name: string | null; email: string } | null;
 }) {
+  const t = useShopCopy(offerCopies);
   const ref = useRef<HTMLDialogElement>(null);
   const id = useId();
   const [session, setSession] = useState(0);
@@ -52,6 +55,7 @@ export function OfferDialog({
 }
 
 function OfferForm(props: { id: string; productId: string; priceLabel: string; minimumLabel: string; currency: string; viewer: { name: string | null; email: string } | null; onClose: () => void }) {
+  const t = useShopCopy(offerCopies);
   const [state, action] = useActionState<OfferFormState, FormData>(submitOfferAction, null);
   const alertRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => {

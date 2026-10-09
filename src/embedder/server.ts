@@ -5,21 +5,24 @@
 //   node src/embedder/server.ts --fetch-only  download/verify the model files and exit (npm run models:fetch,
 //                                             k8s initContainer)
 //
-// Plain Node (built-in type stripping, no build step, no app imports). Internal only: every /embed call
-// needs `Authorization: Bearer $EMBEDDER_TOKEN`; never expose it through an ingress.
+// Plain Node (built-in type stripping, no build step, no app imports). Internal only: every /embed and
+// /translate call needs `Authorization: Bearer $EMBEDDER_TOKEN`; never expose it through an ingress.
 //
 // Env: EMBEDDER_PORT (3100), EMBEDDER_HOST (127.0.0.1; 0.0.0.0 in containers), EMBEDDER_TOKEN (required
 // unless EMBEDDER_ALLOW_NO_TOKEN=1 — local development only), MODEL_CACHE_DIR, SEARCH_MODEL_DOWNLOAD,
-// SEARCH_MODEL_THREADS, EMBEDDER_MAX_INFLIGHT (64 requests).
+// SEARCH_MODEL_THREADS, EMBEDDER_MAX_INFLIGHT (64 requests),
+// TRANSLATE_IDLE_MINUTES (15; unload an unused translation model), TRANSLATE_MAX_MODELS (1 loaded at a time).
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createHash, timingSafeEqual } from "node:crypto";
 import sharp from "sharp";
 import { Batcher, OverloadedError } from "./batcher.ts";
-import { IMAGE_INPUT_SIZE, IMAGE_MODEL, LIMITS, TEXT_KINDS, TEXT_MODEL, type EmbedTextRequest, type ReadyResponse } from "./contract.ts";
+import { IMAGE_INPUT_SIZE, IMAGE_MODEL, LIMITS, TEXT_KINDS, TEXT_MODEL, TRANSLATE_MODELS, TRANSLATE_TARGETS, type EmbedTextRequest, type ReadyResponse, type TranslateRequest, type TranslateTarget } from "./contract.ts";
 import { Models, modelCacheDir, type Part, type Rgb } from "./models.ts";
+import { Translators } from "./translate.ts";
 
 const PARTS: Part[] = ["text", "imageText", "image"];
 const models = new Models();
+const translators = new Translators();
 
 const batchOpts = { maxBatch: 32, maxWaitMs: 3, maxQueue: 512 };
 const batchers = {
@@ -27,6 +30,14 @@ const batchers = {
   passage: new Batcher<string, number[]>((t) => models.embedPassages(t), { ...batchOpts, maxBatch: 16, maxQueue: 1024 }),
   "image-query": new Batcher<string, number[]>((t) => models.embedImageQueries(t), batchOpts),
   image: new Batcher<Rgb, number[]>((imgs) => models.embedImages(imgs), { maxBatch: 8, maxWaitMs: 3, maxQueue: 64 }),
+};
+// Translation: background work (worker jobs, the editor's "Translate again"); one batch per language at
+// a time, like the embedding models. Small batches (≈ 0.5–1 s of CPU each) leave gaps for the
+// latency-critical search query embeddings that share the CPU.
+const translateOpts = { maxBatch: 8, maxWaitMs: 10, maxQueue: 256 };
+const translateBatchers: Record<TranslateTarget, Batcher<string, string>> = {
+  nl: new Batcher<string, string>((t) => translators.translate("nl", t), translateOpts),
+  de: new Batcher<string, string>((t) => translators.translate("de", t), translateOpts),
 };
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -70,7 +81,7 @@ async function readBody(req: IncomingMessage, max: number): Promise<Buffer> {
 
 function readyState(): ReadyResponse {
   const parts = Object.fromEntries(PARTS.map((p) => [p, models.status(p)])) as ReadyResponse["parts"];
-  return { ready: PARTS.every((p) => parts[p] === "ready"), parts, rssMb: Math.round(process.memoryUsage().rss / 1e6) };
+  return { ready: PARTS.every((p) => parts[p] === "ready"), parts, translate: translators.statuses(), rssMb: Math.round(process.memoryUsage().rss / 1e6) };
 }
 
 async function decodeImage(req: IncomingMessage, body: Buffer): Promise<Rgb> {
@@ -113,11 +124,32 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     const state = readyState();
     return send(res, state.ready ? 200 : 503, state);
   }
-  if (req.method !== "POST" || (url.pathname !== "/embed/text" && url.pathname !== "/embed/image")) return send(res, 404, { error: "not found" });
+  if (req.method !== "POST" || (url.pathname !== "/embed/text" && url.pathname !== "/embed/image" && url.pathname !== "/translate")) return send(res, 404, { error: "not found" });
   if (!tokenOk(req)) return send(res, 401, { error: "unauthorized" });
   if (inflight >= maxInflight) return send(res, 503, { error: "overloaded" });
   inflight += 1;
   try {
+    if (url.pathname === "/translate") {
+      const body = await readBody(req, LIMITS.maxTextBodyBytes);
+      let parsed: TranslateRequest;
+      try {
+        parsed = JSON.parse(body.toString("utf8")) as TranslateRequest;
+      } catch {
+        throw new HttpError(400, "invalid JSON");
+      }
+      const { target, texts } = parsed ?? ({} as TranslateRequest);
+      if (!TRANSLATE_TARGETS.includes(target)) throw new HttpError(400, `target must be one of ${TRANSLATE_TARGETS.join(", ")}`);
+      if (!Array.isArray(texts) || texts.length === 0 || texts.length > LIMITS.maxTranslateTexts || texts.some((t) => typeof t !== "string")) {
+        throw new HttpError(400, `texts must be 1–${LIMITS.maxTranslateTexts} strings`);
+      }
+      if (texts.some((t) => t.length > LIMITS.maxTranslateChars)) throw new HttpError(413, `each text must be at most ${LIMITS.maxTranslateChars} characters`);
+      // Empty strings never reach the model.
+      const todo = texts.map((t, i) => [t.trim(), i] as const).filter(([t]) => t !== "");
+      const done = todo.length ? await translateBatchers[target].push(todo.map(([t]) => t)) : [];
+      const translations = texts.map(() => "");
+      todo.forEach(([, i], k) => (translations[i] = done[k]));
+      return send(res, 200, { model: TRANSLATE_MODELS[target].key, translations });
+    }
     if (url.pathname === "/embed/text") {
       const body = await readBody(req, LIMITS.maxTextBodyBytes);
       let parsed: EmbedTextRequest;
@@ -153,6 +185,7 @@ async function main() {
   }
   if (fetchOnly) {
     for (const part of PARTS) await models.load(part);
+    for (const target of TRANSLATE_TARGETS) await translators.fetch(target);
     console.info(`[embedder] models present in ${modelCacheDir()}`);
     return;
   }

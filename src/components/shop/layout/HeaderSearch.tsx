@@ -3,10 +3,10 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { SearchField } from "@/components/shop/search/SearchField";
-import { fieldCopy } from "@/components/shop/search/_copy-field";
+import { fieldCopies } from "@/components/shop/search/_copy-field";
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { splitLocalePath } from "@/lib/i18n/shop-locales";
 import { CloseIcon, SearchIcon } from "./icons";
-
-const t = fieldCopy;
 
 /** Catalog pages render their own search (which keeps the active filters), so the header one hides there. */
 const CATALOG_PREFIXES = ["/shop", "/search", "/archive"];
@@ -17,6 +17,7 @@ const CATALOG_PREFIXES = ["/shop", "/search", "/archive"];
  * pages, which have their own search box next to the heading (docs/design/search/Results.dc.html).
  */
 export function HeaderSearch() {
+  const t = useShopCopy(fieldCopies);
   const pathname = usePathname();
   const sheet = useRef<HTMLDialogElement>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -26,7 +27,8 @@ export function HeaderSearch() {
   useEffect(() => {
     if (sheetOpen && !sheet.current?.open) sheet.current?.showModal();
   }, [sheetOpen]);
-  if (CATALOG_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
+  const path = splitLocalePath(pathname).path;
+  if (CATALOG_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return null;
   return (
     <>
       <SearchField id="shop-search" className="hidden w-full max-w-[22rem] min-w-[150px] lg:block" />

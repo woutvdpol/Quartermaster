@@ -1,4 +1,8 @@
-// Storefront copy for alerts ("notify me"). English; keep all strings here for later translation.
+// Storefront copy for alerts ("notify me"). English; Dutch and German in _copy.nl.ts / _copy.de.ts (bundle `alertsCopies`).
+import { localized } from "@/lib/i18n/shop-copy";
+import { alertsCopyNl } from "./_copy.nl";
+import { alertsCopyDe } from "./_copy.de";
+
 export const alertsCopy = {
   notify: {
     button: "Notify me about similar items",
@@ -38,5 +42,32 @@ export const alertsCopy = {
     captcha: "We could not verify that you are human. Please try again.",
     error: "Something went wrong. Please try again.",
   },
+  /** Account › Alerts page. */
+  account: {
+    intro: (max: number) =>
+      `We email you when new items match. You can have up to ${max} active alerts. Wishlist items notify you automatically when they become available again or get cheaper.`,
+    emptyTitle: "No alerts yet",
+    emptyBody: "Use “Save search” on any search, or “Notify me” on a sold item, and we'll email you when something matching arrives.",
+    browse: "Browse the shop",
+    lastAlert: "Last alert",
+    lastEmail: "Last email",
+    paused: "Paused",
+    view: "View matches",
+    emailFrequencies: {
+      INSTANT: "E-mail: right away (each new item)",
+      DAILY: "E-mail: daily summary",
+      WEEKLY: "E-mail: weekly summary (Mondays)",
+    },
+    save: "Save",
+    pause: "Pause",
+    resume: "Resume",
+    remove: "Delete",
+    removeConfirm: "Delete this alert?",
+    saved: "Saved.",
+    notFound: "Alert not found.",
+    loginAgain: "Please log in again.",
+  },
   manageLink: "Manage alerts",
 } as const;
+
+export const alertsCopies = localized({ en: alertsCopy, nl: alertsCopyNl, de: alertsCopyDe });

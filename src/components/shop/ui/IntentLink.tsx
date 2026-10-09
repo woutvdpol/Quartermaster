@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { localizePath } from "@/lib/i18n/shop-locales";
+import { useShopLocale } from "@/components/shop/i18n/ShopLocale";
 import { useRouter } from "next/navigation";
 import { useRef, type ComponentProps } from "react";
 
@@ -17,8 +19,10 @@ const HOVER_DELAY_MS = 60;
  * The prefetched page is reused for at most `staleTimes.static` (30 s, next.config.ts); live state
  * (cart, reservations) is re-checked by the server actions anyway.
  */
-export function IntentLink({ href, onPointerEnter, onPointerLeave, onTouchStart, onFocus, ...props }: ComponentProps<typeof Link> & { href: string }) {
+export function IntentLink({ href: rawHref, onPointerEnter, onPointerLeave, onTouchStart, onFocus, ...props }: ComponentProps<typeof Link> & { href: string }) {
   const router = useRouter();
+  // Keeps the visitor's language ("/product/1/x" → "/de/product/1/x"), like ./Link.tsx.
+  const href = localizePath(rawHref, useShopLocale());
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Repeated calls are cheap: the router skips URLs whose prefetch is still fresh in its cache.
   const warm = () => router.prefetch(href, FULL);

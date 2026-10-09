@@ -2,6 +2,7 @@ import { getRequestTenant } from "@/server/tenant";
 import { getShopViewer } from "@/server/cart";
 import { getOfferEligibility } from "@/server/offers";
 import { formatMoney } from "@/components/shop/ui/money";
+import { getRequestLocale } from "@/server/i18n/locale";
 import { OfferDialog } from "./OfferDialog";
 
 /**
@@ -14,13 +15,13 @@ import { OfferDialog } from "./OfferDialog";
 export async function OfferButton({ productId }: { productId: string }) {
   const tenant = await getRequestTenant();
   if (!tenant) return null;
-  const [eligibility, viewer] = await Promise.all([getOfferEligibility(tenant.id, productId), getShopViewer(tenant.id)]);
+  const [eligibility, viewer, locale] = await Promise.all([getOfferEligibility(tenant.id, productId), getShopViewer(tenant.id), getRequestLocale()]);
   if (!eligibility) return null;
   return (
     <OfferDialog
       productId={productId}
-      priceLabel={formatMoney(eligibility.price, eligibility.currency)}
-      minimumLabel={formatMoney(eligibility.minimum, eligibility.currency)}
+      priceLabel={formatMoney(eligibility.price, eligibility.currency, locale)}
+      minimumLabel={formatMoney(eligibility.minimum, eligibility.currency, locale)}
       currency={eligibility.currency}
       viewer={viewer ? { name: viewer.name, email: viewer.email } : null}
     />

@@ -1,16 +1,18 @@
 import { cn } from "@/components/shop/ui";
-import { uiCopy } from "@/components/shop/ui/_copy";
+import { uiCopies } from "@/components/shop/ui/_copy";
+import { formatShopDate, pickCopy } from "@/lib/i18n/shop-copy";
+import type { ShopLocale } from "@/lib/i18n/shop-locales";
 import type { VerifyResult as Result } from "@/server/provenance/certificates";
-import { provenanceShopCopy } from "./_copy";
+import { provenanceShopCopies } from "./_copy";
 
-const t = provenanceShopCopy.verify;
-
-function formatDate(iso: string, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-GB", { dateStyle: "long", timeZone }).format(new Date(iso));
+function formatDate(iso: string, timeZone: string, locale: ShopLocale): string {
+  return formatShopDate(iso, locale, { dateStyle: "long" }, timeZone);
 }
 
 /** Outcome of a certificate lookup: valid / revoked / unknown / rate limited. No personal data. */
-export function VerifyResult({ result, timeZone }: { result: Result; timeZone: string }) {
+export function VerifyResult({ result, timeZone, locale }: { result: Result; timeZone: string; locale: ShopLocale }) {
+  const t = pickCopy(provenanceShopCopies, locale).verify;
+  const uiCopy = pickCopy(uiCopies, locale);
   if (result.status === "rate_limited" || result.status === "unknown") {
     const s = result.status === "unknown" ? t.unknown : t.rateLimited;
     return (
@@ -56,11 +58,11 @@ export function VerifyResult({ result, timeZone }: { result: Result; timeZone: s
             <dt className="text-shop-muted">{t.issuedBy}</dt>
             <dd className="text-shop-ink">{c.shopName}</dd>
             <dt className="text-shop-muted">{t.issuedOn}</dt>
-            <dd className="text-shop-ink">{formatDate(c.issuedAt, timeZone)}</dd>
+            <dd className="text-shop-ink">{formatDate(c.issuedAt, timeZone, locale)}</dd>
             {c.revokedAt ? (
               <>
                 <dt className="text-shop-muted">{t.revokedOn}</dt>
-                <dd className="text-shop-crit">{formatDate(c.revokedAt, timeZone)}</dd>
+                <dd className="text-shop-crit">{formatDate(c.revokedAt, timeZone, locale)}</dd>
               </>
             ) : null}
             {c.specifications.map((r, i) => (

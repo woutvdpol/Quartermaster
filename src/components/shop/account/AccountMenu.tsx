@@ -1,6 +1,7 @@
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { getShopCustomer } from "@/server/customer-auth";
-import { accountCopy } from "./_copy";
+import { shopCopy } from "@/server/i18n/locale";
+import { accountCopies } from "./_copy";
 import { AccountMenuDropdown } from "./AccountMenuDropdown";
 import { WishlistSessionSync } from "./WishlistSessionSync";
 
@@ -24,7 +25,7 @@ const linkClass =
 
 export async function AccountMenu() {
   const c = await getShopCustomer();
-  const t = accountCopy.menu;
+  const t = (await shopCopy(accountCopies)).menu;
   if (!c) {
     return (
       <>

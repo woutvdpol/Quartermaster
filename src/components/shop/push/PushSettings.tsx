@@ -3,12 +3,12 @@
 import { useEffect, useId, useState, useSyncExternalStore, useTransition } from "react";
 import { Button } from "@/components/shop/ui/Button";
 import { Select, checkClasses } from "@/components/shop/ui/Field";
-import { pushUiCopy } from "./_copy";
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { pushUiCopies } from "./_copy";
 import { getPushStateAction, subscribePushAction, unsubscribePushAction, updatePushPrefsAction } from "./actions";
 import { PushPermissionError, currentSubscription, pushSupport, subscribeThisDevice, unsubscribeThisDevice } from "./client";
 import { IosInstallSteps } from "./IosInstallSteps";
 
-const t = pushUiCopy.settings;
 const noop = () => () => {};
 
 export type PushSettingsData = {
@@ -28,6 +28,8 @@ const quietValue = (start: number | null, end: number | null) => (start === null
 
 /** Account › Alerts: push on this device, wishlist / reservation pushes, quiet hours, daily maximum (docs/push.md). */
 export function PushSettings({ initial }: { initial: PushSettingsData }) {
+  const copy = useShopCopy(pushUiCopies);
+  const t = copy.settings;
   const id = useId();
   const support = useSyncExternalStore(noop, pushSupport, () => null);
   const [endpoint, setEndpoint] = useState<string | null | undefined>(undefined); // undefined = still checking
@@ -67,7 +69,7 @@ export function PushSettings({ initial }: { initial: PushSettingsData }) {
   function save(patch: Record<string, unknown>) {
     startTransition(async () => {
       const res = await updatePushPrefsAction(patch);
-      setStatus({ ok: res.ok, text: res.message ?? (res.ok ? t.saved : pushUiCopy.error) });
+      setStatus({ ok: res.ok, text: res.message ?? (res.ok ? t.saved : copy.error) });
     });
   }
 
@@ -86,9 +88,9 @@ export function PushSettings({ initial }: { initial: PushSettingsData }) {
           if (!thisDevice) setDevices((n) => n + 1);
           setThisDevice(true);
         }
-        setStatus(res.ok ? { ok: true, text: t.thisDeviceOn } : { ok: false, text: res.message ?? pushUiCopy.error });
+        setStatus(res.ok ? { ok: true, text: t.thisDeviceOn } : { ok: false, text: res.message ?? copy.error });
       } catch (err) {
-        setStatus({ ok: false, text: err instanceof PushPermissionError ? pushUiCopy.denied : pushUiCopy.error });
+        setStatus({ ok: false, text: err instanceof PushPermissionError ? copy.denied : copy.error });
       }
     });
   }
@@ -102,7 +104,7 @@ export function PushSettings({ initial }: { initial: PushSettingsData }) {
         setThisDevice(false);
         setEndpoint(null);
       }
-      setStatus(res.ok ? { ok: true, text: t.thisDeviceOff } : { ok: false, text: res.message ?? pushUiCopy.error });
+      setStatus(res.ok ? { ok: true, text: t.thisDeviceOff } : { ok: false, text: res.message ?? copy.error });
     });
   }
 
@@ -129,7 +131,7 @@ export function PushSettings({ initial }: { initial: PushSettingsData }) {
             {t.turnOff}
           </Button>
         ) : support === "unsupported" ? (
-          <p className="text-sm text-shop-muted">{pushUiCopy.unsupported}</p>
+          <p className="text-sm text-shop-muted">{copy.unsupported}</p>
         ) : (
           <Button variant="primary" size="sm" onClick={turnOn} pending={pending}>
             {t.turnOn}

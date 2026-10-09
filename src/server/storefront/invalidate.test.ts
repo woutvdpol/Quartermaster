@@ -16,6 +16,9 @@ describe("shopTagsForAction", () => {
       expect(shopTagsForAction("t1", a)).toEqual(["tenant:t1:redirects"]);
     }
   });
+  it("maps translation changes to the translations tag (all languages)", () => {
+    expect(shopTagsForAction("t1", "translation.approve")).toEqual(["tenant:t1:translations"]);
+  });
   it("ignores actions that don't change the shop", () => {
     expect(shopTagsForAction("t1", "order.note")).toEqual([]);
     expect(shopTagsForAction("t1", "auth.login")).toEqual([]);

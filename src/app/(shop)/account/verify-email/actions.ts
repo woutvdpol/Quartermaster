@@ -3,12 +3,14 @@
 import { getRequestTenant } from "@/server/tenant";
 import { getShopCustomer } from "@/server/customer-auth/current";
 import { sendCustomerVerification, verifyCustomerEmail } from "@/server/email-verification";
-import { verifyCopy as t } from "./_copy";
+import { shopCopy } from "@/server/i18n/locale";
+import { verifyCopies } from "./_copy";
 
 export type VerifyState = { ok?: boolean; message?: string; invalid?: boolean } | undefined;
 
 /** POST only: mail scanners follow GET links, so opening the link never verifies by itself. */
 export async function verifyEmailAction(_prev: VerifyState, formData: FormData): Promise<VerifyState> {
+  const t = await shopCopy(verifyCopies);
   const token = String(formData.get("token") ?? "").slice(0, 200);
   try {
     const tenant = await getRequestTenant();
@@ -24,6 +26,7 @@ export async function verifyEmailAction(_prev: VerifyState, formData: FormData):
 
 /** Re-sends the verification mail to the signed-in customer of this shop. */
 export async function resendVerificationAction(): Promise<VerifyState> {
+  const t = await shopCopy(verifyCopies);
   try {
     const me = await getShopCustomer();
     if (!me) return { message: t.loginToResend };

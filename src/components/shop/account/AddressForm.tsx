@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { useActionState } from "react";
-import { accountCopy } from "./_copy";
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { accountCopies } from "./_copy";
 import { checkClasses, Select } from "@/components/shop/ui/Field";
 import { Alert, Field, SubmitButton } from "./form";
 
@@ -36,7 +37,8 @@ export function AddressForm({
   /** [code, name] pairs; shipping countries of the shop first. */
   countries: { preferred: Array<[string, string]>; all: Array<[string, string]> };
 }) {
-  const t = accountCopy.addresses;
+  const copy = useShopCopy(accountCopies);
+  const t = copy.addresses;
   const f = t.fields;
   const [state, formAction] = useActionState(action, undefined);
   const fe = state?.fieldErrors ?? {};
@@ -118,9 +120,9 @@ export function AddressForm({
         {t.isDefault}
       </label>
       <div className="flex flex-wrap items-center gap-4 pt-2">
-        <SubmitButton pendingLabel={accountCopy.common.saving}>{t.save}</SubmitButton>
+        <SubmitButton pendingLabel={copy.common.saving}>{t.save}</SubmitButton>
         <Link href="/account/addresses" className="inline-flex min-h-11 items-center text-sm font-medium text-shop-muted underline-offset-4 hover:text-shop-ink hover:underline">
-          {accountCopy.common.cancel}
+          {copy.common.cancel}
         </Link>
       </div>
     </form>

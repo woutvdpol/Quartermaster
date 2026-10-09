@@ -1,6 +1,6 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { localeRedirect } from "@/server/i18n/locale";
 import { confirmSubscription } from "@/server/newsletter";
 import { getRequestTenant } from "@/server/tenant";
 
@@ -21,5 +21,5 @@ export async function confirmNewsletterAction(formData: FormData): Promise<void>
   } catch (error) {
     console.error("confirmNewsletterAction failed", error);
   }
-  redirect(`/newsletter?status=${status}`);
+  await localeRedirect(`/newsletter?status=${status}`);
 }

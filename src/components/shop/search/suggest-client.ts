@@ -4,7 +4,8 @@ import type { SuggestResponse } from "@/server/search/api-types";
  * Client side of search-as-you-type: GET /api/search/suggest with one request in flight (a newer
  * query aborts the older one) and a small per-tab cache keyed by the normalised query, so typing
  * back ("helm" → "helme" → "helm") or reopening the dropdown costs no request. Pure apart from
- * `fetch` (injectable for tests: suggest-client.test.ts). Debouncing is the caller's job.
+ * `fetch` (injectable for tests: suggest-client.test.ts). Debouncing is the caller's job. A non-English
+ * shop language is passed along as `&locale=` (API routes are not language-prefixed).
  */
 
 export const SUGGEST_MIN_CHARS = 2;
@@ -22,7 +23,13 @@ export type SuggestClient = {
   abort(): void;
 };
 
-export function createSuggestClient({ fetchFn = (...a: Parameters<typeof fetch>) => fetch(...a), endpoint = "/api/search/suggest", max = 40 } = {}): SuggestClient {
+export function createSuggestClient({
+  fetchFn = (...a: Parameters<typeof fetch>) => fetch(...a),
+  endpoint = "/api/search/suggest",
+  max = 40,
+  locale = "en",
+}: { fetchFn?: typeof fetch; endpoint?: string; max?: number; locale?: string } = {}): SuggestClient {
+  const lang = locale && locale !== "en" ? `&locale=${encodeURIComponent(locale)}` : "";
   const cache = new Map<string, SuggestResponse>();
   let inflight: AbortController | null = null;
   const remember = (key: string, value: SuggestResponse) => {
@@ -45,7 +52,7 @@ export function createSuggestClient({ fetchFn = (...a: Parameters<typeof fetch>)
       const ctrl = new AbortController();
       inflight = ctrl;
       try {
-        const res = await fetchFn(`${endpoint}?q=${encodeURIComponent(query)}`, { signal: ctrl.signal, headers: { accept: "application/json" } });
+        const res = await fetchFn(`${endpoint}?q=${encodeURIComponent(query)}${lang}`, { signal: ctrl.signal, headers: { accept: "application/json" } });
         if (!res.ok) return null;
         const data = (await res.json()) as SuggestResponse;
         remember(key, data);

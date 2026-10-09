@@ -20,6 +20,8 @@ import { StatusCard } from "./_components/StatusCard";
 import { StockControl } from "./_components/StockDrawer";
 import { ProvenanceCard } from "./_ext/provenance/ProvenanceCard";
 import { FacetsCard } from "./_ext/facets/FacetsCard";
+import { TranslationsCard } from "./_ext/translations/TranslationsCard";
+import { Lineage } from "./_ext/duplicates/Lineage";
 
 /** `[id]` is the product id; a plain number is accepted as stockCode (e.g. /admin/inventory/50231). */
 const loadProduct = cache(async (id: string): Promise<{ ctx: Awaited<ReturnType<typeof requireStaffContext>>; product: ProductDetail }> => {
@@ -123,6 +125,7 @@ export default async function ProductEditPage({ params }: PageProps<"/admin/inve
             limit={limit}
             transportMaxBytes={UPLOAD_TRANSPORT_MAX_BYTES}
             serviceMaxBytes={MAX_UPLOAD_BYTES}
+            lineage={<Lineage productId={product.id} timeZone={tenant.timeZone} />}
           />
         ),
         status: (
@@ -156,6 +159,7 @@ export default async function ProductEditPage({ params }: PageProps<"/admin/inve
         ),
         provenance: <ProvenanceCard productId={product.id} />,
         facets: <FacetsCard productId={product.id} />,
+        translations: <TranslationsCard productId={product.id} />,
         danger: <DangerZone productId={product.id} stockCode={product.stockCode} deletable={deletable} archived={product.status === "ARCHIVED"} />,
       }}
     />

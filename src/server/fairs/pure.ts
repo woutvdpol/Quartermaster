@@ -10,7 +10,7 @@ export const FAIR_METHOD_LABELS: Record<FairPaymentMethod, string> = { card: "Ca
 export const DEFAULT_FLOOR_DISCOUNT = 0.15;
 
 /** Rounding step for a suggested floor (minor units, 2-decimal currencies): nicer numbers for bigger prices. */
-function floorStep(price: number): number {
+export function floorStep(price: number): number {
   if (price < 2_000) return 100; // < €20 → whole euros
   if (price < 10_000) return 500; // < €100 → €5
   if (price < 100_000) return 1_000; // < €1,000 → €10

@@ -1,6 +1,9 @@
+import { localized } from "@/lib/i18n/shop-copy";
 import { wishlistCopy } from "./_copy-wishlist";
+import { accountCopyNl } from "./_copy.nl";
+import { accountCopyDe } from "./_copy.de";
 
-/** English copy for customer accounts, auth pages, wishlist and newsletter pages (multi-language later). */
+/** English copy for customer accounts, auth pages, wishlist and newsletter pages. Dutch and German: _copy.nl.ts / _copy.de.ts (bundle `accountCopies`). */
 export const accountCopy = {
   common: {
     email: "Email address",
@@ -118,6 +121,18 @@ export const accountCopy = {
     items: (n: number) => (n === 1 ? "1 item" : `${n} items`),
     view: "View order",
     empty: "No orders yet.",
+    statuses: {
+      canceled: "Canceled",
+      payment_failed: "Payment failed",
+      payment_expired: "Payment expired",
+      refunded: "Refunded",
+      partially_refunded: "Partially refunded",
+      awaiting_payment: "Awaiting payment",
+      delivered: "Delivered",
+      shipped: "Shipped",
+      packed: "Packed",
+      processing: "Paid — processing",
+    },
   },
   addresses: {
     title: "Addresses",
@@ -239,3 +254,5 @@ export const accountCopy = {
     backHome: "Back to the shop",
   },
 } as const;
+
+export const accountCopies = localized({ en: accountCopy, nl: accountCopyNl, de: accountCopyDe });

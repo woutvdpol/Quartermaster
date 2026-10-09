@@ -1,14 +1,15 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { useActionState } from "react";
 import { ConfirmSubmit } from "@/components/shop/account/ConfirmSubmit";
 import { SubmitButton } from "@/components/shop/account/form";
 import { Badge } from "@/components/shop/ui/Badge";
 import { Select, TextInput } from "@/components/shop/ui/Field";
 import { cn } from "@/components/shop/ui/cn";
-import { alertsCopy } from "@/components/shop/alerts/_copy";
-import { pushUiCopy } from "@/components/shop/push/_copy";
+import { alertsCopies } from "@/components/shop/alerts/_copy";
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { pushUiCopies } from "@/components/shop/push/_copy";
 import { deleteAccountAlertAction, updateAccountAlertAction } from "./actions";
 
 export type AlertRowData = {
@@ -25,18 +26,21 @@ export type AlertRowData = {
 
 export function AlertRow({ alert, pushAvailable = false }: { alert: AlertRowData; pushAvailable?: boolean }) {
   const [state, action] = useActionState(updateAccountAlertAction, null);
-  const f = alertsCopy.form;
+  const copy = useShopCopy(alertsCopies);
+  const pushT = useShopCopy(pushUiCopies);
+  const f = copy.form;
+  const t = copy.account;
   return (
     <li className={cn("rounded-shop border border-shop-line bg-shop-surface p-5 sm:p-6", !alert.active && "opacity-75")}>
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm text-shop-muted">{alert.summary}</p>
-          {alert.lastNotified ? <p className="text-xs text-shop-muted">{alert.push ? "Last alert" : "Last email"}: {alert.lastNotified}</p> : null}
+          {alert.lastNotified ? <p className="text-xs text-shop-muted">{alert.push ? t.lastAlert : t.lastEmail}: {alert.lastNotified}</p> : null}
         </div>
         <div className="flex items-center gap-3">
-          {!alert.active ? <Badge tone="neutral">Paused</Badge> : null}
+          {!alert.active ? <Badge tone="neutral">{t.paused}</Badge> : null}
           <Link href={alert.href} className="inline-flex min-h-11 items-center text-sm font-semibold text-shop-ink underline underline-offset-4 hover:text-shop-primary">
-            View matches
+            {t.view}
           </Link>
         </div>
       </div>
@@ -47,30 +51,30 @@ export function AlertRow({ alert, pushAvailable = false }: { alert: AlertRowData
           <TextInput name="name" defaultValue={alert.name} maxLength={120} required />
         </label>
         <label className="grid gap-1.5 text-sm font-medium">
-          {pushAvailable ? pushUiCopy.delivery.label : f.frequency}
+          {pushAvailable ? pushT.delivery.label : f.frequency}
           <Select name="frequency" defaultValue={alert.push ? "PUSH" : alert.frequency} className={pushAvailable ? "sm:w-60" : "sm:w-44"}>
-            {pushAvailable ? <option value="PUSH">{pushUiCopy.delivery.push}</option> : null}
+            {pushAvailable ? <option value="PUSH">{pushT.delivery.push}</option> : null}
             {(["INSTANT", "DAILY", "WEEKLY"] as const).map((v) => (
               <option key={v} value={v}>
-                {pushAvailable ? `E-mail: ${f.frequencies[v].charAt(0).toLowerCase()}${f.frequencies[v].slice(1)}` : f.frequencies[v]}
+                {pushAvailable ? t.emailFrequencies[v] : f.frequencies[v]}
               </option>
             ))}
           </Select>
         </label>
-        <SubmitButton variant="outline">Save</SubmitButton>
+        <SubmitButton variant="outline">{t.save}</SubmitButton>
       </form>
       <div className="mt-2 flex flex-wrap items-center gap-x-5 text-sm">
         <form action={action}>
           <input type="hidden" name="id" value={alert.id} />
           <input type="hidden" name="op" value={alert.active ? "pause" : "resume"} />
           <button type="submit" className="inline-flex min-h-11 items-center font-semibold text-shop-ink underline underline-offset-4 hover:text-shop-primary">
-            {alert.active ? "Pause" : "Resume"}
+            {alert.active ? t.pause : t.resume}
           </button>
         </form>
         <form action={deleteAccountAlertAction}>
           <input type="hidden" name="id" value={alert.id} />
-          <ConfirmSubmit message="Delete this alert?" className="inline-flex min-h-11 items-center font-semibold text-shop-crit underline underline-offset-4">
-            Delete
+          <ConfirmSubmit message={t.removeConfirm} className="inline-flex min-h-11 items-center font-semibold text-shop-crit underline underline-offset-4">
+            {t.remove}
           </ConfirmSubmit>
         </form>
         {state?.message ? (

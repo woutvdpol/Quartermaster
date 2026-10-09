@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { randomBytes } from "node:crypto";
 import { Suspense } from "react";
 import { Container } from "@/components/shop/ui/Container";
@@ -9,20 +9,24 @@ import { Skeleton } from "@/components/shop/ui/Skeleton";
 import { CheckoutForm } from "@/components/shop/cart/CheckoutForm";
 import { CartLineItem } from "@/components/shop/cart/CartLineItem";
 import { toCartLineData } from "@/components/shop/cart/lines";
-import { cartCopy } from "@/components/shop/cart/_copy";
+import { cartCopies } from "@/components/shop/cart/_copy";
+import { countryOptions } from "@/components/shop/cart/countries";
+import { localeHref, shopCopy } from "@/server/i18n/locale";
+import { pickCopy } from "@/lib/i18n/shop-copy";
 import { requireShop } from "@/server/storefront/context";
 import { getLegalLinks } from "@/server/storefront/content";
 import { getShopViewer } from "@/server/cart";
 import { readCartToken } from "@/server/cart/cookie";
 import { getCheckoutContext, quoteCheckout } from "@/server/checkout";
 import { loginHref } from "@/server/customer-auth/redirect";
-import { countryName } from "@/server/shipping/countries";
 
-const t = cartCopy.checkout;
+export async function generateMetadata(): Promise<Metadata> {
+  const t = (await shopCopy(cartCopies)).checkout;
+  return { title: t.metaTitle, robots: { index: false, follow: false } };
+}
 
-export const metadata: Metadata = { title: t.metaTitle, robots: { index: false, follow: false } };
-
-export default function CheckoutPage() {
+export default async function CheckoutPage() {
+  const t = (await shopCopy(cartCopies)).checkout;
   return (
     <Container className="py-8 sm:py-14">
       <h1 className="mb-6 text-[2.25rem] tracking-tight sm:mb-10 sm:text-5xl">{t.title}</h1>
@@ -48,6 +52,10 @@ function CheckoutSkeleton() {
 
 async function CheckoutContent() {
   const shop = await requireShop();
+  const locale = shop.locale;
+  const t = pickCopy(cartCopies, locale).checkout;
+  // Login/register return here in the visitor's language.
+  const returnTo = await localeHref("/checkout");
   const tenantId = shop.tenant.id;
   const token = await readCartToken();
   const viewer = await getShopViewer(tenantId);
@@ -78,10 +86,10 @@ async function CheckoutContent() {
         <section className="border-t border-shop-line pt-7">
           <p className="text-shop-ink-2">{ctx.requirements.loginReason === "sensitive" ? t.loginRequiredSensitive : t.loginRequiredGuestOff}</p>
           <div className="mt-5 flex flex-wrap gap-3">
-            <ButtonLink href={loginHref("/checkout")} variant="primary">
+            <ButtonLink href={loginHref(returnTo)} variant="primary">
               {t.login}
             </ButtonLink>
-            <ButtonLink href={`/register?next=${encodeURIComponent("/checkout")}`} variant="outline">
+            <ButtonLink href={`/register?next=${encodeURIComponent(returnTo)}`} variant="outline">
               {t.register}
             </ButtonLink>
           </div>
@@ -90,7 +98,7 @@ async function CheckoutContent() {
           <h2 className="mb-2 text-xl">{t.summary}</h2>
           <ul className="divide-y divide-shop-line">
             {lines.map((l) => (
-              <CartLineItem key={l.productId} line={l} compact />
+              <CartLineItem key={l.productId} line={l} locale={locale} compact />
             ))}
           </ul>
         </aside>
@@ -118,7 +126,7 @@ async function CheckoutContent() {
       ) : null}
       <CheckoutForm
         currency={ctx.currency}
-        countries={ctx.countries.map((c) => ({ code: c, name: countryName(c) })).sort((a, b) => a.name.localeCompare(b.name, "en"))}
+        countries={countryOptions(ctx.countries, locale)}
         defaultCountry={ctx.defaultCountry}
         initialQuote={quote}
         payment={ctx.payment}
@@ -129,7 +137,7 @@ async function CheckoutContent() {
         idempotencyKey={randomBytes(16).toString("base64url")}
         lines={lines}
         disclaimer={ctx.disclaimer}
-        loginReturnTo="/checkout"
+        loginReturnTo={returnTo}
         contact={{ email: cart.email, reminderConsent: cart.reminderConsent }}
       />
     </>

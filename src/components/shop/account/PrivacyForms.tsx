@@ -2,15 +2,16 @@
 
 import { useActionState, useRef } from "react";
 import { Button } from "@/components/shop/ui/Button";
-import { accountCopy } from "./_copy";
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { accountCopies } from "./_copy";
 import { Alert, Field, SubmitButton } from "./form";
 
 type State = { ok?: boolean; message?: string; error?: string } | undefined;
 type Action = (prev: State, formData: FormData) => Promise<State>;
 
-const t = accountCopy.privacy;
-
 export function NewsletterForm({ action, status }: { action: Action; status: "active" | "pending" | "unsubscribed" | "none" }) {
+  const copy = useShopCopy(accountCopies);
+  const t = copy.privacy;
   const [state, formAction] = useActionState(action, undefined);
   const subscribed = status === "active";
   return (
@@ -23,7 +24,7 @@ export function NewsletterForm({ action, status }: { action: Action; status: "ac
       )}
       <input type="hidden" name="subscribe" value={subscribed ? "0" : "1"} />
       <div>
-        <SubmitButton variant={subscribed ? "outline" : "primary"} pendingLabel={accountCopy.common.saving}>
+        <SubmitButton variant={subscribed ? "outline" : "primary"} pendingLabel={copy.common.saving}>
           {subscribed ? t.unsubscribe : status === "pending" ? t.resend : t.subscribe}
         </SubmitButton>
       </div>
@@ -33,6 +34,8 @@ export function NewsletterForm({ action, status }: { action: Action; status: "ac
 
 /** "Delete my account" with a confirmation dialog that asks for the password. */
 export function DeleteAccount({ action, email }: { action: Action; email: string }) {
+  const copy = useShopCopy(accountCopies);
+  const t = copy.privacy;
   const [state, formAction] = useActionState(action, undefined);
   const dialog = useRef<HTMLDialogElement>(null);
   return (
@@ -55,12 +58,12 @@ export function DeleteAccount({ action, email }: { action: Action; email: string
           <p className="text-sm text-shop-ink-2">{t.deleteDialogBody}</p>
           {state?.error ? <Alert tone="error">{state.error}</Alert> : null}
           <input type="text" name="username" autoComplete="username" defaultValue={email} hidden readOnly />
-          <Field id="delete-password" name="password" label={accountCopy.common.password} type="password" autoComplete="current-password" required />
+          <Field id="delete-password" name="password" label={copy.common.password} type="password" autoComplete="current-password" required />
           <div className="flex flex-wrap justify-end gap-3">
             <Button variant="ghost" onClick={() => dialog.current?.close()}>
-              {accountCopy.common.cancel}
+              {copy.common.cancel}
             </Button>
-            <SubmitButton variant="accent" pendingLabel={accountCopy.common.saving}>
+            <SubmitButton variant="accent" pendingLabel={copy.common.saving}>
               {t.deleteConfirm}
             </SubmitButton>
           </div>

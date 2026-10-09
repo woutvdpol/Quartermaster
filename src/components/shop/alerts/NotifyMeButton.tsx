@@ -1,5 +1,6 @@
 import { AlertDialogButton } from "./AlertDialog";
-import { alertsCopy } from "./_copy";
+import { shopCopy } from "@/server/i18n/locale";
+import { alertsCopies } from "./_copy";
 import type { CatalogSearchInput } from "@/server/alerts/query";
 
 /**
@@ -7,7 +8,7 @@ import type { CatalogSearchInput } from "@/server/alerts/query";
  * Without `suggestedQuery` the server derives it from the product (category + facet values).
  * Same HTML for every visitor (safe inside cached product pages).
  */
-export function NotifyMeButton({
+export async function NotifyMeButton({
   productId,
   suggestedQuery,
   className,
@@ -19,7 +20,7 @@ export function NotifyMeButton({
   className?: string;
   fullWidth?: boolean;
 }) {
-  const t = alertsCopy.notify;
+  const t = (await shopCopy(alertsCopies)).notify;
   return (
     <div className={className}>
       <p className="mb-2 text-sm text-shop-ink-2">{t.lead}</p>

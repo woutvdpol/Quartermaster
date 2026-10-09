@@ -3,9 +3,11 @@ import { AlertDialogButton } from "@/components/shop/alerts/AlertDialog";
 import { resolveCompliance } from "@/server/compliance";
 import { getSimilarProducts } from "@/server/search";
 import { liveReservedIds, withLiveStatus } from "@/server/storefront-catalog";
-import { catalogCopy as copy } from "../_copy";
+import type { ShopLocale } from "@/lib/i18n/shop-locales";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { catalogCopies } from "../_copy";
 
-const t = copy.product.want;
+const wantCopy = (locale: ShopLocale) => pickCopy(catalogCopies, locale).product.want;
 
 /**
  * "Looks like this" neighbours (smart search, data-cached per product) that the visitor may see:
@@ -29,18 +31,19 @@ export const similarForSale = cache(async (tenantId: string, productId: string, 
  * and the number of similar pieces for sale now, linking to the "Looks like this" rail (#pd-similar).
  * The count streams in; the box and the alert button render immediately.
  */
-export function SoldAlternatives({ tenantId, productId, country }: { tenantId: string; productId: string; country: string | null }) {
+export function SoldAlternatives({ tenantId, productId, country, locale }: { tenantId: string; productId: string; country: string | null; locale: ShopLocale }) {
+  const t = wantCopy(locale);
   return (
     <section className="flex flex-col gap-3 rounded-shop bg-shop-sunken p-5" aria-labelledby="pd-want">
       <h2 id="pd-want" className="font-shop-body text-base font-semibold tracking-normal text-shop-ink">
         {t.title}
       </h2>
       <Suspense fallback={<p className="text-sm text-shop-ink-2">{t.next}</p>}>
-        <SimilarCount tenantId={tenantId} productId={productId} country={country} />
+        <SimilarCount tenantId={tenantId} productId={productId} country={country} locale={locale} />
       </Suspense>
       <AlertDialogButton source={{ productId }} label={t.alert} title={t.alertTitle} intro={t.alertIntro} variant="primary" fullWidth defaultFrequency="INSTANT" />
       <Suspense fallback={null}>
-        <SimilarLink tenantId={tenantId} productId={productId} country={country} />
+        <SimilarLink tenantId={tenantId} productId={productId} country={country} locale={locale} />
       </Suspense>
     </section>
   );
@@ -51,12 +54,14 @@ async function countForSale(tenantId: string, productId: string, country: string
   return items.filter((c) => c.status === "available").length;
 }
 
-async function SimilarCount({ tenantId, productId, country }: { tenantId: string; productId: string; country: string | null }) {
+async function SimilarCount({ tenantId, productId, country, locale }: { tenantId: string; productId: string; country: string | null; locale: ShopLocale }) {
+  const t = wantCopy(locale);
   const n = await countForSale(tenantId, productId, country);
   return <p className="text-sm text-shop-ink-2">{n ? `${t.similar(n)} · ${t.nextAfter}` : t.next}</p>;
 }
 
-async function SimilarLink({ tenantId, productId, country }: { tenantId: string; productId: string; country: string | null }) {
+async function SimilarLink({ tenantId, productId, country, locale }: { tenantId: string; productId: string; country: string | null; locale: ShopLocale }) {
+  const t = wantCopy(locale);
   const n = await countForSale(tenantId, productId, country);
   if (!n) return null;
   return (

@@ -52,31 +52,44 @@ export async function listCustomerOrders(
   }));
 }
 
-export type OrderStatusLabel = { label: string; tone: "neutral" | "success" | "warning" | "danger" };
+export type OrderStatusKey =
+  | "canceled"
+  | "payment_failed"
+  | "payment_expired"
+  | "refunded"
+  | "partially_refunded"
+  | "awaiting_payment"
+  | "delivered"
+  | "shipped"
+  | "packed"
+  | "processing";
+
+/** `label` is English; shop UI translates by `key` (accountCopies.orders.statuses). */
+export type OrderStatusLabel = { key: OrderStatusKey; label: string; tone: "neutral" | "success" | "warning" | "danger" };
 
 /** Customer-facing status of an order (one label combining payment and fulfillment). */
 export function orderStatusLabel(o: Pick<CustomerOrderRow, "paymentStatus" | "fulfillmentStatus" | "canceledAt">): OrderStatusLabel {
-  if (o.canceledAt || o.paymentStatus === "CANCELED") return { label: "Canceled", tone: "danger" };
+  if (o.canceledAt || o.paymentStatus === "CANCELED") return { key: "canceled", label: "Canceled", tone: "danger" };
   switch (o.paymentStatus) {
     case "FAILED":
-      return { label: "Payment failed", tone: "danger" };
+      return { key: "payment_failed", label: "Payment failed", tone: "danger" };
     case "EXPIRED":
-      return { label: "Payment expired", tone: "danger" };
+      return { key: "payment_expired", label: "Payment expired", tone: "danger" };
     case "REFUNDED":
-      return { label: "Refunded", tone: "neutral" };
+      return { key: "refunded", label: "Refunded", tone: "neutral" };
     case "PARTIALLY_REFUNDED":
-      return { label: "Partially refunded", tone: "neutral" };
+      return { key: "partially_refunded", label: "Partially refunded", tone: "neutral" };
     case "PENDING":
-      return { label: "Awaiting payment", tone: "warning" };
+      return { key: "awaiting_payment", label: "Awaiting payment", tone: "warning" };
   }
   switch (o.fulfillmentStatus) {
     case "DELIVERED":
-      return { label: "Delivered", tone: "success" };
+      return { key: "delivered", label: "Delivered", tone: "success" };
     case "SHIPPED":
-      return { label: "Shipped", tone: "success" };
+      return { key: "shipped", label: "Shipped", tone: "success" };
     case "PACKED":
-      return { label: "Packed", tone: "neutral" };
+      return { key: "packed", label: "Packed", tone: "neutral" };
     default:
-      return { label: "Paid — processing", tone: "neutral" };
+      return { key: "processing", label: "Paid — processing", tone: "neutral" };
   }
 }

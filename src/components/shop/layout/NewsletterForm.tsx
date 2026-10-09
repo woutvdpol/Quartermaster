@@ -5,15 +5,15 @@ import { Button } from "@/components/shop/ui/Button";
 import { cn } from "@/components/shop/ui/cn";
 import { Turnstile } from "@/components/shop/turnstile";
 import { subscribeNewsletter, type NewsletterState } from "./newsletter-action";
-import { layoutCopy } from "./_copy";
-
-const t = layoutCopy.newsletter;
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { layoutCopies } from "./_copy";
 
 /**
  * Email sign-up form (footer + NEWSLETTER_SIGNUP block). Progressive enhancement: works without JS.
  * `tone="dark"` for placement on a primary-coloured band (the gallery footer is light).
  */
 export function NewsletterForm({ source = "footer", tone = "light", className }: { source?: "footer" | "block" | "popup"; tone?: "light" | "dark"; className?: string }) {
+  const t = useShopCopy(layoutCopies).newsletter;
   const [state, action, pending] = useActionState<NewsletterState, FormData>(subscribeNewsletter, { status: "idle" });
   const id = useId();
   const message =

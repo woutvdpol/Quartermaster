@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { leadsCopy } from "@/components/shop/leads/_copy";
+import { leadsCopies } from "@/components/shop/leads/_copy";
+import { localizedUrl } from "@/lib/i18n/shop-locales";
+import { pickCopy } from "@/lib/i18n/shop-copy";
 import { SellForm } from "@/components/shop/leads/SellForm";
 import { FormSkeleton } from "@/components/shop/account/FormSkeleton";
 import { Container } from "@/components/shop/ui/Container";
@@ -8,15 +10,15 @@ import { createLeadDraft } from "@/server/leads";
 import { getLegalLinks } from "@/server/storefront/content";
 import { requireShop } from "@/server/storefront/context";
 
-const t = leadsCopy;
-
 export async function generateMetadata(): Promise<Metadata> {
   const shop = await requireShop();
-  return { title: t.title, description: t.metaDescription, alternates: { canonical: `${shop.origin}/sell` } };
+  const t = pickCopy(leadsCopies, shop.locale);
+  return { title: t.title, description: t.metaDescription, alternates: { canonical: localizedUrl(shop.origin, "/sell", shop.locale) } };
 }
 
 export default async function SellPage() {
   const shop = await requireShop();
+  const t = pickCopy(leadsCopies, shop.locale);
   return (
     <Container className="py-10 sm:py-16">
       <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-20">

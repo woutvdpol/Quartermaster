@@ -1,15 +1,16 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
-import { accountCopy } from "./_copy";
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { accountCopies } from "./_copy";
 import { logoutCustomerAction } from "./actions";
-
-const t = accountCopy.account.nav;
 
 /** Disclosure menu for a signed-in customer (keyboard: Esc closes, focus returns to the trigger). */
 export function AccountMenuDropdown({ name, email }: { name: string | null; email: string }) {
+  const copy = useShopCopy(accountCopies);
+  const t = copy.account.nav;
   const [open, setOpen] = useState(false);
   const [lastPath, setLastPath] = useState<string | null>(null);
   const pathname = usePathname();
@@ -57,8 +58,8 @@ export function AccountMenuDropdown({ name, email }: { name: string | null; emai
           <circle cx="12" cy="8" r="4" />
           <path d="M4 20.5c1.4-3.8 4.4-5.5 8-5.5s6.6 1.7 8 5.5" strokeLinecap="round" />
         </svg>
-        <span className="hidden max-w-[10rem] truncate sm:inline">{name ?? accountCopy.menu.account}</span>
-        <span className="sr-only sm:hidden">{accountCopy.menu.openMenu}</span>
+        <span className="hidden max-w-[10rem] truncate sm:inline">{name ?? copy.menu.account}</span>
+        <span className="sr-only sm:hidden">{copy.menu.openMenu}</span>
       </button>
       <div
         id={id}
@@ -66,7 +67,7 @@ export function AccountMenuDropdown({ name, email }: { name: string | null; emai
         className="absolute right-0 z-50 mt-2 w-64 rounded-shop border border-shop-line bg-shop-surface p-2 shadow-shop-pop"
       >
         <p className="truncate px-3 pt-1 pb-2 text-xs text-shop-muted">
-          {accountCopy.menu.signedInAs} <span className="text-shop-ink-2">{email}</span>
+          {copy.menu.signedInAs} <span className="text-shop-ink-2">{email}</span>
         </p>
         <nav aria-label={t.label}>
           <ul>

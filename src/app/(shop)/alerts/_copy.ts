@@ -1,3 +1,8 @@
+/* Copy for the /alerts pages. Dutch and German: _copy.nl.ts / _copy.de.ts (bundle `alertPagesCopies`). */
+import { localized } from "@/lib/i18n/shop-copy";
+import { alertPagesCopyNl } from "./_copy.nl";
+import { alertPagesCopyDe } from "./_copy.de";
+
 export const alertPagesCopy = {
   statusTitle: "Alerts",
   status: {
@@ -15,6 +20,7 @@ export const alertPagesCopy = {
   unsubscribeTitle: "Stop alert",
   unsubscribeSearch: (name: string) => `Stop the alert “${name}”?`,
   unsubscribeSearchGone: "This alert no longer exists.",
+  thisItem: "this item",
   unsubscribeWishlist: (title: string) => `Remove “${title}” from your wishlist and stop emails about it?`,
   unsubscribeButton: "Stop emails",
   unsubscribing: "Stopping…",
@@ -27,3 +33,5 @@ export const alertPagesCopy = {
   backHome: "Back to the shop",
   frequency: { INSTANT: "Right away", DAILY: "Daily", WEEKLY: "Weekly" },
 } as const;
+
+export const alertPagesCopies = localized({ en: alertPagesCopy, nl: alertPagesCopyNl, de: alertPagesCopyDe });

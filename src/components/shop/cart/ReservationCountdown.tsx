@@ -3,9 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/components/shop/ui/cn";
-import { cartCopy } from "./_copy";
-
-const t = cartCopy.countdown;
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { cartCopies } from "./_copy";
 
 export function formatRemaining(ms: number): string {
   const total = Math.max(0, Math.ceil(ms / 1000));
@@ -20,7 +19,7 @@ export function formatRemaining(ms: number): string {
  */
 export function ReservationCountdown({
   expiresAt,
-  label = t.reservedFor,
+  label,
   refreshOnExpire = true,
   className,
 }: {
@@ -29,6 +28,7 @@ export function ReservationCountdown({
   refreshOnExpire?: boolean;
   className?: string;
 }) {
+  const t = useShopCopy(cartCopies).countdown;
   const router = useRouter();
   const end = new Date(expiresAt).getTime();
   const [now, setNow] = useState(() => Date.now());
@@ -65,7 +65,7 @@ export function ReservationCountdown({
         t.expired
       ) : (
         <>
-          <span>{label}</span>
+          <span>{label ?? t.reservedFor}</span>
           <span aria-hidden="true">·</span>
           <span className="font-shop-mono tabular-nums" suppressHydrationWarning aria-hidden="true">
             {formatRemaining(left)}

@@ -1,6 +1,7 @@
 "use server";
 
-import { leadsCopy } from "@/components/shop/leads/_copy";
+import { leadsCopies } from "@/components/shop/leads/_copy";
+import { shopCopy } from "@/server/i18n/locale";
 import type { SellFormState } from "@/components/shop/leads/types";
 import { clientIp } from "@/server/customer-auth";
 import { leadInputFromForm, submitLead } from "@/server/leads";
@@ -8,9 +9,8 @@ import { leadInputFromForm, submitLead } from "@/server/leads";
 import { getOpenShopTenant as getRequestTenant } from "@/server/storefront/launch";
 import { turnstileTokenFrom } from "@/server/turnstile";
 
-const t = leadsCopy.errors;
-
 export async function submitLeadAction(prev: SellFormState, formData: FormData): Promise<SellFormState> {
+  const t = (await shopCopy(leadsCopies)).errors;
   const attempt = (prev?.attempt ?? 0) + 1;
   const raw = leadInputFromForm(formData);
   const values = {

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "./Link";
 import type { ReactNode } from "react";
 import { cn } from "./cn";
 

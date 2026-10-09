@@ -3,12 +3,12 @@
 import { useEffect } from "react";
 import { Button, ButtonLink } from "@/components/shop/ui/Button";
 import { Container } from "@/components/shop/ui/Container";
-import { shopPageCopy } from "./_copy";
-
-const t = shopPageCopy.error;
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { shopPageCopies } from "./_copy";
 
 /** Error boundary for shop pages (the header/footer stay). */
 export default function ShopError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  const t = useShopCopy(shopPageCopies).error;
   useEffect(() => {
     console.error(error);
   }, [error]);

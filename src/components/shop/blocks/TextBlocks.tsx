@@ -6,7 +6,9 @@ import { cn } from "@/components/shop/ui/cn";
 import { CtaLink } from "./CtaLink";
 import { emphasis, stripEmphasis } from "./Emphasis";
 import { contentImage } from "./images";
-import { blocksCopy } from "./_copy";
+import { localizePath, type ShopLocale } from "@/lib/i18n/shop-locales";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { blocksCopies } from "./_copy";
 
 /** Block heading size shared by the text blocks (h2; `*word*` renders in the accent serif). */
 const H2 = "text-[1.75rem] leading-[1.08] tracking-[-0.025em] text-shop-ink sm:text-[2.25rem]";
@@ -81,7 +83,8 @@ export async function TextImageBlock({ data }: { data: BlockData<"TEXT_IMAGE"> }
   );
 }
 
-export async function TextCarouselBlock({ data, blockId }: { data: BlockData<"TEXT_CAROUSEL">; blockId: string }) {
+export async function TextCarouselBlock({ data, blockId, locale }: { data: BlockData<"TEXT_CAROUSEL">; blockId: string; locale: ShopLocale }) {
+  const blocksCopy = pickCopy(blocksCopies, locale);
   const n = data.imageKeys.length;
   const images = await Promise.all(data.imageKeys.map((k) => contentImage(k)));
   return (
@@ -137,7 +140,8 @@ export async function CtaBlock({ data }: { data: BlockData<"CTA"> }) {
   );
 }
 
-export async function GalleryBlock({ data }: { data: BlockData<"GALLERY"> }) {
+export async function GalleryBlock({ data, locale }: { data: BlockData<"GALLERY">; locale: ShopLocale }) {
+  const blocksCopy = pickCopy(blocksCopies, locale);
   if (!data.imageKeys.length) return null;
   const images = await Promise.all(data.imageKeys.map((k) => contentImage(k)));
   return (
@@ -157,7 +161,8 @@ export async function GalleryBlock({ data }: { data: BlockData<"GALLERY"> }) {
 }
 
 /** One or more consecutive TESTIMONIAL blocks, shown together as a scroll-snap slider. */
-export function TestimonialsBlock({ items }: { items: BlockData<"TESTIMONIAL">[] }) {
+export function TestimonialsBlock({ items, locale }: { items: BlockData<"TESTIMONIAL">[]; locale: ShopLocale }) {
+  const blocksCopy = pickCopy(blocksCopies, locale);
   return (
     <Container>
       <ul aria-label={blocksCopy.testimonialsLabel} tabIndex={items.length > 1 ? 0 : undefined} className={cn("gap-4", items.length > 1 ? "shop-rail auto-cols-[88%] pb-3 sm:auto-cols-[46%] lg:auto-cols-[32%]" : "grid")}>
@@ -167,7 +172,7 @@ export function TestimonialsBlock({ items }: { items: BlockData<"TESTIMONIAL">[]
               <blockquote className="flex-1 font-shop-accent text-xl leading-snug text-shop-ink italic sm:text-[1.4rem]">“{t.quote}”</blockquote>
               <figcaption className="mt-5 text-sm font-semibold text-shop-ink-2">
                 {t.link ? (
-                  <a href={t.link.href} rel={/^https?:/i.test(t.link.href) ? "noopener noreferrer" : undefined} className="underline-offset-4 hover:underline">
+                  <a href={localizePath(t.link.href, locale)} rel={/^https?:/i.test(t.link.href) ? "noopener noreferrer" : undefined} className="underline-offset-4 hover:underline">
                     {t.author}
                   </a>
                 ) : (

@@ -1,4 +1,8 @@
-/** English copy for the catalog, product page and archive (multi-language later: same shape per locale). */
+import { localized } from "@/lib/i18n/shop-copy";
+import { catalogCopyNl } from "./_copy.nl";
+import { catalogCopyDe } from "./_copy.de";
+
+/** English copy for the catalog, product page and archive (Dutch/German: ./_copy.nl.ts, ./_copy.de.ts). */
 export const catalogCopy = {
   shop: {
     title: "Shop",
@@ -73,6 +77,7 @@ export const catalogCopy = {
   },
   loadMore: "Load more",
   showing: (shown: number, total: number) => `Showing ${shown} of ${total}`,
+  pagedTitle: (title: string, page: number) => `${title} – page ${page}`,
   product: {
     stockCode: (n: number) => `No. ${n}`,
     status: { available: "For sale", reserved: "Reserved", sold: "Sold" } as Record<string, string>,
@@ -128,3 +133,5 @@ export const catalogCopy = {
     noPhoto: "No photo yet",
   },
 } as const;
+
+export const catalogCopies = localized({ en: catalogCopy, nl: catalogCopyNl, de: catalogCopyDe });

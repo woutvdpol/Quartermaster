@@ -1,6 +1,7 @@
 import type { ProductCardData, ShopImage } from "@/components/shop/ui";
 import type { CatalogCard, PublicImage } from "@/server/storefront-catalog/types";
 import { priceVisible, soldLabel } from "@/server/storefront-catalog/sold";
+import type { ShopLocale } from "@/lib/i18n/shop-locales";
 
 export type CardContext = {
   currency: string;
@@ -8,6 +9,8 @@ export type CardContext = {
   lockSensitive: boolean;
   /** Shop time zone for "Sold Oct 2026" (default UTC). */
   timeZone?: string;
+  /** Visitor language for the sold label (default English). */
+  locale?: ShopLocale;
 };
 
 export function toShopImage(img: PublicImage, alt: string): ShopImage {
@@ -35,7 +38,7 @@ export function toCardData(c: CatalogCard, ctx: CardContext): ProductCardData {
     availability: c.status,
     // Sold items: price only when the dealer ticked "show sold price" on the item (docs/sold-archive.md).
     showPrice: priceVisible(c),
-    soldLabel: c.status === "sold" ? soldLabel(c.soldAt, ctx.timeZone) : null,
+    soldLabel: c.status === "sold" ? soldLabel(c.soldAt, ctx.timeZone, ctx.locale) : null,
     onSale: c.onSale,
     locked,
     image: c.cover

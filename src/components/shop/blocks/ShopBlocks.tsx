@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import type { BlockData } from "@/server/content/blocks";
 import { getCategoryTiles, getNewItems, getProductsByIds, liveReservedIds, toProductCardData } from "@/server/storefront/products";
 import { Container } from "@/components/shop/ui/Container";
@@ -11,12 +11,15 @@ import { ShopImg } from "@/components/shop/ui/ShopImg";
 import { NewsletterForm } from "@/components/shop/layout/NewsletterForm";
 import type { BlockContext } from "./context";
 import { emphasis, stripEmphasis } from "./Emphasis";
-import { blocksCopy } from "./_copy";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { translateCards } from "@/server/storefront/translate";
+import { blocksCopies } from "./_copy";
 
 export async function TextProductBlock({ data, ctx }: { data: BlockData<"TEXT_PRODUCT">; ctx: BlockContext }) {
-  const rows = data.productId ? await getProductsByIds(ctx.tenantId, [data.productId]) : [];
+  const rows = data.productId ? await translateCards(ctx.tenantId, ctx.locale, await getProductsByIds(ctx.tenantId, [data.productId])) : [];
   const reserved = await liveReservedIds(ctx.tenantId, rows.map((r) => r.id));
   const product = rows[0] ? toProductCardData(rows[0], { ...ctx.card, reservedIds: reserved }) : null;
+  const blocksCopy = pickCopy(blocksCopies, ctx.locale);
   return (
     <Container className="grid items-center gap-8 md:grid-cols-12 md:gap-14">
       <div className="md:col-span-7">
@@ -30,7 +33,7 @@ export async function TextProductBlock({ data, ctx }: { data: BlockData<"TEXT_PR
       </div>
       {product ? (
         <div className="mx-auto w-full max-w-sm md:col-span-5">
-          <ProductCard product={product} showStockCode={ctx.showStockCode} sizes="(min-width: 768px) 380px, 90vw" />
+          <ProductCard product={product} showStockCode={ctx.showStockCode} locale={ctx.locale} sizes="(min-width: 768px) 380px, 90vw" />
         </div>
       ) : null}
     </Container>
@@ -38,14 +41,16 @@ export async function TextProductBlock({ data, ctx }: { data: BlockData<"TEXT_PR
 }
 
 export async function NewItemsBlock({ data, ctx, priority }: { data: BlockData<"NEW_ITEMS">; ctx: BlockContext; priority?: boolean }) {
-  const rows = await getNewItems(ctx.tenantId, data.count);
+  // Titles in the shop language (approved translations; docs/i18n.md).
+  const rows = await translateCards(ctx.tenantId, ctx.locale, await getNewItems(ctx.tenantId, data.count));
   const reserved = await liveReservedIds(ctx.tenantId, rows.map((r) => r.id));
   const products = rows.map((r) => toProductCardData(r, { ...ctx.card, reservedIds: reserved }));
+  const blocksCopy = pickCopy(blocksCopies, ctx.locale);
   return (
     <Container>
-      {data.title || data.cta ? <SectionHeading title={emphasis(data.title || "New arrivals")} action={data.cta ? { label: data.cta.label, href: data.cta.href } : null} /> : null}
+      {data.title || data.cta ? <SectionHeading title={emphasis(data.title || blocksCopy.newItemsTitle)} action={data.cta ? { label: data.cta.label, href: data.cta.href } : null} /> : null}
       {products.length ? (
-        <ProductGrid products={products} columns={ctx.gridColumns} showStockCode={ctx.showStockCode} priorityCount={priority ? ctx.gridColumns : 0} />
+        <ProductGrid products={products} columns={ctx.gridColumns} showStockCode={ctx.showStockCode} locale={ctx.locale} priorityCount={priority ? ctx.gridColumns : 0} />
       ) : (
         <EmptyState title={blocksCopy.newItemsEmpty} />
       )}
@@ -60,6 +65,7 @@ export async function NewItemsBlock({ data, ctx, priority }: { data: BlockData<"
 export async function CategoriesBlock({ data, ctx }: { data: BlockData<"CATEGORIES">; ctx: BlockContext }) {
   const tiles = await getCategoryTiles(ctx.tenantId, data.categoryIds);
   if (!tiles.length) return null;
+  const blocksCopy = pickCopy(blocksCopies, ctx.locale);
   return (
     <Container>
       {data.title ? <SectionHeading title={emphasis(data.title)} /> : null}

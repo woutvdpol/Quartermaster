@@ -1,16 +1,17 @@
 "use client";
 
 import { useActionState } from "react";
-import { accountCopy } from "@/components/shop/account/_copy";
+import { accountCopies } from "@/components/shop/account/_copy";
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
 import { Alert, Field, Honeypot, SubmitButton } from "@/components/shop/account/form";
 import { Turnstile } from "@/components/shop/turnstile";
 import { checkClasses } from "@/components/shop/ui/Field";
 import { cn } from "@/components/shop/ui/cn";
 import { registerAction } from "./actions";
 
-const t = accountCopy.register;
-
 export function RegisterForm({ next, minPasswordLength }: { next: string; minPasswordLength: number }) {
+  const copy = useShopCopy(accountCopies);
+  const t = copy.register;
   const [state, action] = useActionState(registerAction, undefined);
   const fe = state?.fieldErrors ?? {};
   return (
@@ -18,10 +19,10 @@ export function RegisterForm({ next, minPasswordLength }: { next: string; minPas
       <input type="hidden" name="next" value={next} />
       <Honeypot />
       {state?.error ? <Alert tone="error">{state.error}</Alert> : null}
-      <Field id="name" label={accountCopy.common.name} autoComplete="name" required maxLength={200} defaultValue={state?.values?.name} error={fe.name} />
+      <Field id="name" label={copy.common.name} autoComplete="name" required maxLength={200} defaultValue={state?.values?.name} error={fe.name} />
       <Field
         id="email"
-        label={accountCopy.common.email}
+        label={copy.common.email}
         type="email"
         autoComplete="email"
         inputMode="email"
@@ -32,7 +33,7 @@ export function RegisterForm({ next, minPasswordLength }: { next: string; minPas
       />
       <Field
         id="password"
-        label={accountCopy.common.password}
+        label={copy.common.password}
         type="password"
         autoComplete="new-password"
         required

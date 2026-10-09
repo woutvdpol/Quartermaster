@@ -1,18 +1,21 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { accountCopy } from "@/components/shop/account/_copy";
+import { accountCopies } from "@/components/shop/account/_copy";
+import { shopCopy } from "@/server/i18n/locale";
 import { AuthPanel } from "@/components/shop/account/AuthPanel";
 import { Alert, SubmitButton } from "@/components/shop/account/form";
 import { FormSkeleton } from "@/components/shop/account/FormSkeleton";
 import { confirmNewsletterAction } from "./actions";
 
-const t = accountCopy.newsletter;
-
 // The token is in the URL: keep it out of search engines and Referer headers.
-export const metadata: Metadata = { title: t.confirmTitle, robots: { index: false, follow: false }, referrer: "no-referrer" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = (await shopCopy(accountCopies)).newsletter;
+  return { title: t.confirmTitle, robots: { index: false, follow: false }, referrer: "no-referrer" };
+}
 
 /** Landing page of the confirmation mail link. Shows a button; nothing changes until it is pressed. */
-export default function NewsletterConfirmPage({ searchParams }: PageProps<"/newsletter/confirm">) {
+export default async function NewsletterConfirmPage({ searchParams }: PageProps<"/newsletter/confirm">) {
+  const t = (await shopCopy(accountCopies)).newsletter;
   return (
     <AuthPanel title={t.confirmTitle}>
       <Suspense fallback={<FormSkeleton fields={0} />}>
@@ -25,6 +28,7 @@ export default function NewsletterConfirmPage({ searchParams }: PageProps<"/news
 async function ConfirmContent({ searchParams }: { searchParams: PageProps<"/newsletter/confirm">["searchParams"] }) {
   const raw = (await searchParams).token;
   const token = typeof raw === "string" ? raw.slice(0, 200) : "";
+  const t = (await shopCopy(accountCopies)).newsletter;
   if (!token) return <Alert tone="info">{t.missingToken}</Alert>;
   return (
     <form action={confirmNewsletterAction} className="grid gap-4">

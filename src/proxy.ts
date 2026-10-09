@@ -3,6 +3,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { buildCsp, createNonce, cspHeaderName, parseCspMode, reportingEndpointsHeader } from "@/lib/csp";
 import { networkRewritePath, platformNetworkRedirect } from "@/lib/network";
+import { LOCALE_HEADER, isLocalizablePath, splitLocalePath } from "@/lib/i18n/shop-locales";
 import { THEME_PREVIEW_COOKIE, THEME_PREVIEW_HEADER, THEME_PREVIEW_MAX_AGE_SECONDS, THEME_PREVIEW_PARAM } from "@/lib/theme-preview";
 
 // Keep in sync with SESSION_COOKIE in src/server/auth/session.ts (that module is server-only).
@@ -43,10 +44,19 @@ export function proxy(request: NextRequest) {
   const previewOn =
     !isAdmin && (previewParam === "1" || (previewParam !== "0" && request.cookies.get(THEME_PREVIEW_COOKIE)?.value === "1"));
 
+  // Shop languages (docs/i18n.md § Shop-routing): "/de/x" is served by the route "/x" with LOCALE_HEADER
+  // set; English has no prefix, so "/en/x" 308s to "/x". Not on the network host nor for admin/API/files.
+  const networkHost = normalizeHost(process.env.NETWORK_HOST ?? null);
+  const onNetworkHost = !!networkHost && normalizeHost(request.headers.get("host")) === networkHost;
+  const localePath = isAdmin || onNetworkHost ? null : splitLocalePath(pathname);
+  const localized = localePath?.prefixed && isLocalizablePath(localePath.path) ? localePath : null;
+
   let response: NextResponse;
   const networkRedirect = isAdmin ? null : platformNetworkRedirect(request.headers.get("host"), pathname);
   if (networkRedirect) {
     response = NextResponse.redirect(networkRedirect + search, 308);
+  } else if (localized?.locale === "en") {
+    response = NextResponse.redirect(new URL(localized.path + search, request.url), 308);
   } else if (
     isAdmin &&
     !PUBLIC_ADMIN_PATHS.some((p) => isUnder(pathname, p)) &&
@@ -59,6 +69,8 @@ export function proxy(request: NextRequest) {
     // Overwrite (never trust) any client-supplied x-qm-host.
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-qm-host", normalizeHost(request.headers.get("host")));
+    requestHeaders.delete(LOCALE_HEADER);
+    if (localized) requestHeaders.set(LOCALE_HEADER, localized.locale);
     // Next takes the script nonce from the request's CSP header; never let the client supply one.
     for (const name of CSP_REQUEST_HEADERS) requestHeaders.delete(name);
     requestHeaders.delete(THEME_PREVIEW_HEADER);
@@ -68,10 +80,10 @@ export function proxy(request: NextRequest) {
       requestHeaders.set("x-nonce", nonce);
     }
     // Quartermaster network on its own host (NETWORK_HOST, src/lib/network.ts): "/x" is served by /network/x.
-    const networkHost = normalizeHost(process.env.NETWORK_HOST ?? null);
-    const networkPath = networkHost && normalizeHost(request.headers.get("host")) === networkHost ? networkRewritePath(pathname) : null;
-    response = networkPath
-      ? NextResponse.rewrite(new URL(networkPath + search, request.url), { request: { headers: requestHeaders } })
+    const networkPath = onNetworkHost ? networkRewritePath(pathname) : null;
+    const rewriteTo = networkPath ?? localized?.path ?? null;
+    response = rewriteTo
+      ? NextResponse.rewrite(new URL(rewriteTo + search, request.url), { request: { headers: requestHeaders } })
       : NextResponse.next({ request: { headers: requestHeaders } });
   }
 

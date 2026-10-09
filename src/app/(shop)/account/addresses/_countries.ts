@@ -1,20 +1,24 @@
 import "server-only";
 import { db } from "@/server/db";
-import { COUNTRIES, COUNTRY_CODES, isCountryCode } from "@/server/shipping/countries";
+import { COUNTRY_CODES, isCountryCode } from "@/server/shipping/countries";
+import { localCountryName } from "@/components/shop/account/format";
+import { INTL_LOCALE, type ShopLocale } from "@/lib/i18n/shop-locales";
 
-/** Country options for the address form: countries the shop ships to first, then every country. */
-export async function countryOptions(tenantId: string) {
+/** Country options for the address form (names in the shop language): countries the shop ships to first, then every country. */
+export async function countryOptions(tenantId: string, locale: ShopLocale) {
   const zones = await db.shippingZone.findMany({
     where: { tenantId, isActive: true, isPickup: false },
     orderBy: { sortOrder: "asc" },
     select: { countries: true },
   });
   const preferred = [...new Set(zones.flatMap((z) => z.countries))].filter(isCountryCode).slice(0, 40);
-  const byName = (a: [string, string], b: [string, string]) => a[1].localeCompare(b[1], "en");
+  const collator = new Intl.Collator(INTL_LOCALE[locale]);
+  const byName = (a: [string, string], b: [string, string]) => collator.compare(a[1], b[1]);
+  const named = (c: string) => [c, localCountryName(c, locale)] as [string, string];
   return {
     /** First country of the first delivery zone (usually the shop's home country). */
     defaultCountry: (zones[0]?.countries.find(isCountryCode) as string | undefined) ?? preferred[0] ?? "NL",
-    preferred: preferred.map((c) => [c, COUNTRIES[c]] as [string, string]).sort(byName),
-    all: COUNTRY_CODES.map((c) => [c, COUNTRIES[c]] as [string, string]).sort(byName),
+    preferred: preferred.map(named).sort(byName),
+    all: COUNTRY_CODES.map(named).sort(byName),
   };
 }

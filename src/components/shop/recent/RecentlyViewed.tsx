@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { ProductGrid } from "@/components/shop/ui/ProductGrid";
 import { SectionHeading } from "@/components/shop/ui/SectionHeading";
 import type { DisplayCurrency, ProductCardData } from "@/components/shop/ui/types";
-import { recentCopy } from "./_copy";
+import { useShopCopy, useShopLocale } from "@/components/shop/i18n/ShopLocale";
+import { recentCopies } from "./_copy";
 import { getRecentlyViewedCards } from "./actions";
 import { readRecent } from "./storage";
 
@@ -16,13 +17,13 @@ import { readRecent } from "./storage";
  * Props:
  *  - exclude: product id to leave out (the product currently shown).
  *  - limit: max cards (default 4 = one desktop row; max 12).
- *  - title: heading text (default "Recently viewed").
+ *  - title: heading text (default: "Recently viewed" in the visitor's language).
  *  - columns / display / showStockCode: passed to ProductGrid.
  */
 export function RecentlyViewed({
   exclude,
   limit = 4,
-  title = recentCopy.title,
+  title,
   columns = 4,
   display,
   showStockCode,
@@ -36,6 +37,9 @@ export function RecentlyViewed({
   showStockCode?: boolean;
   className?: string;
 }) {
+  const locale = useShopLocale();
+  const t = useShopCopy(recentCopies);
+  const heading = title ?? t.title;
   const [cards, setCards] = useState<ProductCardData[] | null>(null);
 
   useEffect(() => {
@@ -56,9 +60,9 @@ export function RecentlyViewed({
 
   if (!cards?.length) return null;
   return (
-    <section aria-label={title} className={className}>
-      <SectionHeading title={title} />
-      <ProductGrid products={cards} columns={columns} display={display} showStockCode={showStockCode} />
+    <section aria-label={heading} className={className}>
+      <SectionHeading title={heading} />
+      <ProductGrid products={cards} columns={columns} display={display} showStockCode={showStockCode} locale={locale} />
     </section>
   );
 }

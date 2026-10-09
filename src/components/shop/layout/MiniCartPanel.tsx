@@ -1,14 +1,14 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import type { MiniCartData } from "@/components/shop/cart/mini-cart-action";
 import { buttonClasses } from "@/components/shop/ui/Button";
 import { cn } from "@/components/shop/ui/cn";
 import { formatMoney } from "@/components/shop/ui/money";
-import { uiCopy } from "@/components/shop/ui/_copy";
-import { layoutCopy } from "./_copy";
+import { uiCopies } from "@/components/shop/ui/_copy";
+import { useShopCopy, useShopLocale } from "@/components/shop/i18n/ShopLocale";
+import { layoutCopies } from "./_copy";
 
-const t = layoutCopy.miniCart;
 /** Lines shown in the panel; the rest is summarised as "+ N more". */
 const MAX_LINES = 4;
 
@@ -24,6 +24,9 @@ export function MiniCartPanel({
   loading: boolean;
   openedAt: number;
 }) {
+  const locale = useShopLocale();
+  const t = useShopCopy(layoutCopies).miniCart;
+  const ui = useShopCopy(uiCopies);
   const lines = data?.lines ?? [];
   const shown = lines.slice(0, MAX_LINES);
   const more = lines.length - shown.length;
@@ -108,7 +111,7 @@ export function MiniCartPanel({
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       {l.stockCode !== null ? (
                         <span className="font-shop-mono text-xs text-shop-accent">
-                          {uiCopy.product.stockCode} {l.stockCode}
+                          {ui.product.stockCode} {l.stockCode}
                         </span>
                       ) : null}
                       <span className="line-clamp-2 text-sm leading-snug font-medium">
@@ -128,7 +131,7 @@ export function MiniCartPanel({
                           "text-shop-muted line-through",
                       )}
                     >
-                      {formatMoney(l.price, l.currency)}
+                      {formatMoney(l.price, l.currency, locale)}
                     </span>
                   </Link>
                 </li>
@@ -146,6 +149,7 @@ export function MiniCartPanel({
                   {formatMoney(
                     data?.subtotal ?? 0,
                     data?.currency ?? lines[0].currency,
+                    locale,
                   )}
                 </span>
               </div>

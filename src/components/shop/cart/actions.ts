@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 // Not while the shop is "coming soon" (src/server/storefront/launch.ts).
 import { getOpenShopTenant as getRequestTenant } from "@/server/storefront/launch";
@@ -20,6 +19,10 @@ import {
 import { db } from "@/server/db";
 import { quoteCheckout, type CheckoutQuote } from "@/server/checkout";
 import { applyCartCoupon, removeCartCoupon, restoreCart, setCartContact } from "@/server/cart/extras";
+import { getRequestLocale, localeRedirect } from "@/server/i18n/locale";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { cartCopies } from "./_copy";
+import { localizeServerMessage } from "./server-messages";
 
 /*
  * Cart server actions, shared by the product page (AddToCartButton), the header and the cart page.
@@ -40,10 +43,12 @@ export type AddToCartState =
   | { ok: false; code: "RESERVED" | "UNAVAILABLE" | "LOGIN_REQUIRED" | "NOT_FOUND" | "RATE_LIMITED" | "ERROR"; message: string; count?: number };
 
 export async function addToCartAction(productId: unknown): Promise<AddToCartState> {
-  if (typeof productId !== "string" || productId.length > 64) return { ok: false, code: "NOT_FOUND", message: "This item could not be found" };
+  const locale = await getRequestLocale();
+  const t = pickCopy(cartCopies, locale);
+  if (typeof productId !== "string" || productId.length > 64) return { ok: false, code: "NOT_FOUND", message: t.errors.itemNotFound };
   const tenantId = await requireTenantId();
   const limitKey = `cart.add:${tenantId}:${(await clientIp()) ?? "unknown"}`;
-  if (!(await take(limitKey, ADD_RULE))) return { ok: false, code: "RATE_LIMITED", message: "Too many attempts. Please wait a moment." };
+  if (!(await take(limitKey, ADD_RULE))) return { ok: false, code: "RATE_LIMITED", message: t.add.rateLimited };
 
   const viewer = await getShopViewer(tenantId);
   const token = await readCartToken();
@@ -52,7 +57,17 @@ export async function addToCartAction(productId: unknown): Promise<AddToCartStat
   const count = await cartItemCount(tenantId, newToken ?? token);
   revalidatePath("/cart");
   if (result.ok) return { ok: true, count, expiresAt: result.expiresAt.toISOString(), alreadyInCart: result.alreadyInCart };
-  return { ok: false, code: result.code, message: result.message, count };
+  const message =
+    result.code === "RESERVED"
+      ? t.errors.reservedByOther(result.minutes)
+      : result.code === "UNAVAILABLE"
+        ? t.errors.itemUnavailable
+        : result.code === "LOGIN_REQUIRED"
+          ? t.errors.loginToBuy
+          : result.code === "NOT_FOUND"
+            ? t.errors.itemNotFound
+            : localizeServerMessage(result.message, locale);
+  return { ok: false, code: result.code, message, count };
 }
 
 /** useActionState-compatible variant (works as a plain form POST before hydration). */
@@ -109,7 +124,7 @@ export async function removeUnavailableAction(): Promise<void> {
 export async function startCheckoutAction(): Promise<void> {
   const tenantId = await requireTenantId();
   await extendReservations(tenantId, await readCartToken());
-  redirect("/checkout");
+  await localeRedirect("/checkout");
 }
 
 /**
@@ -140,15 +155,17 @@ export type CouponFormState = { ok: boolean; message: string } | null;
 
 /** Apply a discount code to the cart (rate limited: codes must not be brute-forced). */
 export async function applyCouponAction(_prev: CouponFormState, form: FormData): Promise<CouponFormState> {
+  const locale = await getRequestLocale();
+  const t = pickCopy(cartCopies, locale);
   const code = form.get("couponCode");
-  if (typeof code !== "string" || !code.trim()) return { ok: false, message: "Enter a code" };
+  if (typeof code !== "string" || !code.trim()) return { ok: false, message: t.errors.enterCode };
   const tenantId = await requireTenantId();
   const key = `cart.coupon:${tenantId}:${(await clientIp()) ?? "unknown"}`;
-  if (!(await take(key, COUPON_RULE))) return { ok: false, message: "Too many attempts. Please wait a few minutes." };
+  if (!(await take(key, COUPON_RULE))) return { ok: false, message: t.coupon.rateLimited };
   const res = await applyCartCoupon(tenantId, await readCartToken(), code);
   revalidatePath("/cart");
   revalidatePath("/checkout");
-  return res.ok ? { ok: true, message: `Code ${res.outcome.code} applied` } : { ok: false, message: res.message };
+  return res.ok ? { ok: true, message: t.coupon.applied(res.outcome.code) } : { ok: false, message: localizeServerMessage(res.message, locale) };
 }
 
 export async function removeCouponAction(): Promise<void> {

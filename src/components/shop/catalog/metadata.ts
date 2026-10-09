@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { hasActiveFilters, type CatalogParams, type CatalogSort } from "@/server/storefront-catalog/params";
 import { SHOP_PATH, facetValueHref } from "@/server/storefront-catalog/urls";
-import { shopOgDefaults, type OgShop } from "@/lib/seo/metadata";
+import { shopAlternates, shopOgDefaults, type OgShop } from "@/lib/seo/metadata";
+import { SOURCE_LOCALE } from "@/lib/i18n/shop-locales";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { catalogCopies } from "./_copy";
 import { metaDescription, metaTitle } from "@/lib/seo/text";
 
 /**
@@ -12,6 +15,7 @@ import { metaDescription, metaTitle } from "@/lib/seo/text";
  *    (their canonical points at the clean listing);
  *  - exactly one facet filter on /shop (`/shop?f=period.ww2`) is the same list as the facet landing
  *    page, so it declares that page canonical instead.
+ * Canonical and hreflang follow the visitor's language (shopAlternates): "/de/shop" is canonical for itself.
  */
 export function catalogMetadata({
   shop,
@@ -32,15 +36,17 @@ export function catalogMetadata({
   const variant = hasActiveFilters(params) || params.show !== null || params.view !== null || resorted;
   const landing = landingFor(path, params, resorted);
   const canonical = landing ?? (params.page > 1 && !variant ? `${path}?page=${params.page}` : path);
-  const fullTitle = metaTitle(params.page > 1 ? `${title} – page ${params.page}` : title);
+  const locale = shop.locale ?? SOURCE_LOCALE;
+  const fullTitle = metaTitle(params.page > 1 ? pickCopy(catalogCopies, locale).pagedTitle(title, params.page) : title);
   const desc = metaDescription(description);
+  const alternates = shopAlternates({ locale, locales: shop.locales ?? [locale] }, canonical);
   return {
     title: fullTitle,
     description: desc,
-    alternates: { canonical },
+    alternates,
     // Only set when needed: `robots: undefined` would also wipe the layout's noindex (coming soon / preview).
     ...(variant && !landing ? { robots: { index: false, follow: true } } : {}),
-    openGraph: { ...shopOgDefaults(shop), title: fullTitle, description: desc, url: canonical },
+    openGraph: { ...shopOgDefaults(shop), title: fullTitle, description: desc, url: alternates.canonical },
   };
 }
 

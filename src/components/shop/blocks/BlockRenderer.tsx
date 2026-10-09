@@ -58,7 +58,7 @@ export function BlockRenderer({ blocks, ctx, heroIsTitle = false }: { blocks: Pu
         if (g.kind === "testimonials") {
           return (
             <Section key={g.id}>
-              <TestimonialsBlock items={g.items} />
+              <TestimonialsBlock items={g.items} locale={ctx.locale} />
             </Section>
           );
         }
@@ -90,13 +90,13 @@ function renderBlock(b: PublicBlock, ctx: BlockContext, index: number): ReactNod
     case "TEXT_IMAGE":
       return <TextImageBlock data={b.data} />;
     case "TEXT_CAROUSEL":
-      return <TextCarouselBlock data={b.data} blockId={b.id} />;
+      return <TextCarouselBlock data={b.data} blockId={b.id} locale={ctx.locale} />;
     case "QUOTE":
       return <QuoteBlock data={b.data} />;
     case "CTA":
       return <CtaBlock data={b.data} />;
     case "GALLERY":
-      return <GalleryBlock data={b.data} />;
+      return <GalleryBlock data={b.data} locale={ctx.locale} />;
     case "TEXT_PRODUCT":
       return (
         <Suspense fallback={<Container><Skeleton className="h-72 w-full" /></Container>}>

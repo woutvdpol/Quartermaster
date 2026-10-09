@@ -1,18 +1,23 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { Suspense } from "react";
 import { Alert, SubmitButton } from "@/components/shop/account/form";
 import { Container } from "@/components/shop/ui/Container";
 import { Skeleton } from "@/components/shop/ui/Skeleton";
 import { manageViewSigned } from "@/server/alerts";
 import { getRequestTenant } from "@/server/tenant";
-import { alertPagesCopy as t } from "../_copy";
+import { shopCopy } from "@/server/i18n/locale";
+import { alertPagesCopies } from "../_copy";
 import { stopManagedAlertAction } from "./actions";
 
-export const metadata: Metadata = { title: t.manageTitle, robots: { index: false, follow: false }, referrer: "no-referrer" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await shopCopy(alertPagesCopies);
+  return { title: t.manageTitle, robots: { index: false, follow: false }, referrer: "no-referrer" };
+}
 
 /** All alerts of one address, reached through the signed "Manage all alerts" link in alert mails. */
-export default function ManageAlertsPage({ searchParams }: PageProps<"/alerts/manage">) {
+export default async function ManageAlertsPage({ searchParams }: PageProps<"/alerts/manage">) {
+  const t = await shopCopy(alertPagesCopies);
   return (
     <Container size="narrow" className="py-10 sm:py-16">
       <h1 className="text-[2.1rem] leading-[1.05] tracking-[-0.03em] text-shop-ink sm:text-[2.6rem]">{t.manageTitle}</h1>
@@ -25,6 +30,7 @@ export default function ManageAlertsPage({ searchParams }: PageProps<"/alerts/ma
 
 async function Content({ searchParams }: { searchParams: PageProps<"/alerts/manage">["searchParams"] }) {
   const q = await searchParams;
+  const t = await shopCopy(alertPagesCopies);
   const link = { t: typeof q.t === "string" ? q.t : "", s: typeof q.s === "string" ? q.s : "", sig: typeof q.sig === "string" ? q.sig : "" };
   const tenant = await getRequestTenant();
   const view = tenant && tenant.id === link.t ? await manageViewSigned({ tenantId: link.t, savedSearchId: link.s, sig: link.sig }) : null;

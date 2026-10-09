@@ -1,26 +1,26 @@
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import type { ReactNode } from "react";
 import { Container } from "@/components/shop/ui/Container";
 import { cn } from "@/components/shop/ui/cn";
-import { accountCopy } from "./_copy";
+import { shopCopy } from "@/server/i18n/locale";
+import { accountCopies } from "./_copy";
 import { logoutCustomerAction } from "./actions";
 
 export type AccountSection = "overview" | "orders" | "addresses" | "wishlist" | "alerts" | "profile" | "privacy";
 
-const t = accountCopy.account.nav;
-
-const NAV: Array<{ key: AccountSection; href: string; label: string }> = [
-  { key: "overview", href: "/account", label: t.overview },
-  { key: "orders", href: "/account/orders", label: t.orders },
-  { key: "wishlist", href: "/wishlist", label: t.wishlist },
-  { key: "alerts", href: "/account/alerts", label: t.alerts },
-  { key: "addresses", href: "/account/addresses", label: t.addresses },
-  { key: "profile", href: "/account/profile", label: t.profile },
-  { key: "privacy", href: "/account/privacy", label: t.privacy },
+const NAV: Array<{ key: AccountSection; href: string }> = [
+  { key: "overview", href: "/account" },
+  { key: "orders", href: "/account/orders" },
+  { key: "wishlist", href: "/wishlist" },
+  { key: "alerts", href: "/account/alerts" },
+  { key: "addresses", href: "/account/addresses" },
+  { key: "profile", href: "/account/profile" },
+  { key: "privacy", href: "/account/privacy" },
 ];
 
-/** Account page frame: sidebar navigation on desktop, horizontal tabs on phones. Static (no session read). */
-export function AccountShell({ active, title, children }: { active: AccountSection; title: string; children: ReactNode }) {
+/** Account page frame: sidebar navigation on desktop, horizontal tabs on phones. No session read (only the request language). */
+export async function AccountShell({ active, title, children }: { active: AccountSection; title: string; children: ReactNode }) {
+  const t = (await shopCopy(accountCopies)).account.nav;
   return (
     <Container className="py-8 sm:py-14">
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[220px_minmax(0,1fr)] md:gap-14">
@@ -37,7 +37,7 @@ export function AccountShell({ active, title, children }: { active: AccountSecti
                       n.key === active ? "bg-shop-sunken font-semibold text-shop-ink" : "text-shop-ink-2 hover:bg-shop-sunken hover:text-shop-ink",
                     )}
                   >
-                    {n.label}
+                    {t[n.key]}
                   </Link>
                 </li>
               ))}

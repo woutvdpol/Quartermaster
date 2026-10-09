@@ -1,10 +1,12 @@
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import Form from "next/form";
 import { cn, formatMoney, currencyExponent } from "@/components/shop/ui";
 import { catalogQueryString, categoryHref, type CatalogParams, type CatalogSort } from "@/server/storefront-catalog";
 import type { CatalogFacets, FacetGroup, FacetValueOption, PublicCategoryNode } from "@/server/storefront-catalog/types";
 import { HiddenParams } from "./HiddenParams";
-import { catalogCopy as copy } from "./_copy";
+import { localizePath, type ShopLocale } from "@/lib/i18n/shop-locales";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { catalogCopies } from "./_copy";
 
 type Props = {
   /** Distinguishes the desktop sidebar from the mobile sheet copy (unique ids). */
@@ -25,6 +27,7 @@ type Props = {
   lockedFacets?: string[];
   /** Category page URL (default: the shop's /shop/category/{slug}; the sold archive has its own). */
   categoryLink?: (slug: string) => string;
+  locale: ShopLocale;
 };
 
 /**
@@ -34,7 +37,8 @@ type Props = {
  * Plain links and a GET form — works without JS.
  */
 export function FacetPanel(props: Props) {
-  const { idPrefix, basePath, params, defaultSort, facets, tree, currency, priceFilter } = props;
+  const { idPrefix, basePath, params, defaultSort, facets, tree, currency, priceFilter, locale } = props;
+  const copy = pickCopy(catalogCopies, locale);
   const tags = facets.tags.map((t) => ({ ...t, label: t.name }));
   return (
     <div className="flex flex-col divide-y divide-shop-line *:py-6 *:first:pt-0 *:last:pb-0">
@@ -49,7 +53,7 @@ export function FacetPanel(props: Props) {
           <h2 id={`${idPrefix}-tags`} className="mb-3 px-3 font-shop-body text-sm font-semibold tracking-normal text-shop-ink">
             {copy.filters.tags}
           </h2>
-          <TagList tags={tags} params={params} basePath={basePath} defaultSort={defaultSort} />
+          <TagList tags={tags} params={params} basePath={basePath} defaultSort={defaultSort} locale={locale} />
         </section>
       ) : null}
 
@@ -58,18 +62,18 @@ export function FacetPanel(props: Props) {
           <h2 id={`${idPrefix}-price`} className="mb-3 px-3 font-shop-body text-sm font-semibold tracking-normal text-shop-ink">
             {copy.filters.price}
           </h2>
-          <Form action={basePath} scroll={false} className="flex flex-col gap-3">
+          <Form action={localizePath(basePath, locale)} scroll={false} className="flex flex-col gap-3">
             <HiddenParams params={params} keep={["q", "facets", "tags", "sort", "view"]} defaultSort={defaultSort} />
             <div className="grid grid-cols-2 gap-2">
-              <PriceInput id={`${idPrefix}-min`} name="min" label={copy.filters.priceMin} value={params.min} placeholder={facets.price ? Math.floor(facets.price.min / 10 ** currencyExponent(currency)) : undefined} currency={currency} />
-              <PriceInput id={`${idPrefix}-max`} name="max" label={copy.filters.priceMax} value={params.max} placeholder={facets.price ? Math.ceil(facets.price.max / 10 ** currencyExponent(currency)) : undefined} currency={currency} />
+              <PriceInput id={`${idPrefix}-min`} name="min" label={copy.filters.priceMin} value={params.min} placeholder={facets.price ? Math.floor(facets.price.min / 10 ** currencyExponent(currency)) : undefined} currency={currency} locale={locale} />
+              <PriceInput id={`${idPrefix}-max`} name="max" label={copy.filters.priceMax} value={params.max} placeholder={facets.price ? Math.ceil(facets.price.max / 10 ** currencyExponent(currency)) : undefined} currency={currency} locale={locale} />
             </div>
             <button type="submit" className="h-10 rounded-shop-control border border-shop-line-strong bg-shop-surface text-sm font-semibold text-shop-ink transition-colors hover:border-shop-ink">
               {copy.filters.applyPrice}
             </button>
             {facets.price ? (
               <p className="text-xs text-shop-muted tabular-nums">
-                {formatMoney(facets.price.min, currency)} – {formatMoney(facets.price.max, currency)}
+                {formatMoney(facets.price.min, currency, locale)} – {formatMoney(facets.price.max, currency, locale)}
               </p>
             ) : null}
           </Form>
@@ -79,8 +83,8 @@ export function FacetPanel(props: Props) {
   );
 }
 
-function PriceInput({ id, name, label, value, placeholder, currency }: { id: string; name: string; label: string; value: number | null; placeholder?: number; currency: string }) {
-  const symbol = formatMoney(0, currency).replace(/[\d.,\s]/g, "") || currency;
+function PriceInput({ id, name, label, value, placeholder, currency, locale }: { id: string; name: string; label: string; value: number | null; placeholder?: number; currency: string; locale: ShopLocale }) {
+  const symbol = formatMoney(0, currency, locale).replace(/[\d.,\s]/g, "") || currency;
   return (
     <div className="flex flex-col gap-1">
       <label htmlFor={id} className="text-xs text-shop-muted">
@@ -119,7 +123,8 @@ function pruneValues(values: FacetValueOption[]): FacetValueOption[] {
 
 const hasSelected = (v: FacetValueOption): boolean => v.selected || v.children.some(hasSelected);
 
-function FacetSection({ group, idPrefix, basePath, shopPath, params, defaultSort, lockedFacets = [] }: Props & { group: FacetGroup }) {
+function FacetSection({ group, idPrefix, basePath, shopPath, params, defaultSort, lockedFacets = [], locale }: Props & { group: FacetGroup }) {
+  const copy = pickCopy(catalogCopies, locale);
   const values = pruneValues(group.values);
   if (!values.length) return null;
   const locked = new Set(lockedFacets);
@@ -177,7 +182,8 @@ function FacetSection({ group, idPrefix, basePath, shopPath, params, defaultSort
   );
 }
 
-function TagList({ tags, params, basePath, defaultSort }: { tags: { slug: string; label: string; count: number }[]; params: CatalogParams; basePath: string; defaultSort: CatalogSort }) {
+function TagList({ tags, params, basePath, defaultSort, locale }: { tags: { slug: string; label: string; count: number }[]; params: CatalogParams; basePath: string; defaultSort: CatalogSort; locale: ShopLocale }) {
+  const copy = pickCopy(catalogCopies, locale);
   const selected = new Set(params.tags);
   const render = (t: (typeof tags)[number]) => {
     const on = selected.has(t.slug);
@@ -224,7 +230,8 @@ function TagList({ tags, params, basePath, defaultSort }: { tags: { slug: string
   );
 }
 
-function CategorySection({ idPrefix, shopPath, params, defaultSort, facets, tree, currentCategoryId, currentPath, categoryLink = categoryHref }: Props & { tree: PublicCategoryNode[] }) {
+function CategorySection({ idPrefix, shopPath, params, defaultSort, facets, tree, currentCategoryId, currentPath, categoryLink = categoryHref, locale }: Props & { tree: PublicCategoryNode[] }) {
+  const copy = pickCopy(catalogCopies, locale);
   const counts = facets.categoryCounts;
   const totalOf = (n: PublicCategoryNode): number => (counts[n.id] ?? 0) + n.children.reduce((s, c) => s + totalOf(c), 0);
   const onPath = new Set(currentPath);

@@ -5,12 +5,14 @@ import { useCallback, useEffect, useId, useRef, useState, type DragEvent } from 
 import { cn } from "@/components/shop/ui/cn";
 import { IntentLink } from "@/components/shop/ui/IntentLink";
 import { formatMoney } from "@/components/shop/ui/money";
+import { useLocalizedHref, useShopCopy, useShopLocale } from "@/components/shop/i18n/ShopLocale";
 import { LockedImg, ShopImg } from "@/components/shop/ui/ShopImg";
 import type { ImageSearchItem, ImageSearchResponse, SearchErrorResponse } from "@/server/search/api-types";
 import { PHOTO_MAX_BYTES, downscalePhoto, isImageFile } from "./photo-image";
-import { searchCopy } from "./_copy";
+import { searchCopies } from "./_copy";
 
-const t = searchCopy.photo;
+/** "€1,450.00" → "€1,450", "1.450,00 €" → "1.450 €" (whole amounts without cents). */
+const dropZeroCents = (s: string) => s.replace(/[.,]00(?=\D*$)/, "");
 
 type Phase =
   | { kind: "idle" }
@@ -33,6 +35,10 @@ function looksLike(items: ImageSearchItem[]): string | null {
  * (503) the dialog offers a text search instead. The photo is never stored (server: in memory only).
  */
 export function PhotoSearchDialog({ onClose }: { onClose: () => void }) {
+  const locale = useShopLocale();
+  const copy = useShopCopy(searchCopies);
+  const t = copy.photo;
+  const localizedHref = useLocalizedHref();
   const dialog = useRef<HTMLDialogElement>(null);
   const chooseInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
@@ -62,7 +68,7 @@ export function PhotoSearchDialog({ onClose }: { onClose: () => void }) {
     form.append("file", blob, "photo.jpg");
     if (q.trim()) form.append("q", q.trim());
     try {
-      const res = await fetch("/api/search/image", { method: "POST", body: form, signal: c.signal });
+      const res = await fetch(locale === "en" ? "/api/search/image" : `/api/search/image?locale=${locale}`, { method: "POST", body: form, signal: c.signal });
       const body = (await res.json().catch(() => null)) as ImageSearchResponse | SearchErrorResponse | null;
       if (c.signal.aborted) return;
       if (res.ok && body && "items" in body) setPhase({ kind: "results", res: body });
@@ -71,7 +77,7 @@ export function PhotoSearchDialog({ onClose }: { onClose: () => void }) {
     } catch {
       if (!c.signal.aborted) setPhase({ kind: "error", message: t.failed });
     }
-  }, []);
+  }, [t, locale]);
 
   const accept = useCallback(
     async (file: File | null | undefined) => {
@@ -89,7 +95,7 @@ export function PhotoSearchDialog({ onClose }: { onClose: () => void }) {
       setPhoto({ blob, url: URL.createObjectURL(blob) });
       void search(blob, words);
     },
-    [search, words],
+    [search, words, t],
   );
 
   // Paste a photo anywhere while the dialog is open (desktop).
@@ -238,9 +244,9 @@ export function PhotoSearchDialog({ onClose }: { onClose: () => void }) {
           <div role="alert" className="flex flex-col gap-3 p-4 sm:p-6">
             <p className="font-semibold">{t.unavailableTitle}</p>
             <p className="text-sm text-shop-muted">{t.unavailableBody}</p>
-            <Form action="/shop" className="flex max-w-md gap-2" onSubmit={() => dialog.current?.close()}>
+            <Form action={localizedHref("/shop")} className="flex max-w-md gap-2" onSubmit={() => dialog.current?.close()}>
               <label htmlFor={`${titleId}-fallback`} className="sr-only">
-                {searchCopy.field.label}
+                {copy.field.label}
               </label>
               <input
                 id={`${titleId}-fallback`}
@@ -283,10 +289,10 @@ export function PhotoSearchDialog({ onClose }: { onClose: () => void }) {
                           <span className="absolute bottom-2 left-2 rounded-shop-control bg-shop-surface px-2 py-0.5 text-[0.7rem] font-semibold text-shop-ink shadow-shop">{t.match[p.match]}</span>
                         ) : null}
                       </span>
-                      <span className="font-shop-mono text-[0.7rem] text-shop-accent">{searchCopy.panel.stockCode(p.stockCode)}</span>
+                      <span className="font-shop-mono text-[0.7rem] text-shop-accent">{copy.panel.stockCode(p.stockCode)}</span>
                       <span className="flex justify-between gap-2 text-[0.85rem]">
                         <span className="line-clamp-2 font-medium group-hover:underline">{p.title}</span>
-                        <strong className="shrink-0 tabular-nums">{p.showPrice ? formatMoney(p.priceCents, p.currency).replace(/\.00$/, "") : searchCopy.panel.sold}</strong>
+                        <strong className="shrink-0 tabular-nums">{p.showPrice ? dropZeroCents(formatMoney(p.priceCents, p.currency, locale)) : copy.panel.sold}</strong>
                       </span>
                     </IntentLink>
                   </li>

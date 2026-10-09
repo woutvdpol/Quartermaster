@@ -7,6 +7,7 @@
 // default value as-is (skipping inner defaults); `.prefault()` parses it, so inner defaults apply.
 import { DEFAULT_SYNONYMS, MAX_SYNONYM_TEXT } from "@/server/search/synonyms";
 import { z } from "zod";
+import { EXTRA_LOCALES } from "@/lib/i18n/shop-locales";
 
 // ─── Shared primitives ──────────────────────────────────────────────────────
 
@@ -265,6 +266,18 @@ export const analyticsSchema = z
     if (!v.matomoSiteId) ctx.addIssue({ code: "custom", path: ["matomoSiteId"], message: "Required for Matomo" });
   });
 
+/**
+ * Shop languages (docs/i18n.md). English is the main language; `locales` are the extra languages the
+ * shop is served in (/nl, /de) and translated into. Machine translations are only shown after review.
+ */
+export const i18nSchema = z.object({
+  locales: z
+    .array(z.enum(EXTRA_LOCALES))
+    .max(EXTRA_LOCALES.length)
+    .transform((l) => [...new Set(l)])
+    .default([]),
+});
+
 /** SUPERADMIN-only. Limits use `null` for "plan default". */
 export const platformSchema = z.object({
   plan: z.enum(["bronze", "silver", "gold"]).default("bronze"),
@@ -290,6 +303,7 @@ export const SETTINGS_SCHEMAS = {
   legal: legalSchema,
   mail: mailSchema,
   analytics: analyticsSchema,
+  i18n: i18nSchema,
   platform: platformSchema,
 } as const;
 

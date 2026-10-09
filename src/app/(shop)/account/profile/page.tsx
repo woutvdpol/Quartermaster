@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { accountCopy } from "@/components/shop/account/_copy";
+import { accountCopies } from "@/components/shop/account/_copy";
+import { shopCopy } from "@/server/i18n/locale";
 import { AccountShell, Panel } from "@/components/shop/account/AccountShell";
 import { FormSkeleton } from "@/components/shop/account/FormSkeleton";
 import { EmailForm, PasswordForm, ProfileForm } from "@/components/shop/account/ProfileForms";
@@ -8,11 +9,13 @@ import { MIN_PASSWORD_LENGTH } from "@/server/auth/password";
 import { requireShopCustomer } from "@/server/customer-auth";
 import { changeEmailAction, changePasswordAction, updateProfileAction } from "../actions";
 
-const t = accountCopy.profile;
+export async function generateMetadata(): Promise<Metadata> {
+  const t = (await shopCopy(accountCopies)).profile;
+  return { title: t.title, robots: { index: false, follow: false } };
+}
 
-export const metadata: Metadata = { title: t.title, robots: { index: false, follow: false } };
-
-export default function ProfilePage() {
+export default async function ProfilePage() {
+  const t = (await shopCopy(accountCopies)).profile;
   return (
     <AccountShell active="profile" title={t.title}>
       <Suspense fallback={<FormSkeleton fields={4} />}>
@@ -24,6 +27,7 @@ export default function ProfilePage() {
 
 async function Profile() {
   const c = await requireShopCustomer("/account/profile");
+  const t = (await shopCopy(accountCopies)).profile;
   return (
     <div className="grid gap-6">
       <Panel title={t.details}>

@@ -1,4 +1,8 @@
-/** English copy for the shop chrome (header, footer, age gate, newsletter). */
+import { localized } from "@/lib/i18n/shop-copy";
+import { layoutCopyDe } from "./_copy.de";
+import { layoutCopyNl } from "./_copy.nl";
+
+/** English copy for the shop chrome (header, footer, age gate, newsletter; Dutch/German: ./_copy.nl.ts, ./_copy.de.ts). */
 export const layoutCopy = {
   skipToContent: "Skip to content",
   header: {
@@ -32,6 +36,7 @@ export const layoutCopy = {
     checkout: "Checkout",
   },
   footer: {
+    navLabel: "Footer",
     newsletterTitle: "Newsletter",
     newsletterText: "New arrivals and stories from the collection, straight to your inbox.",
     contact: "Contact",
@@ -52,6 +57,12 @@ export const layoutCopy = {
     captcha: "We could not verify that you are human. Please try again.",
     honeypot: "Leave this field empty",
   },
+  openingSoon: {
+    eyebrow: "Opening soon",
+    body: "We are preparing our shop. Please come back soon.",
+    notify: "Leave your email and we let you know when we open.",
+    questions: "Questions?",
+  },
   ageGate: {
     title: (age: number) => `Are you ${age} or older?`,
     body: (shop: string, age: number) =>
@@ -61,3 +72,5 @@ export const layoutCopy = {
     denied: (age: number) => `Sorry, you must be ${age} or older to visit this shop.`,
   },
 } as const;
+
+export const layoutCopies = localized({ en: layoutCopy, nl: layoutCopyNl, de: layoutCopyDe });

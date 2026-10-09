@@ -6,7 +6,9 @@ import { formatIndicative } from "./money";
 import { Price } from "./Price";
 import { LockedImg, ShopImg } from "./ShopImg";
 import type { DisplayCurrency, ProductCardData } from "./types";
-import { uiCopy } from "./_copy";
+import { uiCopies } from "./_copy";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import type { ShopLocale } from "@/lib/i18n/shop-locales";
 
 /**
  * Product tile for grids and rails. Server component (no client JS); interactive bits go in slots:
@@ -23,6 +25,7 @@ export function ProductCard({
   headingLevel = 3,
   sizes,
   className,
+  locale,
 }: {
   product: ProductCardData;
   wishlistSlot?: ReactNode;
@@ -33,12 +36,15 @@ export function ProductCard({
   headingLevel?: 2 | 3 | 4;
   sizes?: string;
   className?: string;
+  /** Shop language (copy and price format). */
+  locale: ShopLocale;
 }) {
+  const uiCopy = pickCopy(uiCopies, locale);
   const H = `h${headingLevel}` as "h2" | "h3" | "h4";
   const sold = product.availability === "sold";
   const indicative =
     product.showPrice && display && display.currency !== product.currency
-      ? formatIndicative(product.priceCents, product.currency, display.currency, display.rate)
+      ? formatIndicative(product.priceCents, product.currency, display.currency, display.rate, locale)
       : null;
   return (
     <article className={cn("group relative flex flex-col", className)}>
@@ -89,7 +95,7 @@ export function ProductCard({
             </IntentLink>
           </H>
           {product.showPrice ? (
-            <Price cents={product.priceCents} currency={product.currency} display={null} size="sm" className={cn("shrink-0 [&>span:first-child]:font-bold", sold && "opacity-60")} />
+            <Price cents={product.priceCents} currency={product.currency} display={null} size="sm" locale={locale} className={cn("shrink-0 [&>span:first-child]:font-bold", sold && "opacity-60")} />
           ) : sold && product.soldLabel ? null : (
             <span className="shrink-0 text-sm text-shop-muted">{uiCopy.product.sold}</span>
           )}

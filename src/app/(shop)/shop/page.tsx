@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { requireShop } from "@/server/storefront/context";
 import { CatalogView, defaultSortFor } from "@/components/shop/catalog/CatalogView";
-import { catalogCopy as copy } from "@/components/shop/catalog/_copy";
+import { catalogCopies } from "@/components/shop/catalog/_copy";
+import { pickCopy } from "@/lib/i18n/shop-copy";
 import { catalogMetadata } from "@/components/shop/catalog/metadata";
 import { SHOP_PATH, parseCatalogParams } from "@/server/storefront-catalog";
 import { JsonLd } from "@/components/shop/ui/JsonLd";
@@ -10,6 +11,7 @@ import { loadSeoShop } from "@/server/seo";
 
 export async function generateMetadata({ searchParams }: PageProps<"/shop">): Promise<Metadata> {
   const shop = await requireShop();
+  const copy = pickCopy(catalogCopies, shop.locale);
   const defaultSort = defaultSortFor(shop, "shop");
   const params = parseCatalogParams(await searchParams, defaultSort);
   return catalogMetadata({
@@ -24,6 +26,7 @@ export async function generateMetadata({ searchParams }: PageProps<"/shop">): Pr
 
 export default async function ShopPage({ searchParams }: PageProps<"/shop">) {
   const shop = await requireShop();
+  const copy = pickCopy(catalogCopies, shop.locale);
   const sp = await searchParams;
   const view = <CatalogView shop={shop} mode="shop" basePath={SHOP_PATH} searchParams={sp} title={copy.shop.title} crumbs={[{ label: copy.shop.title }]} />;
   if (!shop.settings.content.homeRedirectsToShop) return view;

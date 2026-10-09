@@ -20,10 +20,14 @@ import { HeaderCountsProvider } from "@/components/shop/layout/HeaderCounts";
 import { ServerHeaderCounts } from "@/components/shop/layout/ServerHeaderCounts";
 import { AnalyticsBeacon } from "@/components/shop/layout/AnalyticsBeacon";
 import { TurnstileSiteKeyProvider } from "@/components/shop/turnstile/TurnstileSiteKey";
-import { layoutCopy } from "@/components/shop/layout/_copy";
+import { layoutCopies } from "@/components/shop/layout/_copy";
+import { pickCopy } from "@/lib/i18n/shop-copy";
 import { shopDescription } from "@/server/seo";
 import { metaDescription } from "@/lib/seo/text";
 import { shopOgDefaults } from "@/lib/seo/metadata";
+import { ShopLocaleProvider } from "@/components/shop/i18n/ShopLocale";
+import { getRequestLocale } from "@/server/i18n/locale";
+import { translateMenus } from "@/server/storefront/translate";
 import "./shop.css";
 
 /*
@@ -59,9 +63,14 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ShopLayout({ children }: LayoutProps<"/">) {
   const scope = await getRequestScope();
   // Network pages on NETWORK_HOST (src/app/(shop)/network, docs/network.md) bring their own chrome too.
-  if (scope.kind === "platform" || (await isNetworkHostRequest())) return children;
+  // They are English only: "/de/…" there does not exist.
+  if (scope.kind === "platform" || (await isNetworkHostRequest())) {
+    if ((await getRequestLocale()) !== "en") notFound();
+    return children;
+  }
   const shop = await getShopContext();
-  if (!shop) notFound();
+  // Unknown host, or a language this shop does not serve (docs/i18n.md § Shop-routing).
+  if (!shop || !shop.locales.includes(shop.locale)) notFound();
 
   const { appearance, legal, analytics } = shop.settings;
   const launch = await getLaunchState();
@@ -69,17 +78,20 @@ export default async function ShopLayout({ children }: LayoutProps<"/">) {
   // Not live yet: visitors get the "Opening soon" page instead of any shop page; staff see the shop.
   if (launch.prelaunch && !launch.staff) {
     return (
-      <TurnstileSiteKeyProvider siteKey={process.env.TURNSTILE_SITE_KEY || process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || undefined}>
-        <div className="shop-root flex min-h-dvh flex-col" data-shop-theme={appearance.theme} style={style}>
-          <ShopFonts appearance={appearance} />
-          <OpeningSoon shop={shop} />
-        </div>
-      </TurnstileSiteKeyProvider>
+      <ShopLocaleProvider locale={shop.locale} locales={shop.locales}>
+        <TurnstileSiteKeyProvider siteKey={process.env.TURNSTILE_SITE_KEY || process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || undefined}>
+          <div className="shop-root flex min-h-dvh flex-col" data-shop-theme={appearance.theme} style={style}>
+            <ShopFonts appearance={appearance} />
+            <OpeningSoon shop={shop} />
+          </div>
+        </TurnstileSiteKeyProvider>
+      </ShopLocaleProvider>
     );
   }
   const notLive = launch.prelaunch;
   const [menus, allLegalLinks, ageOk] = await Promise.all([
-    getPublicMenus(shop.tenant.id),
+    // Menu labels in the shop language (approved translations only; docs/i18n.md).
+    getPublicMenus(shop.tenant.id).then((m) => translateMenus(shop.tenant.id, shop.locale, m)),
     getLegalLinks(shop.tenant.id),
     legal.ageVerification === "popup"
       ? hasConfirmedAge(legal.minimumAge)
@@ -89,57 +101,59 @@ export default async function ShopLayout({ children }: LayoutProps<"/">) {
   const legalLinks = withoutMenuDuplicates(allLegalLinks, menus.footer);
 
   return (
-    <TurnstileSiteKeyProvider
-      siteKey={
-        process.env.TURNSTILE_SITE_KEY ||
-        process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ||
-        undefined
-      }
-    >
-      <HeaderCountsProvider>
-        <div
-          className="shop-root flex min-h-dvh flex-col"
-          data-shop-theme={appearance.theme}
-          style={style}
-        >
-          <ShopFonts appearance={appearance} />
-          <a
-            href="#main"
-            className="sr-only z-50 rounded-shop-sm bg-shop-surface px-4 py-2 text-shop-ink shadow-shop-pop focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+    <ShopLocaleProvider locale={shop.locale} locales={shop.locales}>
+      <TurnstileSiteKeyProvider
+        siteKey={
+          process.env.TURNSTILE_SITE_KEY ||
+          process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ||
+          undefined
+        }
+      >
+        <HeaderCountsProvider>
+          <div
+            className="shop-root flex min-h-dvh flex-col"
+            data-shop-theme={appearance.theme}
+            style={style}
           >
-            {layoutCopy.skipToContent}
-          </a>
-          <Header
-            tenantId={shop.tenant.id}
-            shopName={shop.shopName}
-            logoPath={appearance.logoPath}
-            menu={menus.header}
-          />
-          <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
-            {children}
-          </main>
-          <Footer shop={shop} menu={menus.footer} legalLinks={legalLinks} />
-          {!ageOk ? (
-            <AgeGate shopName={shop.shopName} minimumAge={legal.minimumAge} />
-          ) : null}
-          <Suspense fallback={null}>
-            <ServerHeaderCounts tenantId={shop.tenant.id} />
-          </Suspense>
-          {notLive && !shop.themePreview ? <NotLiveRibbon /> : null}
-          {shop.themePreview ? (
-            <ThemePreviewBridge
-              hasDraft={shop.themePreview.hasDraft}
-              notLive={notLive}
-              {...shopFontTables()}
+            <ShopFonts appearance={appearance} />
+            <a
+              href="#main"
+              className="sr-only z-50 rounded-shop-sm bg-shop-surface px-4 py-2 text-shop-ink shadow-shop-pop focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+            >
+              {pickCopy(layoutCopies, shop.locale).skipToContent}
+            </a>
+            <Header
+              tenantId={shop.tenant.id}
+              shopName={shop.shopName}
+              logoPath={appearance.logoPath}
+              menu={menus.header}
             />
-          ) : null}
-          {analytics.provider === "own" && !shop.themePreview && !notLive ? (
+            <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
+              {children}
+            </main>
+            <Footer shop={shop} menu={menus.footer} legalLinks={legalLinks} />
+            {!ageOk ? (
+              <AgeGate shopName={shop.shopName} minimumAge={legal.minimumAge} />
+            ) : null}
             <Suspense fallback={null}>
-              <AnalyticsBeacon />
+              <ServerHeaderCounts tenantId={shop.tenant.id} />
             </Suspense>
-          ) : null}
-        </div>
-      </HeaderCountsProvider>
-    </TurnstileSiteKeyProvider>
+            {notLive && !shop.themePreview ? <NotLiveRibbon /> : null}
+            {shop.themePreview ? (
+              <ThemePreviewBridge
+                hasDraft={shop.themePreview.hasDraft}
+                notLive={notLive}
+                {...shopFontTables()}
+              />
+            ) : null}
+            {analytics.provider === "own" && !shop.themePreview && !notLive ? (
+              <Suspense fallback={null}>
+                <AnalyticsBeacon />
+              </Suspense>
+            ) : null}
+          </div>
+        </HeaderCountsProvider>
+      </TurnstileSiteKeyProvider>
+    </ShopLocaleProvider>
   );
 }

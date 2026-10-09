@@ -1,4 +1,11 @@
-/** English copy for the offer flow (multi-language later). */
+import { localized } from "@/lib/i18n/shop-copy";
+import { offerCopyNl } from "./_copy.nl";
+import { offerCopyDe } from "./_copy.de";
+
+/**
+ * Copy for the offer flow. English source; Dutch and German in _copy.nl.ts / _copy.de.ts (`offerCopies`).
+ * `errors` translates the English messages of src/server/offers (see cart/server-messages.ts).
+ */
 export const offerCopy = {
   button: "Make an offer",
   dialogTitle: "Make an offer",
@@ -41,4 +48,25 @@ export const offerCopy = {
   counterExpired: "This counter offer has expired.",
   counterAccepted: "You already accepted this counter offer — check your email for your personal checkout link.",
   counterClosed: "This counter offer is no longer open.",
+  /** Messages returned by the offer service and actions (English originals there). */
+  errors: {
+    checkFields: "Please check the highlighted fields",
+    name: "Enter your name",
+    amount: "Enter an amount",
+    severalOffers: "You have made several offers recently. Please try again later.",
+    notAllowed: "This item doesn't accept offers",
+    inSomeonesCart: "Someone has this item in their cart right now. Please try again later.",
+    atOrAbovePrice: "Your offer is at or above the price — you can simply buy it",
+    lowest: (amount: string) => `The lowest offer we can consider is ${amount}`,
+    duplicate: "You already have an open offer for this item. We'll get back to you soon.",
+    captcha: "We could not verify that you are human. Please try again.",
+    offerLinkInvalid: "This offer link is no longer valid",
+    linkInvalid: "This link is no longer valid",
+    unknownChoice: "Unknown choice",
+    counterAnswered: "This counter offer was already answered",
+    counterExpired: "This counter offer has expired",
+    soldMeantime: "Sorry — this item has been sold in the meantime",
+  },
 } as const;
+
+export const offerCopies = localized({ en: offerCopy, nl: offerCopyNl, de: offerCopyDe });

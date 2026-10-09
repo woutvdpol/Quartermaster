@@ -1,5 +1,6 @@
 import { AlertDialogButton } from "./AlertDialog";
-import { alertsCopy } from "./_copy";
+import { shopCopy } from "@/server/i18n/locale";
+import { alertsCopies } from "./_copy";
 import type { CatalogSearchInput } from "@/server/alerts/query";
 
 /**
@@ -8,8 +9,8 @@ import type { CatalogSearchInput } from "@/server/alerts/query";
  *                              categoryId: category?.id ?? null, facetValueIds }} />
  * (tags = slugs, min/max = whole currency units; ids of other shops are dropped server-side).
  */
-export function SaveSearchButton({ query, className }: { query: CatalogSearchInput; className?: string }) {
-  const t = alertsCopy.save;
+export async function SaveSearchButton({ query, className }: { query: CatalogSearchInput; className?: string }) {
+  const t = (await shopCopy(alertsCopies)).save;
   return (
     <AlertDialogButton
       source={{ query }}

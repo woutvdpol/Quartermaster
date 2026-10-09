@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import {
   changeCustomerEmail,
   changeCustomerPassword,
@@ -9,6 +8,7 @@ import {
   deleteAddress,
   deleteCustomerAccount,
   getShopCustomer,
+  loginHref,
   setDefaultAddress,
   setNewsletterPreference,
   updateAddress,
@@ -16,7 +16,8 @@ import {
   type AddressFieldErrors,
   type AddressInput,
 } from "@/server/customer-auth";
-import { accountCopy } from "@/components/shop/account/_copy";
+import { localeHref, localeRedirect, shopCopy } from "@/server/i18n/locale";
+import { accountCopies } from "@/components/shop/account/_copy";
 
 /*
  * Account mutations. Every action re-resolves the signed-in customer of THIS host from the session;
@@ -32,13 +33,14 @@ function str(formData: FormData, name: string): string {
 
 async function customerOrLogin(returnTo: string) {
   const c = await getShopCustomer();
-  if (!c) redirect(`/login?next=${encodeURIComponent(returnTo)}`);
+  if (!c) return localeRedirect(loginHref(await localeHref(returnTo)));
   return c;
 }
 
 // ─── Profile ────────────────────────────────────────────────────────────────
 
 export async function updateProfileAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const accountCopy = await shopCopy(accountCopies);
   const c = await customerOrLogin("/account/profile");
   const res = await updateCustomerProfile(c.user, { name: str(formData, "name"), phone: str(formData, "phone") });
   if (!res.ok) return { error: accountCopy.register.errors.invalid, fieldErrors: res.fieldErrors };
@@ -47,6 +49,7 @@ export async function updateProfileAction(_prev: FormState, formData: FormData):
 }
 
 export async function changeEmailAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const accountCopy = await shopCopy(accountCopies);
   const c = await customerOrLogin("/account/profile");
   const res = await changeCustomerEmail(c.user, str(formData, "email"), str(formData, "password"));
   if (!res.ok) return { error: accountCopy.profile.emailErrors[res.error] };
@@ -55,6 +58,7 @@ export async function changeEmailAction(_prev: FormState, formData: FormData): P
 }
 
 export async function changePasswordAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const accountCopy = await shopCopy(accountCopies);
   const t = accountCopy.profile.passwordErrors;
   const c = await customerOrLogin("/account/profile");
   const next = str(formData, "newPassword");
@@ -93,13 +97,14 @@ export async function saveAddressAction(_prev: AddressFormState, formData: FormD
   const input = addressFromForm(formData);
   const res = id ? await updateAddress(owner, id, input) : await createAddress(owner, input);
   if (!res.ok) {
+    const accountCopy = await shopCopy(accountCopies);
     const t = accountCopy.addresses;
     if (res.error === "limit") return { error: t.limit };
     if (res.error === "not_found") return { error: t.notFound };
     return { error: accountCopy.register.errors.invalid, fieldErrors: res.fieldErrors };
   }
   revalidatePath("/account", "layout");
-  redirect("/account/addresses");
+  await localeRedirect("/account/addresses");
 }
 
 export async function deleteAddressAction(formData: FormData): Promise<void> {
@@ -117,6 +122,7 @@ export async function setDefaultAddressAction(formData: FormData): Promise<void>
 // ─── Newsletter & privacy ───────────────────────────────────────────────────
 
 export async function newsletterPreferenceAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const accountCopy = await shopCopy(accountCopies);
   const t = accountCopy.privacy;
   const c = await customerOrLogin("/account/privacy");
   const subscribed = str(formData, "subscribe") === "1";
@@ -132,6 +138,6 @@ export async function newsletterPreferenceAction(_prev: FormState, formData: For
 export async function deleteAccountAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const c = await customerOrLogin("/account/privacy");
   const res = await deleteCustomerAccount(c.user, str(formData, "password"));
-  if (!res.ok) return { error: accountCopy.privacy.deleteErrors[res.error] };
-  redirect("/login?deleted=1");
+  if (!res.ok) return { error: (await shopCopy(accountCopies)).privacy.deleteErrors[res.error] };
+  await localeRedirect("/login?deleted=1");
 }

@@ -13,20 +13,25 @@ import { CheckoutButton } from "@/components/shop/cart/CheckoutButton";
 import { CouponForm } from "@/components/shop/cart/CouponForm";
 import { RestoreCartPrompt } from "@/components/shop/cart/RestoreCartPrompt";
 import { toCartLineData } from "@/components/shop/cart/lines";
-import { cartCopy } from "@/components/shop/cart/_copy";
+import { cartCopies } from "@/components/shop/cart/_copy";
+import { countryOptions } from "@/components/shop/cart/countries";
+import { localizeServerMessage } from "@/components/shop/cart/server-messages";
+import { shopCopy } from "@/server/i18n/locale";
+import { pickCopy } from "@/lib/i18n/shop-copy";
 import { requireShop } from "@/server/storefront/context";
 import { getCart, getShopViewer } from "@/server/cart";
 import { readCartToken } from "@/server/cart/cookie";
 import { getCheckoutContext, quoteCheckout } from "@/server/checkout";
-import { countryName } from "@/server/shipping/countries";
 import { getVisitorDisplayCurrency } from "@/server/rates/display";
 import { RecentlyViewed } from "@/components/shop/recent";
 
-const t = cartCopy.cart;
+export async function generateMetadata(): Promise<Metadata> {
+  const t = (await shopCopy(cartCopies)).cart;
+  return { title: t.metaTitle, robots: { index: false, follow: false } };
+}
 
-export const metadata: Metadata = { title: t.metaTitle, robots: { index: false, follow: false } };
-
-export default function CartPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+export default async function CartPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const t = (await shopCopy(cartCopies)).cart;
   return (
     <Container className="py-8 sm:py-14">
       <h1 className="mb-6 text-[2.25rem] tracking-tight sm:mb-10 sm:text-5xl">{t.title}</h1>
@@ -62,6 +67,9 @@ function CartSkeleton() {
 
 async function CartContent() {
   const shop = await requireShop();
+  const locale = shop.locale;
+  const copy = pickCopy(cartCopies, locale);
+  const t = copy.cart;
   const tenantId = shop.tenant.id;
   const token = await readCartToken();
   const [cart, viewer] = await Promise.all([getCart(tenantId, token), getShopViewer(tenantId)]);
@@ -109,7 +117,7 @@ async function CartContent() {
         <p className="mb-1 text-sm text-shop-muted">{t.uniqueNote}</p>
         <ul className="divide-y divide-shop-line border-b border-shop-line">
           {lines.map((line) => (
-            <CartLineItem key={line.productId} line={line} display={display} />
+            <CartLineItem key={line.productId} line={line} locale={locale} display={display} />
           ))}
         </ul>
         {hasUnavailable ? (
@@ -121,19 +129,19 @@ async function CartContent() {
         ) : null}
       </section>
 
-      <aside aria-label={cartCopy.checkout.summary} className="flex flex-col gap-5 rounded-shop bg-shop-sunken p-5 sm:p-7 lg:sticky lg:top-24">
-        <h2 className="text-xl">{cartCopy.checkout.summary}</h2>
+      <aside aria-label={copy.checkout.summary} className="flex flex-col gap-5 rounded-shop bg-shop-sunken p-5 sm:p-7 lg:sticky lg:top-24">
+        <h2 className="text-xl">{copy.checkout.summary}</h2>
         <CartSummary
           key={`${cart.couponCode ?? ""}:${cart.subtotal}`}
           subtotal={cart.subtotal}
           currency={cart.currency}
-          countries={ctx.countries.map((c) => ({ code: c, name: countryName(c) })).sort((a, b) => a.name.localeCompare(b.name, "en"))}
+          countries={countryOptions(ctx.countries, locale)}
           initialCountry={country}
           initialQuote={quote}
         />
         <CouponForm
           code={cart.couponCode}
-          problem={quote?.coupon && !quote.coupon.ok ? quote.coupon.message : null}
+          problem={quote?.coupon && !quote.coupon.ok ? localizeServerMessage(quote.coupon.message, locale) : null}
           hasOfferLines={cart.lines.some((l) => l.offerApplied)}
         />
         <CheckoutButton disabled={!canCheckout} />

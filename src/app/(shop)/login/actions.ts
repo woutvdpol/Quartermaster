@@ -3,10 +3,11 @@
 import { redirect } from "next/navigation";
 import { verifyLoginTotp } from "@/server/auth/service";
 import { destroySession } from "@/server/auth/session";
-import { clientIp, customerLogin, hasPendingCustomerTotp, safeShopRedirect } from "@/server/customer-auth";
+import { clientIp, customerLogin, DEFAULT_AFTER_LOGIN, hasPendingCustomerTotp, safeShopRedirect } from "@/server/customer-auth";
 // Not while the shop is "coming soon" (src/server/storefront/launch.ts).
 import { getOpenShopTenant as getRequestTenant } from "@/server/storefront/launch";
-import { accountCopy } from "@/components/shop/account/_copy";
+import { localeHref, localeRedirect, shopCopy } from "@/server/i18n/locale";
+import { accountCopies } from "@/components/shop/account/_copy";
 
 export type LoginState = { error?: string; email?: string } | undefined;
 export type TotpState = { error?: string; restart?: boolean } | undefined;
@@ -16,11 +17,17 @@ function field(formData: FormData, name: string): string {
   return typeof v === "string" ? v : "";
 }
 
+/** The `next` field (already in the visitor's language) or the account page in the request language. */
+async function nextTarget(formData: FormData): Promise<string> {
+  return safeShopRedirect(field(formData, "next"), await localeHref(DEFAULT_AFTER_LOGIN));
+}
+
 export async function shopLoginAction(_prev: LoginState, formData: FormData): Promise<LoginState> {
-  const t = accountCopy.login.errors;
+  const copy = await shopCopy(accountCopies);
+  const t = copy.login.errors;
   const email = field(formData, "email").trim().slice(0, 254);
   const password = field(formData, "password");
-  const next = safeShopRedirect(field(formData, "next"));
+  const next = await nextTarget(formData);
   if (!email || !password) return { error: t.missing, email };
 
   let result: Awaited<ReturnType<typeof customerLogin>>;
@@ -31,17 +38,18 @@ export async function shopLoginAction(_prev: LoginState, formData: FormData): Pr
     result = await customerLogin({ tenantId: tenant.id, email, password, ip: await clientIp() });
   } catch (error) {
     console.error("shopLoginAction failed", error);
-    return { error: accountCopy.common.unexpected, email };
+    return { error: copy.common.unexpected, email };
   }
   if (!result.ok) return { error: t[result.error], email };
-  if (result.next === "totp") redirect(`/login/2fa?next=${encodeURIComponent(next)}`);
+  if (result.next === "totp") await localeRedirect(`/login/2fa?next=${encodeURIComponent(next)}`);
   redirect(next);
 }
 
 export async function shopVerifyTotpAction(_prev: TotpState, formData: FormData): Promise<TotpState> {
-  const t = accountCopy.twoFactor.errors;
+  const copy = await shopCopy(accountCopies);
+  const t = copy.twoFactor.errors;
   const code = field(formData, "code").trim();
-  const next = safeShopRedirect(field(formData, "next"));
+  const next = await nextTarget(formData);
   if (!code) return { error: t.missing };
   let result: Awaited<ReturnType<typeof verifyLoginTotp>>;
   try {
@@ -50,7 +58,7 @@ export async function shopVerifyTotpAction(_prev: TotpState, formData: FormData)
     result = await verifyLoginTotp(code);
   } catch (error) {
     console.error("shopVerifyTotpAction failed", error);
-    return { error: accountCopy.common.unexpected };
+    return { error: copy.common.unexpected };
   }
   if (!result.ok) return { error: t[result.error], restart: result.error !== "invalid_code" };
   redirect(next);
@@ -59,5 +67,5 @@ export async function shopVerifyTotpAction(_prev: TotpState, formData: FormData)
 /** Abandons a pending 2FA login and returns to the login form. */
 export async function cancelTotpAction(): Promise<void> {
   if (await hasPendingCustomerTotp()) await destroySession();
-  redirect("/login");
+  await localeRedirect("/login");
 }

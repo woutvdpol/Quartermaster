@@ -4,7 +4,8 @@ import { useCallback, useRef, useState, type KeyboardEvent, type PointerEvent, t
 import { preload } from "react-dom";
 import { cn } from "@/components/shop/ui/cn";
 import { pickSources, srcSets, type ImageSource } from "@/lib/media/variants";
-import { catalogCopy } from "../_copy";
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { catalogCopies } from "../_copy";
 import { IDENTITY, MAX_SCALE, panBy, zoomAt, type ZoomState } from "./zoom";
 
 export type GalleryImage = {
@@ -28,8 +29,6 @@ export type GalleryImage = {
  */
 const MAIN_SIZES = "(min-width: 1360px) 700px, (min-width: 1024px) calc(57vw - 70px), (min-width: 640px) calc(100vw - 48px), calc(100vw - 32px)";
 
-const t = catalogCopy.gallery;
-
 /**
  * Product gallery: main image (large variant via srcSet), thumbnail strip, arrow-key navigation and a
  * lightbox (<dialog>) with "deep zoom" on the 2000w variant — wheel, pinch, double-click/tap, buttons
@@ -37,6 +36,7 @@ const t = catalogCopy.gallery;
  * transforms driven by pointer events.
  */
 export function ProductGallery({ images, title }: { images: GalleryImage[]; title: string }) {
+  const t = useShopCopy(catalogCopies).gallery;
   const [index, setIndex] = useState(0);
   const dialog = useRef<HTMLDialogElement>(null);
   const count = images.length;
@@ -193,6 +193,7 @@ function Lightbox({
   onIndex: (i: number) => void;
   alt: (img: GalleryImage, i: number) => string;
 }) {
+  const t = useShopCopy(catalogCopies).gallery;
   const count = images.length;
   // Zoom belongs to one photo: switching photos starts from IDENTITY again.
   const [zoom, setZoom] = useState<{ i: number; z: ZoomState }>({ i: index, z: IDENTITY });

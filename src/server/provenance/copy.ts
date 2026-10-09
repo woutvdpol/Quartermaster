@@ -1,7 +1,13 @@
 /*
  * Shared wording for certificates (PDF, verify page, product page). English (UI copy rule); kept in
  * one place so the printed certificate and the website say the same thing. Pure module.
+ * `provenanceCopy` (English) stays the source for the PDF and the Markdown alternate; the storefront
+ * picks its language from `provenanceCopies` (Dutch/German: ./copy.nl.ts, ./copy.de.ts).
  */
+
+import { localized } from "@/lib/i18n/shop-copy";
+import { provenanceCopyNl } from "./copy.nl";
+import { provenanceCopyDe } from "./copy.de";
 
 export const provenanceCopy = {
   certificateTitle: "Certificate of Authenticity",
@@ -17,3 +23,5 @@ export const provenanceCopy = {
   stockCode: "Stock code",
   revokedBanner: "REVOKED — this certificate is no longer valid",
 } as const;
+
+export const provenanceCopies = localized({ en: provenanceCopy, nl: provenanceCopyNl, de: provenanceCopyDe });

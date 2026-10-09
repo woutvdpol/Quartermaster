@@ -1,13 +1,14 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { resetPassword } from "@/server/auth/service";
 import { getRequestTenant } from "@/server/tenant";
-import { accountCopy } from "@/components/shop/account/_copy";
+import { localeRedirect, shopCopy } from "@/server/i18n/locale";
+import { accountCopies } from "@/components/shop/account/_copy";
 
 export type ResetState = { error?: string; invalidToken?: boolean } | undefined;
 
 export async function resetPasswordAction(_prev: ResetState, formData: FormData): Promise<ResetState> {
+  const accountCopy = await shopCopy(accountCopies);
   const t = accountCopy.reset;
   const token = String(formData.get("token") ?? "");
   const password = String(formData.get("password") ?? "");
@@ -29,5 +30,5 @@ export async function resetPasswordAction(_prev: ResetState, formData: FormData)
       ? { error: t.invalidToken, invalidToken: true }
       : { error: result.message ?? accountCopy.profile.passwordErrors.invalid_password };
   }
-  redirect("/login?reset=1");
+  await localeRedirect("/login?reset=1");
 }

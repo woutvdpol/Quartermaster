@@ -1,10 +1,13 @@
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { cn } from "@/components/shop/ui";
 import { catalogQueryString, type CatalogParams, type CatalogSort, type CatalogView } from "@/server/storefront-catalog";
-import { catalogCopy as copy } from "./_copy";
+import type { ShopLocale } from "@/lib/i18n/shop-locales";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { catalogCopies } from "./_copy";
 
 /** Grid / list switch (links, so it works without JS and survives reloads via ?view=). */
-export function ViewToggle({ basePath, params, view, defaultSort }: { basePath: string; params: CatalogParams; view: CatalogView; defaultSort: CatalogSort }) {
+export function ViewToggle({ basePath, params, view, defaultSort, locale }: { basePath: string; params: CatalogParams; view: CatalogView; defaultSort: CatalogSort; locale: ShopLocale }) {
+  const copy = pickCopy(catalogCopies, locale);
   const item = (v: CatalogView, label: string, icon: React.ReactNode) => (
     <Link
       href={`${basePath}${catalogQueryString(params, { view: v }, defaultSort)}`}

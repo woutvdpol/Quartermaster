@@ -28,7 +28,7 @@ export function downloadAllowed(): boolean {
 }
 
 let libPromise: Promise<T> | null = null;
-function lib(): Promise<T> {
+export function lib(): Promise<T> {
   libPromise ??= import("@huggingface/transformers").then((t) => {
     // Download cache and "local models" folder are the same directory (<dir>/<model id>/…), so files
     // fetched once are found again without network access.
@@ -42,7 +42,7 @@ function lib(): Promise<T> {
   return libPromise;
 }
 
-function sessionOptions() {
+export function sessionOptions() {
   const threads = Number(process.env.SEARCH_MODEL_THREADS);
   return Number.isInteger(threads) && threads > 0 ? { intraOpNumThreads: threads, interOpNumThreads: 1 } : undefined;
 }

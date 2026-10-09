@@ -8,17 +8,22 @@ import { getShopCustomer } from "@/server/customer-auth/current";
 import { getRequestTenant } from "@/server/tenant";
 import { isEmailVerified } from "@/server/email-verification";
 import { ResendForm, VerifyForm } from "./VerifyForms";
-import { verifyCopy as t } from "./_copy";
+import { shopCopy } from "@/server/i18n/locale";
+import { verifyCopies } from "./_copy";
 
 // The token is in the URL: never index this page, never leak it via the Referer header.
-export const metadata: Metadata = { title: t.title, robots: { index: false, follow: false }, referrer: "no-referrer" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await shopCopy(verifyCopies);
+  return { title: t.title, robots: { index: false, follow: false }, referrer: "no-referrer" };
+}
 
 /**
  * /account/verify-email?token=… — shows a "Confirm" button (POST). Opening the link alone never
  * verifies (mail scanners prefetch links). Without a token, a signed-in unverified customer can
  * request a new mail.
  */
-export default function VerifyEmailPage({ searchParams }: PageProps<"/account/verify-email">) {
+export default async function VerifyEmailPage({ searchParams }: PageProps<"/account/verify-email">) {
+  const t = await shopCopy(verifyCopies);
   return (
     <AuthPanel title={t.title} intro={t.intro}>
       <Suspense fallback={<FormSkeleton />}>
@@ -31,6 +36,7 @@ export default function VerifyEmailPage({ searchParams }: PageProps<"/account/ve
 async function VerifyContent({ searchParams }: { searchParams: PageProps<"/account/verify-email">["searchParams"] }) {
   const tenant = await getRequestTenant();
   if (!tenant) notFound();
+  const t = await shopCopy(verifyCopies);
   const raw = (await searchParams).token;
   const token = typeof raw === "string" ? raw.slice(0, 200) : "";
   const me = await getShopCustomer();

@@ -4,10 +4,12 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { buttonClasses } from "@/components/shop/ui/Button";
 import { buyOfferAction, respondToCounterAction } from "./actions";
-import { offerCopy as t } from "./_copy";
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { offerCopies } from "./_copy";
 
 /** "Buy now" on /offer/<token>: adds the item at the agreed price and navigates to checkout. */
 export function BuyOfferButton({ token, label }: { token: string; label: string }) {
+  const t = useShopCopy(offerCopies);
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +37,7 @@ export function BuyOfferButton({ token, label }: { token: string; label: string 
 
 /** Accept / decline buttons on /offer/counter/<token> (POST via server action). */
 export function CounterButtons({ token, acceptLabel }: { token: string; acceptLabel: string }) {
+  const t = useShopCopy(offerCopies);
   const router = useRouter();
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);

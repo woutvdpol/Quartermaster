@@ -3,12 +3,12 @@
 import { useId, useState, useSyncExternalStore, useTransition } from "react";
 import { Button } from "@/components/shop/ui/Button";
 import { cn } from "@/components/shop/ui/cn";
-import { pushUiCopy } from "./_copy";
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { pushUiCopies } from "./_copy";
 import { keepEmailAction, subscribePushAction } from "./actions";
 import { PushPermissionError, pushSupport, subscribeThisDevice } from "./client";
 import { IosInstallSteps } from "./IosInstallSteps";
 
-const t = pushUiCopy;
 const noop = () => () => {};
 type Frequency = "INSTANT" | "DAILY" | "WEEKLY";
 
@@ -32,6 +32,7 @@ export function PushChoice({
   publicKey: string;
   onClose: () => void;
 }) {
+  const t = useShopCopy(pushUiCopies);
   const id = useId();
   const support = useSyncExternalStore(noop, pushSupport, () => null);
   const [choice, setChoice] = useState<"push" | "email">("push");

@@ -1,8 +1,10 @@
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { Suspense } from "react";
 import type { PublicMenuItem } from "@/server/content/menus";
 import { Container } from "@/components/shop/ui/Container";
 import { CurrencySwitcherSlot } from "@/components/shop/currency/CurrencySwitcherSlot";
+import { LanguageSwitcher } from "@/components/shop/i18n/LanguageSwitcher";
+import { shopCopy } from "@/server/i18n/locale";
 import { HeaderActions } from "./HeaderActions";
 import { ChevronDownIcon } from "./icons";
 import { MenuLink } from "./MenuLink";
@@ -10,20 +12,19 @@ import { MobileNav } from "./MobileNav";
 import { HeaderSearch } from "./HeaderSearch";
 import { SearchBox } from "./SearchBox";
 import { StickyHeader } from "./StickyHeader";
-import { layoutCopy } from "./_copy";
-
-const t = layoutCopy.header;
+import { layoutCopies } from "./_copy";
 
 const topLink = "flex items-center py-2 text-shop-ink-2 transition-colors hover:text-shop-primary";
 
 /**
  * Shop header (one row, "gallery" layout): logo / name, the HEADER menu inline on desktop (two
- * levels; sub-items open on hover and keyboard focus), then search, display-currency switcher and
- * the wishlist-account-cart actions. Phones get a hamburger drawer (MobileNav) holding menu + search.
+ * levels; sub-items open on hover and keyboard focus), then search, language switcher (only when the
+ * shop serves more than English; also in the drawer for phones), display-currency switcher and the
+ * wishlist-account-cart actions. Phones get a hamburger drawer (MobileNav) holding menu + search.
  * Sticky; tightens once scrolled. The currency switcher reads a cookie, so it streams in behind its
  * own <Suspense>.
  */
-export function Header({
+export async function Header({
   tenantId,
   shopName,
   logoPath,
@@ -34,6 +35,7 @@ export function Header({
   logoPath: string | null;
   menu: PublicMenuItem[];
 }) {
+  const t = (await shopCopy(layoutCopies)).header;
   return (
     <StickyHeader>
       <Container className="flex min-h-16 items-center gap-1.5 py-2.5 transition-[padding] duration-200 sm:gap-3 lg:min-h-20 lg:gap-x-6 lg:py-4 lg:group-data-[scrolled]/header:py-2.5 xl:gap-x-8">
@@ -87,6 +89,7 @@ export function Header({
 
         <div className="ml-auto flex min-w-0 items-center justify-end gap-1 sm:gap-2.5 lg:flex-1">
           <HeaderSearch />
+          <LanguageSwitcher className="hidden sm:flex" />
           <Suspense fallback={null}>
             <CurrencySwitcherSlot tenantId={tenantId} className="hidden sm:block" />
           </Suspense>

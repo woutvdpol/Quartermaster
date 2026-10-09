@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { Suspense } from "react";
-import { accountCopy } from "@/components/shop/account/_copy";
+import { accountCopies } from "@/components/shop/account/_copy";
+import { getRequestLocale, shopCopy } from "@/server/i18n/locale";
 import { AccountShell, Panel } from "@/components/shop/account/AccountShell";
 import { AddressLines } from "@/components/shop/account/AddressCard";
 import { OrderList } from "@/components/shop/account/OrderList";
@@ -10,11 +11,13 @@ import { Skeleton } from "@/components/shop/ui/Skeleton";
 import { listAddresses, listCustomerOrders, requireShopCustomer } from "@/server/customer-auth";
 import { wishlistCount } from "@/server/wishlist";
 
-const t = accountCopy.account;
+export async function generateMetadata(): Promise<Metadata> {
+  const t = (await shopCopy(accountCopies)).account;
+  return { title: t.title, robots: { index: false, follow: false } };
+}
 
-export const metadata: Metadata = { title: t.title, robots: { index: false, follow: false } };
-
-export default function AccountPage() {
+export default async function AccountPage() {
+  const t = (await shopCopy(accountCopies)).account;
   return (
     <AccountShell active="overview" title={t.title}>
       <Suspense fallback={<OverviewSkeleton />}>
@@ -26,6 +29,9 @@ export default function AccountPage() {
 
 async function Overview() {
   const c = await requireShopCustomer("/account");
+  const locale = await getRequestLocale();
+  const copy = await shopCopy(accountCopies);
+  const t = copy.account;
   const owner = { tenantId: c.tenant.id, customerId: c.customer.id };
   const [orders, addresses, wished] = await Promise.all([
     listCustomerOrders({ ...owner, email: c.user.email }, { take: 3 }),
@@ -53,7 +59,7 @@ async function Overview() {
         }
       >
         {orders.length ? (
-          <OrderList orders={orders} timeZone={c.tenant.timezone} />
+          <OrderList orders={orders} timeZone={c.tenant.timezone} locale={locale} />
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-shop-muted">{t.noOrders}</p>
@@ -66,12 +72,12 @@ async function Overview() {
 
       <div className="grid gap-6 sm:grid-cols-2">
         <Panel title={t.defaultAddress}>
-          {shipping ? <AddressLines a={shipping} /> : <p className="text-sm text-shop-muted">{t.noAddress}</p>}
+          {shipping ? <AddressLines a={shipping} locale={locale} /> : <p className="text-sm text-shop-muted">{t.noAddress}</p>}
           <Link href="/account/addresses" className={`${linkClass} mt-3`}>
             {t.manageAddresses}
           </Link>
         </Panel>
-        <Panel title={accountCopy.wishlist.title}>
+        <Panel title={copy.wishlist.title}>
           <p className="text-sm text-shop-ink-2">{t.wishlistCount(wished)}</p>
           <Link href="/wishlist" className={`${linkClass} mt-3`}>
             {t.viewWishlist}

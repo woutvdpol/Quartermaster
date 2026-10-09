@@ -4,18 +4,25 @@ import { ButtonLink } from "@/components/shop/ui/Button";
 import { EmptyState } from "@/components/shop/ui/EmptyState";
 import { formatMoney } from "@/components/shop/ui/money";
 import { BuyOfferButton } from "@/components/shop/offers/OfferActionButtons";
-import { OfferProductCard, formatShopDate } from "@/components/shop/offers/OfferProductCard";
-import { offerCopy as t } from "@/components/shop/offers/_copy";
+import { OfferProductCard, formatOfferDate } from "@/components/shop/offers/OfferProductCard";
+import { offerCopies } from "@/components/shop/offers/_copy";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { shopCopy } from "@/server/i18n/locale";
 import { requireShop } from "@/server/storefront/context";
 import { getShopViewer } from "@/server/cart";
 import { getOfferCheckoutView } from "@/server/offers";
 
-export const metadata: Metadata = { title: t.checkoutTitle, robots: { index: false, follow: false }, referrer: "no-referrer" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await shopCopy(offerCopies);
+  return { title: t.checkoutTitle, robots: { index: false, follow: false }, referrer: "no-referrer" };
+}
 
 /** Personal checkout link of an accepted offer. Read-only; "Buy now" is a POST (server action). */
 export default async function OfferCheckoutPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const shop = await requireShop();
+  const locale = shop.locale;
+  const t = pickCopy(offerCopies, locale);
   const [view, viewer] = await Promise.all([getOfferCheckoutView(shop.tenant.id, token), getShopViewer(shop.tenant.id)]);
 
   if (!view) {
@@ -27,14 +34,14 @@ export default async function OfferCheckoutPage({ params }: { params: Promise<{ 
       </Container>
     );
   }
-  const fmt = (n: number) => formatMoney(n, view.currency);
+  const fmt = (n: number) => formatMoney(n, view.currency, locale);
   const showImage = !(view.product.blurred && !viewer && shop.settings.legal.blurSensitiveForGuests);
   const notice = { ready: null, expired: t.expired, used: t.used, sold: t.sold, closed: t.closed }[view.state];
 
   return (
     <Container size="narrow" className="py-12 sm:py-20">
       <h1 className="mb-8 text-center text-[2.1rem] leading-[1.05] tracking-[-0.03em] text-shop-ink sm:mb-10 sm:text-[2.6rem]">{t.checkoutTitle}</h1>
-      <OfferProductCard product={view.product} showImage={showImage}>
+      <OfferProductCard product={view.product} showImage={showImage} locale={locale}>
         <dl className="flex flex-col gap-1 text-sm">
           <div className="flex justify-between gap-4">
             <dt className="text-shop-ink-2">{t.listPrice}</dt>
@@ -47,7 +54,7 @@ export default async function OfferCheckoutPage({ params }: { params: Promise<{ 
         </dl>
         {view.state === "ready" ? (
           <>
-            {view.expiresAt ? <p className="text-sm text-shop-ink-2">{t.validUntil(formatShopDate(view.expiresAt, shop.tenant.timezone))}</p> : null}
+            {view.expiresAt ? <p className="text-sm text-shop-ink-2">{t.validUntil(formatOfferDate(view.expiresAt, shop.tenant.timezone, locale))}</p> : null}
             <BuyOfferButton token={token} label={`${t.buyNow} — ${fmt(view.agreedAmount)}`} />
             <p className="text-xs text-shop-muted">{t.private}</p>
           </>

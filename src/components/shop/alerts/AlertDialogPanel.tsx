@@ -1,16 +1,16 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/shop/ui/Button";
 import { Field, TextInput } from "@/components/shop/ui/Field";
 import { Turnstile } from "@/components/shop/turnstile";
-import { alertsCopy } from "./_copy";
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { alertsCopies } from "./_copy";
 import { createAlertAction, getAlertDialogStateAction, type AlertDialogState, type CreateAlertResult } from "./actions";
 import { PushChoice } from "@/components/shop/push/PushChoice";
-import { pushUiCopy } from "@/components/shop/push/_copy";
+import { pushUiCopies } from "@/components/shop/push/_copy";
 
-const t = alertsCopy;
 type Frequency = "INSTANT" | "DAILY" | "WEEKLY";
 
 /**
@@ -30,6 +30,8 @@ export function AlertDialogPanel({
   intro: string;
   defaultFrequency?: Frequency;
 }) {
+  const t = useShopCopy(alertsCopies);
+  const pushT = useShopCopy(pushUiCopies);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const id = useId();
   const [state, setState] = useState<AlertDialogState | null>(null);
@@ -87,7 +89,7 @@ export function AlertDialogPanel({
         <div className="p-6 sm:p-8">
           <div className="mb-3 flex items-start justify-between gap-4">
             <h2 id={`${id}-title`} className="text-2xl">
-              {pushChoice ? pushUiCopy.choice.title : title}
+              {pushChoice ? pushT.choice.title : title}
             </h2>
             <button
               type="button"

@@ -5,23 +5,29 @@ import { Container } from "@/components/shop/ui/Container";
 import { ButtonLink, buttonClasses } from "@/components/shop/ui/Button";
 import { Skeleton } from "@/components/shop/ui/Skeleton";
 import { cn } from "@/components/shop/ui/cn";
-import { formatMoney, SHOP_LOCALE } from "@/components/shop/ui/money";
+import { formatMoney } from "@/components/shop/ui/money";
 import { SyncHeaderCounts } from "@/components/shop/layout/HeaderCounts";
 import { OrderStatusPoller } from "@/components/shop/cart/OrderStatusPoller";
 import { PayOrderForm } from "@/components/shop/cart/PayOrderForm";
 import { PendingButton } from "@/components/shop/cart/PendingButton";
-import { cartCopy } from "@/components/shop/cart/_copy";
-import { uiCopy } from "@/components/shop/ui/_copy";
+import { cartCopies, cartCopy } from "@/components/shop/cart/_copy";
+import { localizeEnglishCountryName } from "@/components/shop/cart/countries";
+import { uiCopies } from "@/components/shop/ui/_copy";
+import { pickCopy, formatShopDate } from "@/lib/i18n/shop-copy";
+import { shopCopy } from "@/server/i18n/locale";
 import { requireShop } from "@/server/storefront/context";
 import { currentCartCount } from "@/server/cart/cookie";
 import { getOrderStatusView, type OrderStatusView } from "@/server/checkout";
 import { shouldPoll } from "@/server/checkout/status";
 import { simulatePaymentAction } from "./actions";
 
-const t = cartCopy.order;
-
 // The uuid is a secret: keep it out of search engines and referrers.
-export const metadata: Metadata = { title: "Order status", robots: { index: false, follow: false }, referrer: "no-referrer" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = (await shopCopy(cartCopies)).order;
+  return { title: t.statusMetaTitle, robots: { index: false, follow: false }, referrer: "no-referrer" };
+}
+
+type OrderCopy = (typeof cartCopy)["order"];
 
 export default function OrderPage({ params }: PageProps<"/order/[uuid]">) {
   return (
@@ -47,7 +53,7 @@ const ICONS = {
   neutral: <path d="M8 12h8" />,
 } as const;
 
-function StatusPanel({ view }: { view: OrderStatusView }) {
+function StatusPanel({ view, t }: { view: OrderStatusView; t: OrderCopy }) {
   const panel = (tone: keyof typeof TONES, title: string, text: string, extra?: React.ReactNode) => (
     <div role="status" className="flex flex-col gap-4 rounded-shop bg-shop-sunken p-5 sm:flex-row sm:gap-5 sm:p-7">
       <span aria-hidden="true" className={cn("grid size-11 shrink-0 place-items-center rounded-shop-control", TONES[tone])}>
@@ -104,11 +110,16 @@ function StatusPanel({ view }: { view: OrderStatusView }) {
 async function OrderContent({ params }: { params: PageProps<"/order/[uuid]">["params"] }) {
   const { uuid } = await params;
   const shop = await requireShop();
+  const locale = shop.locale;
+  const copy = pickCopy(cartCopies, locale);
+  const t = copy.order;
   const view = await getOrderStatusView(shop.tenant.id, uuid);
   if (!view) notFound();
   const cartCount = await currentCartCount(shop.tenant.id);
-  const fmt = (n: number) => formatMoney(n, view.currency);
-  const placed = new Intl.DateTimeFormat(SHOP_LOCALE, { dateStyle: "long", timeStyle: "short", timeZone: shop.tenant.timezone }).format(view.placedAt);
+  const fmt = (n: number) => formatMoney(n, view.currency, locale);
+  const placed = formatShopDate(view.placedAt, locale, { dateStyle: "long", timeStyle: "short" }, shop.tenant.timezone);
+  // The service falls back to an English label for orders without a stored one.
+  const surchargeLabel = view.surchargeLabel === "Payment surcharge" ? copy.checkout.surchargeLine : view.surchargeLabel;
 
   return (
     <div className="flex flex-col gap-8">
@@ -118,7 +129,7 @@ async function OrderContent({ params }: { params: PageProps<"/order/[uuid]">["pa
         <p className="text-sm text-shop-muted">{t.placedOn(placed)}</p>
       </header>
 
-      <StatusPanel view={view} />
+      <StatusPanel view={view} t={t} />
       <OrderStatusPoller active={shouldPoll(view.state)} />
 
       {view.devSimulation ? (
@@ -163,7 +174,7 @@ async function OrderContent({ params }: { params: PageProps<"/order/[uuid]">["pa
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 {shop.settings.catalog.showStockCode && l.stockCode !== null ? (
                   <span className="font-shop-mono text-xs text-shop-accent">
-                    {uiCopy.product.stockCode} {l.stockCode}
+                    {pickCopy(uiCopies, locale).product.stockCode} {l.stockCode}
                   </span>
                 ) : null}
                 <span className="leading-snug font-medium">
@@ -183,7 +194,7 @@ async function OrderContent({ params }: { params: PageProps<"/order/[uuid]">["pa
           {view.discountTotal > 0 ? (
             <div className="flex justify-between">
               <dt className="text-shop-ink-2">
-                {cartCopy.coupon.discount}
+                {copy.coupon.discount}
                 {view.couponCode ? <span className="text-shop-muted"> · {view.couponCode}</span> : null}
               </dt>
               <dd className="font-medium tabular-nums">−{fmt(view.discountTotal)}</dd>
@@ -198,7 +209,7 @@ async function OrderContent({ params }: { params: PageProps<"/order/[uuid]">["pa
           </div>
           {view.surchargeTotal > 0 ? (
             <div className="flex justify-between">
-              <dt className="text-shop-ink-2">{view.surchargeLabel}</dt>
+              <dt className="text-shop-ink-2">{surchargeLabel}</dt>
               <dd className="font-medium tabular-nums">{fmt(view.surchargeTotal)}</dd>
             </div>
           ) : null}
@@ -216,7 +227,7 @@ async function OrderContent({ params }: { params: PageProps<"/order/[uuid]">["pa
             <dd className="text-shop-ink">
               {view.shipping.name}
               <br />
-              {view.shipping.city}, {view.shipping.country}
+              {view.shipping.city}, {localizeEnglishCountryName(view.shipping.country, locale)}
             </dd>
           </div>
           {view.shipping.option ? (

@@ -1,20 +1,22 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import type { PublicMenuItem } from "@/server/content/menus";
+import { LanguageSwitcher } from "@/components/shop/i18n/LanguageSwitcher";
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
 import { CloseIcon, MenuIcon } from "./icons";
-import { layoutCopy } from "./_copy";
+import { layoutCopies } from "./_copy";
 import { MenuLink } from "./MenuLink";
-
-const t = layoutCopy.header;
 
 /**
  * Phone navigation: a modal <dialog> drawer (focus trap, Esc to close and inert background come
  * from the platform). Closes on navigation. `search` is the search field (suggestions flow below it in the drawer).
+ * The language switcher sits at the bottom of the drawer (the header bar hides it on small phones).
  */
 export function MobileNav({ items, shopName, search }: { items: PublicMenuItem[]; shopName: string; search: React.ReactNode }) {
+  const t = useShopCopy(layoutCopies).header;
   const dialog = useRef<HTMLDialogElement>(null);
   const pathname = usePathname();
   useEffect(() => {
@@ -74,6 +76,7 @@ export function MobileNav({ items, shopName, search }: { items: PublicMenuItem[]
             ))}
           </ul>
         </nav>
+        <LanguageSwitcher className="border-t border-shop-line px-5 py-4" />
       </dialog>
     </>
   );

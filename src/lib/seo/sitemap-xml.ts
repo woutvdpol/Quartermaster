@@ -8,7 +8,10 @@
  * that is all we emit. Image entries carry only <image:loc> (title/caption were deprecated in 2022).
  */
 
-export type SitemapUrl = { loc: string; lastmod?: string | Date | null; images?: string[] };
+import { hreflangAlternates, SOURCE_LOCALE, type ShopLocale } from "@/lib/i18n/shop-locales";
+
+/** `alternates`: hreflang → absolute URL (xhtml:link, docs/i18n.md § Shop-routing). */
+export type SitemapUrl = { loc: string; lastmod?: string | Date | null; images?: string[]; alternates?: Record<string, string> };
 export type SitemapRef = { loc: string; lastmod?: string | Date | null };
 
 /** Max URLs per product sitemap file (protocol limit is 50,000 / 50 MB; images make entries big). */
@@ -48,10 +51,14 @@ export function urlsetXml(urls: SitemapUrl[]): string {
         .slice(0, IMAGES_PER_URL)
         .map((src) => `<image:image><image:loc>${xmlEscape(src)}</image:loc></image:image>`)
         .join("");
-      return `<url><loc>${xmlEscape(u.loc)}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}${images}</url>`;
+      const links = Object.entries(u.alternates ?? {})
+        .map(([lang, href]) => `<xhtml:link rel="alternate" hreflang="${xmlEscape(lang)}" href="${xmlEscape(href)}"/>`)
+        .join("");
+      return `<url><loc>${xmlEscape(u.loc)}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}${links}${images}</url>`;
     })
     .join("\n");
-  const ns = `xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${withImages ? ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"' : ""}`;
+  const withLinks = urls.some((u) => u.alternates && Object.keys(u.alternates).length);
+  const ns = `xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${withLinks ? ' xmlns:xhtml="http://www.w3.org/1999/xhtml"' : ""}${withImages ? ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"' : ""}`;
   return `${HEAD}<urlset ${ns}>\n${body}${body ? "\n" : ""}</urlset>\n`;
 }
 
@@ -82,4 +89,26 @@ export function parseSitemapFile(name: string): SitemapFile | null {
 
 export function sitemapFileName(f: SitemapFile): string {
   return f.kind === "products" ? `products-${f.chunk}.xml` : `${f.kind}.xml`;
+}
+
+/**
+ * One entry per served language for each (unprefixed) shop path, every entry listing all languages +
+ * x-default as hreflang alternates (Google's sitemap method). With English only, entries stay as they
+ * were. Images are listed on the English entry only (same files; keeps the files well under 50 MB).
+ */
+export function localizedSitemapUrls(
+  origin: string,
+  locales: readonly ShopLocale[],
+  entries: { path: string; lastmod?: string | Date | null; images?: string[] }[],
+): SitemapUrl[] {
+  if (locales.length < 2) return entries.map((e) => ({ loc: new URL(e.path, origin).toString(), lastmod: e.lastmod, ...(e.images ? { images: e.images } : {}) }));
+  return entries.flatMap((e) => {
+    const alternates = hreflangAlternates(origin, e.path, locales);
+    return locales.map((l) => ({
+      loc: alternates[l],
+      lastmod: e.lastmod,
+      alternates,
+      ...(l === SOURCE_LOCALE && e.images ? { images: e.images } : {}),
+    }));
+  });
 }

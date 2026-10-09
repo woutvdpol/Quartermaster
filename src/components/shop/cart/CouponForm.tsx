@@ -5,15 +5,15 @@ import { cn } from "@/components/shop/ui/cn";
 import { inputClasses } from "@/components/shop/ui/Field";
 import { PendingButton } from "./PendingButton";
 import { applyCouponAction, removeCouponAction, type CouponFormState } from "./actions";
-import { cartCopy } from "./_copy";
-
-const t = cartCopy.coupon;
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { cartCopies } from "./_copy";
 
 /**
  * Discount code field (cart page). Plain forms → works without JS. The applied code is validated
  * again by every quote and at placement; `problem` shows why it currently doesn't apply.
  */
 export function CouponForm({ code, problem, hasOfferLines }: { code: string | null; problem: string | null; hasOfferLines: boolean }) {
+  const t = useShopCopy(cartCopies).coupon;
   const [state, action] = useActionState<CouponFormState, FormData>(applyCouponAction, null);
   if (code) {
     return (

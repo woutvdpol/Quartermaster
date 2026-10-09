@@ -3,7 +3,20 @@ import { formatMoney } from "@/components/shop/ui";
 import { estimateShopShipping } from "@/server/storefront/shipping";
 import { countryName } from "@/server/shipping/countries";
 import { visitorCountry } from "@/server/storefront-catalog/country";
-import { catalogCopy as copy } from "../_copy";
+import { getRequestLocale } from "@/server/i18n/locale";
+import { INTL_LOCALE, type ShopLocale } from "@/lib/i18n/shop-locales";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import { catalogCopies } from "../_copy";
+
+/** Country name in the visitor's language (the shipping list's English name for English / as fallback). */
+export function localCountryName(code: string, locale: ShopLocale): string {
+  if (locale === "en") return countryName(code);
+  try {
+    return new Intl.DisplayNames([INTL_LOCALE[locale]], { type: "region" }).of(code) ?? countryName(code);
+  } catch {
+    return countryName(code);
+  }
+}
 
 /**
  * "Shipping to Netherlands from €12.50" for the visitor's country (edge header / IP → Accept-Language →
@@ -25,7 +38,8 @@ export async function ShippingHint({
   shopCountry: string;
   freeShippingThreshold: number;
 }) {
-  const h = await headers();
+  const [h, locale] = await Promise.all([headers(), getRequestLocale()]);
+  const copy = pickCopy(catalogCopies, locale);
   const country = visitorCountry(h, shopCountry || "NL");
   // Zones come from the data cache (identical for every visitor); only the country is per request.
   const quote = await estimateShopShipping(tenantId, {
@@ -35,14 +49,14 @@ export async function ShippingHint({
     freeShippingThreshold: freeShippingThreshold || null,
   }).catch(() => null);
   if (!quote) return null;
-  const name = countryName(country);
+  const name = localCountryName(country, locale);
   let text: string;
   if (!quote.deliverable) text = copy.product.shippingNone(name);
   else {
     const delivery = quote.options.filter((o) => !o.isPickup).sort((a, b) => a.price - b.price)[0];
     if (!delivery) text = copy.product.shippingPickupOnly(name);
     else if (delivery.price === 0) text = copy.product.shippingFree(name);
-    else text = copy.product.shippingFrom(name, formatMoney(delivery.price, currency));
+    else text = copy.product.shippingFrom(name, formatMoney(delivery.price, currency, locale));
   }
   return (
     <p className="flex items-center gap-2 text-sm text-shop-muted">

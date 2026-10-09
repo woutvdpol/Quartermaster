@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { accountCopy } from "@/components/shop/account/_copy";
+import { accountCopies } from "@/components/shop/account/_copy";
+import { getRequestLocale, shopCopy } from "@/server/i18n/locale";
 import { AccountShell, Panel } from "@/components/shop/account/AccountShell";
 import { AddressForm } from "@/components/shop/account/AddressForm";
 import { FormSkeleton } from "@/components/shop/account/FormSkeleton";
@@ -9,11 +10,13 @@ import { getAddress, requireShopCustomer } from "@/server/customer-auth";
 import { saveAddressAction } from "../../actions";
 import { countryOptions } from "../_countries";
 
-const t = accountCopy.addresses;
+export async function generateMetadata(): Promise<Metadata> {
+  const t = (await shopCopy(accountCopies)).addresses;
+  return { title: t.editTitle, robots: { index: false, follow: false } };
+}
 
-export const metadata: Metadata = { title: t.editTitle, robots: { index: false, follow: false } };
-
-export default function EditAddressPage({ params }: PageProps<"/account/addresses/[id]">) {
+export default async function EditAddressPage({ params }: PageProps<"/account/addresses/[id]">) {
+  const t = (await shopCopy(accountCopies)).addresses;
   return (
     <AccountShell active="addresses" title={t.editTitle}>
       <Panel>
@@ -30,7 +33,7 @@ async function EditAddress({ params }: { params: PageProps<"/account/addresses/[
   const c = await requireShopCustomer(`/account/addresses/${encodeURIComponent(id)}`);
   const address = await getAddress({ tenantId: c.tenant.id, customerId: c.customer.id }, id);
   if (!address) notFound();
-  const countries = await countryOptions(c.tenant.id);
+  const countries = await countryOptions(c.tenant.id, await getRequestLocale());
   const initial = {
     id: address.id,
     type: address.type,

@@ -1,12 +1,14 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { useActionState } from "react";
 import { Alert, SubmitButton } from "@/components/shop/account/form";
 import { resendVerificationAction, verifyEmailAction } from "./actions";
-import { verifyCopy as t } from "./_copy";
+import { useLocalizedHref, useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { verifyCopies } from "./_copy";
 
 export function VerifyForm({ token, canResend }: { token: string; canResend: boolean }) {
+  const t = useShopCopy(verifyCopies);
   const [state, action] = useActionState(verifyEmailAction, undefined);
   if (state?.ok) {
     return (
@@ -38,12 +40,14 @@ export function VerifyForm({ token, canResend }: { token: string; canResend: boo
 }
 
 export function ResendForm({ canResend }: { canResend: boolean }) {
+  const t = useShopCopy(verifyCopies);
+  const href = useLocalizedHref();
   const [state, action] = useActionState(resendVerificationAction, undefined);
   if (!canResend) {
     return (
       <p className="text-sm text-shop-muted">
         {t.loginToResend}{" "}
-        <Link href="/login?next=%2Faccount%2Fverify-email" className="font-medium text-shop-primary underline-offset-4 hover:underline">
+        <Link href={`/login?next=${encodeURIComponent(href("/account/verify-email"))}`} className="font-medium text-shop-primary underline-offset-4 hover:underline">
           {t.login}
         </Link>
       </p>

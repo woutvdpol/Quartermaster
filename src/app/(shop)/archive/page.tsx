@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requireShop } from "@/server/storefront/context";
 import { CatalogView, defaultSortFor } from "@/components/shop/catalog/CatalogView";
-import { catalogCopy as copy } from "@/components/shop/catalog/_copy";
+import { catalogCopies } from "@/components/shop/catalog/_copy";
+import { pickCopy } from "@/lib/i18n/shop-copy";
 import { catalogMetadata } from "@/components/shop/catalog/metadata";
 import { ARCHIVE_PATH, SHOP_PATH, parseCatalogParams } from "@/server/storefront-catalog";
 
@@ -13,6 +14,7 @@ import { ARCHIVE_PATH, SHOP_PATH, parseCatalogParams } from "@/server/storefront
  */
 export async function generateMetadata({ searchParams }: PageProps<"/archive">): Promise<Metadata> {
   const shop = await requireShop();
+  const copy = pickCopy(catalogCopies, shop.locale);
   if (!shop.settings.catalog.publicArchive) return {};
   const defaultSort = defaultSortFor(shop, "archive");
   const params = parseCatalogParams(await searchParams, defaultSort);
@@ -21,6 +23,7 @@ export async function generateMetadata({ searchParams }: PageProps<"/archive">):
 
 export default async function ArchivePage({ searchParams }: PageProps<"/archive">) {
   const shop = await requireShop();
+  const copy = pickCopy(catalogCopies, shop.locale);
   if (!shop.settings.catalog.publicArchive) notFound();
   const sp = await searchParams;
   return (

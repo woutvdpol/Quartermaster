@@ -1,0 +1,101 @@
+/* Insights screen copy (English). */
+
+import type { InsightPeriod, StaleReason } from "@/server/insights/pure";
+
+export const PATH = "/admin/insights";
+
+export const copy = {
+  crumb: "Insights",
+  title: "Stock",
+  metaTitle: "Stock insights",
+  periodLegend: "Period",
+  periods: { "90d": "Last 90 days", "12m": "Last 12 months", ytd: "This year" } satisfies Record<InsightPeriod, string>,
+  /** Short period noun for "vs. …" notes. */
+  previous: { "90d": "the 90 days before", "12m": "the year before", ytd: "the same time last year" } satisfies Record<InsightPeriod, string>,
+  kpis: {
+    label: "Key figures",
+    stockAtCost: "Stock at cost",
+    stockNote: (items: string, list: string) => `${items} items · at list ${list}`,
+    missingCost: (n: number) => `${n} without purchase price (counted as 0)`,
+    medianDays: "Median days to sell",
+    faster: (d: number, prev: string) => `${d} ${d === 1 ? "day" : "days"} faster than ${prev}`,
+    slower: (d: number, prev: string) => `${d} ${d === 1 ? "day" : "days"} slower than ${prev}`,
+    same: (prev: string) => `same as ${prev}`,
+    noSales: "no sales with a listing date yet",
+    sellThrough: "Sell-through",
+    sellThroughNote: (sold: number, listed: number) => `${sold} of ${listed} items listed in the period sold`,
+    noListings: "nothing listed in this period",
+    tiedUp: (days: number) => `Tied up > ${days} days`,
+    tiedNote: (n: number) => `at cost · ${n} ${n === 1 ? "item" : "items"}`,
+    points: "pt",
+  },
+  categories: {
+    title: "By category",
+    category: "Category",
+    inStock: "In stock",
+    sold: "Sold",
+    days: "Days to sell",
+    margin: "Margin",
+    sellThrough: "Sell-through",
+    empty: "No stock or sales yet.",
+    daysValue: (d: number) => `${d} d`,
+    headline: (fast: string, slow: string, ratio: string, margin: "higher" | "lower" | null) =>
+      `${fast} sell ${ratio}× as fast as ${slow}${margin ? ` — and at a ${margin} margin` : ""}.`,
+  },
+  buyMore: {
+    title: "Buy more of these",
+    groupNote: (sold: number, days: number, margin: number | null) =>
+      `${sold} sold · median ${days} ${days === 1 ? "day" : "days"}${margin == null ? "" : ` · avg. margin ${margin}%`}`,
+    inStock: (n: number) => `${n} in stock`,
+    noGroups: "Nothing stands out yet: no group sold fast with little stock left in this period.",
+    searchesTitle: "Searched for, nothing found",
+    search: (q: string, zero: number) => `${zero} ${zero === 1 ? "search" : "searches"} for “${q}”, nothing found`,
+    basis: "Based on what sold faster than your median at a margin at least your average, with little stock left — and on what visitors searched for without finding it.",
+    noSearches: "No searches without results in this period.",
+  },
+  stale: {
+    title: (n: number) => `Sitting too long · ${n} ${n === 1 ? "item" : "items"}`,
+    note: "Suggestions only — nothing changes until you click",
+    threshold: "Listed longer than",
+    thresholdOption: (d: number) => `${d} days`,
+    item: "Item",
+    listed: "Listed",
+    viewsAlerts: "Views / alerts",
+    why: "Why",
+    suggestion: "Suggestion",
+    days: (d: number) => `${d} days`,
+    noViews: "—",
+    viewsTitle: "Product page views (own analytics) / wishlists and saved-search alerts",
+    empty: (d: number) => `Nothing has been listed longer than ${d} days. Nice.`,
+    more: (n: number) => `${n} more not shown — the oldest are listed first.`,
+    reasons: {
+      comparables: (low: string, high: string) => (low === high ? `Similar ones sold for ${low}` : `Similar ones sold for ${low}–${high}`),
+      price: "Many views, no buyer: price?",
+      findability: "Few views — hardly found",
+      slowCategory: "Category sells slowly",
+      unclear: "Listed a long time",
+    } satisfies Record<StaleReason, unknown>,
+    reprice: (price: string) => `Reprice to ${price}`,
+    repriceTitle: (code: number) => `Reprice No. ${code}?`,
+    repriceBody: (title: string, from: string, to: string, count: number) =>
+      `${title}: ${from} → ${to}, the median of ${count} comparable sold items. Customers with this item on their wishlist get a price-drop alert.`,
+    repriceConfirm: "Change price",
+    repriced: (code: number, price: string) => `No. ${code} now costs ${price}.`,
+    feature: "Feature on homepage",
+    fair: "Take to next fair",
+    bundle: (code: number) => `Bundle offer with ${code}`,
+    bundleTitle: (title: string) => `Offer together with “${title}” (same category, also slow)`,
+    edit: "Edit",
+  },
+  error: {
+    section: "This section could not be loaded. Reload the page to try again.",
+    title: "Insights could not be loaded",
+    body: "Something went wrong while calculating the figures. Try again in a moment.",
+    retry: "Try again",
+  },
+  errors: {
+    generic: "Something went wrong. Try again.",
+    forbidden: "You do not have access to this shop.",
+    unauthenticated: "Your session has ended. Sign in again.",
+  },
+};

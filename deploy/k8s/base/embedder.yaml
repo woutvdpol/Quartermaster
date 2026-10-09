@@ -1,6 +1,7 @@
 # Smart-search embedder (Dockerfile target `embedder`, src/embedder/server.ts): the local AI models
-# (multilingual-e5-small + SigLIP 2) behind an internal HTTP API for web (query/photo embeddings) and
-# worker (indexing). ClusterIP only — never routed through the ingress; NetworkPolicy admits only web
+# (multilingual-e5-small + SigLIP 2, plus Opus-MT EN→NL/DE for shop translations, docs/i18n.md) behind
+# an internal HTTP API for web (query/photo embeddings, "Translate again") and worker (indexing,
+# translation jobs). ClusterIP only — never routed through the ingress; NetworkPolicy admits only web
 # and worker pods, and every /embed call needs EMBEDDER_TOKEN (Secret quartermaster-secrets).
 #
 # Model cache: a PVC (default). The initContainer downloads missing model files (~650 MB, once) so the
@@ -10,7 +11,8 @@
 # huggingface.co). docs/deploy.md § Embedder.
 #
 # Resources from measurements (docs/search.md § Geheugen): RSS ≈ 1.3 GB right after loading all models,
-# ≈ 0.8–1.1 GB steady. CPU: a query ≈ 5–20 ms, a photo ≈ 60 ms on one batch; SEARCH_MODEL_THREADS
+# ≈ 0.8–1.1 GB steady. A translation model adds ≈ 0.4–0.5 GB while loaded (lazy, one at a time:
+# TRANSLATE_MAX_MODELS=1, unloaded after 15 idle minutes) — hence the 3 Gi limit. CPU: a query ≈ 5–20 ms, a photo ≈ 60 ms on one batch; SEARCH_MODEL_THREADS
 # matches the CPU limit so onnxruntime does not oversubscribe (throttling would blow the 150 ms
 # query timeout of the web pods).
 apiVersion: v1
@@ -73,7 +75,7 @@ spec:
               memory: 1536Mi
             limits:
               cpu: "2"
-              memory: 2Gi
+              memory: 3Gi
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -111,10 +113,10 @@ spec:
           resources:
             requests:
               cpu: 500m
-              memory: 1536Mi
+              memory: 2Gi
             limits:
               cpu: "2"
-              memory: 2Gi
+              memory: 3Gi
           startupProbe:
             httpGet:
               path: /ready

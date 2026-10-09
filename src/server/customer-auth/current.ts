@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { currentSession } from "@/server/auth/guards";
 import { getRequestTenant } from "@/server/tenant";
 import { ensureCustomer } from "./service";
+import { localeHref } from "@/server/i18n/locale";
 import { loginHref } from "./redirect";
 
 /*
@@ -26,10 +27,10 @@ export const getShopCustomer = cache(async () => {
   return { tenant, user, customer, sessionId: session.sessionId };
 });
 
-/** For account pages: the customer, or a redirect to `/login?next=<returnTo>`. */
+/** For account pages: the customer, or a redirect to `/login?next=<returnTo>` (both in the request language). */
 export async function requireShopCustomer(returnTo: string): Promise<ShopCustomer> {
   const c = await getShopCustomer();
-  if (!c) redirect(loginHref(returnTo));
+  if (!c) redirect(await localeHref(loginHref(await localeHref(returnTo))));
   return c;
 }
 

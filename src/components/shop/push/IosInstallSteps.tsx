@@ -1,8 +1,11 @@
-import { pushUiCopy } from "./_copy";
+"use client";
+
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { pushUiCopies } from "./_copy";
 
 /** iPhone/iPad Safari: push needs the home-screen app first (iOS 16.4+). */
 export function IosInstallSteps() {
-  const t = pushUiCopy.ios;
+  const t = useShopCopy(pushUiCopies).ios;
   return (
     <div className="rounded-shop bg-shop-sunken px-4 py-3 text-sm" role="note">
       <p className="font-semibold">{t.title}</p>

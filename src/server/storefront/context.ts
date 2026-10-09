@@ -6,6 +6,8 @@ import { getRequestScope, normalizeHost } from "@/server/tenant";
 import { getSettings } from "@/server/settings";
 import { getThemePreview } from "@/server/theme/preview";
 import { shopCache } from "./cache";
+import { getRequestLocale } from "@/server/i18n/locale";
+import { servedLocales, type ShopLocale } from "@/lib/i18n/shop-locales";
 
 /*
  * The shop a request is for, plus the PUBLIC subset of its settings. Never put purchase/platform
@@ -27,10 +29,14 @@ export type ShopContext = {
   settings: PublicShopSettings;
   /** Staff theme preview (Website → Theme): `settings.appearance` carries the unpublished draft. */
   themePreview: { hasDraft: boolean } | null;
+  /** Language of this request ("/de/…" → de; docs/i18n.md § Shop-routing). May be one the shop does not serve. */
+  locale: ShopLocale;
+  /** Languages this shop serves: English first, then settings.i18n.locales. */
+  locales: ShopLocale[];
 };
 
 async function loadPublicSettings(tenantId: string) {
-  const [general, appearance, catalog, checkout, content, legal, analytics, platform] = await Promise.all([
+  const [general, appearance, catalog, checkout, content, legal, analytics, platform, i18n] = await Promise.all([
     getSettings(tenantId, "general"),
     getSettings(tenantId, "appearance"),
     getSettings(tenantId, "catalog"),
@@ -39,6 +45,7 @@ async function loadPublicSettings(tenantId: string) {
     getSettings(tenantId, "legal"),
     getSettings(tenantId, "analytics"),
     getSettings(tenantId, "platform"),
+    getSettings(tenantId, "i18n"),
   ]);
   return {
     general: {
@@ -77,6 +84,7 @@ async function loadPublicSettings(tenantId: string) {
     legal,
     analytics: { provider: analytics.provider },
     features: { newsletter: platform.newsletterEnabled },
+    i18n: { locales: i18n.locales },
   };
 }
 
@@ -104,7 +112,7 @@ export const getShopContext = cache(async (): Promise<ShopContext | null> => {
   const h = await headers();
   const host = normalizeHost(h.get("host")) ?? "";
   const t = scope.tenant;
-  const [cached, preview] = await Promise.all([cachedPublicSettings(t.id), getThemePreview(t.id)]);
+  const [cached, preview, locale] = await Promise.all([cachedPublicSettings(t.id), getThemePreview(t.id), getRequestLocale()]);
   // The draft is merged per request, never written to the shared cache.
   const settings = preview?.draft ? { ...cached, appearance: { ...cached.appearance, ...preview.draft } } : cached;
   return {
@@ -114,12 +122,16 @@ export const getShopContext = cache(async (): Promise<ShopContext | null> => {
     shopName: settings.general.shopName || t.name,
     settings,
     themePreview: preview ? { hasDraft: preview.draft !== null } : null,
+    locale,
+    // `?? []`: entries cached before the i18n group existed.
+    locales: servedLocales(settings.i18n?.locales ?? []),
   };
 });
 
 /** Like getShopContext, but 404s when the host is not a shop. Use at the top of every shop page. */
 export async function requireShop(): Promise<ShopContext> {
   const shop = await getShopContext();
-  if (!shop) notFound();
+  // A language the shop does not serve ("/de/…" while German is off) does not exist.
+  if (!shop || !shop.locales.includes(shop.locale)) notFound();
   return shop;
 }

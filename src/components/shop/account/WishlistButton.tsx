@@ -1,12 +1,14 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { useHeaderCounts } from "@/components/shop/layout/HeaderCounts";
 import { cn } from "@/components/shop/ui/cn";
+import { useShopCopy } from "@/components/shop/i18n/ShopLocale";
+import { splitLocalePath } from "@/lib/i18n/shop-locales";
 import { loginHref } from "@/server/customer-auth/redirect";
-import { wishlistCopy } from "./_copy-wishlist";
+import { wishlistCopies } from "./_copy-wishlist";
 import { getWishlistStateAction, toggleWishlistAction } from "./actions";
 
 /*
@@ -77,7 +79,7 @@ export function WishlistButton({
   variant?: "icon" | "outline" | "full";
   className?: string;
 }) {
-  const t = wishlistCopy;
+  const t = useShopCopy(wishlistCopies);
   const state = useSyncExternalStore(subscribe, () => snapshot, () => SERVER_SNAPSHOT);
   const pathname = usePathname();
   const router = useRouter();
@@ -119,7 +121,8 @@ export function WishlistButton({
         return;
       }
       setCounts({ wishlist: snapshot.ids.size });
-      if (pathname === "/wishlist" || pathname.startsWith("/account")) router.refresh();
+      const path = splitLocalePath(pathname).path;
+      if (path === "/wishlist" || path.startsWith("/account")) router.refresh();
     });
   };
 

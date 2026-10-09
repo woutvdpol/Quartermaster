@@ -1,7 +1,9 @@
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import { Suspense } from "react";
 import { Badge, Breadcrumbs, Container, LockedImg, Markdown, Price, ProductCard, ProductGrid, SectionHeading } from "@/components/shop/ui";
-import { searchCopy } from "@/components/shop/search/_copy";
+import { searchCopies } from "@/components/shop/search/_copy";
+import { pickCopy } from "@/lib/i18n/shop-copy";
+import type { ShopLocale } from "@/lib/i18n/shop-locales";
 import { WishlistButton } from "@/components/shop/account/WishlistButton";
 import { NotifyMeButton } from "@/components/shop/alerts";
 import { ProvenanceBlock } from "@/components/shop/provenance/ProvenanceBlock";
@@ -12,16 +14,17 @@ import { getShopViewer } from "@/server/storefront/viewer";
 import { ARCHIVE_PATH, SHOP_PATH, archiveCategoryHref, categoryHref, facetValueHref, getRelated, liveReservedIds, tagHref, withLiveStatus } from "@/server/storefront-catalog";
 import { inSoldArchive, priceVisible, soldMonth } from "@/server/storefront-catalog/sold";
 import { resolveCompliance } from "@/server/compliance";
-import { countryName } from "@/server/shipping/countries";
 import type { PublicImage, PublicProduct, PublicStatus } from "@/server/storefront-catalog/types";
+import { translateCards } from "@/server/storefront/translate";
+import { TranslatedNote } from "@/components/shop/i18n/TranslatedNote";
 import { applyGeoBlur, toCardData } from "../to-card";
-import { catalogCopy as copy } from "../_copy";
+import { catalogCopies } from "../_copy";
 import { LockedPanel } from "./LockedPanel";
 import { ProductBuyBox } from "./ProductBuyBox";
 import { OfferButton } from "@/components/shop/offers/OfferButton";
 import { ProductGallery, type GalleryImage } from "./ProductGallery";
 import { pickSources } from "@/lib/media/variants";
-import { ShippingHint } from "./ShippingHint";
+import { ShippingHint, localCountryName } from "./ShippingHint";
 import { SoldAlternatives, similarForSale } from "./SoldAlternatives";
 
 /** Visitor-country compliance for this product (src/server/compliance); null/absent = nothing applies. */
@@ -43,6 +46,7 @@ export function ProductDetail({
   locked,
   geo = null,
   display = null,
+  translation = null,
 }: {
   shop: ShopContext;
   product: PublicProduct;
@@ -52,13 +56,17 @@ export function ProductDetail({
   locked: boolean;
   geo?: ProductGeo | null;
   display?: DisplayCurrency | null;
+  /** A translated description exists: show "Translated from English · Show original" (docs/i18n.md). */
+  translation?: { descriptionTranslatable: boolean; descriptionTranslated: boolean; original: boolean } | null;
 }) {
   const { catalog, legal, checkout, general } = shop.settings;
   const currency = shop.tenant.currency;
+  const locale = shop.locale;
+  const copy = pickCopy(catalogCopies, locale);
   const sold = status === "sold";
   // Sold items: price only when the dealer shows it for this item (docs/sold-archive.md).
   const showPrice = priceVisible({ status, showSoldPrice: product.showSoldPrice });
-  const soldIn = sold ? soldMonth(product.soldAt, shop.tenant.timezone) : null;
+  const soldIn = sold ? soldMonth(product.soldAt, shop.tenant.timezone, locale) : null;
   // A sold item in the public archive lives under "Sold archive" in the breadcrumbs.
   const archived = inSoldArchive({ status, archiveHidden: product.archiveHidden }, catalog.publicArchive);
   const crumbs = archived
@@ -83,7 +91,7 @@ export function ProductDetail({
   return (
     <Container className="py-6 sm:py-10">
       <RecentlyViewedTracker productId={product.id} />
-      <Breadcrumbs items={crumbs} jsonLdBase={shop.origin} />
+      <Breadcrumbs items={crumbs} jsonLdBase={shop.origin} locale={locale} />
 
       <div className="mt-6 grid gap-8 sm:mt-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:gap-14 xl:gap-20">
         <div className="min-w-0">
@@ -117,7 +125,7 @@ export function ProductDetail({
 
           {locked ? (
             <div className="mt-8">
-              <LockedPanel returnTo={product.href} />
+              <LockedPanel returnTo={product.href} locale={locale} />
             </div>
           ) : (
             <>
@@ -125,13 +133,13 @@ export function ProductDetail({
                 {showPrice && sold ? (
                   <p className="flex items-baseline gap-2">
                     <span className="text-sm text-shop-muted">{copy.product.soldFor}</span>
-                    <Price cents={product.price} currency={currency} display={display} size="xl" />
+                    <Price cents={product.price} currency={currency} display={display} locale={locale} size="xl" />
                   </p>
                 ) : showPrice ? (
-                  <Price cents={product.price} currency={currency} display={display} size="xl" />
+                  <Price cents={product.price} currency={currency} display={display} locale={locale} size="xl" />
                 ) : null}
                 <div className="flex flex-wrap gap-1.5">
-                  <StatusBadge status={status} soldIn={soldIn} />
+                  <StatusBadge status={status} soldIn={soldIn} locale={locale} />
                   {product.onSale && status !== "sold" ? <Badge tone="accent">{copy.product.sale}</Badge> : null}
                 </div>
               </div>
@@ -144,7 +152,7 @@ export function ProductDetail({
 
               {geo?.noShipping && geo.country && status !== "sold" ? (
                 <p role="note" className={`mt-5 bg-shop-warn-soft text-shop-warn ${notice}`}>
-                  {copy.product.noShipping(countryName(geo.country))}
+                  {copy.product.noShipping(localCountryName(geo.country, locale))}
                 </p>
               ) : null}
 
@@ -173,7 +181,7 @@ export function ProductDetail({
               ) : (
                 // Sold (design "SoldProduct"): no buy button — an alert for the next one and similar pieces for sale.
                 <div className="mt-7">
-                  <SoldAlternatives tenantId={shop.tenant.id} productId={product.id} country={geo?.country ?? null} />
+                  <SoldAlternatives tenantId={shop.tenant.id} productId={product.id} country={geo?.country ?? null} locale={locale} />
                 </div>
               )}
 
@@ -230,7 +238,15 @@ export function ProductDetail({
                 <h2 id="pd-desc" className="mb-5 text-2xl text-shop-ink sm:text-[1.75rem]">
                   {copy.product.description}
                 </h2>
-                <Markdown source={product.description} />
+                {/* English source text on a Dutch/German page: tell assistive tech (and translators) its language. */}
+                <div lang={locale !== "en" && !translation?.descriptionTranslated ? "en" : undefined}>
+                  <Markdown source={product.description} />
+                </div>
+                {translation?.descriptionTranslatable ? (
+                  <div className="mt-4">
+                    <TranslatedNote locale={locale} path={product.href} original={translation.original} />
+                  </div>
+                ) : null}
               </section>
             ) : null}
 
@@ -300,7 +316,8 @@ export function ProductDetail({
   );
 }
 
-function StatusBadge({ status, soldIn = null }: { status: PublicStatus; soldIn?: string | null }) {
+function StatusBadge({ status, soldIn = null, locale }: { status: PublicStatus; soldIn?: string | null; locale: ShopLocale }) {
+  const copy = pickCopy(catalogCopies, locale);
   if (status === "sold") return <Badge tone="sold">{soldIn ? copy.product.soldBadge(soldIn) : copy.product.status.sold}</Badge>;
   if (status === "reserved") return <Badge tone="reserved">{copy.product.status.reserved}</Badge>;
   return <Badge tone="ok">{copy.product.status.available}</Badge>;
@@ -318,7 +335,10 @@ async function RelatedProducts({
   display: DisplayCurrency | null;
 }) {
   const tenantId = shop.tenant.id;
-  const candidates = await getRelated(tenantId, { id: product.id, relatedIds: product.relatedIds, categoryId: product.categoryId, tagIds: product.tags.map((t) => t.id) }, 4);
+  const copy = pickCopy(catalogCopies, shop.locale);
+  const candidates = await getRelated(tenantId, { id: product.id, relatedIds: product.relatedIds, categoryId: product.categoryId, tagIds: product.tags.map((t) => t.id) }, 4).then((c) =>
+    translateCards(tenantId, shop.locale, c),
+  );
   if (!candidates.length) return null;
   const ids = candidates.map((r) => r.id);
   const [reserved, viewer, verdicts] = await Promise.all([
@@ -333,6 +353,7 @@ async function RelatedProducts({
       toCardData(c, {
         currency: shop.tenant.currency,
         lockSensitive: shop.settings.legal.blurSensitiveForGuests && !viewer,
+        locale: shop.locale,
       }),
       c,
       verdicts[c.id]?.blurred ?? false,
@@ -341,7 +362,7 @@ async function RelatedProducts({
   return (
     <section className="mt-20 border-t border-shop-line pt-12" aria-labelledby="pd-related">
       <SectionHeading title={<span id="pd-related">{copy.product.related}</span>} />
-      <ProductGrid products={cards} columns={4} display={display} showStockCode={shop.settings.catalog.showStockCode} headingLevel={3} wishlistSlot={(p) => <WishlistButton productId={p.id} />} />
+      <ProductGrid products={cards} columns={4} display={display} locale={shop.locale} showStockCode={shop.settings.catalog.showStockCode} headingLevel={3} wishlistSlot={(p) => <WishlistButton productId={p.id} />} />
     </section>
   );
 }
@@ -360,11 +381,13 @@ const SIMILAR_MIN_SOLD = 1;
  */
 async function SimilarProducts({ shop, product, country, display }: { shop: ShopContext; product: PublicProduct; country: string | null; display: DisplayCurrency | null }) {
   const tenantId = shop.tenant.id;
-  const [{ items: visible, verdicts }, viewer] = await Promise.all([similarForSale(tenantId, product.id, country), getShopViewer(tenantId)]);
+  const searchCopy = pickCopy(searchCopies, shop.locale);
+  const [{ items: found, verdicts }, viewer] = await Promise.all([similarForSale(tenantId, product.id, country), getShopViewer(tenantId)]);
+  const visible = await translateCards(tenantId, shop.locale, found);
   if (visible.length < (product.status === "sold" ? SIMILAR_MIN_SOLD : SIMILAR_MIN)) return null;
   const cards = visible.map((c) =>
     applyGeoBlur(
-      toCardData(c, { currency: shop.tenant.currency, lockSensitive: shop.settings.legal.blurSensitiveForGuests && !viewer }),
+      toCardData(c, { currency: shop.tenant.currency, lockSensitive: shop.settings.legal.blurSensitiveForGuests && !viewer, locale: shop.locale }),
       c,
       verdicts[c.id]?.blurred ?? false,
     ),
@@ -378,6 +401,7 @@ async function SimilarProducts({ shop, product, country, display }: { shop: Shop
             key={p.id}
             product={p}
             display={display}
+            locale={shop.locale}
             showStockCode={shop.settings.catalog.showStockCode}
             headingLevel={3}
             sizes="(min-width: 640px) 15rem, 11.5rem"

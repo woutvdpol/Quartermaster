@@ -1,20 +1,21 @@
-import Link from "next/link";
+import Link from "@/components/shop/ui/Link";
 import type { ReactNode } from "react";
 import { cn } from "@/components/shop/ui/cn";
 import { splitUnderstood } from "./highlight";
-import { searchCopy } from "./_copy";
+import { shopCopy } from "@/server/i18n/locale";
+import { searchCopies } from "./_copy";
 
 /*
  * Results-page pieces of smart search (docs/design/search/Results.dc.html). Server components: plain
- * links, no client JS — removing a chip or switching to a literal search is a navigation.
+ * links, no client JS — removing a chip or switching to a literal search is a navigation. Copy in the
+ * request language (async server components).
  */
-
-const t = searchCopy.results;
 
 export type ChipLink = { label: string; href: string };
 
 /** “duitse helm ww2 *onder 500*” — the words the search understood as filters in the accent face. */
-export function SearchHeading({ query, matched, scope }: { query: string; matched: string[]; scope?: string | null }) {
+export async function SearchHeading({ query, matched, scope }: { query: string; matched: string[]; scope?: string | null }) {
+  const t = (await shopCopy(searchCopies)).results;
   const parts = splitUnderstood(query, matched);
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
@@ -46,7 +47,7 @@ const CloseGlyph = () => (
  * "We searched for helm with [Country: Germany ×] [Max €500 ×] — Search the words literally instead".
  * Renders nothing when the query was taken as plain words and nothing needs saying.
  */
-export function InterpretationBar({
+export async function InterpretationBar({
   text,
   chips,
   relaxed,
@@ -59,6 +60,8 @@ export function InterpretationBar({
   /** Literal-mode link: `on` = this page is a literal search (link back to the understood one). */
   literal: { on: boolean; href: string; q: string };
 }) {
+  const copy = await shopCopy(searchCopies);
+  const t = copy.results;
   if (literal.on) {
     return (
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-shop bg-shop-sunken px-4 py-3 text-sm text-shop-ink-2">
@@ -71,7 +74,7 @@ export function InterpretationBar({
   }
   if (!chips.length && !relaxed) return null;
   return (
-    <div className="flex flex-col gap-2 rounded-shop bg-shop-sunken px-4 py-3" role="region" aria-label={searchCopy.panel.understood}>
+    <div className="flex flex-col gap-2 rounded-shop bg-shop-sunken px-4 py-3" role="region" aria-label={copy.panel.understood}>
       {relaxed ? <p className="text-sm text-shop-ink-2">{t.relaxed}</p> : null}
       {chips.length ? (
         <div className="flex flex-wrap items-center gap-2">
@@ -106,7 +109,8 @@ export function InterpretationBar({
 }
 
 /** "Close, but not all filters match" — a horizontal rail below the results. */
-export function NearMissRail({ dropped, total, allHref, children }: { dropped: string; total: number; allHref: string; children: ReactNode }) {
+export async function NearMissRail({ dropped, total, allHref, children }: { dropped: string; total: number; allHref: string; children: ReactNode }) {
+  const t = (await shopCopy(searchCopies)).results;
   return (
     <section aria-labelledby="search-near" className="mt-14 flex flex-col gap-3.5 border-t border-shop-line pt-8">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
@@ -128,7 +132,7 @@ export function NearMissRail({ dropped, total, allHref, children }: { dropped: s
 }
 
 /** Zero results: did-you-mean, drop an understood filter, literal search, broader categories. */
-export function SearchZeroState({
+export async function SearchZeroState({
   q,
   didYouMean,
   without,
@@ -146,6 +150,7 @@ export function SearchZeroState({
   wholeShop: { label: string; href: string } | null;
   className?: string;
 }) {
+  const t = (await shopCopy(searchCopies)).results;
   const pill = "inline-flex h-9 items-center rounded-shop-control border border-shop-line-strong bg-shop-surface px-3.5 text-sm font-medium text-shop-ink transition-colors hover:border-shop-ink";
   return (
     <div className={cn("flex flex-col gap-6 rounded-shop bg-shop-sunken px-5 py-10 sm:px-10 sm:py-14", className)}>
@@ -160,7 +165,7 @@ export function SearchZeroState({
             ?
           </p>
         ) : null}
-        <p className="text-sm text-shop-muted">{searchCopy.results.tips}</p>
+        <p className="text-sm text-shop-muted">{t.tips}</p>
       </div>
       {without.length || literalHref || wholeShop ? (
         <div className="flex flex-wrap items-center gap-2">
