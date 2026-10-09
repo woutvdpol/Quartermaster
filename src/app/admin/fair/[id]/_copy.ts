@@ -22,7 +22,9 @@ export const sellCopy = {
     invalid: "Enter a stock number.",
     onTable: (n: number) => `On the table (${n} ${n === 1 ? "item" : "items"})`,
     hidden: "Hidden in the webshop while the fair runs · back online automatically when you end the fair",
+    hiddenSoon: "Hidden in the webshop once you start the fair",
     visible: "Also visible in the webshop while the fair runs",
+    ended: "The fair has ended · unsold items are back in the webshop",
   },
   item: {
     listed: (list: string, bought: string | null) => (bought ? `Listed ${list} · bought ${bought}` : `Listed ${list}`),

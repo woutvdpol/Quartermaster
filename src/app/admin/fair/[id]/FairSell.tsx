@@ -257,6 +257,7 @@ export function FairSell({ initial }: { initial: FairSellData }) {
           message={screen.message}
           onTable={forSale.length}
           hidden={data.fair.hideFromShop}
+          status={data.fair.status}
           onLookup={lookup}
         />
       ) : null}
@@ -278,7 +279,22 @@ export function FairSell({ initial }: { initial: FairSellData }) {
 type Detector = { detect: (source: HTMLVideoElement) => Promise<{ rawValue: string }[]> };
 type DetectorCtor = { new (opts: { formats: string[] }): Detector; getSupportedFormats?: () => Promise<string[]> };
 
-function ScanScreen({ disabled, message, onTable, hidden, onLookup }: { disabled: boolean; message?: string; onTable: number; hidden: boolean; onLookup: (text: string) => void }) {
+function ScanScreen({
+  disabled,
+  message,
+  onTable,
+  hidden,
+  status,
+  onLookup,
+}: {
+  disabled: boolean;
+  message?: string;
+  onTable: number;
+  hidden: boolean;
+  status: "PREPARING" | "LIVE" | "ENDED";
+  onLookup: (text: string) => void;
+}) {
+  const shopNote = status === "ENDED" ? t.scan.ended : !hidden ? t.scan.visible : status === "PREPARING" ? t.scan.hiddenSoon : t.scan.hidden;
   const [code, setCode] = useState("");
   return (
     <main className="grid flex-1 content-start gap-4 p-4">
@@ -316,7 +332,7 @@ function ScanScreen({ disabled, message, onTable, hidden, onLookup }: { disabled
       ) : null}
       <div className="grid gap-1 rounded-card border border-line bg-panel px-3.5 py-3 text-[13px]">
         <strong>{t.scan.onTable(onTable)}</strong>
-        <span className="text-muted">{hidden ? t.scan.hidden : t.scan.visible}</span>
+        <span className="text-muted">{shopNote}</span>
       </div>
     </main>
   );
