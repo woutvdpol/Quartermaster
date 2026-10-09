@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Translations in the product editor</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ECECE5}
+button{font:inherit;cursor:pointer}
+a{color:#7E5416}a:hover{color:#1E2119}
+</style>
+</helmet>
+<div style="width: 1280px; height: 940px; box-sizing: border-box; background: #ECECE5; color: #1E2119; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; padding: 24px; display: flex; flex-direction: column; gap: 16px">
+  <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 12px">
+    <div>
+      <span style="font-size: 12px; color: #4A4D40">Inventory › No. 50160</span>
+      <h1 style="margin: 2px 0 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px">STAHLHELM M40 HEER, ET64 · TRANSLATIONS</h1>
+    </div>
+    <div role="tablist" aria-label="Language" style="display: flex; gap: 6px">
+      <button type="button" role="tab" aria-selected="false" style="height: 36px; padding: 0 14px; border: 1px solid #D7D8CC; border-radius: 4px; background: #FAFAF6">EN · original</button>
+      <button type="button" role="tab" aria-selected="false" style="height: 36px; padding: 0 14px; border: 1px solid #D7D8CC; border-radius: 4px; background: #FAFAF6">NL <span style="color: #2F6B3A">· reviewed</span></button>
+      <button type="button" role="tab" aria-selected="true" style="height: 36px; padding: 0 14px; border: 2px solid #1E2119; border-radius: 4px; background: #FFFFFF; font-weight: 600">DE <span style="color: #8A4B12; font-weight: 500">· automatic</span></button>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 300px; gap: 16px; flex-grow: 1; min-height: 0">
+    <section style="background: #F3F3EC; border: 1px solid #D7D8CC; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #4A4D40">ORIGINAL · ENGLISH</h2>
+      <div><span style="font-size: 12px; color: #4A4D40">Title</span><p style="margin: 4px 0 0">Stahlhelm M40 Heer, ET64</p></div>
+      <div><span style="font-size: 12px; color: #4A4D40">Description</span><p style="margin: 4px 0 0; line-height: 1.55">Original M40 steel helmet of the Heer, maker-marked ET64 with lot number 3721. The single Heer decal is around 80% present; paint shows honest age-appropriate wear with no repaint. Leather liner (size 57) complete with all fingers and chinstrap.</p></div>
+      <div><span style="font-size: 12px; color: #4A4D40">Details</span><p style="margin: 4px 0 0">Markings: ET64, lot 3721 · Size: 64 shell, 57 liner · Condition: Very good</p></div>
+    </section>
+
+    <section style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px">
+        <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #4A4D40">GERMAN</h2>
+        <span style="font-size: 12px; background: #F5E7C4; color: #6E4A00; border-radius: 999px; padding: 3px 10px">Automatic · not online until reviewed</span>
+      </div>
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #4A4D40">Title
+        <input type="text" value="Stahlhelm M40 Heer, ET64" style="height: 38px; border: 1px solid #B7B49F; border-radius: 4px; padding: 0 10px; font: inherit; font-size: 14px; color: #1E2119; background: #FFFFFF">
+      </label>
+      <label style="display: flex; gap: 8px; align-items: center; font-size: 13px"><input type="checkbox" checked>Keep the original title in every language</label>
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #4A4D40">Description
+        <textarea rows="7" style="border: 1px solid #B7B49F; border-radius: 4px; padding: 10px; font: inherit; font-size: 14px; line-height: 1.55; color: #1E2119; background: #FFFFFF; resize: vertical">Originaler Stahlhelm M40 des Heeres, Herstellerkennung ET64 mit Losnummer 3721. Das Heeres-Abzeichen ist zu etwa 80 % erhalten; der Lack zeigt ehrliche, altersgemäße Gebrauchsspuren, nicht nachlackiert. Lederinnenfutter (Größe 57) vollständig mit allen Lappen und Kinnriemen.</textarea>
+      </label>
+      <span style="font-size: 12px; color: #4A4D40">Details and facets are translated from your facet list (set once per value), not per product.</span>
+      <div style="display: flex; gap: 8px; margin-top: auto">
+        <button type="button" style="height: 38px; padding: 0 16px; border: 0; border-radius: 4px; background: #7E5416; color: #FFFFFF; font-weight: 600">Approve &amp; publish</button>
+        <button type="button" style="height: 38px; padding: 0 14px; border: 1px solid #D7D8CC; border-radius: 4px; background: #FFFFFF">Translate again</button>
+      </div>
+    </section>
+
+    <aside style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+      <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #4A4D40">YOUR GLOSSARY · DE</h2>
+      <span style="font-size: 12px; color: #4A4D40">Collector terms the translator must use. Applied to every product.</span>
+      <div style="display: flex; flex-direction: column; font-size: 13px; border-top: 1px solid #E3E3DA">
+        <span style="display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #EDEDE6"><span>liner</span><b>Innenfutter</b></span>
+        <span style="display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #EDEDE6"><span>decal</span><b>Abzeichen</b></span>
+        <span style="display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #EDEDE6"><span>shell</span><b>Glocke</b></span>
+        <span style="display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #EDEDE6"><span>Heer, Luftwaffe, Kriegsmarine</span><b>never translate</b></span>
+        <span style="display: flex; justify-content: space-between; padding: 7px 0"><span>maker-marked</span><b>Herstellerkennung</b></span>
+      </div>
+      <a href="#" style="font-size: 13px">+ Add a term</a>
+      <div style="margin-top: auto; border-top: 1px solid #E3E3DA; padding-top: 10px; display: flex; flex-direction: column; gap: 6px; font-size: 13px">
+        <strong>This shop</strong>
+        <span style="color: #4A4D40">Languages: English (main), Dutch, German</span>
+        <span style="color: #4A4D40">New listings: translated automatically, online in a language after you approve it (until then visitors see English)</span>
+        <span style="color: #4A4D40">Translated on your own server — texts never leave it.</span>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":940}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stock insights</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ECECE5}
+button{font:inherit;cursor:pointer}
+a{color:#7E5416}a:hover{color:#1E2119}
+</style>
+</helmet>
+<div style="width: 1280px; height: 1040px; box-sizing: border-box; background: #ECECE5; color: #1E2119; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; display: flex">
+  <nav aria-label="Admin" style="width: 220px; flex-shrink: 0; background: #2F3526; color: #D9DCCB; padding: 18px 14px; display: flex; flex-direction: column; gap: 4px; box-sizing: border-box">
+    <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: 0.04em; padding: 4px 10px 16px">QUARTERMASTER</span>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; text-decoration: none">Dashboard</a>
+    <a href="#" aria-current="page" style="color: #FFFFFF; background: #3E4532; padding: 8px 10px; border-radius: 4px; font-weight: 600; text-decoration: none">Insights</a>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; text-decoration: none">Inventory</a>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; text-decoration: none">Orders</a>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; text-decoration: none">Fairs</a>
+  </nav>
+
+  <main style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column">
+    <header style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; border-bottom: 1px solid #D7D8CC; background: #FAFAF6">
+      <div>
+        <span style="font-size: 12px; color: #4A4D40">Insights</span>
+        <h1 style="margin: 2px 0 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px">STOCK</h1>
+      </div>
+      <label style="display: flex; align-items: center; gap: 8px; font-size: 13px">Period
+        <select style="height: 34px; border: 1px solid #B7B49F; border-radius: 4px; font: inherit; background: #FFFFFF"><option>Last 12 months</option><option>Last 90 days</option><option>This year</option></select>
+      </label>
+    </header>
+
+    <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px">
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px">
+        <div style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 14px 16px"><span style="font-size: 11px; letter-spacing: 0.12em; color: #4A4D40">STOCK AT COST</span><b style="display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 32px">€38,420</b><span style="font-size: 12px; color: #4A4D40">212 items · at list €61,900</span></div>
+        <div style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 14px 16px"><span style="font-size: 11px; letter-spacing: 0.12em; color: #4A4D40">MEDIAN DAYS TO SELL</span><b style="display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 32px">41</b><span style="font-size: 12px; color: #2F6B3A">7 days faster than the year before</span></div>
+        <div style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 14px 16px"><span style="font-size: 11px; letter-spacing: 0.12em; color: #4A4D40">SELL-THROUGH</span><b style="display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 32px">58%</b><span style="font-size: 12px; color: #4A4D40">of items listed in the period sold</span></div>
+        <div style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 14px 16px"><span style="font-size: 11px; letter-spacing: 0.12em; color: #4A4D40">TIED UP &gt; 180 DAYS</span><b style="display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 32px; color: #8A4B12">€9,150</b><span style="font-size: 12px; color: #4A4D40">at cost · 31 items</span></div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px">
+        <section style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+          <h2 style="margin: 0 0 4px; font-size: 12px; letter-spacing: 0.12em; color: #4A4D40">BY CATEGORY</h2>
+          <div style="display: grid; grid-template-columns: 1.4fr 0.7fr 0.7fr 0.8fr 0.7fr 1.2fr; gap: 8px; font-size: 11px; letter-spacing: 0.08em; color: #4A4D40; padding-bottom: 6px; border-bottom: 1px solid #E3E3DA"><span>CATEGORY</span><span>IN STOCK</span><span>SOLD</span><span>DAYS TO SELL</span><span>MARGIN</span><span>SELL-THROUGH</span></div>
+          <sc-for list="{{cats}}" as="c" hint-placeholder-count="6">
+            <div style="display: grid; grid-template-columns: 1.4fr 0.7fr 0.7fr 0.8fr 0.7fr 1.2fr; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid #EDEDE6">
+              <span style="font-weight: 500">{{c.name}}</span><span>{{c.stock}}</span><span>{{c.sold}}</span><span>{{c.days}}</span><span>{{c.margin}}</span>
+              <span style="display: flex; align-items: center; gap: 8px"><span style="flex-grow: 1; height: 8px; background: #E3E3DA; border-radius: 999px; overflow: hidden"><span style="display: block; height: 100%; width: {{c.pct}}; background: #7E5416"></span></span><span style="font-size: 12px; width: 34px">{{c.pct}}</span></span>
+            </div>
+          </sc-for>
+          <span style="font-size: 12px; color: #4A4D40; margin-top: 4px">Helmets sell twice as fast as documents — and at a higher margin.</span>
+        </section>
+
+        <section style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+          <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #4A4D40">BUY MORE OF THESE</h2>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid #EDEDE6; padding-bottom: 8px"><span><b>German steel helmets</b><br><span style="font-size: 12px; color: #4A4D40">9 sold · median 12 days · avg. margin 44%</span></span><span style="font-size: 12px; color: #2F6B3A; white-space: nowrap">2 in stock</span></div>
+            <div style="display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid #EDEDE6; padding-bottom: 8px"><span><b>Dutch army, Interbellum</b><br><span style="font-size: 12px; color: #4A4D40">6 sold · median 19 days · avg. margin 39%</span></span><span style="font-size: 12px; color: #2F6B3A; white-space: nowrap">1 in stock</span></div>
+            <div style="display: flex; justify-content: space-between; gap: 8px"><span><b>Iron Crosses, 1914</b><br><span style="font-size: 12px; color: #4A4D40">11 sold · median 22 days · avg. margin 31%</span></span><span style="font-size: 12px; color: #2F6B3A; white-space: nowrap">3 in stock</span></div>
+          </div>
+          <span style="font-size: 12px; color: #4A4D40">Based on what sold fast and what collectors searched for without finding it (17 searches for “M35” this quarter).</span>
+        </section>
+      </div>
+
+      <section style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px">
+          <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #4A4D40">SITTING TOO LONG · 31 ITEMS</h2>
+          <span style="font-size: 12px; color: #4A4D40">Suggestions only — nothing changes until you click</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 2fr 0.7fr 0.9fr 1.6fr 1.6fr; gap: 10px; font-size: 11px; letter-spacing: 0.08em; color: #4A4D40; padding-bottom: 6px; border-bottom: 1px solid #E3E3DA"><span>ITEM</span><span>LISTED</span><span>VIEWS / ALERTS</span><span>WHY</span><span>SUGGESTION</span></div>
+        <sc-for list="{{slow}}" as="s" hint-placeholder-count="4">
+          <div style="display: grid; grid-template-columns: 2fr 0.7fr 0.9fr 1.6fr 1.6fr; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid #EDEDE6">
+            <span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #7A2420">No. {{s.no}}</span><br>{{s.title}} · <b>{{s.price}}</b></span>
+            <span>{{s.age}}</span>
+            <span>{{s.views}}</span>
+            <span style="font-size: 13px; color: #4A4D40">{{s.why}}</span>
+            <span style="display: flex; flex-wrap: wrap; gap: 6px"><button type="button" style="height: 30px; padding: 0 10px; border: 1px solid #1E2119; border-radius: 4px; background: #FFFFFF; font-size: 13px">{{s.action}}</button><button type="button" style="height: 30px; padding: 0 10px; border: 1px solid #D7D8CC; border-radius: 4px; background: transparent; font-size: 13px">Take to next fair</button></span>
+          </div>
+        </sc-for>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1040}}'>
+class Component extends DCLogic {
+renderVals() {
+const cats = [
+['Helmets', 11, 14, '18 d', '42%', '78%'],
+['Badges & awards', 8, 21, '24 d', '35%', '72%'],
+['Uniforms', 6, 7, '46 d', '38%', '54%'],
+['Equipment', 7, 6, '63 d', '29%', '46%'],
+['Edged weapons', 3, 2, '88 d', '33%', '40%'],
+['Documents', 6, 3, '121 d', '24%', '33%']
+].map(([name, stock, sold, days, margin, pct]) => ({ name, stock, sold, days, margin, pct }));
+const slow = [
+['50200', 'Zeltbahn M31, splinter camo', '€345', '412 days', '96 / 0', 'Similar ones sold for €260–290', 'Reprice to €289'],
+['50206', 'Dienstglas 6x30 binoculars', '€390', '305 days', '41 / 1', 'Few views — hardly found', 'Feature on homepage'],
+['50176', 'Dutch M37 field cap, 1939', '€140', '268 days', '188 / 3', 'Many views, no buyer: price?', 'Reprice to €125'],
+['50194', 'Leather belt with pouches', '€145', '201 days', '57 / 0', 'Category sells slowly', 'Bundle offer with 50191']
+].map(([no, title, price, age, views, why, action]) => ({ no, title, price, age, views, why, action }));
+return { cats, slow };
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-10-09T12:00:00Z" },
+  "title": "Stock insights, duplicate check & languages",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1280, "h": 1040, "title": "1 · Stock insights — what sells, what sits, what to reprice" },
+    "Duplicate.dc.html": { "x": 1360, "y": 0, "w": 1000, "h": 720, "title": "2 · Duplicate check — on photo upload" },
+    "ShopDE.dc.html": { "x": 0, "y": 1340, "w": 1280, "h": 980, "title": "3 · Shop in German — language switch, translated listing", "expand": "fill" },
+    "Translate.dc.html": { "x": 1360, "y": 1340, "w": 1280, "h": 940, "title": "4 · Translations — review in the product editor" }
+  },
+  "order": ["Main.dc.html", "Duplicate.dc.html", "ShopDE.dc.html", "Translate.dc.html"],
+  "notes": {
+    "row1": { "x": 0, "y": -300, "text": "Stock insights & duplicate check", "kind": "title1", "maxW": 2360 },
+    "row2": { "x": 0, "y": 1040, "text": "Shop in more languages", "kind": "title1", "maxW": 2640 }
+  },
+  "designSystems": []
+}

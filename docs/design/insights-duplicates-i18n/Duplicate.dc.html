@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Duplicate check on upload</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ECECE5}
+button{font:inherit;cursor:pointer}
+a{color:#7E5416}a:hover{color:#1E2119}
+</style>
+</helmet>
+<div style="width: 1000px; height: 720px; box-sizing: border-box; background: #ECECE5; color: #1E2119; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; padding: 24px; display: flex; flex-direction: column; gap: 16px">
+  <div>
+    <span style="font-size: 12px; color: #4A4D40">Inventory › New product</span>
+    <h1 style="margin: 2px 0 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px">NEW PRODUCT <span style="font-family: 'IBM Plex Mono', monospace; font-size: 15px; color: #7A2420; font-weight: 500">No. 50242</span></h1>
+  </div>
+
+  <section style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+    <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #4A4D40">PHOTOS</h2>
+    <div style="display: flex; gap: 10px">
+      <span style="width: 120px; height: 120px; border-radius: 4px; background: #C9C7B6; position: relative"><span style="position: absolute; left: 6px; top: 6px; background: #FAFAF6; border-radius: 3px; padding: 1px 6px; font-size: 11px; font-weight: 600">Cover</span></span>
+      <span style="width: 120px; height: 120px; border-radius: 4px; background: #B7B49F"></span>
+      <span style="width: 120px; height: 120px; border: 1px dashed #B7B49F; border-radius: 4px; display: grid; place-items: center; color: #4A4D40; font-size: 12px">+ Add</span>
+    </div>
+
+    <div role="status" style="background: #F5E7C4; border: 1px solid #E5D3A3; border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px">
+      <strong style="color: #6E4A00">These photos look very much like a piece you already had</strong>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+        <div style="background: #FFFFFF; border: 1px solid #E5D3A3; border-radius: 6px; padding: 10px; display: flex; gap: 10px; align-items: center">
+          <span style="width: 64px; height: 64px; flex-shrink: 0; border-radius: 4px; background: #C9C7B6"></span>
+          <span style="display: flex; flex-direction: column; gap: 2px; font-size: 13px">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #7A2420">No. 49702 · sold Jul 2026</span>
+            <b>Bayonet 84/98 with frog, matching</b>
+            <span style="color: #4A4D40">Very close match · same markings photo</span>
+            <a href="#">Open No. 49702</a>
+          </span>
+        </div>
+        <div style="background: #FFFFFF; border: 1px solid #E5D3A3; border-radius: 6px; padding: 10px; display: flex; gap: 10px; align-items: center">
+          <span style="width: 64px; height: 64px; flex-shrink: 0; border-radius: 4px; background: #B7B49F"></span>
+          <span style="display: flex; flex-direction: column; gap: 2px; font-size: 13px">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #7A2420">No. 50131 · draft</span>
+            <b>Bayonet 84/98, no frog</b>
+            <span style="color: #4A4D40">Close match</span>
+            <a href="#">Open No. 50131</a>
+          </span>
+        </div>
+      </div>
+      <fieldset style="border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px">
+        <legend style="font-size: 13px; color: #6E4A00; margin-bottom: 6px">What is it?</legend>
+        <label style="display: flex; gap: 8px; align-items: flex-start"><input type="radio" name="dup" style="margin-top: 3px"><span><b>The same piece came back</b> (bought back, returned) — link it to No. 49702 so its history and provenance carry over</span></label>
+        <label style="display: flex; gap: 8px; align-items: flex-start"><input type="radio" name="dup" style="margin-top: 3px"><span><b>I already listed it</b> — stop here and open No. 50131</span></label>
+        <label style="display: flex; gap: 8px; align-items: flex-start"><input type="radio" name="dup" checked style="margin-top: 3px"><span><b>A different piece</b> — just similar. Carry on.</span></label>
+      </fieldset>
+      <span style="font-size: 12px; color: #6E4A00">Checked against your own stock, drafts and sold archive. Photos are compared on your own server.</span>
+    </div>
+  </section>
+
+  <section style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 16px; display: flex; gap: 16px; align-items: center">
+    <span style="font-size: 13px; color: #4A4D40; flex-grow: 1">Also when you list a piece that came back from a buyer: the archive shows both sales, so you see what it did last time.</span>
+    <button type="button" style="height: 38px; padding: 0 16px; border: 0; border-radius: 4px; background: #7E5416; color: #FFFFFF; font-weight: 600">Save draft</button>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1000,"height":720}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

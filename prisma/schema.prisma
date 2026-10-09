@@ -87,6 +87,9 @@ model Tenant {
   productEmbeddings     ProductEmbedding[]
   searchIndexRun        SearchIndexRun?
   fairs                 Fair[]
+  translations          Translation[]
+  translationTerms      TranslationTerm[]
+  searchQueryStats      SearchQueryStat[]
   fairItems             FairItem[]
   pushSubscriptions     PushSubscription[]
   pushMessages          PushMessage[]
@@ -376,6 +379,9 @@ model Product {
   // Fair mode (docs/fair-mode.md): set while the item is on a LIVE fair that hides fair stock from
   // the webshop; cleared when the fair ends or the item is taken off the fair.
   fairHoldId               String?
+  // Duplicate check (docs/duplicate-check.md): set when this listing is the same physical piece as an
+  // earlier product (bought back / returned), so history and provenance can be followed.
+  previousProductId        String?
   // Phase 5 — provenance & compliance
   provenance               String? // public Markdown provenance (collection history); legacy: none (new)
   authenticityGuaranteed   Boolean       @default(false) // shows the lifetime authenticity guarantee
@@ -401,6 +407,8 @@ model Product {
   category           Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   purchaseRecord     PurchaseRecord?     @relation(fields: [purchaseRecordId], references: [id], onDelete: SetNull)
   fairHold           Fair?               @relation("FairHold", fields: [fairHoldId], references: [id], onDelete: SetNull)
+  previousProduct    Product?            @relation("ProductLineage", fields: [previousProductId], references: [id], onDelete: SetNull)
+  laterProducts      Product[]           @relation("ProductLineage")
   fairItems          FairItem[]
   images             ProductImage[]
   tags               ProductTag[]
@@ -426,6 +434,7 @@ model Product {
   @@index([tenantId, soldAt])
   @@index([purchaseRecordId])
   @@index([fairHoldId])
+  @@index([previousProductId])
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_title_trgm_idx")
   @@index([description(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_description_trgm_idx")
   @@index([sku(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_sku_trgm_idx")
@@ -1835,4 +1844,81 @@ model PushMessage {
   @@index([tenantId, sentAt])
   @@index([customerId, createdAt])
   @@map("push_messages")
+}
+
+// ─── Shop translations (docs/i18n.md) ───────────────────────────────────────
+// One row per (entity, field, locale). The shop shows a translation only when APPROVED; until then
+// visitors see the source text. sourceHash = hash of the source text the translation was made from,
+// so a changed source marks the translation stale (status back to MACHINE / needs review).
+
+enum TranslationEntity {
+  PRODUCT // fields: title, description, seoTitle, seoDescription
+  CATEGORY // title, description, seoTitle, seoDescription
+  FACET // name
+  FACET_VALUE // label
+  CONTENT_PAGE // title, body / blocks (JSON as string)
+  MENU_ITEM // label
+}
+
+enum TranslationStatus {
+  QUEUED // waiting for the machine translator
+  MACHINE // machine translated, not reviewed — not shown in the shop
+  APPROVED // reviewed (possibly edited) — shown in the shop
+}
+
+model Translation {
+  id         String            @id @default(cuid())
+  tenantId   String
+  entity     TranslationEntity
+  entityId   String
+  field      String
+  locale     String // "nl", "de" (the shop's main language is the source)
+  value      String?
+  status     TranslationStatus @default(QUEUED)
+  sourceHash String
+  stale      Boolean           @default(false) // source changed after approval
+  approvedAt DateTime?
+  approvedBy String? // user id
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, entity, entityId, field, locale])
+  @@index([tenantId, locale, status])
+  @@index([tenantId, entity, entityId])
+  @@map("translations")
+}
+
+/// Per-shop glossary: collector terms the machine translation must use (or keep untranslated).
+model TranslationTerm {
+  id        String   @id @default(cuid())
+  tenantId  String
+  locale    String
+  source    String
+  target    String? // null = keep the source term untranslated
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, locale, source])
+  @@map("translation_terms")
+}
+
+// ─── Stock insights (docs/insights.md) ──────────────────────────────────────
+
+/// Daily aggregate of shop searches (no visitor data): which queries are asked and which find nothing.
+model SearchQueryStat {
+  id          String   @id @default(cuid())
+  tenantId    String
+  day         DateTime @db.Date
+  query       String // normalised (lower-case, trimmed, collapsed whitespace), max 120 chars
+  searches    Int      @default(0)
+  zeroResults Int      @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, day, query])
+  @@index([tenantId, day])
+  @@map("search_query_stats")
 }

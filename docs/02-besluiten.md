@@ -155,3 +155,17 @@ Ontwerp goedgekeurd (`docs/design/fair-archive-push-network/`, artifact "Fair mo
   - De domeinnaam is nog te bepalen.
   - Opt-in per handelaar (`Tenant.networkOptIn`); de koper rekent af in de shop van de handelaar.
   - Het verdienmodel komt later.
+
+## Innovatieronde 3 — akkoord eigenaar (09-10-2026)
+Ontwerp goedgekeurd (`docs/design/insights-duplicates-i18n/`).
+- **Inzicht in de voorraad:** een pagina "Insights" in het admin.
+  - Kerncijfers: voorraadwaarde, doorlooptijd, sell-through, geld dat vastzit.
+  - Per categorie, plus "Buy more of these" (snelle verkopers en zoekopdrachten zonder resultaat).
+  - "Sitting too long" met de reden en een voorstel.
+  - **"Reprice" past de prijs aan met één klik plus bevestiging.** Alle andere voorstellen worden alleen getoond.
+- **Dubbelcheck bij het uploaden van foto's:** foto's worden vergeleken met de eigen voorraad, concepten en het verkocht-archief, via de foto-AI die al draait.
+  - Keuzes: "teruggekomen" (koppelen via `previousProductId`, de historie gaat mee), "staat al in de lijst", "ander stuk".
+- **Shop in meerdere talen:** Engels (hoofdtaal), **Nederlands en Duits**, met URL's als `/nl/...` en `/de/...`.
+  - Machinevertaling met lokale Opus-MT-modellen in de embedder-container, plus een woordenlijst per shop.
+  - **Vertalingen staan pas online na goedkeuring.** Tot die tijd zien bezoekers de Engelse tekst.
+  - De bestaande voorraad wordt in één keer vertaald en komt in de nakijklijst.
