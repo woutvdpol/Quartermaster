@@ -14,6 +14,15 @@ async function owner() {
   return c ? { tenantId: c.tenant.id, customerId: c.customer.id } : null;
 }
 
+/**
+ * The delivery select: "PUSH" = web push right away, no instant e-mail (docs/push.md); otherwise an
+ * e-mail frequency and push off.
+ */
+function deliveryPatch(name: string, value: string) {
+  if (value === "PUSH") return { name, frequency: "INSTANT" as const, push: true };
+  return { name, frequency: value as "INSTANT" | "DAILY" | "WEEKLY", push: false };
+}
+
 /** Edit name / frequency, pause (`op=pause`) or resume (`op=resume`) one of the customer's alerts. */
 export async function updateAccountAlertAction(_prev: AccountAlertResult | null, formData: FormData): Promise<AccountAlertResult> {
   const o = await owner();
@@ -26,7 +35,7 @@ export async function updateAccountAlertAction(_prev: AccountAlertResult | null,
         ? { active: false }
         : op === "resume"
           ? { active: true }
-          : { name: str(formData.get("name")), frequency: str(formData.get("frequency")) as "INSTANT" | "DAILY" | "WEEKLY" };
+          : deliveryPatch(str(formData.get("name")), str(formData.get("frequency")));
     const ok = await updateCustomerSearch(o, id, patch);
     revalidatePath("/account/alerts");
     return ok ? { ok: true, message: "Saved." } : { ok: false, message: "Alert not found." };

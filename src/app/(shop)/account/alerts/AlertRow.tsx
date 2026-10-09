@@ -8,19 +8,22 @@ import { Badge } from "@/components/shop/ui/Badge";
 import { Select, TextInput } from "@/components/shop/ui/Field";
 import { cn } from "@/components/shop/ui/cn";
 import { alertsCopy } from "@/components/shop/alerts/_copy";
+import { pushUiCopy } from "@/components/shop/push/_copy";
 import { deleteAccountAlertAction, updateAccountAlertAction } from "./actions";
 
 export type AlertRowData = {
   id: string;
   name: string;
   frequency: "INSTANT" | "DAILY" | "WEEKLY";
+  /** Delivered as web push (docs/push.md). */
+  push: boolean;
   active: boolean;
   summary: string;
   href: string;
   lastNotified: string | null;
 };
 
-export function AlertRow({ alert }: { alert: AlertRowData }) {
+export function AlertRow({ alert, pushAvailable = false }: { alert: AlertRowData; pushAvailable?: boolean }) {
   const [state, action] = useActionState(updateAccountAlertAction, null);
   const f = alertsCopy.form;
   return (
@@ -28,7 +31,7 @@ export function AlertRow({ alert }: { alert: AlertRowData }) {
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm text-shop-muted">{alert.summary}</p>
-          {alert.lastNotified ? <p className="text-xs text-shop-muted">Last email: {alert.lastNotified}</p> : null}
+          {alert.lastNotified ? <p className="text-xs text-shop-muted">{alert.push ? "Last alert" : "Last email"}: {alert.lastNotified}</p> : null}
         </div>
         <div className="flex items-center gap-3">
           {!alert.active ? <Badge tone="neutral">Paused</Badge> : null}
@@ -44,11 +47,12 @@ export function AlertRow({ alert }: { alert: AlertRowData }) {
           <TextInput name="name" defaultValue={alert.name} maxLength={120} required />
         </label>
         <label className="grid gap-1.5 text-sm font-medium">
-          {f.frequency}
-          <Select name="frequency" defaultValue={alert.frequency} className="sm:w-44">
+          {pushAvailable ? pushUiCopy.delivery.label : f.frequency}
+          <Select name="frequency" defaultValue={alert.push ? "PUSH" : alert.frequency} className={pushAvailable ? "sm:w-60" : "sm:w-44"}>
+            {pushAvailable ? <option value="PUSH">{pushUiCopy.delivery.push}</option> : null}
             {(["INSTANT", "DAILY", "WEEKLY"] as const).map((v) => (
               <option key={v} value={v}>
-                {f.frequencies[v]}
+                {pushAvailable ? `E-mail: ${f.frequencies[v].charAt(0).toLowerCase()}${f.frequencies[v].slice(1)}` : f.frequencies[v]}
               </option>
             ))}
           </Select>

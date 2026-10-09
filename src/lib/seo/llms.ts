@@ -69,7 +69,11 @@ function howItWorks(i: LlmsInput): string[] {
       : []),
     `- Every item page has a Markdown version: replace the page URL with ${o}/product/{No}.md (for example the item with No. 123 is at ${o}/product/123.md).`,
     "- \"Reserved\" means someone is checking out the item or it is held for a customer; it may become available again.",
-    ...(i.hasArchive ? [`- Sold items stay visible in the reference archive (${o}/archive), marked as sold.`] : []),
+    ...(i.hasArchive
+      ? [
+          `- Sold items stay visible in the sold archive (${o}/archive) as a reference: photos, markings, condition and the month of sale. They are not for sale; the sold price is only shown where the dealer chose to show it.`,
+        ]
+      : []),
     ...(i.returnsLine ? [`- ${i.returnsLine}`] : []),
     "",
   ];

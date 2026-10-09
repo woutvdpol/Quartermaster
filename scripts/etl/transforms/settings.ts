@@ -61,7 +61,7 @@ export function legacySettingValue(row: LegacySetting): string | null {
   }
 }
 
-function toBool(v: string | null): boolean | null {
+export function toBool(v: string | null): boolean | null {
   if (v === null) return null;
   const s = v.trim().toLowerCase();
   if (["1", "true", "on", "yes"].includes(s)) return true;

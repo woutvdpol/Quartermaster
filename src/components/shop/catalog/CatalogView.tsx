@@ -8,13 +8,16 @@ import { collectionPageJsonLd } from "@/lib/seo/json-ld";
 import { Breadcrumbs, ButtonLink, Container, EmptyState, Pagination, ProductGrid, buttonClasses, currencyExponent, type Crumb } from "@/components/shop/ui";
 import { WishlistButton } from "@/components/shop/account/WishlistButton";
 import { SaveSearchButton } from "@/components/shop/alerts";
+import { AlertDialogButton } from "@/components/shop/alerts/AlertDialog";
 import { getVisitorDisplayCurrency } from "@/server/rates/display";
 import type { ShopContext } from "@/server/storefront/context";
 import { getShopViewer } from "@/server/storefront/viewer";
 import {
   PAGE_SIZE,
   MAX_SHOW,
+  ARCHIVE_PATH,
   SHOP_PATH,
+  archiveCategoryHref,
   catalogQueryString,
   flattenTree,
   getCatalogPage,
@@ -91,7 +94,10 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
 
   // Visitor country (edge geo header) → per-country compliance rules; unknown country = no geo rules.
   const country = visitorCountry(await headers());
-  const [tree, hide] = await Promise.all([mode === "shop" ? getCategoryTree(tenantId) : Promise.resolve(null), complianceHideFilter(tenantId, country)]);
+  // The archive uses the same category tree (structure only; its counts come from the archive facets).
+  const [tree, hide] = await Promise.all([getCategoryTree(tenantId), complianceHideFilter(tenantId, country)]);
+  // Root of the list this view belongs to: category links and "clear" chips stay inside the archive.
+  const rootPath = mode === "archive" ? ARCHIVE_PATH : SHOP_PATH;
   const node = category && tree ? (flattenTree(tree).find((n) => n.id === category.id) ?? null) : null;
   const scope: ListScope = {
     mode,
@@ -118,6 +124,8 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
         interpret: !params.literal,
         // "Close, but not all filters match" — first page only.
         nearMisses: params.page === 1 && !params.show,
+        // "sold"/"verkocht" may switch to the sold archive only while the shop has one.
+        archive: settings.publicArchive,
       }).then((r) => ({ page: { items: r.items, total: r.total }, facets: r.facets!, interpretation: r.interpretation, nearMisses: r.nearMisses ?? null }))
     : Promise.all([getCatalogPage(tenantId, scope, params), getFacets(tenantId, scope, params)]).then(([page, facets]) => ({ page, facets, interpretation: null, nearMisses: null }));
   const [{ page, facets, interpretation, nearMisses }, selectedTags, viewer, display] = await Promise.all([
@@ -147,7 +155,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
   const [reserved, verdicts, saveFacetValueIds] = await Promise.all([
     mode === "shop" ? liveReservedIds(tenantId, ids) : Promise.resolve(new Set<string>()),
     country ? resolveCompliance(tenantId, ids, country) : Promise.resolve({} as Awaited<ReturnType<typeof resolveCompliance>>),
-    mode === "shop" ? selectedFacetValueIds(tenantId, params, lockedFacets) : Promise.resolve([] as string[]),
+    selectedFacetValueIds(tenantId, params, lockedFacets),
   ]);
   // "Save this search" (alerts): the current filters as a stored query.
   const saveQuery = {
@@ -160,8 +168,8 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
   };
   const cardCtx = {
     currency,
-    showPriceWhenSold: settings.showPriceWhenSold,
     lockSensitive: shop.settings.legal.blurSensitiveForGuests && !viewer,
+    timeZone: shop.tenant.timezone,
   };
   const toCards = (items: CatalogPage["items"]) => withLiveStatus(items, reserved).map((c) => applyGeoBlur(toCardData(c, cardCtx), c, verdicts[c.id]?.blurred ?? false));
   const cards = toCards(page.items);
@@ -173,7 +181,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
   const chipLinks = (interpretation?.chips ?? []).map((c) => ({ label: c.label, href: qs({ q: c.removeQuery || null }) }));
   const hints = params.q && cards.length === 0 ? await searchHints(tenantId, params.q, { currency }) : null;
   const zeroCategories =
-    params.q && cards.length === 0 && tree
+    params.q && cards.length === 0 && tree && mode === "shop"
       ? (() => {
           const matching = matchCategories(tree, params.q, categoryHref, 4);
           const top = tree.filter((n) => n.total > 0 && !matching.some((m) => m.id === n.id)).map((n) => ({ id: n.id, label: n.title, href: categoryHref(n.slug), count: n.total }));
@@ -206,7 +214,8 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
 
   const facetProps = {
     basePath,
-    shopPath: SHOP_PATH,
+    shopPath: rootPath,
+    categoryLink: mode === "archive" ? archiveCategoryHref : categoryHref,
     params,
     defaultSort,
     facets,
@@ -294,7 +303,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
           <div className="mb-8 empty:hidden">
             <ActiveFilters
               basePath={basePath}
-              shopPath={SHOP_PATH}
+              shopPath={rootPath}
               params={params}
               defaultSort={defaultSort}
               tagNames={tagNames}
@@ -386,6 +395,26 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
                 <ProductCard key={p.id} product={p} showStockCode={settings.showStockCode} display={display} headingLevel={3} sizes="12.5rem" className="w-[12.5rem] flex-none snap-start" />
               ))}
             </NearMissRail>
+          ) : null}
+
+          {mode === "archive" ? (
+            // Sold archive (design "SoldArchive"): the current filters as a saved search for new pieces.
+            <section className="mt-14 flex flex-wrap items-center justify-between gap-5 rounded-shop bg-shop-sunken px-6 py-6 sm:px-7" aria-labelledby="archive-alert">
+              <div className="max-w-xl">
+                <h2 id="archive-alert" className="font-shop-body text-xl font-semibold tracking-normal text-shop-ink">
+                  {copy.archive.alertTitle}
+                </h2>
+                <p className="mt-1.5 text-shop-ink-2">{copy.archive.alertBody}</p>
+              </div>
+              <AlertDialogButton
+                source={{ query: saveQuery }}
+                label={copy.archive.alertButton}
+                title={copy.archive.alertTitle}
+                intro={copy.archive.alertBody}
+                variant="primary"
+                defaultFrequency="INSTANT"
+              />
+            </section>
           ) : null}
         </div>
       </div>

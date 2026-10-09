@@ -1,11 +1,13 @@
 import { getSeoScope, notFoundResponse, textResponse } from "@/server/seo/http";
+import { NETWORK_PATH, readNetworkHosts } from "@/lib/network";
 import { getIndexableProductCount, getSitemapCategories, getSitemapFacetValues, getSitemapPages } from "@/server/seo";
 import { PRODUCTS_PER_SITEMAP, latest, sitemapFileName, sitemapIndexXml, urlsetXml, type SitemapRef } from "@/lib/seo/sitemap-xml";
 
 /*
  * /sitemap.xml per host (replaces the old src/app/sitemap.ts, which could not produce an index):
  *  - shop host:   sitemap index → /sitemaps/{pages,categories,facets,products-N}.xml
- *  - platform:    a small urlset (landing + application page)
+ *  - platform:    a small urlset (landing + application page + the network, when it has no own host)
+ *  - network:     NETWORK_HOST: the network pages
  *  - coming soon: an empty urlset (robots.txt disallows everything anyway)
  * docs/seo-geo.md §Sitemaps.
  */
@@ -14,7 +16,12 @@ export async function GET() {
   if (scope.kind === "none") return notFoundResponse();
   if (scope.kind === "closed") return textResponse(urlsetXml([]), "application/xml");
   if (scope.kind === "platform") {
-    return textResponse(urlsetXml([{ loc: `${scope.origin}/` }, { loc: `${scope.origin}/apply` }]), "application/xml");
+    // The network lives here unless it has its own host (NETWORK_HOST, docs/network.md).
+    const network = readNetworkHosts().networkHost ? [] : [{ loc: `${scope.origin}${NETWORK_PATH}` }, { loc: `${scope.origin}${NETWORK_PATH}/dealers` }];
+    return textResponse(urlsetXml([{ loc: `${scope.origin}/` }, { loc: `${scope.origin}/apply` }, ...network]), "application/xml");
+  }
+  if (scope.kind === "network") {
+    return textResponse(urlsetXml([{ loc: `${scope.origin}/` }, { loc: `${scope.origin}/dealers` }]), "application/xml");
   }
 
   const { shop } = scope;

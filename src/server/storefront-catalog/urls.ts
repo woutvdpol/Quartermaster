@@ -5,6 +5,8 @@ export const ARCHIVE_PATH = "/archive";
 
 export const productHref = (p: { stockCode: number; slug: string }) => `/product/${p.stockCode}/${encodeURIComponent(p.slug)}`;
 export const categoryHref = (slug: string) => `/shop/category/${encodeURIComponent(slug)}`;
+/** Sold archive filtered to one category (and its subcategories). */
+export const archiveCategoryHref = (slug: string) => `${ARCHIVE_PATH}/category/${encodeURIComponent(slug)}`;
 export const tagHref = (slug: string) => `/shop?tag=${encodeURIComponent(slug)}`;
 /** SEO landing page for one facet value (/shop/facet/{facet}/{value}). */
 export const facetValueHref = (facetSlug: string, valueSlug: string) => `/shop/facet/${encodeURIComponent(facetSlug)}/${encodeURIComponent(valueSlug)}`;

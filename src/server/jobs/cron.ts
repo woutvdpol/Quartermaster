@@ -2,6 +2,7 @@ import "server-only";
 import { timingSafeEqual, createHash } from "node:crypto";
 import { ALERT_CRON_TASKS } from "@/server/alerts/jobs";
 import { SEARCH_CRON_TASKS } from "@/server/search/jobs";
+import { PUSH_CRON_TASKS } from "@/server/push/jobs";
 import { COMMERCE_CRON_TASKS } from "./commerce-cron";
 
 /**
@@ -48,6 +49,7 @@ export const CRON_TASKS = {
   ...ALERT_CRON_TASKS, // alerts.digest, alerts.scan
   ...COMMERCE_CRON_TASKS, // offers.expire, cart.abandoned
   ...SEARCH_CRON_TASKS, // search.sync
+  ...PUSH_CRON_TASKS, // push.reservations, push.flush
   "rates.refresh": {
     // ECB publishes ~16:00 CET on working days; 15:30 UTC is after that in summer and winter time.
     schedule: "30 15 * * *",

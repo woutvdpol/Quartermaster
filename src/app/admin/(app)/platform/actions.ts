@@ -14,6 +14,7 @@ import {
   setTenantStatus,
   updateTenant,
 } from "@/server/platform";
+import { allowNetwork, removeFromNetwork } from "@/server/network/admin";
 import { fail, failFrom } from "../_system/errors";
 import { inviteLink } from "../_system/tenant";
 import { PAGE_SIZE, toRows } from "../audit-log/_data";
@@ -150,4 +151,26 @@ export async function loadMorePlatformAuditAction(
   } catch (err) {
     return failFrom(err);
   }
+}
+
+/** Quartermaster network moderation (docs/network.md): take a shop out and keep it out. */
+export async function removeFromNetworkAction(formData: FormData): Promise<ActionResult> {
+  try {
+    await removeFromNetwork(await requirePlatformContext(), formString(formData, "tenantId"));
+  } catch (err) {
+    return failFrom(err);
+  }
+  revalidatePath(BASE, "layout");
+  return actionOk("Shop removed from the network. The owner cannot join again until you allow it.");
+}
+
+/** Lets the owner opt in to the network again (does not list the shop by itself). */
+export async function allowNetworkAction(formData: FormData): Promise<ActionResult> {
+  try {
+    await allowNetwork(await requirePlatformContext(), formString(formData, "tenantId"));
+  } catch (err) {
+    return failFrom(err);
+  }
+  revalidatePath(BASE, "layout");
+  return actionOk("The owner can join the network again.");
 }

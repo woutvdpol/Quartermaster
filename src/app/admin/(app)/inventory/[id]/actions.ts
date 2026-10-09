@@ -82,6 +82,8 @@ const saveSchema = z.object({
   restrictedSymbols: z.boolean(),
   requiresDeactivationCert: z.boolean(),
   onSale: z.boolean(),
+  showInArchive: z.boolean(),
+  showSoldPrice: z.boolean(),
   tags: z.array(z.string().trim().min(1).max(100, e.tooLong(100))).max(100),
   specifications: z
     .array(z.object({ label: z.string().max(200, e.tooLong(200)), value: z.string().max(2000, e.tooLong(2000)) }))
@@ -142,6 +144,8 @@ export async function saveProductAction(_prev: ActionState, formData: FormData):
     restrictedSymbols: formData.get("restrictedSymbols") === "on",
     requiresDeactivationCert: formData.get("requiresDeactivationCert") === "on",
     onSale: formData.get("onSale") === "on",
+    showInArchive: formData.get("showInArchive") === "on",
+    showSoldPrice: formData.get("showSoldPrice") === "on",
     tags: formData.getAll("tags").filter((v): v is string => typeof v === "string"),
     specifications: (() => {
       const labels = formData.getAll("specLabel");
@@ -175,6 +179,8 @@ export async function saveProductAction(_prev: ActionState, formData: FormData):
       restrictedSymbols: d.restrictedSymbols,
       requiresDeactivationCert: d.requiresDeactivationCert,
       onSale: d.onSale,
+      archiveHidden: !d.showInArchive,
+      showSoldPrice: d.showSoldPrice,
       tagIds,
       ...(d.regenerateSlug ? { regenerateSlug: true } : slugChanged ? { slug: d.slug } : {}),
     });

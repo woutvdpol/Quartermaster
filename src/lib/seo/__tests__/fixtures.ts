@@ -48,6 +48,8 @@ export function productFixture(over: Partial<PublicProduct> = {}): PublicProduct
     acceptsOffers: false,
     publishedAt: "2026-01-01T00:00:00.000Z",
     soldAt: null,
+    archiveHidden: false,
+    showSoldPrice: false,
     updatedAt: "2026-02-01T00:00:00.000Z",
     seoTitle: null,
     seoDescription: null,

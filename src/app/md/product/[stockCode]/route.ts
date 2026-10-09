@@ -8,12 +8,14 @@ import { getShopViewer } from "@/server/storefront/viewer";
 import { getProduct, liveReservedIds, parseStockCode } from "@/server/storefront-catalog";
 import type { PublicStatus } from "@/server/storefront-catalog/types";
 import { productMarkdown, returnsSummary } from "@/lib/seo/markdown-alternate";
+import { priceVisible, soldMonth, soldPageNoindex } from "@/server/storefront-catalog/sold";
 
 /*
  * Markdown alternate of a product page: /product/{No}.md (rewrite in next.config.ts). Same visibility
  * as the HTML page: unknown / unpublished / compliance-hidden → 404, sensitive items only for
  * signed-in customers (when the shop blurs them), blurred-by-rule photos left out.
- * The HTML page is canonical (Link header); sold items outside the public archive are noindex.
+ * The HTML page is canonical (Link header); sold items outside the public archive (archive off, or
+ * hidden per item) are noindex. Sold items carry no price unless the dealer shows it per item.
  */
 export async function GET(_req: Request, ctx: { params: Promise<{ stockCode: string }> }) {
   const scope = await getSeoScope();
@@ -40,7 +42,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ stockCode: str
     shop: { name: shop.shopName, origin: shop.origin, currency: shop.tenant.currency, country: general.address.country },
     product,
     status,
-    showPrice: status !== "sold" || catalog.showPriceWhenSold,
+    showPrice: priceVisible({ status, showSoldPrice: product.showSoldPrice }),
+    soldMonth: status === "sold" ? soldMonth(product.soldAt) : null,
     showImages: !verdict?.blurred,
     provenance: provenance
       ? { text: provenance.provenance, certificateIncluded: provenance.certificateIncluded, authenticityGuaranteed: provenance.authenticityGuaranteed }
@@ -53,7 +56,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ stockCode: str
     disclaimer: legal.disclaimers.product || null,
   });
   const canonical = new URL(product.href, shop.origin).toString();
-  const noindex = product.blurred || (status === "sold" && !catalog.publicArchive);
+  const noindex = soldPageNoindex({ ...product, status }, catalog.publicArchive);
   return textResponse(body, "text/markdown", {
     Link: `<${canonical}>; rel="canonical"`,
     ...(noindex ? { "X-Robots-Tag": "noindex" } : {}),

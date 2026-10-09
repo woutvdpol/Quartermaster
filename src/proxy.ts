@@ -2,6 +2,7 @@
 // Real authorization happens in server code (src/server/auth/guards.ts).
 import { NextResponse, type NextRequest } from "next/server";
 import { buildCsp, createNonce, cspHeaderName, parseCspMode, reportingEndpointsHeader } from "@/lib/csp";
+import { networkRewritePath, platformNetworkRedirect } from "@/lib/network";
 import { THEME_PREVIEW_COOKIE, THEME_PREVIEW_HEADER, THEME_PREVIEW_MAX_AGE_SECONDS, THEME_PREVIEW_PARAM } from "@/lib/theme-preview";
 
 // Keep in sync with SESSION_COOKIE in src/server/auth/session.ts (that module is server-only).
@@ -43,7 +44,10 @@ export function proxy(request: NextRequest) {
     !isAdmin && (previewParam === "1" || (previewParam !== "0" && request.cookies.get(THEME_PREVIEW_COOKIE)?.value === "1"));
 
   let response: NextResponse;
-  if (
+  const networkRedirect = isAdmin ? null : platformNetworkRedirect(request.headers.get("host"), pathname);
+  if (networkRedirect) {
+    response = NextResponse.redirect(networkRedirect + search, 308);
+  } else if (
     isAdmin &&
     !PUBLIC_ADMIN_PATHS.some((p) => isUnder(pathname, p)) &&
     !request.cookies.get(SESSION_COOKIE)?.value
@@ -63,10 +67,19 @@ export function proxy(request: NextRequest) {
       requestHeaders.set(cspHeaderName(cspMode), csp);
       requestHeaders.set("x-nonce", nonce);
     }
-    response = NextResponse.next({ request: { headers: requestHeaders } });
+    // Quartermaster network on its own host (NETWORK_HOST, src/lib/network.ts): "/x" is served by /network/x.
+    const networkHost = normalizeHost(process.env.NETWORK_HOST ?? null);
+    const networkPath = networkHost && normalizeHost(request.headers.get("host")) === networkHost ? networkRewritePath(pathname) : null;
+    response = networkPath
+      ? NextResponse.rewrite(new URL(networkPath + search, request.url), { request: { headers: requestHeaders } })
+      : NextResponse.next({ request: { headers: requestHeaders } });
   }
 
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) response.headers.set(name, value);
+  // Fair mode scans QR labels with the camera (src/app/admin/fair, docs/fair-mode.md).
+  if (isUnder(pathname, "/admin/fair")) {
+    response.headers.set("Permissions-Policy", SECURITY_HEADERS["Permissions-Policy"].replace("camera=()", "camera=(self)"));
+  }
   if (previewParam === "1") {
     response.cookies.set(THEME_PREVIEW_COOKIE, "1", {
       httpOnly: true,
@@ -94,5 +107,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon\\.ico|fonts/|uploads/|uploads$|api/health).*)"],
+  // sw.js (web push service worker, docs/push.md) is a static script: no HTML nonce/CSP logic.
+  matcher: ["/((?!_next/static|_next/image|favicon\\.ico|fonts/|uploads/|uploads$|api/health|sw\\.js$).*)"],
 };

@@ -32,13 +32,22 @@ describe("productMarkdown", () => {
     expect(md).toContain("![Liner](https://s.example/uploads/b/large.webp)");
   });
 
-  it("hides the price of sold items when the shop does and withholds blurred photos", () => {
-    const md = productMarkdown({ shop, product: productFixture({ status: "sold" }), status: "sold", showPrice: false, showImages: false, provenance: null, shippingLines: [], returnsLine: null, disclaimer: "Sold as collectible." });
-    expect(md).toContain("- **Price:** Not shown");
-    expect(md).toContain("- **Availability:** Sold");
+  it("gives sold items no price unless shown per item, and withholds blurred photos", () => {
+    const md = productMarkdown({ shop, product: productFixture({ status: "sold" }), status: "sold", showPrice: false, soldMonth: "Oct 2026", showImages: false, provenance: null, shippingLines: [], returnsLine: null, disclaimer: "Sold as collectible." });
+    expect(md).not.toContain("- **Price:**");
+    expect(md).not.toContain("- **Sold for:**");
+    expect(md).not.toContain("€");
+    expect(md).toContain("- **Availability:** Sold (Oct 2026); no longer for sale, kept as a reference");
     expect(md).not.toContain("## Photos");
     expect(md).not.toContain("## Shipping and returns");
     expect(md.trimEnd().endsWith("Sold as collectible.")).toBe(true);
+  });
+
+  it("shows the sold price of a sold item when the dealer ticked it", () => {
+    const md = productMarkdown({ shop, product: productFixture({ status: "sold", showSoldPrice: true }), status: "sold", showPrice: true, soldMonth: null, showImages: true, provenance: null, shippingLines: [], returnsLine: null, disclaimer: null });
+    expect(md).toContain("- **Sold for:** €450.00 (EUR)");
+    expect(md).not.toContain("- **Price:**");
+    expect(md).toContain("- **Availability:** Sold; no longer for sale, kept as a reference");
   });
 });
 

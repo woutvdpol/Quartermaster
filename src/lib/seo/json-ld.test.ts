@@ -121,6 +121,16 @@ describe("productJsonLd", () => {
     expect(validateJsonLd(ld)).toEqual([]);
   });
 
+  it("sold archive item with its sold price shown: Offer marked SoldOut, without shipping or returns", () => {
+    const ld = productJsonLd(shop, productFixture({ status: "sold", showSoldPrice: true }), "sold", { showPrice: true, shipping: [], returns: null });
+    expect(ld.offers).toMatchObject({ "@type": "Offer", availability: "https://schema.org/SoldOut", price: "450.00", priceCurrency: "EUR" });
+    expect(ld.offers && "shippingDetails" in ld.offers).toBe(false);
+    expect(ld.offers && "hasMerchantReturnPolicy" in ld.offers).toBe(false);
+    // Still a full Product (reference page): name, image, properties.
+    expect(ld).toMatchObject({ "@type": "Product", name: "German M35 helmet", itemCondition: "https://schema.org/UsedCondition" });
+    expect(validateJsonLd(ld)).toEqual([]);
+  });
+
   it("uses zero-decimal currencies correctly", () => {
     expect(productJsonLd({ ...shop, currency: "JPY" }, productFixture({ price: 12000 }), "available", { showPrice: true }).offers?.price).toBe("12000");
   });

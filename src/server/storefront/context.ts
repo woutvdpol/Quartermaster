@@ -57,7 +57,6 @@ async function loadPublicSettings(tenantId: string) {
       gridColumns: catalog.gridColumns,
       defaultSort: catalog.defaultSort,
       endlessScroll: catalog.endlessScroll,
-      showPriceWhenSold: catalog.showPriceWhenSold,
       priceFilter: catalog.priceFilter,
       showTags: catalog.showTags,
       showStockCode: catalog.showStockCode,

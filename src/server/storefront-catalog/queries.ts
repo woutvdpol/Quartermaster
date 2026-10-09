@@ -24,6 +24,7 @@ import {
   type CatalogSort,
 } from "./params";
 import { productHref } from "./urls";
+import { priceVisible } from "./sold";
 import type {
   CatalogCard,
   CatalogFacets,
@@ -47,18 +48,27 @@ import type {
  *
  * Visibility:
  *   shop     ACTIVE with stock, or RESERVED (shown as "reserved")
- *   archive  SOLD
+ *   archive  SOLD and not archiveHidden (docs/sold-archive.md)
  *   detail   shop ∪ archive (sold items stay reachable as a reference — docs/analysis/03 §8)
  * DRAFT, ARCHIVED and STOLEN are never public.
  */
 
 export type CatalogMode = "shop" | "archive";
 
-const VISIBLE_SHOP = Prisma.sql`(p.status = 'RESERVED' OR (p.status = 'ACTIVE' AND p.quantity > 0))`;
-const VISIBLE_ARCHIVE = Prisma.sql`p.status = 'SOLD'`;
+// Items on a LIVE fair that hides fair stock (Product.fairHoldId, docs/fair-mode.md) are not listed.
+const VISIBLE_SHOP = Prisma.sql`((p.status = 'RESERVED' OR (p.status = 'ACTIVE' AND p.quantity > 0)) AND p."fairHoldId" IS NULL)`;
+const VISIBLE_ARCHIVE = Prisma.sql`(p.status = 'SOLD' AND NOT p."archiveHidden")`;
 
 function visibleSql(mode: CatalogMode) {
   return mode === "archive" ? VISIBLE_ARCHIVE : VISIBLE_SHOP;
+}
+
+/**
+ * The price as the visitor may see it. In the archive only items with `showSoldPrice` have one (NULL
+ * otherwise), so price filters, price sorting and the price bounds never reveal a hidden sold price.
+ */
+function priceSql(mode: CatalogMode) {
+  return mode === "archive" ? Prisma.sql`(CASE WHEN p."showSoldPrice" THEN p.price END)` : Prisma.sql`p.price`;
 }
 
 // ─── Images ────────────────────────────────────────────────────────────────
@@ -391,9 +401,9 @@ export function whereSql(
   }
   if (omit !== "price") {
     if (f.min !== null)
-      parts.push(Prisma.sql`p.price >= ${f.min * (scope.priceUnit ?? 100)}`);
+      parts.push(Prisma.sql`${priceSql(scope.mode)} >= ${f.min * (scope.priceUnit ?? 100)}`);
     if (f.max !== null)
-      parts.push(Prisma.sql`p.price <= ${f.max * (scope.priceUnit ?? 100)}`);
+      parts.push(Prisma.sql`${priceSql(scope.mode)} <= ${f.max * (scope.priceUnit ?? 100)}`);
   }
   return Prisma.join(parts, " AND ");
 }
@@ -411,9 +421,9 @@ export function orderSql(sort: CatalogSort, mode: CatalogMode): Prisma.Sql {
     case "oldest":
       return Prisma.sql`${LISTED_AT} ASC, p.id ASC`;
     case "price_asc":
-      return Prisma.sql`p.price ASC, p.id ASC`;
+      return Prisma.sql`${priceSql(mode)} ASC NULLS LAST, p.id ASC`;
     case "price_desc":
-      return Prisma.sql`p.price DESC, p.id DESC`;
+      return Prisma.sql`${priceSql(mode)} DESC NULLS LAST, p.id DESC`;
     case "featured":
       return Prisma.sql`p.importance DESC, ${LISTED_AT} DESC, p.id DESC`;
     case "updated":
@@ -443,6 +453,7 @@ export async function loadCards(
       status: true,
       onSale: true,
       blurred: true,
+      showSoldPrice: true,
       publishedAt: true,
       soldAt: true,
       category: { select: { title: true, slug: true, isActive: true } },
@@ -460,10 +471,12 @@ export async function loadCards(
         slug: p.slug,
         href: productHref(p),
         title: p.title,
-        price: p.price,
+        // A hidden sold price never leaves the server (cards also feed the JSON search API).
+        price: priceVisible(p) ? p.price : 0,
         status: baseStatus(p.status),
         onSale: p.onSale,
         blurred: p.blurred,
+        showSoldPrice: p.showSoldPrice,
         publishedAt: iso(p.publishedAt),
         soldAt: iso(p.soldAt),
         category: p.category?.isActive
@@ -583,7 +596,7 @@ export async function getCatalogFacets(
       ORDER BY n DESC, t.name ASC
       LIMIT 200`,
       db.$queryRaw<{ min: number | null; max: number | null }[]>`
-      SELECT min(p.price)::int AS min, max(p.price)::int AS max FROM products p
+      SELECT min(${priceSql(scope.mode)})::int AS min, max(${priceSql(scope.mode)})::int AS max FROM products p
       WHERE ${whereSql(tenantId, scope, f, "price")}`,
       facetValueCounts(tenantId, whereSql(tenantId, scope, f), unselected),
       ...selection
@@ -757,6 +770,9 @@ export async function getPublicProduct(
       acceptsOffers: true,
       publishedAt: true,
       soldAt: true,
+      archiveHidden: true,
+      showSoldPrice: true,
+      fairHoldId: true,
       updatedAt: true,
       seoTitle: true,
       seoDescription: true,
@@ -797,8 +813,9 @@ export async function getPublicProduct(
     title: p.title,
     description: p.description,
     specifications: parseSpecs(p.specifications),
-    price: p.price,
-    status: baseStatus(p.status),
+    price: priceVisible(p) ? p.price : 0,
+    // On a fair (held from the shop): reachable via its QR label, but shown as not purchasable.
+    status: p.fairHoldId && p.status === "ACTIVE" ? "reserved" : baseStatus(p.status),
     onSale: p.onSale,
     weightGrams: p.weightGrams,
     blurred: p.blurred,
@@ -808,6 +825,8 @@ export async function getPublicProduct(
     acceptsOffers: p.acceptsOffers,
     publishedAt: iso(p.publishedAt),
     soldAt: iso(p.soldAt),
+    archiveHidden: p.archiveHidden,
+    showSoldPrice: p.showSoldPrice,
     updatedAt: p.updatedAt.toISOString(),
     seoTitle: p.seoTitle,
     seoDescription: p.seoDescription,

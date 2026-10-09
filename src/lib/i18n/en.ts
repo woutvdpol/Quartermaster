@@ -34,6 +34,7 @@ export const en = {
       sourcing: "Sourcing & provenance",
       orders: "Orders",
       shippingBoard: "Shipping board",
+      fairs: "Fairs",
       offers: "Offers",
       coupons: "Coupons",
       customers: "Customers",

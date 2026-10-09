@@ -85,9 +85,11 @@ export async function exactMatches(where: Prisma.Sql, q: Pick<ParsedQuery, "stoc
  * Nearest products by embedding. HNSW with iterative scans (pgvector ≥ 0.8) so tenant/visibility
  * filters do not starve the result; the planner may also pick an exact scan for small tenants.
  * `kind`/`dim` select the partial index (`embedding::vector(384)` text, `::vector(768)` image).
+ * `tenantId` may be a list: the Quartermaster network searches several shops at once (src/server/network);
+ * `where` must then restrict the products to those tenants as well.
  */
 export async function vectorSearch(
-  tenantId: string,
+  tenantId: string | readonly string[],
   where: Prisma.Sql,
   vector: number[],
   opts: { kind: "text" | "image"; dim: number; limit?: number; minSimilarity?: number; excludeId?: string },
@@ -99,6 +101,7 @@ export async function vectorSearch(
   const castType = Prisma.raw(opts.dim === 384 ? "vector(384)" : opts.dim === 768 ? "vector(768)" : "vector");
   const distance = Prisma.sql`(e.embedding::${castType} <=> ${lit}::${castType})`;
   const exclude = opts.excludeId ? Prisma.sql`AND p.id <> ${opts.excludeId}` : Prisma.empty;
+  const tenantFilter = typeof tenantId === "string" ? Prisma.sql`e."tenantId" = ${tenantId}` : Prisma.sql`e."tenantId" = ANY(${[...tenantId]}::text[])`;
   const [, , rows] = await db.$transaction([
     db.$executeRaw`SELECT set_config('hnsw.iterative_scan', 'relaxed_order', true)`,
     db.$executeRaw`SELECT set_config('hnsw.ef_search', ${String(Math.max(40, Math.min(400, limit * 2)))}, true)`,
@@ -106,7 +109,7 @@ export async function vectorSearch(
       SELECT e."productId" AS id, ${distance}::float8 AS distance
       FROM product_embeddings e
       JOIN products p ON p.id = e."productId"
-      WHERE e."tenantId" = ${tenantId} AND e.kind = ${opts.kind}::embedding_kind AND ${where} ${exclude}
+      WHERE ${tenantFilter} AND e.kind = ${opts.kind}::embedding_kind AND ${where} ${exclude}
       ORDER BY ${distance}
       LIMIT ${limit}`,
   ]);

@@ -24,6 +24,7 @@ export const productCardSelect = {
   status: true,
   onSale: true,
   blurred: true,
+  showSoldPrice: true,
   quantity: true,
   publishedAt: true,
   category: { select: { title: true } },
@@ -78,8 +79,6 @@ export type CardOptions = {
   viewerSignedIn: boolean;
   /** legal.blurSensitiveForGuests */
   blurSensitiveForGuests: boolean;
-  /** catalog.showPriceWhenSold */
-  showPriceWhenSold: boolean;
   /** Ids with a live (unexpired ACTIVE) reservation — see `liveReservedIds`. */
   reservedIds?: ReadonlySet<string>;
 };
@@ -97,15 +96,17 @@ export function toProductCardData(p: ProductCardRow | ProductCardRowJson, opts: 
   const img = p.images[0];
   let image: ShopImage | null = img ? toShopImage(img, p.title) : null;
   if (image && locked) image = { src: "", blurDataUrl: image.blurDataUrl, alt: "" }; // never leak the real URL
+  // Sold items show their price only when ticked per item (docs/sold-archive.md); a hidden one is not sent.
+  const showPrice = availability !== "sold" || p.showSoldPrice;
   return {
     id: p.id,
     stockCode: p.stockCode,
     title: p.title,
     href: productHref(p),
-    priceCents: p.price,
+    priceCents: showPrice ? p.price : 0,
     currency: opts.currency,
     availability,
-    showPrice: availability !== "sold" || opts.showPriceWhenSold,
+    showPrice,
     onSale: p.onSale,
     locked,
     image,
@@ -130,7 +131,7 @@ export async function liveReservedIds(tenantId: string, ids: string[]): Promise<
 /** Latest ACTIVE products (newest listing first). Uncached; see `getNewItems`. */
 export async function queryNewItems(tenantId: string, count: number): Promise<ProductCardRowJson[]> {
   const rows = await db.product.findMany({
-    where: { tenantId, status: "ACTIVE", quantity: { gt: 0 } },
+    where: { tenantId, status: "ACTIVE", quantity: { gt: 0 }, fairHoldId: null },
     orderBy: [{ publishedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
     take: Math.min(Math.max(count, 1), 48),
     select: productCardSelect,
@@ -180,7 +181,7 @@ export async function queryCategoryTiles(tenantId: string, ids: string[]): Promi
     return out;
   };
   const cats = ids.length ? ids.flatMap((id) => all.filter((c) => c.id === id)) : all.filter((c) => c.parentId === null);
-  const counts = await db.product.groupBy({ by: ["categoryId"], where: { tenantId, status: "ACTIVE" }, _count: { _all: true } });
+  const counts = await db.product.groupBy({ by: ["categoryId"], where: { tenantId, status: "ACTIVE", fairHoldId: null }, _count: { _all: true } });
   const countBy = new Map(counts.map((r) => [r.categoryId, r._count._all]));
   return Promise.all(
     cats.map(async (c) => {

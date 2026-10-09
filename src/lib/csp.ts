@@ -72,6 +72,9 @@ export function buildCsp({ nonce, area, dev = false }: CspOptions): string {
     "font-src": ["'self'"],
     "connect-src": ["'self'"],
     "frame-src": ["'self'", TURNSTILE_ORIGIN],
+    // The push service worker (/sw.js, docs/push.md). Needed explicitly: worker-src falls back to
+    // script-src, where 'strict-dynamic' makes browsers ignore 'self'.
+    "worker-src": ["'self'"],
     "object-src": ["'none'"],
     "base-uri": ["'self'"],
     "form-action": ["'self'", MOLLIE_CHECKOUT_ORIGIN],

@@ -6,7 +6,11 @@ import { catalogCopy as copy } from "@/components/shop/catalog/_copy";
 import { catalogMetadata } from "@/components/shop/catalog/metadata";
 import { ARCHIVE_PATH, SHOP_PATH, parseCatalogParams } from "@/server/storefront-catalog";
 
-/** Sold-items reference archive (settings.catalog.publicArchive). Prices only with showPriceWhenSold. */
+/**
+ * Sold archive (settings.catalog.publicArchive, docs/sold-archive.md): SOLD items not hidden per item,
+ * most recently sold first, with the catalog's search, categories, facets and compliance rules.
+ * Prices only on items where the dealer ticked "show sold price".
+ */
 export async function generateMetadata({ searchParams }: PageProps<"/archive">): Promise<Metadata> {
   const shop = await requireShop();
   if (!shop.settings.catalog.publicArchive) return {};

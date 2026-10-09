@@ -63,6 +63,14 @@ export function shopRobots({ origin, allowAiTraining }: ShopRobotsInput): Metada
 }
 
 /** robots.txt for the platform host: the landing + application pages are public, the rest is not. */
+/** NETWORK_HOST (Quartermaster network on its own host, docs/network.md): only the network pages. */
+export function networkRobots(origin: string): MetadataRoute.Robots {
+  return {
+    rules: { userAgent: "*", allow: "/", disallow: ["/api/", "/admin", "/qm-unmatched"] },
+    sitemap: new URL("/sitemap.xml", origin).toString(),
+  };
+}
+
 export function platformRobots(origin: string): MetadataRoute.Robots {
   return {
     rules: { userAgent: "*", allow: "/", disallow: ["/admin", "/api/", "/apply/", "/qm-unmatched"] },

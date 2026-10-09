@@ -25,6 +25,7 @@ import { productJsonLd, shippingDetailsJsonLd } from "@/lib/seo/json-ld";
 import { productMetaDescription, productOgImage, productOgTags } from "@/lib/seo/metadata";
 import { metaTitle } from "@/lib/seo/text";
 import { blockedShippingCountries, deliveryCountries, loadSeoShop } from "@/server/seo";
+import { priceVisible, soldPageNoindex } from "@/server/storefront-catalog/sold";
 
 type Props = PageProps<"/product/[stockCode]/[[...slug]]">;
 
@@ -101,13 +102,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
   const { catalog } = shop.settings;
-  const showPrice = product.status !== "sold" || catalog.showPriceWhenSold;
+  const showPrice = priceVisible(product);
   const description = productMetaDescription(product, shop.shopName, showPrice ? shop.tenant.currency : null);
   // No preview image where a compliance rule blurs the photos; generated card when there are none.
   const image = geo.blurred ? null : productOgImage(product);
   // Sensitive items are never indexed (signed-in customers can still view them); sold items only
-  // while the shop keeps a public archive (docs/seo-geo.md §Verkochte items).
-  const noindex = product.blurred || (product.status === "sold" && !catalog.publicArchive);
+  // as part of the public archive, i.e. not hidden from it (docs/sold-archive.md, docs/seo-geo.md).
+  const noindex = soldPageNoindex(product, catalog.publicArchive);
   return {
     title,
     description,
@@ -165,7 +166,8 @@ export default async function ProductPage({ params }: Props) {
             geo.blurred ? { ...product, images: [] } : product,
             status,
             {
-              showPrice: status !== "sold" || shop.settings.catalog.showPriceWhenSold,
+              // Sold: an Offer with availability SoldOut only when the sold price is shown, else none.
+              showPrice: priceVisible({ status, showSoldPrice: product.showSoldPrice }),
               shipping: status === "sold" ? [] : shippingDetailsJsonLd(seo.zones, {
                 weightGrams: product.weightGrams,
                 price: product.price,

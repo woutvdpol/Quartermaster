@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense, type CSSProperties } from "react";
 import { getRequestScope } from "@/server/tenant";
+import { isNetworkHostRequest } from "@/server/network/request";
 import { getShopContext } from "@/server/storefront/context";
 import { getLegalLinks, getPublicMenus, withoutMenuDuplicates } from "@/server/storefront/content";
 import { getLaunchState } from "@/server/storefront/launch";
@@ -29,7 +30,8 @@ import "./shop.css";
  * Storefront shell for every route in the (shop) group.
  *  - tenant host  → themed shop chrome (header, footer, age gate, analytics)
  *  - platform host → children unwrapped (only `/` renders there: the Quartermaster landing page;
- *                   every other shop page calls `requireShop()` and 404s)
+ *                   every other shop page calls `requireShop()` and 404s; plus /network, the network)
+ *  - NETWORK_HOST  → children unwrapped (only the network pages render there)
  *  - unknown host → 404
  */
 
@@ -48,15 +50,16 @@ export async function generateMetadata(): Promise<Metadata> {
     applicationName: shop.shopName,
     openGraph: shopOgDefaults(shop),
     twitter: { card: "summary_large_image" },
-    ...(shop.settings.appearance.logoPath
-      ? { icons: { icon: shop.settings.appearance.logoPath } }
-      : {}),
+    // Home-screen icon (iOS ignores manifest icons) + standalone web app: needed for web push on iPhone (docs/push.md).
+    icons: { ...(shop.settings.appearance.logoPath ? { icon: shop.settings.appearance.logoPath } : {}), apple: "/pwa-icon/180" },
+    appleWebApp: { capable: true, title: shop.shopName, statusBarStyle: "default" },
   };
 }
 
 export default async function ShopLayout({ children }: LayoutProps<"/">) {
   const scope = await getRequestScope();
-  if (scope.kind === "platform") return children;
+  // Network pages on NETWORK_HOST (src/app/(shop)/network, docs/network.md) bring their own chrome too.
+  if (scope.kind === "platform" || (await isNetworkHostRequest())) return children;
   const shop = await getShopContext();
   if (!shop) notFound();
 

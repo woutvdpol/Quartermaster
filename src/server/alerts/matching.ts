@@ -3,6 +3,7 @@ import { db } from "@/server/db";
 import { audit } from "@/server/audit";
 import type { ServiceContext } from "@/server/context";
 import { queueMail } from "@/server/mail/queue";
+import { pushRecipients, queueSavedSearchPush } from "@/server/push";
 import { MAX_DIGEST_DELIVERIES } from "./mail-contracts";
 import { matchesQuery, normalizeQuery, type MatchLookups, type ProductFacts } from "./match";
 import { digestSlotDue } from "./schedule";
@@ -45,6 +46,7 @@ async function loadProductFacts(tenantId: string, productId: string) {
       description: true,
       sku: true,
       stockCode: true,
+      slug: true,
       price: true,
       categoryId: true,
       publishedAt: true,
@@ -63,7 +65,7 @@ async function loadProductFacts(tenantId: string, productId: string) {
     tagIds: p.tags.map((t) => t.tagId),
     facetValueIds: p.productFacetValues.map((v) => v.facetValueId),
   };
-  return { id: p.id, publishedAt: p.publishedAt!, facts };
+  return { id: p.id, publishedAt: p.publishedAt!, facts, link: { title: p.title, price: p.price, stockCode: p.stockCode, slug: p.slug } };
 }
 
 export type MatchResult = { matched: number; created: number; instantMails: number };
@@ -77,7 +79,7 @@ export async function matchProduct(tenantId: string, productId: string, lookups?
   if (!product) return { matched: 0, created: 0, instantMails: 0 };
   const searches = await db.savedSearch.findMany({
     where: { tenantId, confirmedAt: { not: null }, unsubscribedAt: null, createdAt: { lte: product.publishedAt } },
-    select: { id: true, query: true, frequency: true },
+    select: { id: true, query: true, frequency: true, push: true, customerId: true, name: true },
   });
   if (!searches.length) return { matched: 0, created: 0, instantMails: 0 };
   const lk = lookups ?? (await loadMatchLookups(tenantId));
@@ -94,15 +96,40 @@ export async function matchProduct(tenantId: string, productId: string, lookups?
     await db.savedSearch.updateMany({ where: { id: { in: created.map((d) => d.savedSearchId!) } }, data: { lastMatchedAt: now } });
   }
 
-  const instant = new Set(hits.filter((s) => s.frequency === "INSTANT").map((s) => s.id));
+  // Web push (docs/push.md): a search with `push` goes to the customer's devices right away. With
+  // frequency INSTANT the push REPLACES the instant mail (falls back to the mail when the customer has
+  // no device / push is off); DAILY / WEEKLY searches with push get the push now and the digest later.
+  const byId = new Map(hits.map((s) => [s.id, s]));
+  const pushTo = await pushRecipients(tenantId, hits.flatMap((s) => (s.push && s.customerId ? [s.customerId] : [])));
+  const currency = pushTo.size ? ((await db.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } }))?.currency ?? "EUR") : "EUR";
+  const pushInput = (s: { customerId: string | null; name: string }, deliveryId: string) => ({
+    tenantId,
+    customerId: s.customerId!,
+    deliveryId,
+    searchName: s.name,
+    product: product.link,
+    currency,
+  });
   let instantMails = 0;
   for (const d of created) {
-    if (!d.savedSearchId || !instant.has(d.savedSearchId)) continue;
+    const s = d.savedSearchId ? byId.get(d.savedSearchId) : undefined;
+    if (!s) continue;
+    const viaPush = s.push && !!s.customerId && pushTo.has(s.customerId);
+    if (s.frequency !== "INSTANT") {
+      if (viaPush) {
+        await db.$transaction((tx) => queueSavedSearchPush(tx, pushInput(s, d.id))).catch((err) => console.error("[alerts] saved-search push failed", err));
+      }
+      continue;
+    }
     const sent = await db.$transaction(async (tx) => {
       const claimed = await tx.alertDelivery.updateMany({ where: { id: d.id, sentAt: null }, data: { sentAt: now } });
       if (!claimed.count) return false;
-      await tx.savedSearch.update({ where: { id: d.savedSearchId! }, data: { lastNotifiedAt: now } });
-      await queueMail({ tenantId, template: "alert-new-arrivals", props: { savedSearchId: d.savedSearchId!, deliveryIds: [d.id] } }, { tx });
+      await tx.savedSearch.update({ where: { id: s.id }, data: { lastNotifiedAt: now } });
+      if (viaPush) {
+        await queueSavedSearchPush(tx, pushInput(s, d.id));
+        return false;
+      }
+      await queueMail({ tenantId, template: "alert-new-arrivals", props: { savedSearchId: s.id, deliveryIds: [d.id] } }, { tx });
       return true;
     });
     if (sent) instantMails++;

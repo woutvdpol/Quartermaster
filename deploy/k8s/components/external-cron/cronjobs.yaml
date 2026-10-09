@@ -180,3 +180,43 @@ spec:
               env:
                 - name: CRON_TASK
                   value: search.sync
+---
+# Web push: "your reservation ends soon" (docs/push.md)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: quartermaster-cron-push-reservations
+  labels:
+    app.kubernetes.io/component: cron
+spec:
+  schedule: "* * * * *"
+  timeZone: Etc/UTC
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: trigger
+              env:
+                - name: CRON_TASK
+                  value: push.reservations
+---
+# Web push: re-queue pushes held back by quiet hours / the daily cap
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: quartermaster-cron-push-flush
+  labels:
+    app.kubernetes.io/component: cron
+spec:
+  schedule: "*/5 * * * *"
+  timeZone: Etc/UTC
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: trigger
+              env:
+                - name: CRON_TASK
+                  value: push.flush

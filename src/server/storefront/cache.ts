@@ -74,6 +74,7 @@ export function shopTagsForAction(tenantId: string, action: string): string[] {
     case "reservation":
     case "facet": // facet taxonomy + product assignments (src/server/facets)
     case "compliance": // per-country rules (src/server/compliance) — cached with the catalog
+    case "fair": // fair holds hide/show items, fair sales sell them (src/server/fairs)
       return [shopTag(tenantId, "catalog")];
     case "order":
       // Paying/cancelling changes product availability (SOLD / released).

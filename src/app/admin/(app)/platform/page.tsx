@@ -65,6 +65,12 @@ export default async function PlatformPage({ searchParams }: PageProps<"/admin/p
         </span>
       ),
     },
+    {
+      key: "network",
+      header: "Network",
+      hideBelow: "md",
+      cell: (t) => (t.networkOptIn ? <StatusPill tone="ok">Listed</StatusPill> : <span className="text-muted">No</span>),
+    },
     { key: "orders", header: "Orders 30d", numeric: true, hideBelow: "md", cell: (t) => t.orders30d },
     { key: "owners", header: "Owners", numeric: true, hideBelow: "lg", cell: (t) => t.ownerCount },
     { key: "currency", header: "Currency", hideBelow: "lg", cell: (t) => <span className="font-mono">{t.currency}</span> },

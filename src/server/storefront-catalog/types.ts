@@ -38,6 +38,8 @@ export type CatalogCard = {
   status: PublicStatus;
   onSale: boolean;
   blurred: boolean;
+  /** Sold item whose price the dealer shows in the archive (docs/sold-archive.md); `price` is 0 otherwise. */
+  showSoldPrice: boolean;
   publishedAt: string | null;
   soldAt: string | null;
   category: { title: string; slug: string } | null;
@@ -129,6 +131,10 @@ export type PublicProduct = {
   acceptsOffers: boolean;
   publishedAt: string | null;
   soldAt: string | null;
+  /** Sold archive (docs/sold-archive.md): left out of the archive list / sitemap / index. */
+  archiveHidden: boolean;
+  /** Sold price shown; when false and sold, `price` is 0 (never sent to the visitor). */
+  showSoldPrice: boolean;
   updatedAt: string;
   seoTitle: string | null;
   seoDescription: string | null;

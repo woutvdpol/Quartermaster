@@ -3,6 +3,7 @@ import type { PublicMenuItem } from "@/server/content/menus";
 import type { LegalLink } from "@/server/storefront/content";
 import type { ShopContext } from "@/server/storefront/context";
 import { Container } from "@/components/shop/ui/Container";
+import { ARCHIVE_PATH } from "@/server/storefront-catalog/urls";
 import { MenuLink } from "./MenuLink";
 import { NewsletterForm } from "./NewsletterForm";
 import { layoutCopy } from "./_copy";
@@ -20,6 +21,9 @@ export function Footer({ shop, menu, legalLinks }: { shop: ShopContext; menu: Pu
   // Footer roots are column headings; a root with a link but no children becomes a one-link column.
   const columns = menu.map((item) => ({ item, links: item.children.length ? item.children : item.href ? [item] : [] }));
   const link = "text-shop-muted transition-colors hover:text-shop-ink";
+  // Sold archive (docs/sold-archive.md): a default link unless the dealer's footer menu already has one.
+  const hasArchiveLink = (items: PublicMenuItem[]): boolean => items.some((i) => i.href === ARCHIVE_PATH || hasArchiveLink(i.children));
+  const archiveLink = shop.settings.catalog.publicArchive && !hasArchiveLink(menu);
   const heading = "mb-3 text-sm font-semibold text-shop-ink";
 
   return (
@@ -60,6 +64,13 @@ export function Footer({ shop, menu, legalLinks }: { shop: ShopContext; menu: Pu
                 </p>
               ) : null}
             </address>
+          ) : null}
+          {archiveLink ? (
+            <p className="mt-4">
+              <Link href={ARCHIVE_PATH} className={link}>
+                {t.soldArchive}
+              </Link>
+            </p>
           ) : null}
         </div>
 

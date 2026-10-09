@@ -66,7 +66,7 @@ async function releaseOrderReservations(tx: Tx, tenantId: string, orderId: strin
 
 // ─── Finalization ───────────────────────────────────────────────────────────
 
-export type FinalizeSource = "webhook" | "manual";
+export type FinalizeSource = "webhook" | "manual" | "fair";
 export type FinalizeResult = {
   /** false = already finalized earlier (idempotent no-op). */
   finalized: boolean;
@@ -125,6 +125,14 @@ export async function finalizeOrderTx(
   const lines = await tx.orderLine.findMany({ where: { tenantId, orderId }, select: { productId: true, quantity: true } });
   const perProduct = new Map<string, number>();
   for (const l of lines) if (l.productId) perProduct.set(l.productId, (perProduct.get(l.productId) ?? 0) + l.quantity);
+  // Stock already booked out for this order is not booked twice (fair sale on invoice: the buyer took
+  // the item at the stand before paying — src/server/fairs).
+  const booked = await tx.stockMovement.groupBy({ by: ["productId"], where: { tenantId, orderId, reason: "SALE" }, _sum: { delta: true } });
+  for (const b of booked) {
+    const left = (perProduct.get(b.productId) ?? 0) + (b._sum.delta ?? 0);
+    if (left > 0) perProduct.set(b.productId, left);
+    else perProduct.delete(b.productId);
+  }
 
   const oversold: FinalizeResult["oversold"] = [];
   // Sorted lock order avoids deadlocks between orders that share products.

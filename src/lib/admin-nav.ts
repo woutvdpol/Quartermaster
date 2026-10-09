@@ -34,6 +34,7 @@ export const ADMIN_NAV: { group: NavGroupKey; items: NavItem[] }[] = [
     items: [
       { key: "orders", slug: "orders", built: true },
       { key: "shippingBoard", slug: "shipping-board", built: true },
+      { key: "fairs", slug: "fairs", built: true },
       { key: "offers", slug: "offers", built: true },
       { key: "coupons", slug: "coupons", built: true },
       { key: "customers", slug: "customers", built: true },

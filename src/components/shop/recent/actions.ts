@@ -29,7 +29,6 @@ export async function getRecentlyViewedCards(ids: unknown): Promise<ProductCardD
       currency: shop.tenant.currency,
       viewerSignedIn: !!viewer,
       blurSensitiveForGuests: shop.settings.legal.blurSensitiveForGuests,
-      showPriceWhenSold: shop.settings.catalog.showPriceWhenSold,
       reservedIds,
     }),
   );

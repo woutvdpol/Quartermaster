@@ -58,12 +58,13 @@ export function CatalogList({
                   {p.availability === "reserved" ? <Badge tone="reserved">{copy.product.status.reserved}</Badge> : null}
                   {p.onSale && !sold ? <Badge tone="accent">{copy.product.sale}</Badge> : null}
                   {p.locked ? <Badge>{copy.product.lockedCta}</Badge> : null}
+                  {sold && p.soldLabel ? <span className="text-sm text-shop-muted">{p.soldLabel}</span> : null}
                 </div>
               </div>
               <div className="mt-auto pt-1 sm:mt-0 sm:shrink-0 sm:pt-0 sm:text-right">
                 {p.showPrice ? (
                   <Price cents={p.priceCents} currency={p.currency} display={display} size="lg" className={cn("[&>span:first-child]:font-bold", sold && "opacity-60")} />
-                ) : (
+                ) : sold && p.soldLabel ? null : (
                   <span className="text-sm text-shop-muted">{copy.product.priceHidden}</span>
                 )}
               </div>

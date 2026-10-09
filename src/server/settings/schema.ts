@@ -138,11 +138,14 @@ export const catalogSchema = z.object({
   gridColumns: z.union([z.literal(3), z.literal(4)]).default(4),
   defaultSort: z.enum(["featured", "price_desc", "price_asc", "newest", "oldest", "updated"]).default("newest"),
   endlessScroll: z.boolean().default(false),
+  // Legacy shop-wide switch, superseded by Product.showSoldPrice (per item, docs/sold-archive.md).
+  // Kept for the legacy import mapping; the shop no longer reads it.
   showPriceWhenSold: z.boolean().default(false),
   priceFilter: z.boolean().default(false),
   showTags: z.boolean().default(true),
   showStockCode: z.boolean().default(true),
-  publicArchive: z.boolean().default(false),
+  // Sold archive (/archive, docs/sold-archive.md): sold items stay visible and indexable as reference.
+  publicArchive: z.boolean().default(true),
   relatedProducts: z.boolean().default(false),
   allowOffersDefault: z.boolean().default(false),
   // Product-admin features
@@ -271,6 +274,9 @@ export const platformSchema = z.object({
   // Mails per month; -1 = unlimited. Usage is counted elsewhere, not by decrementing this value.
   newsletterQuota: z.int().min(-1).default(1000),
   storageQuotaGb: z.number().min(0).max(10_000).default(5),
+  // Quartermaster network moderation (docs/network.md): set when a platform admin removes the shop from
+  // the network; the owner cannot opt in again until it is cleared on the platform page.
+  networkBlocked: z.boolean().default(false),
 });
 
 // ─── Registry ───────────────────────────────────────────────────────────────

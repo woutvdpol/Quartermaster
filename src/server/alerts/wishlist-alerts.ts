@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@/server/db";
 import { audit } from "@/server/audit";
 import { queueMail } from "@/server/mail/queue";
+import { queuePriceDropPushes } from "@/server/push";
 import type { Prisma } from "@/generated/prisma/client";
 import type { AlertKind } from "@/generated/prisma/enums";
 import { verifyWishlistLink } from "./signing";
@@ -86,14 +87,20 @@ export async function processPriceDrop(tenantId: string, productId: string, oldP
   if (!p || p.price >= oldPrice) return 0; // already raised again
   const now = new Date();
   let sent = 0;
+  const notified: string[] = [];
   for (const w of await wishlisters(tenantId, productId)) {
     const ok = await db.$transaction(async (tx) => {
       if (!(await claimWishlistDelivery("PRICE_DROP", tenantId, w.customerId, productId, now, tx))) return false;
       await queueMail({ tenantId, template: "alert-price-drop", props: { customerId: w.customerId, productId, oldPrice, newPrice: p.price } }, { tx });
       return true;
     });
-    if (ok) sent++;
+    if (ok) {
+      sent++;
+      notified.push(w.customerId);
+    }
   }
+  // Also a push for customers with push on (docs/push.md); the e-mail stays. Never throws.
+  if (notified.length) await queuePriceDropPushes(tenantId, productId, oldPrice, p.price, notified);
   return sent;
 }
 

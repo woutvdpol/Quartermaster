@@ -10,7 +10,7 @@ import { searchMetrics } from "./metrics";
 import { getShopDictionary, parseWith, type ShopDictionary } from "./dictionary";
 import { TtlLru } from "./lru";
 import { STOPWORDS, fold, lexemes } from "./normalize";
-import type { InterpretationChip, ParsedQuery } from "./parser";
+import { parseQuery, type InterpretationChip, type ParsedQuery } from "./parser";
 import type { SuggestReason } from "./ui-labels";
 import { exactMatches, lexicalSearch, orderIds, productVectors, vectorSearch, type ScoredId } from "./retrieval";
 import { rrf, type RankedList } from "./rrf";
@@ -78,6 +78,8 @@ export type SearchInput = {
    * was understood as filters and the result is small, re-run without the most restrictive one.
    */
   nearMisses?: boolean;
+  /** "sold"/"verkocht" may switch to the sold archive (settings.catalog.publicArchive). Default true. */
+  archive?: boolean;
 };
 
 export type SearchInterpretation = {
@@ -223,6 +225,8 @@ function interpretationOf(p: ParsedQuery, relaxed: boolean): SearchInterpretatio
 
 type Plan = {
   tenantId: string;
+  /** Vector retrievers search these tenants instead of `tenantId` (Quartermaster network: searchAcrossTenants). */
+  vectorTenantIds?: readonly string[];
   scope: ListScope;
   /** Facet tokens: locked + explicit + understood. */
   tokens: string[];
@@ -256,14 +260,14 @@ async function retrieve(plan: Plan, where: Prisma.Sql, parsed: ParsedQuery, embe
     const { vector, state } = await embedIfWarm(embedder, "text", semanticText(parsed));
     if (!vector || !embedder) return { hits: [] as ScoredId[], state, ms: ms(t0) };
     // Unfiltered candidates: the keep rules need the spread of scores (applied after fusion inputs are in).
-    const hits = await vectorSearch(plan.tenantId, where, vector, { kind: "text", dim: embedder.textDim, limit: SEMANTIC_LIMIT });
+    const hits = await vectorSearch(plan.vectorTenantIds ?? plan.tenantId, where, vector, { kind: "text", dim: embedder.textDim, limit: SEMANTIC_LIMIT });
     return { hits, state, ms: ms(t0) };
   })();
   const imageP = (async () => {
     if (!hasText || opts.imageText === false) return { hits: [] as ScoredId[], state: "skipped" as RetrieverState, ms: 0 };
     const { vector, state } = await embedIfWarm(embedder, "imageText", semanticText(parsed));
     if (!vector || !embedder) return { hits: [] as ScoredId[], state, ms: ms(t0) };
-    const hits = await vectorSearch(plan.tenantId, where, vector, { kind: "image", dim: embedder.imageDim, limit: IMAGE_TEXT_LIMIT });
+    const hits = await vectorSearch(plan.vectorTenantIds ?? plan.tenantId, where, vector, { kind: "image", dim: embedder.imageDim, limit: IMAGE_TEXT_LIMIT });
     return { hits, state, ms: ms(t0) };
   })();
   const [lexical, semantic, image] = await Promise.all([lexicalP, semanticP, imageP]);
@@ -299,7 +303,7 @@ export async function searchProducts(tenantId: string, input: SearchInput): Prom
   const filters = input.filters ?? {};
   const baseScope: ListScope = { mode: "shop", categoryIds: null, ...input.scope };
   // "verkocht" searches the sold archive (only where the archive is the alternative to the shop list).
-  const mode: CatalogMode = parsed.status === "sold" ? "archive" : baseScope.mode;
+  const mode: CatalogMode = parsed.status === "sold" && input.archive !== false ? "archive" : baseScope.mode;
   const scope: ListScope = { ...baseScope, mode };
   const explicitTokens = [...(baseScope.lockedFacets ?? []), ...(filters.facets ?? []), ...tokensForValueIds(dict.taxonomy, filters.facetValueIds ?? [])];
   const requestedSort = input.sort ?? "relevance";
@@ -658,4 +662,94 @@ export async function similarProducts(tenantId: string, productId: string, opts:
     .slice(0, limit)
     .map((h) => h.id);
   return loadCards(tenantId, ids);
+}
+
+// ─── Across tenants (Quartermaster network) ─────────────────────────────────
+
+/*
+ * The network search (src/server/network, docs/network.md) ranks with the same retrievers and fusion
+ * as a shop search, over several shops at once. Facets, synonyms and price phrases are per shop, so
+ * the query is parsed without a shop dictionary: free text + stock numbers only. The caller supplies
+ * the product predicate (`where`, over `products p`), which must restrict to `tenantIds` itself.
+ */
+
+const NO_TAXONOMY: PublicTaxonomy = { facets: [], values: [] };
+
+export type AcrossTenantsInput = {
+  tenantIds: readonly string[];
+  where: Prisma.Sql;
+  q: string;
+  /** "relevance" (default) ranks; other sorts order the matches (catalog sort SQL, shop mode). */
+  sort?: CatalogSort;
+};
+
+export type AcrossTenantsResult = {
+  /** Matching product ids in result order (≤ MAX_RESULTS). */
+  ids: string[];
+  /** Free text that was searched (no facet/price interpretation across shops). */
+  text: string;
+  stockCode: number | null;
+  timing: Pick<SearchTiming, "totalMs" | "lexicalMs" | "semanticMs" | "imageMs" | "semantic" | "imageText">;
+};
+
+/** Network query parse: no shop dictionary; price/status/sort phrases are dropped (prices differ per shop). */
+export function parseAcrossTenants(q: string): ParsedQuery {
+  const parsed = parseQuery(q, { taxonomy: NO_TAXONOMY, synonyms: [], currency: "EUR" });
+  return { ...parsed, facets: [], min: null, max: null, status: null, sort: null, chips: parsed.chips.filter((c) => c.kind === "stock") };
+}
+
+export async function searchAcrossTenants(input: AcrossTenantsInput): Promise<AcrossTenantsResult> {
+  const started = performance.now();
+  const parsed = parseAcrossTenants(input.q);
+  const sort = input.sort ?? "relevance";
+  const base = { ids: [] as string[], text: parsed.text, stockCode: parsed.stockCode };
+  if (!input.tenantIds.length) {
+    return { ...base, timing: { totalMs: ms(started), lexicalMs: 0, semanticMs: 0, imageMs: 0, semantic: "skipped", imageText: "skipped" } };
+  }
+  const textless = !parsed.text.trim() || !parsed.terms.length;
+  if (textless && parsed.stockCode === null) {
+    const t = performance.now();
+    const ids = await listIds(input.where, orderSql(sort === "relevance" ? "newest" : sort, "shop"));
+    return { ...base, ids, timing: { totalMs: ms(started), lexicalMs: ms(t), semanticMs: 0, imageMs: 0, semantic: "skipped", imageText: "skipped" } };
+  }
+  const plan: Plan = {
+    tenantId: input.tenantIds[0],
+    vectorTenantIds: input.tenantIds,
+    scope: { mode: "shop", categoryIds: null },
+    tokens: [],
+    tags: [],
+    min: null,
+    max: null,
+    tax: NO_TAXONOMY,
+  };
+  const r = await retrieve(plan, input.where, parsed, await getEmbedder());
+  const ids = sort === "relevance" ? r.fused : await orderIds(r.fused, orderSql(sort, "shop"));
+  return {
+    ...base,
+    ids,
+    timing: { totalMs: ms(started), lexicalMs: r.lexicalMs, semanticMs: r.semanticMs, imageMs: r.imageMs, semantic: r.semantic, imageText: r.imageText },
+  };
+}
+
+/**
+ * Photo search over several shops (same thresholds as searchByImage). Returns ids in visual order with
+ * their cosine similarity. Throws SearchUnavailableError like searchByImage.
+ */
+export async function searchImageAcrossTenants(input: { tenantIds: readonly string[]; where: Prisma.Sql; image: RgbImage }): Promise<{ ids: string[]; scores: Record<string, number> }> {
+  const embedder = await getEmbedder();
+  if (!embedder) throw new SearchUnavailableError("Photo search is not available");
+  if (embedder.status("image") !== "ready") {
+    embedder.warm("image");
+    throw new SearchUnavailableError("Photo search is not available right now");
+  }
+  let vector: number[];
+  try {
+    vector = await embedder.embedImage(input.image);
+  } catch {
+    throw new SearchUnavailableError("Photo search is not available right now");
+  }
+  if (!input.tenantIds.length) return { ids: [], scores: {} };
+  const candidates = await vectorSearch(input.tenantIds, input.where, vector, { kind: "image", dim: embedder.imageDim, limit: 96, minSimilarity: IMAGE_MIN_SIMILARITY });
+  const visual = candidates.filter((h) => h.score >= (candidates[0]?.score ?? 1) - IMAGE_MARGIN);
+  return { ids: visual.map((h) => h.id), scores: Object.fromEntries(visual.map((h) => [h.id, h.score])) };
 }

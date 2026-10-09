@@ -206,14 +206,15 @@ function facetValue(p: PublicProduct, kind: string): string | null {
 export type ProductJsonLdExtras = {
   shipping?: object[];
   returns?: ReturnPolicy | null;
-  /** The visitor may see the price (sold items only with showPriceWhenSold). */
+  /** The visitor may see the price (sold items only with Product.showSoldPrice, docs/sold-archive.md). */
   showPrice: boolean;
 };
 
 /**
  * schema.org Product + Offer for a product page that is not locked (sensitive item for a guest).
  * Pass `images: []` on the product when a compliance rule blurs its photos for the visitor.
- * Sold items without a visible price get no Offer (an Offer without price is invalid).
+ * Sold items without a visible price get no Offer (an Offer without price is invalid); with one, the
+ * Offer says SoldOut (pass no shipping/returns for sold items).
  */
 export function productJsonLd(shop: Pick<SeoShop, "origin" | "name" | "currency">, p: PublicProduct, status: PublicStatus, extras: ProductJsonLdExtras) {
   const url = abs(shop.origin, p.href);

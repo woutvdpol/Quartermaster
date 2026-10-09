@@ -26,9 +26,12 @@ let reader: Reader<Response> | null | undefined;
 function getReader(): Reader<Response> | null {
   if (reader !== undefined) return reader;
   if (process.env.GEOIP?.trim().toLowerCase() === "off") return (reader = null);
-  const file = process.env.GEOIP_DB?.trim() || DEFAULT_DB;
+  const custom = process.env.GEOIP_DB?.trim();
+  const file = custom || DEFAULT_DB;
   try {
-    reader = new Reader<Response>(readFileSync(file));
+    // Two literal-ish reads so the build's file tracer doesn't treat an arbitrary path as "trace the
+    // whole project"; the custom path is ignored by the tracer on purpose (it lives outside the app).
+    reader = new Reader<Response>(custom ? readFileSync(/* turbopackIgnore: true */ custom) : readFileSync(DEFAULT_DB));
   } catch (e) {
     console.warn(`[geo] IP country database unavailable (${file}): ${(e as Error).message}. Falling back to headers / Accept-Language.`);
     reader = null;

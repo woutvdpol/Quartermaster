@@ -23,6 +23,8 @@ type Props = {
   priceFilter: boolean;
   /** Facet tokens fixed by the page (facet landing page); deselecting one leaves the landing page. */
   lockedFacets?: string[];
+  /** Category page URL (default: the shop's /shop/category/{slug}; the sold archive has its own). */
+  categoryLink?: (slug: string) => string;
 };
 
 /**
@@ -222,7 +224,7 @@ function TagList({ tags, params, basePath, defaultSort }: { tags: { slug: string
   );
 }
 
-function CategorySection({ idPrefix, shopPath, params, defaultSort, facets, tree, currentCategoryId, currentPath }: Props & { tree: PublicCategoryNode[] }) {
+function CategorySection({ idPrefix, shopPath, params, defaultSort, facets, tree, currentCategoryId, currentPath, categoryLink = categoryHref }: Props & { tree: PublicCategoryNode[] }) {
   const counts = facets.categoryCounts;
   const totalOf = (n: PublicCategoryNode): number => (counts[n.id] ?? 0) + n.children.reduce((s, c) => s + totalOf(c), 0);
   const onPath = new Set(currentPath);
@@ -240,7 +242,7 @@ function CategorySection({ idPrefix, shopPath, params, defaultSort, facets, tree
         return (
           <li key={n.id}>
             <Link
-              href={`${categoryHref(n.slug)}${qs}`}
+              href={`${categoryLink(n.slug)}${qs}`}
               aria-current={current ? "page" : undefined}
               className={cn(
                 "flex items-center justify-between gap-3 rounded-shop-control px-3 py-1.5 text-sm transition-colors",

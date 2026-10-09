@@ -69,6 +69,8 @@ export type TenantListItem = {
   timezone: string;
   createdAt: Date;
   primaryHost: string | null;
+  /** Opted in to the Quartermaster network (docs/network.md). */
+  networkOptIn: boolean;
   ownerCount: number;
   productCount: number;
   activeProductCount: number;
@@ -135,6 +137,7 @@ export async function listTenants(ctx: PlatformContext, query: z.input<typeof li
       timezone: t.timezone,
       createdAt: t.createdAt,
       primaryHost: t.domains[0]?.host ?? null,
+      networkOptIn: t.networkOptIn,
       ownerCount: s?.ownerCount ?? 0,
       productCount: s?.productCount ?? 0,
       activeProductCount: s?.activeProductCount ?? 0,

@@ -7,7 +7,8 @@ import { ServiceError } from "@/server/context";
 import { getTenant, listTenants, requirePlatformContext } from "@/server/platform";
 import { toRows } from "../../audit-log/_data";
 import { AuditList } from "../../audit-log/_components/AuditList";
-import { addDomainAction, loadMorePlatformAuditAction, removeDomainAction, setPrimaryDomainAction, setTenantStatusAction, updateTenantAction } from "../actions";
+import { getSettings } from "@/server/settings";
+import { addDomainAction, allowNetworkAction, removeFromNetworkAction, loadMorePlatformAuditAction, removeDomainAction, setPrimaryDomainAction, setTenantStatusAction, updateTenantAction } from "../actions";
 import { AddDomainForm } from "../_components/AddDomainForm";
 import { TenantForm } from "../_components/TenantForm";
 import { STATUS_EFFECT, STATUS_LABEL, STATUS_TONE, timeZoneOptions, type TenantStatusValue } from "../_shared";
@@ -32,9 +33,10 @@ export default async function PlatformTenantPage({ params }: PageProps<"/admin/p
   const tenant = await loadTenant(ctx, tenantId);
   if (!tenant) notFound();
 
-  const [stats, audit] = await Promise.all([
+  const [stats, audit, platformSettings] = await Promise.all([
     listTenants(ctx, { search: tenant.slug }).then((list) => list.find((t) => t.id === tenant.id) ?? null),
     queryPlatformAuditLog(ctx, { tenantId: tenant.id, limit: 25 }),
+    getSettings(tenant.id, "platform"),
   ]);
   const currencyLocked = (stats?.productCount ?? 0) > 0;
   const status = tenant.status as TenantStatusValue;
@@ -81,6 +83,41 @@ export default async function PlatformTenantPage({ params }: PageProps<"/admin/p
               </Link>
               .
             </p>
+          </Card>
+
+          <Card title="Quartermaster network" aside={tenant.networkOptIn ? <StatusPill tone="ok">Listed</StatusPill> : <StatusPill tone="mute">Not listed</StatusPill>}>
+            <p className="mb-3 text-[13px] text-ink-2">
+              {tenant.networkOptIn
+                ? <>The owner shows this shop&apos;s stock in the network{tenant.networkJoinedAt ? <> since <DateTime value={tenant.networkJoinedAt} format="date" /></> : null}.</>
+                : platformSettings.networkBlocked
+                  ? "Removed from the network by Quartermaster. The owner cannot join again until you allow it."
+                  : "The owner has not opted in to the network."}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {tenant.networkOptIn || !platformSettings.networkBlocked ? (
+                <ConfirmDialog
+                  trigger="Remove from network"
+                  triggerSize="sm"
+                  tone="danger"
+                  title={`Remove “${tenant.name}” from the network?`}
+                  description="Its stock disappears from the network search straight away, and the owner cannot opt in again until you allow it. The shop itself is not affected."
+                  confirmLabel="Remove from network"
+                  action={removeFromNetworkAction}
+                  fields={{ tenantId: tenant.id }}
+                />
+              ) : (
+                <ConfirmDialog
+                  trigger="Allow again"
+                  triggerSize="sm"
+                  tone="primary"
+                  title={`Allow “${tenant.name}” to join the network again?`}
+                  description="The owner can then switch the network on in Settings → General. The shop is not listed until they do."
+                  confirmLabel="Allow again"
+                  action={allowNetworkAction}
+                  fields={{ tenantId: tenant.id }}
+                />
+              )}
+            </div>
           </Card>
 
           <Card title="Status">

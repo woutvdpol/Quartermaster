@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { Badge, Breadcrumbs, Container, LockedImg, Markdown, Price, ProductCard, ProductGrid, SectionHeading } from "@/components/shop/ui";
-import { getSimilarProducts } from "@/server/search";
 import { searchCopy } from "@/components/shop/search/_copy";
 import { WishlistButton } from "@/components/shop/account/WishlistButton";
 import { NotifyMeButton } from "@/components/shop/alerts";
@@ -10,7 +9,8 @@ import { RecentlyViewed, RecentlyViewedTracker } from "@/components/shop/recent"
 import type { DisplayCurrency } from "@/components/shop/ui/types";
 import type { ShopContext } from "@/server/storefront/context";
 import { getShopViewer } from "@/server/storefront/viewer";
-import { SHOP_PATH, categoryHref, facetValueHref, getRelated, liveReservedIds, tagHref, withLiveStatus } from "@/server/storefront-catalog";
+import { ARCHIVE_PATH, SHOP_PATH, archiveCategoryHref, categoryHref, facetValueHref, getRelated, liveReservedIds, tagHref, withLiveStatus } from "@/server/storefront-catalog";
+import { inSoldArchive, priceVisible, soldMonth } from "@/server/storefront-catalog/sold";
 import { resolveCompliance } from "@/server/compliance";
 import { countryName } from "@/server/shipping/countries";
 import type { PublicImage, PublicProduct, PublicStatus } from "@/server/storefront-catalog/types";
@@ -22,6 +22,7 @@ import { OfferButton } from "@/components/shop/offers/OfferButton";
 import { ProductGallery, type GalleryImage } from "./ProductGallery";
 import { pickSources } from "@/lib/media/variants";
 import { ShippingHint } from "./ShippingHint";
+import { SoldAlternatives, similarForSale } from "./SoldAlternatives";
 
 /** Visitor-country compliance for this product (src/server/compliance); null/absent = nothing applies. */
 export type ProductGeo = { country: string | null; blurred: boolean; noShipping: boolean };
@@ -54,12 +55,23 @@ export function ProductDetail({
 }) {
   const { catalog, legal, checkout, general } = shop.settings;
   const currency = shop.tenant.currency;
-  const showPrice = status !== "sold" || catalog.showPriceWhenSold;
-  const crumbs = [
-    { label: copy.shop.title, href: SHOP_PATH },
-    ...product.categoryPath.map((c) => ({ label: c.title, href: categoryHref(c.slug) })),
-    { label: product.title },
-  ];
+  const sold = status === "sold";
+  // Sold items: price only when the dealer shows it for this item (docs/sold-archive.md).
+  const showPrice = priceVisible({ status, showSoldPrice: product.showSoldPrice });
+  const soldIn = sold ? soldMonth(product.soldAt, shop.tenant.timezone) : null;
+  // A sold item in the public archive lives under "Sold archive" in the breadcrumbs.
+  const archived = inSoldArchive({ status, archiveHidden: product.archiveHidden }, catalog.publicArchive);
+  const crumbs = archived
+    ? [
+        { label: copy.archive.title, href: ARCHIVE_PATH },
+        ...product.categoryPath.map((c) => ({ label: c.title, href: archiveCategoryHref(c.slug) })),
+        { label: product.title },
+      ]
+    : [
+        { label: copy.shop.title, href: SHOP_PATH },
+        ...product.categoryPath.map((c) => ({ label: c.title, href: categoryHref(c.slug) })),
+        { label: product.title },
+      ];
   const eyebrowFacets = EYEBROW_KINDS.flatMap((kind) => product.facets.filter((f) => f.facet.kind === kind).map((f) => f.values[0]?.name)).filter(Boolean).slice(0, 3);
   const eyebrow = [product.categoryPath.at(-1)?.title, ...eyebrowFacets].filter(Boolean).join(" · ");
   const geoBlurred = Boolean(geo?.blurred) && !locked;
@@ -110,9 +122,16 @@ export function ProductDetail({
           ) : (
             <>
               <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3">
-                {showPrice ? <Price cents={product.price} currency={currency} display={display} size="xl" /> : null}
+                {showPrice && sold ? (
+                  <p className="flex items-baseline gap-2">
+                    <span className="text-sm text-shop-muted">{copy.product.soldFor}</span>
+                    <Price cents={product.price} currency={currency} display={display} size="xl" />
+                  </p>
+                ) : showPrice ? (
+                  <Price cents={product.price} currency={currency} display={display} size="xl" />
+                ) : null}
                 <div className="flex flex-wrap gap-1.5">
-                  <StatusBadge status={status} />
+                  <StatusBadge status={status} soldIn={soldIn} />
                   {product.onSale && status !== "sold" ? <Badge tone="accent">{copy.product.sale}</Badge> : null}
                 </div>
               </div>
@@ -152,8 +171,9 @@ export function ProductDetail({
                   </div>
                 </div>
               ) : (
+                // Sold (design "SoldProduct"): no buy button — an alert for the next one and similar pieces for sale.
                 <div className="mt-7">
-                  <WishlistButton productId={product.id} variant="full" className="w-full" />
+                  <SoldAlternatives tenantId={shop.tenant.id} productId={product.id} country={geo?.country ?? null} />
                 </div>
               )}
 
@@ -242,7 +262,7 @@ export function ProductDetail({
                 HTML (docs/seo-geo.md). Its data is cached per tenant, so this costs no extra query. */}
             <ProvenanceBlock productId={product.id} />
 
-            {status !== "available" ? (
+            {status === "reserved" ? (
               <section className="flex flex-col gap-4 rounded-shop border border-shop-line p-6" aria-labelledby="pd-notify">
                 <div>
                   <h2 id="pd-notify" className="text-xl text-shop-ink">
@@ -280,8 +300,8 @@ export function ProductDetail({
   );
 }
 
-function StatusBadge({ status }: { status: PublicStatus }) {
-  if (status === "sold") return <Badge tone="sold">{copy.product.status.sold}</Badge>;
+function StatusBadge({ status, soldIn = null }: { status: PublicStatus; soldIn?: string | null }) {
+  if (status === "sold") return <Badge tone="sold">{soldIn ? copy.product.soldBadge(soldIn) : copy.product.status.sold}</Badge>;
   if (status === "reserved") return <Badge tone="reserved">{copy.product.status.reserved}</Badge>;
   return <Badge tone="ok">{copy.product.status.available}</Badge>;
 }
@@ -312,7 +332,6 @@ async function RelatedProducts({
     applyGeoBlur(
       toCardData(c, {
         currency: shop.tenant.currency,
-        showPriceWhenSold: shop.settings.catalog.showPriceWhenSold,
         lockSensitive: shop.settings.legal.blurSensitiveForGuests && !viewer,
       }),
       c,
@@ -327,8 +346,12 @@ async function RelatedProducts({
   );
 }
 
-/** Fewer neighbours than this and the "Looks like this" rail is not shown. */
+/**
+ * Fewer neighbours than this and the "Looks like this" rail is not shown. On a sold page every
+ * neighbour counts: the rail is where "See the N similar pieces for sale" points to.
+ */
 const SIMILAR_MIN = 3;
+const SIMILAR_MIN_SOLD = 1;
 
 /**
  * "Looks like this" (smart search, docs/search.md): neighbours by photo and text embeddings, data-cached
@@ -337,19 +360,11 @@ const SIMILAR_MIN = 3;
  */
 async function SimilarProducts({ shop, product, country, display }: { shop: ShopContext; product: PublicProduct; country: string | null; display: DisplayCurrency | null }) {
   const tenantId = shop.tenant.id;
-  const candidates = await getSimilarProducts(tenantId, product.id).catch(() => []);
-  if (candidates.length < SIMILAR_MIN) return null;
-  const ids = candidates.map((c) => c.id);
-  const [reserved, viewer, verdicts] = await Promise.all([
-    liveReservedIds(tenantId, ids),
-    getShopViewer(tenantId),
-    country ? resolveCompliance(tenantId, ids, country) : Promise.resolve({} as Awaited<ReturnType<typeof resolveCompliance>>),
-  ]);
-  const visible = candidates.filter((c) => !verdicts[c.id]?.hidden);
-  if (visible.length < SIMILAR_MIN) return null;
-  const cards = withLiveStatus(visible, reserved).map((c) =>
+  const [{ items: visible, verdicts }, viewer] = await Promise.all([similarForSale(tenantId, product.id, country), getShopViewer(tenantId)]);
+  if (visible.length < (product.status === "sold" ? SIMILAR_MIN_SOLD : SIMILAR_MIN)) return null;
+  const cards = visible.map((c) =>
     applyGeoBlur(
-      toCardData(c, { currency: shop.tenant.currency, showPriceWhenSold: shop.settings.catalog.showPriceWhenSold, lockSensitive: shop.settings.legal.blurSensitiveForGuests && !viewer }),
+      toCardData(c, { currency: shop.tenant.currency, lockSensitive: shop.settings.legal.blurSensitiveForGuests && !viewer }),
       c,
       verdicts[c.id]?.blurred ?? false,
     ),

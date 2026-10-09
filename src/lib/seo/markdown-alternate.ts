@@ -21,8 +21,10 @@ export type ProductMarkdownInput = {
   shop: { name: string; origin: string; currency: string; country: string };
   product: PublicProduct;
   status: PublicStatus;
-  /** Sold items show their price only with catalog.showPriceWhenSold. */
+  /** Sold items show their price only with Product.showSoldPrice (docs/sold-archive.md). */
   showPrice: boolean;
+  /** Sold items: the month of sale ("Oct 2026"), shown with the availability. */
+  soldMonth?: string | null;
   /** Images may be omitted (compliance blur in the visitor's country). */
   showImages: boolean;
   provenance: { text: string | null; certificateIncluded: boolean; authenticityGuaranteed: boolean } | null;
@@ -53,8 +55,13 @@ export function productMarkdown(i: ProductMarkdownInput): string {
   const facts = [
     line("No.", String(p.stockCode)),
     p.sku && p.sku !== String(p.stockCode) ? line("SKU", p.sku) : null,
-    line("Price", i.showPrice ? `${formatMoney(p.price, i.shop.currency)} (${i.shop.currency})` : "Not shown"),
-    line("Availability", STATUS_LABEL[i.status]),
+    // Sold: no price on offer — only the sold price, when the dealer shows it for this item.
+    i.status === "sold"
+      ? i.showPrice
+        ? line("Sold for", `${formatMoney(p.price, i.shop.currency)} (${i.shop.currency})`)
+        : null
+      : line("Price", i.showPrice ? `${formatMoney(p.price, i.shop.currency)} (${i.shop.currency})` : "Not shown"),
+    line("Availability", i.status === "sold" ? `Sold${i.soldMonth ? ` (${i.soldMonth})` : ""}; no longer for sale, kept as a reference` : STATUS_LABEL[i.status]),
     line("Condition", `Used${condition ? ` — ${condition}` : ""}; unique item (one piece)`),
     line("Category", p.categoryPath.map((c) => c.title).join(" > ") || null),
     ...p.facets.map((f) => line(f.facet.name, f.values.map((v) => v.path.join(" › ")).join(", "))),

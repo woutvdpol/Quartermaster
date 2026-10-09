@@ -62,6 +62,37 @@ describe("storefront-catalog queries", () => {
     expect(archive.items[0].status).toBe("sold");
   });
 
+  it("sold archive: per-item hiding and sold price, most recently sold first, no price leaks", async () => {
+    const sold = async (title: string, soldAt: Date, extra: { archiveHidden?: boolean; showSoldPrice?: boolean; price: number }) => {
+      const p = await product(tenantId, { title, status: "SOLD", quantity: 0, price: extra.price });
+      return db.product.update({ where: { id: p.id }, data: { soldAt, archiveHidden: extra.archiveHidden ?? false, showSoldPrice: extra.showSoldPrice ?? false } });
+    };
+    const older = await sold("M40 older", new Date(Date.UTC(2026, 6, 1)), { price: 50000, showSoldPrice: true });
+    const newer = await sold("M40 newer", new Date(Date.UTC(2026, 9, 1)), { price: 90000 });
+    const hidden = await sold("M40 hidden", new Date(Date.UTC(2026, 8, 1)), { price: 70000, archiveHidden: true, showSoldPrice: true });
+    const archive: ListScope = { mode: "archive", categoryIds: null, priceUnit: 100 };
+    const ids = async (raw: Record<string, string> = {}) => (await listCatalog(tenantId, archive, parseCatalogParams(raw))).items.map((i) => i.id);
+
+    // archiveHidden is left out; newest sale first.
+    expect(await ids()).toEqual([newer.id, older.id]);
+    const page = await listCatalog(tenantId, archive, parseCatalogParams({}));
+    expect(page.items.map((i) => [i.showSoldPrice, i.price])).toEqual([
+      [false, 0], // hidden sold price never leaves the server
+      [true, 50000],
+    ]);
+    // Price filters and sorting only see shown prices.
+    expect(await ids({ min: "800" })).toEqual([]);
+    expect(await ids({ max: "600" })).toEqual([older.id]);
+    expect(await ids({ sort: "price_desc" })).toEqual([older.id, newer.id]);
+    const facets = await getCatalogFacets(tenantId, archive, parseCatalogParams({}));
+    expect(facets.price).toEqual({ min: 50000, max: 50000 });
+
+    // The hidden item's page stays reachable (order links), flagged for noindex by the page.
+    const detail = await getPublicProduct(tenantId, hidden.stockCode);
+    expect(detail).toMatchObject({ status: "sold", archiveHidden: true, showSoldPrice: true, price: 70000 });
+    expect((await getPublicProduct(tenantId, newer.stockCode))?.price).toBe(0);
+  });
+
   it("filters by search, tags (AND), price and category subtree; sorts by price", async () => {
     const root = await db.category.create({ data: { tenantId, title: "Helmets", slug: "helmets" } });
     const child = await db.category.create({ data: { tenantId, title: "Steel", slug: "steel", parentId: root.id } });

@@ -14,6 +14,7 @@ import {
   summarizeDescription,
   type SavedSearchQuery,
 } from "@/server/alerts";
+import { vapidPublicKey } from "@/server/push";
 
 /*
  * Server actions behind <NotifyMeButton> and <SaveSearchButton>. The tenant comes from the request
@@ -25,6 +26,8 @@ export type AlertDialogState = {
   email: string | null;
   defaultName: string;
   summary: string;
+  /** Web push available for this visitor (logged in + VAPID configured): offer it after saving (docs/push.md). */
+  pushPublicKey: string | null;
 };
 
 const idSchema = z.string().min(1).max(64);
@@ -51,7 +54,7 @@ async function resolveInput(tenantId: string, source: unknown): Promise<SavedSea
 /** Loaded when the dialog opens: who is the visitor (prefill email) and what will be saved. */
 export async function getAlertDialogStateAction(source: unknown): Promise<AlertDialogState> {
   const tenant = await getRequestTenant();
-  if (!tenant) return { loggedIn: false, email: null, defaultName: "", summary: "" };
+  if (!tenant) return { loggedIn: false, email: null, defaultName: "", summary: "", pushPublicKey: null };
   const [customer, query] = await Promise.all([getShopCustomer(), resolveInput(tenant.id, source).catch(() => null)]);
   const summary = query ? summarizeDescription(await describeQuery(tenant.id, query)) : "";
   return {
@@ -59,10 +62,16 @@ export async function getAlertDialogStateAction(source: unknown): Promise<AlertD
     email: customer?.user.email ?? null, // the login address (Customer.email may be a placeholder until verified)
     defaultName: summary.slice(0, 120),
     summary,
+    pushPublicKey: customer ? vapidPublicKey() : null,
   };
 }
 
-export type CreateAlertResult = { status: "created" | "pending" | "duplicate" | "limit" | "rate_limited" | "invalid" | "captcha" | "error"; message?: string };
+export type CreateAlertResult = {
+  status: "created" | "pending" | "duplicate" | "limit" | "rate_limited" | "invalid" | "captcha" | "error";
+  message?: string;
+  /** The customer's saved search (created / duplicate) — for the push choice after saving. */
+  id?: string;
+};
 
 export async function createAlertAction(input: unknown): Promise<CreateAlertResult> {
   const parsed = z
@@ -94,7 +103,7 @@ export async function createAlertAction(input: unknown): Promise<CreateAlertResu
       },
       { ip },
     );
-    return { status: res.status };
+    return "id" in res ? { status: res.status, id: res.id } : { status: res.status };
   } catch (err) {
     if (err instanceof ServiceError && err.code === "INVALID") return { status: "invalid", message: err.message };
     console.error("createAlertAction failed", err);

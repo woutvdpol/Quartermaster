@@ -13,7 +13,7 @@ import { adjustPriceByPercent } from "@/server/catalog/pricing";
 import type { ProductStatus } from "@/generated/prisma/enums";
 import { copy } from "../_copy";
 import { IdFields, SelectionBar } from "./SelectionBar";
-import { bulkArchiveAction, bulkBumpAction, bulkCategoryAction, bulkPriceAction, bulkStatusAction } from "../actions";
+import { bulkArchiveAction, bulkBumpAction, bulkCategoryAction, bulkPriceAction, bulkSoldArchiveAction, bulkStatusAction } from "../actions";
 
 const t = copy.bulk;
 
@@ -57,6 +57,23 @@ export function BulkActions({
             action={bulkBumpAction}
           >
             <IdFields ids={ids} />
+          </ConfirmDialog>
+          <ConfirmDialog
+            trigger={t.soldArchive}
+            triggerSize="sm"
+            tone="primary"
+            title={t.soldArchiveTitle(ids.length)}
+            description={t.soldArchiveBody}
+            confirmLabel={t.soldArchiveApply}
+            action={bulkSoldArchiveAction}
+          >
+            <IdFields ids={ids} />
+            <Select
+              label={t.soldArchiveField}
+              name="change"
+              defaultValue="show"
+              options={(["show", "hide", "price", "noPrice"] as const).map((v) => ({ value: v, label: t.soldArchiveOptions[v] }))}
+            />
           </ConfirmDialog>
           <ConfirmDialog
             trigger={t.archive}

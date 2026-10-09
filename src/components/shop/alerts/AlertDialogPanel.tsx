@@ -7,6 +7,8 @@ import { Field, TextInput } from "@/components/shop/ui/Field";
 import { Turnstile } from "@/components/shop/turnstile";
 import { alertsCopy } from "./_copy";
 import { createAlertAction, getAlertDialogStateAction, type AlertDialogState, type CreateAlertResult } from "./actions";
+import { PushChoice } from "@/components/shop/push/PushChoice";
+import { pushUiCopy } from "@/components/shop/push/_copy";
 
 const t = alertsCopy;
 type Frequency = "INSTANT" | "DAILY" | "WEEKLY";
@@ -32,6 +34,7 @@ export function AlertDialogPanel({
   const id = useId();
   const [state, setState] = useState<AlertDialogState | null>(null);
   const [result, setResult] = useState<CreateAlertResult | null>(null);
+  const [saved, setSaved] = useState<{ name: string; frequency: Frequency } | null>(null);
   const [pending, startTransition] = useTransition();
 
   // Mounted (with a fresh key) by every click of the trigger: open and load the visitor's state.
@@ -39,7 +42,7 @@ export function AlertDialogPanel({
     dialogRef.current?.showModal();
     getAlertDialogStateAction(source)
       .then(setState)
-      .catch(() => setState({ loggedIn: false, email: null, defaultName: "", summary: "" }));
+      .catch(() => setState({ loggedIn: false, email: null, defaultName: "", summary: "", pushPublicKey: null }));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per mount (per click)
   }, []);
 
@@ -54,6 +57,8 @@ export function AlertDialogPanel({
   }, []);
 
   function submit(formData: FormData) {
+    const name = String(formData.get("name") ?? "");
+    const frequency = String(formData.get("frequency") ?? defaultFrequency) as Frequency;
     startTransition(async () => {
       const res = await createAlertAction({
         source,
@@ -64,11 +69,13 @@ export function AlertDialogPanel({
         turnstileToken: (formData.get("cf-turnstile-response") as string | null) ?? null,
       });
       setResult(res);
+      setSaved({ name: name.trim() || state?.defaultName || "", frequency });
     });
   }
 
   const done = result && (result.status === "created" || result.status === "pending" || result.status === "duplicate");
   const message = result ? (result.message ?? t.result[result.status]) : null;
+  const pushChoice = done && result?.id && state?.pushPublicKey && saved ? { id: result.id, key: state.pushPublicKey, ...saved } : null;
 
   return (
     <>
@@ -80,7 +87,7 @@ export function AlertDialogPanel({
         <div className="p-6 sm:p-8">
           <div className="mb-3 flex items-start justify-between gap-4">
             <h2 id={`${id}-title`} className="text-2xl">
-              {title}
+              {pushChoice ? pushUiCopy.choice.title : title}
             </h2>
             <button
               type="button"
@@ -93,7 +100,16 @@ export function AlertDialogPanel({
               </svg>
             </button>
           </div>
-          {done ? (
+          {pushChoice ? (
+            // Logged-in customer + push available: "Push alert on this phone" vs "E-mail" (docs/push.md).
+            <PushChoice
+              searchId={pushChoice.id}
+              searchName={pushChoice.name}
+              frequency={pushChoice.frequency}
+              publicKey={pushChoice.key}
+              onClose={() => dialogRef.current?.close()}
+            />
+          ) : done ? (
             <div className="grid gap-4">
               <p role="status" className="rounded-shop bg-shop-ok-soft px-4 py-3 text-sm text-shop-ok">
                 {message}

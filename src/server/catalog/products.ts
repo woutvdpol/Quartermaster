@@ -98,6 +98,10 @@ const createSchema = z.object({
 const updateSchema = z
   .object({
     ...editableFields,
+    /** Sold archive (docs/sold-archive.md): leave this sold item out of the public archive. */
+    archiveHidden: z.boolean(),
+    /** Sold archive: show the sold price of this item (default off). */
+    showSoldPrice: z.boolean(),
     /** Explicit new slug (slugified; CONFLICT when taken). */
     slug: z.string().trim().min(1).max(120),
     /** Regenerate the slug from the (new) title, de-duplicated. */
@@ -695,12 +699,16 @@ const bulkSchema = z
     priceAdjustPercent: z.number().gt(-100).max(1000).optional(),
     tagIdsAdd: z.array(idSchema).max(100).optional(),
     tagIdsRemove: z.array(idSchema).max(100).optional(),
+    /** Sold archive (docs/sold-archive.md): hide from / show in the archive. */
+    archiveHidden: z.boolean().optional(),
+    /** Sold archive: show / hide the sold price. */
+    showSoldPrice: z.boolean().optional(),
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), "Nothing to update");
 
 export type BulkUpdateInput = z.input<typeof bulkSchema>;
 
-/** Applies category / price % / tag changes to many products in one transaction (all-or-nothing). */
+/** Applies category / price % / tag / sold-archive changes to many products in one transaction (all-or-nothing). */
 export async function bulkUpdate(ctx: ServiceContext, ids: string[], input: BulkUpdateInput): Promise<{ updated: number }> {
   const productIds = [...new Set(parseInput(idsSchema, ids))];
   const data = parseInput(bulkSchema, input);
@@ -710,6 +718,9 @@ export async function bulkUpdate(ctx: ServiceContext, ids: string[], input: Bulk
     await assertRefs(tx, ctx.tenantId, { categoryId: data.categoryId, tagIds: [...(data.tagIdsAdd ?? []), ...(data.tagIdsRemove ?? [])] });
     const where = { tenantId: ctx.tenantId, id: { in: productIds } };
     if (data.categoryId !== undefined) await tx.product.updateMany({ where, data: { categoryId: data.categoryId } });
+    if (data.archiveHidden !== undefined || data.showSoldPrice !== undefined) {
+      await tx.product.updateMany({ where, data: { archiveHidden: data.archiveHidden, showSoldPrice: data.showSoldPrice } });
+    }
     if (data.priceAdjustPercent !== undefined && data.priceAdjustPercent !== 0) {
       const pct = data.priceAdjustPercent;
       const failures = rows

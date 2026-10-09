@@ -11,7 +11,8 @@ import { toPublicImage } from "@/server/storefront-catalog/queries";
  * Uncached reads behind sitemaps, the merchant feed and llms.txt (cached wrappers: ./index.ts).
  * Every query filters on an explicit tenantId. Results are JSON-safe (ISO date strings).
  *
- * Indexable product = public (ACTIVE with stock, RESERVED, and SOLD only with the public archive),
+ * Indexable product = public (ACTIVE with stock, RESERVED, and SOLD only with the public archive and
+ * not archiveHidden — docs/sold-archive.md),
  * not sensitive (Product.blurred: guests get a login wall, so search engines would too) and not hidden
  * by a compliance rule in the shop's own country. Photos blurred by a rule there are left out.
  */
@@ -44,7 +45,8 @@ function visibleWhere(tenantId: string, includeSold: boolean): Prisma.ProductWhe
   return {
     tenantId,
     blurred: false,
-    OR: [{ status: "ACTIVE", quantity: { gt: 0 } }, { status: "RESERVED" }, ...(includeSold ? [{ status: "SOLD" as const }] : [])],
+    // fairHoldId: on a LIVE fair that hides fair stock (docs/fair-mode.md).
+    OR: [{ status: "ACTIVE", quantity: { gt: 0 }, fairHoldId: null }, { status: "RESERVED" }, ...(includeSold ? [{ status: "SOLD" as const, archiveHidden: false }] : [])],
   };
 }
 
@@ -95,6 +97,7 @@ function feedWhere(tenantId: string): Prisma.ProductWhereInput {
     tenantId,
     status: "ACTIVE",
     quantity: { gt: 0 },
+    fairHoldId: null, // not buyable while on a fair (docs/fair-mode.md)
     blurred: false,
     ageRestricted: false,
     restrictedSymbols: false,

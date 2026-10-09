@@ -88,6 +88,29 @@ export async function bulkBumpAction(formData: FormData): Promise<ActionResult> 
   }
 }
 
+/** Sold archive flags (docs/sold-archive.md): show/hide in the archive, show/hide the sold price. */
+const SOLD_ARCHIVE_CHANGES = {
+  show: { archiveHidden: false },
+  hide: { archiveHidden: true },
+  price: { showSoldPrice: true },
+  noPrice: { showSoldPrice: false },
+} as const;
+
+export async function bulkSoldArchiveAction(formData: FormData): Promise<ActionResult> {
+  const ids = readIds(formData);
+  if (!ids) return actionFail(t.noSelection);
+  const change = formString(formData, "change");
+  if (!Object.hasOwn(SOLD_ARCHIVE_CHANGES, change)) return actionFail(t.failed);
+  try {
+    const ctx = await requireStaffContext();
+    const { updated } = await bulkUpdate(ctx, ids, SOLD_ARCHIVE_CHANGES[change as keyof typeof SOLD_ARCHIVE_CHANGES]);
+    done();
+    return actionOk(t.soldArchive(updated));
+  } catch (err) {
+    return errorResult(err, t.failed);
+  }
+}
+
 export async function bulkArchiveAction(formData: FormData): Promise<ActionResult> {
   const ids = readIds(formData);
   if (!ids) return actionFail(t.noSelection);

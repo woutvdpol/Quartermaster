@@ -54,6 +54,10 @@ export type EditorProduct = {
   restrictedSymbols: boolean;
   requiresDeactivationCert: boolean;
   onSale: boolean;
+  /** Sold archive (docs/sold-archive.md). */
+  sold: boolean;
+  archiveHidden: boolean;
+  showSoldPrice: boolean;
   tags: string[];
   updatedAt: Date;
 };
@@ -394,6 +398,27 @@ export function ProductEditor({
                 />
                 <Switch form={F} label={f.ageRestricted} name="ageRestricted" defaultChecked={product.ageRestricted} layout="row" />
                 <Switch form={F} label={f.onSale} name="onSale" defaultChecked={product.onSale} layout="row" />
+              </div>
+            </Card>
+
+            <Card title={copy.cards.soldArchive} aside={product.sold ? undefined : copy.cards.soldArchiveAside}>
+              <div className="grid">
+                <Switch
+                  form={F}
+                  label={f.showInArchive}
+                  description={f.showInArchiveHint}
+                  name="showInArchive"
+                  defaultChecked={!product.archiveHidden}
+                  layout="row"
+                />
+                <Switch
+                  form={F}
+                  label={f.showSoldPrice}
+                  description={f.showSoldPriceHint}
+                  name="showSoldPrice"
+                  defaultChecked={product.showSoldPrice}
+                  layout="row"
+                />
               </div>
             </Card>
 

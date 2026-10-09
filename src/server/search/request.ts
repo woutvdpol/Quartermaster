@@ -47,6 +47,6 @@ export async function toPublicCards(ctx: SearchRequestContext, cards: CatalogCar
     liveReservedIds(tenantId, ids),
     ctx.country ? resolveCompliance(tenantId, ids, ctx.country) : Promise.resolve({} as Awaited<ReturnType<typeof resolveCompliance>>),
   ]);
-  const cardCtx = { currency: ctx.shop.tenant.currency, showPriceWhenSold: ctx.shop.settings.catalog.showPriceWhenSold, lockSensitive: ctx.lockSensitive };
+  const cardCtx = { currency: ctx.shop.tenant.currency, lockSensitive: ctx.lockSensitive };
   return withLiveStatus(cards, reserved).map((c) => applyGeoBlur(toCardData(c, cardCtx), c, verdicts[c.id]?.blurred ?? false));
 }

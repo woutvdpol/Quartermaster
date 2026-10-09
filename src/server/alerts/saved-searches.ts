@@ -201,6 +201,8 @@ export type PublicSearchRow = {
   id: string;
   name: string;
   frequency: AlertFrequency;
+  /** Also delivered as web push (docs/push.md). */
+  push: boolean;
   status: SavedSearchStatus;
   createdAt: Date;
   lastNotifiedAt: Date | null;
@@ -209,13 +211,14 @@ export type PublicSearchRow = {
 
 async function toPublicRows(
   tenantId: string,
-  rows: { id: string; name: string; frequency: AlertFrequency; query: Prisma.JsonValue; confirmedAt: Date | null; unsubscribedAt: Date | null; createdAt: Date; lastNotifiedAt: Date | null }[],
+  rows: { id: string; name: string; frequency: AlertFrequency; push: boolean; query: Prisma.JsonValue; confirmedAt: Date | null; unsubscribedAt: Date | null; createdAt: Date; lastNotifiedAt: Date | null }[],
 ): Promise<PublicSearchRow[]> {
   const descriptions = await describeQueries(tenantId, rows.map((r) => r.query));
   return rows.map((r, i) => ({
     id: r.id,
     name: r.name,
     frequency: r.frequency,
+    push: r.push,
     status: savedSearchStatus(r),
     createdAt: r.createdAt,
     lastNotifiedAt: r.lastNotifiedAt,
@@ -227,6 +230,7 @@ const publicSelect = {
   id: true,
   name: true,
   frequency: true,
+  push: true,
   query: true,
   confirmedAt: true,
   unsubscribedAt: true,
@@ -278,6 +282,8 @@ export async function listCustomerSearches(owner: CustomerOwner): Promise<Public
 const updateSchema = z.object({
   name: nameSchema.min(1, "Enter a name").optional(),
   frequency: frequencySchema.optional(),
+  /** Web push for new matches (docs/push.md); only meaningful for customers with a device. */
+  push: z.boolean().optional(),
   /** false = pause (unsubscribed), true = resume. */
   active: z.boolean().optional(),
 });

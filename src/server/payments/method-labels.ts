@@ -33,6 +33,10 @@ export const METHOD_LABELS: Record<string, string> = {
   swish: "Swish",
   mbway: "MB WAY",
   multibanco: "Multibanco",
+  // Fair-mode sales (registered only, no Mollie — docs/fair-mode.md)
+  card: "Card (fair)",
+  cash: "Cash",
+  invoice: "Invoice",
 };
 
 export function methodLabel(id: string): string {

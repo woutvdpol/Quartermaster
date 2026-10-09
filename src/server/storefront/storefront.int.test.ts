@@ -6,7 +6,7 @@ import { createCategory } from "@/server/catalog/categories";
 import { createTenantContext, resetDb } from "../../../tests/integration/helpers";
 import { listFacetValuesForSitemap, queryCategoryTiles, queryNewItems, queryProductsByIds, toProductCardData } from "./products";
 
-const opts = { currency: "EUR", viewerSignedIn: false, blurSensitiveForGuests: true, showPriceWhenSold: false };
+const opts = { currency: "EUR", viewerSignedIn: false, blurSensitiveForGuests: true };
 
 describe("storefront product reads", () => {
   let a: ServiceContext;

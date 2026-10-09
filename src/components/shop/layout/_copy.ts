@@ -36,6 +36,7 @@ export const layoutCopy = {
     newsletterText: "New arrivals and stories from the collection, straight to your inbox.",
     contact: "Contact",
     poweredBy: "Powered by",
+    soldArchive: "Sold archive",
     legal: "Legal",
     rights: "All rights reserved.",
   },

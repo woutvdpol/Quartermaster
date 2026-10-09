@@ -25,7 +25,6 @@ export function blockContext(shop: ShopContext, opts: { viewerSignedIn: boolean;
       currency: shop.tenant.currency,
       viewerSignedIn: opts.viewerSignedIn,
       blurSensitiveForGuests: s.legal.blurSensitiveForGuests,
-      showPriceWhenSold: s.catalog.showPriceWhenSold,
     },
     gridColumns: s.catalog.gridColumns,
     showStockCode: s.catalog.showStockCode,

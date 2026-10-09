@@ -34,8 +34,10 @@ export type ProductCardData = {
   /** ISO 4217 shop currency (Tenant.currency). */
   currency: string;
   availability: ProductAvailability;
-  /** False hides the price (sold items when catalog.showPriceWhenSold is off). */
+  /** False hides the price (sold items without Product.showSoldPrice, docs/sold-archive.md). */
   showPrice: boolean;
+  /** Sold items: "Sold Oct 2026" (sold archive); null/absent for live items. */
+  soldLabel?: string | null;
   onSale: boolean;
   /**
    * Sensitive item viewed by a guest (legal.blurSensitiveForGuests): `image` then only carries the

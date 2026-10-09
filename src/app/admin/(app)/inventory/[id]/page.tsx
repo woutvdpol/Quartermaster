@@ -94,6 +94,9 @@ export default async function ProductEditPage({ params }: PageProps<"/admin/inve
     restrictedSymbols: product.restrictedSymbols,
     requiresDeactivationCert: product.requiresDeactivationCert,
     onSale: product.onSale,
+    sold: product.status === "SOLD",
+    archiveHidden: product.archiveHidden,
+    showSoldPrice: product.showSoldPrice,
     tags: product.tags.map((t) => t.name),
     updatedAt: product.updatedAt,
   };

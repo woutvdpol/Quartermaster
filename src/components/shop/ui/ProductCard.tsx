@@ -90,10 +90,11 @@ export function ProductCard({
           </H>
           {product.showPrice ? (
             <Price cents={product.priceCents} currency={product.currency} display={null} size="sm" className={cn("shrink-0 [&>span:first-child]:font-bold", sold && "opacity-60")} />
-          ) : (
+          ) : sold && product.soldLabel ? null : (
             <span className="shrink-0 text-sm text-shop-muted">{uiCopy.product.sold}</span>
           )}
         </div>
+        {sold && product.soldLabel ? <p className="text-sm text-shop-muted">{product.soldLabel}</p> : null}
         {indicative ? (
           <p className="text-xs text-shop-muted tabular-nums" title={uiCopy.price.indicativeTitle}>
             ≈ {indicative} · {uiCopy.price.indicative}

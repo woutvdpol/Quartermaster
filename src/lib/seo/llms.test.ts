@@ -23,6 +23,7 @@ describe("llms.txt", () => {
     expect(txt).toContain("Based in Utrecht, Netherlands. Prices are in EUR. Contact: info@s.example.");
     expect(txt).toContain("- [All items for sale](https://s.example/shop)");
     expect(txt).toContain("- [Sold archive](https://s.example/archive)");
+    expect(txt).toContain("Sold items stay visible in the sold archive (https://s.example/archive) as a reference");
     expect(txt).toContain("https://s.example/feeds/google-merchant.xml");
     expect(txt).toContain("- [Helmets](https://s.example/shop/category/helmets): 12 items for sale");
     expect(txt).not.toContain("German"); // short version: top level only

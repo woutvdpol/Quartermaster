@@ -67,9 +67,10 @@ export async function reserveProduct(input: ReserveInput, tx?: Tx): Promise<Rese
   const holdMinutes = minutes;
 
   return inTx(tx, async (tx) => {
-    const product = await tx.product.findFirst({ where: { id: productId, tenantId }, select: { status: true, quantity: true } });
+    const product = await tx.product.findFirst({ where: { id: productId, tenantId }, select: { status: true, quantity: true, fairHoldId: true } });
     if (!product) throw new ServiceError("NOT_FOUND", "Product not found");
-    if (product.status !== "ACTIVE" || product.quantity <= 0) throw new ServiceError("CONFLICT", "Product is not available");
+    // fairHoldId: on a LIVE fair that hides fair stock from the shop (docs/fair-mode.md).
+    if (product.status !== "ACTIVE" || product.quantity <= 0 || product.fairHoldId) throw new ServiceError("CONFLICT", "Product is not available");
 
     await tx.$executeRaw`
       UPDATE reservations SET status = 'EXPIRED', "releasedAt" = now(), "updatedAt" = now()

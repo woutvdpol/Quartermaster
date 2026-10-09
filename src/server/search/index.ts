@@ -8,6 +8,7 @@ import "server-only";
  *   searchByImage(tenantId, rgb, input)    → SearchResult (decode uploads with decodeSearchImage first)
  *   similarProducts(tenantId, productId)   → CatalogCard[] (getSimilarProducts: data-cached per tenant)
  *   searchHints(tenantId, q)               → "did you mean" for searches without results
+ *   searchAcrossTenants / searchImageAcrossTenants → Quartermaster network (several shops; src/server/network)
  *
  * Route handlers: GET /api/search/suggest?q=…, POST /api/search/image (multipart `file`, optional `q`).
  * Admin: getSearchIndexOverview / requestReindex. Indexing runs in the worker (./jobs.ts).
@@ -17,6 +18,8 @@ export {
   suggest,
   searchByImage,
   similarProducts,
+  searchAcrossTenants,
+  searchImageAcrossTenants,
   warmSearchModels,
   SearchUnavailableError,
   MAX_RESULTS,
@@ -31,6 +34,8 @@ export {
   type ImageSearchInput,
   type NearMisses,
   type SuggestReason,
+  type AcrossTenantsInput,
+  type AcrossTenantsResult,
 } from "./service";
 export { searchHints, type SearchHints } from "./hints";
 export { getSimilarProducts } from "./similar";

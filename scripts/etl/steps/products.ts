@@ -3,6 +3,7 @@ import { ETL_MARK, chunk, isEtlOwned, json, sameValues, type EtlContext } from "
 import { decodeSpecifications } from "../transforms/json";
 import { deriveProductStatus } from "../transforms/status";
 import { assignUniqueSlugs } from "../transforms/slugs";
+import { legacySettingValue, toBool } from "../transforms/settings";
 
 const PROVENANCE_HINT = /collect|herkomst|provenance|\bex\s|nalatenschap|estate|papieren|papers/i;
 
@@ -21,6 +22,7 @@ const COMPARED = {
   importance: true,
   publishedAt: true,
   soldAt: true,
+  showSoldPrice: true,
   ageRestricted: true,
   blurred: true,
   onSale: true,
@@ -39,6 +41,9 @@ export async function productsStep(ctx: EtlContext) {
   const { tx, report, tenantId } = ctx;
   const rows = await ctx.legacy.read("products");
   report.legacy("products", rows.length);
+  // Legacy shop-wide "show price when sold" → per item on the sold products (docs/sold-archive.md).
+  const showPriceRow = (await ctx.legacy.read("settings")).find((s) => s.key === "show_price_when_sold");
+  const legacyShowSoldPrice = (showPriceRow ? toBool(legacySettingValue(showPriceRow)) : null) ?? false;
 
   const existing: ExistingProduct[] = await tx.product.findMany({
     where: { tenantId },
@@ -133,6 +138,7 @@ export async function productsStep(ctx: EtlContext) {
       // Legacy `updated_at` was the listing / "bump to top" date (docs/etl/alerts.md: never now()).
       publishedAt: r.updated_at ?? r.created_at ?? null,
       soldAt: r.sold_on,
+      showSoldPrice: legacyShowSoldPrice && status === "SOLD",
       ageRestricted: !!r.age_restricted,
       blurred: !!r.blur,
       onSale: !!r.sale_item,

@@ -139,6 +139,7 @@ Alles is runtime-config (behalve de build-args hierboven); één image gaat door
 | `TURNSTILE_SECRET_KEY` | Secret | ja (prod) | Leeg = beschermde formulieren geweigerd in productie. |
 | `CRON_SECRET` | Secret | alleen met external-cron | ≥ 16 tekens; leeg = `/api/cron/*` uit. |
 | `MATOMO_TOKEN` | Secret | nee | Alleen naar `MATOMO_URL` gestuurd. |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Secret | nee | Web push voor ingelogde klanten (`docs/push.md`). Eén sleutelpaar voor het hele platform (`npx web-push generate-vapid-keys`); `VAPID_SUBJECT` = `mailto:`-adres van de beheerder. Leeg = push uit, de shop verbergt elke push-optie. Nieuw paar = alle apparaten moeten opnieuw aanmelden. Web én worker hebben ze nodig. |
 | `EMBEDDER_TOKEN` | Secret | ja (slim zoeken) | Gedeeld geheim web/worker ↔ embedder (Bearer-header), ≥ 32 tekens. Ontbreekt het bij de embedder, dan start die niet; web/worker vallen dan terug op lexicaal zoeken. |
 | `EMBEDDER_URL` | ConfigMap | nee | Interne URL van de embedder, k8s `http://quartermaster-embedder:3100`, compose `http://embedder:3100`. Leeg = slim zoeken alleen lexicaal + facetten (semantisch en foto-zoeken uit). |
 | `EMBEDDER_TIMEOUT_QUERY_MS`, `EMBEDDER_TIMEOUT_IMAGE_MS`, `EMBEDDER_TIMEOUT_PASSAGE_MS` | ConfigMap | nee (150 / 2000 / 60000) | Time-outs van de embedder-client. Bij een time-out/fout gaat het circuit 15 s open: zoeken draait dan lexicaal (`/api/ready` → `search.timeouts`, `lexicalFallbacks`). |
@@ -348,7 +349,7 @@ Restore in een **nieuwe, lege** database (veiliger: eerst controleren, dan `DATA
 
 ## 14. Cron
 
-Terugkerende taken (`src/server/jobs/cron.ts`, UTC): `reservations.expire` (elke minuut), `alerts.scan` (5 min), `alerts.digest`, `offers.expire`, `rate-limit.prune`, `cart.abandoned` (elk uur), `leads.photos.cleanup` (dagelijks), `rates.refresh` (dagelijks 15:30).
+Terugkerende taken (`src/server/jobs/cron.ts`, UTC): `reservations.expire` (elke minuut), `alerts.scan` (5 min), `alerts.digest`, `offers.expire`, `rate-limit.prune`, `cart.abandoned` (elk uur), `leads.photos.cleanup` (dagelijks), `rates.refresh` (dagelijks 15:30), `push.reservations` (elke minuut), `push.flush` (5 min).
 
 - **Default**: de worker plant ze via pg-boss (`WORKER_CRON=1`). Geen extra Kubernetes-objecten nodig; pg-boss voorkomt dubbele runs bij meerdere workers.
 - **Alternatief**: `components/external-cron` maakt per taak een CronJob die `POST http://quartermaster-web/api/cron/<taak>` doet met `Authorization: Bearer $CRON_SECRET` (constant-time vergeleken; endpoint uit zolang `CRON_SECRET` leeg of < 16 tekens is). Het component zet `WORKER_CRON=0`. Alleen interessant als je schedules als Kubernetes-objecten wilt zien/pauzeren. Houd de lijst in sync met `CRON_TASKS`.
