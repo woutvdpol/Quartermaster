@@ -19,14 +19,17 @@ import { verifyWishlistLink } from "./signing";
  * a reservation that bounces back and forth within a day notifies once.
  */
 
-export const COOLDOWN_MS: Record<Exclude<AlertKind, "SAVED_SEARCH">, number> = {
+/** Wishlist mail alerts; RESERVATION_ENDING is push-only (PushMessage, docs/push.md). */
+type WishlistAlertKind = Exclude<AlertKind, "SAVED_SEARCH" | "RESERVATION_ENDING">;
+
+export const COOLDOWN_MS: Record<WishlistAlertKind, number> = {
   BACK_AVAILABLE: 24 * 60 * 60 * 1000,
   PRICE_DROP: 7 * 24 * 60 * 60 * 1000,
 };
 
 /** Claims the (kind, customer, product) slot. True = this caller must send the mail. */
 export async function claimWishlistDelivery(
-  kind: Exclude<AlertKind, "SAVED_SEARCH">,
+  kind: WishlistAlertKind,
   tenantId: string,
   customerId: string,
   productId: string,

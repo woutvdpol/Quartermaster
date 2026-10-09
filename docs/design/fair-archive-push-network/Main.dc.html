@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fair mode on the phone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ECECE5}
+button{font:inherit;cursor:pointer}
+a{color:#7E5416}a:hover{color:#1E2119}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #ECECE5; color: #1E2119; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 15px; display: flex; flex-direction: column; overflow: hidden">
+  <header style="background: #2F3526; color: #D9DCCB; padding: 12px 16px; display: flex; flex-direction: column; gap: 6px">
+    <div style="display: flex; justify-content: space-between; align-items: center">
+      <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px; letter-spacing: 0.06em">FAIR MODE</span>
+      <span style="font-size: 13px">[Fair name] · day 1</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px">
+      <span style="display: flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{dot}}"></span>{{netLabel}}</span>
+      <span style="font-family: 'IBM Plex Mono', monospace">Today: 7 sold · €2,840</span>
+    </div>
+  </header>
+
+  <sc-if value="{{s1}}" hint-placeholder-val="{{true}}">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px; padding: 16px">
+      <div style="aspect-ratio: 1 / 1; background: #1E2119; border-radius: 10px; display: grid; place-items: center; position: relative">
+        <span style="width: 62%; aspect-ratio: 1 / 1; border: 3px solid #D9A94E; border-radius: 12px"></span>
+        <span style="position: absolute; bottom: 14px; color: #D9DCCB; font-size: 13px">Point at the QR label on the item</span>
+      </div>
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #4A4D40">Or type the stock number
+        <span style="display: flex; gap: 8px">
+          <input type="text" inputmode="numeric" value="50160" style="flex-grow: 1; height: 48px; border: 1px solid #B7B49F; border-radius: 6px; padding: 0 12px; font: 500 18px 'IBM Plex Mono', monospace; color: #1E2119; background: #FFFFFF">
+          <button type="button" onClick="{{next}}" style="height: 48px; padding: 0 18px; border: 0; border-radius: 6px; background: #7E5416; color: #FFFFFF; font-weight: 600">Find</button>
+        </span>
+      </label>
+      <div style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px">
+        <strong style="font-size: 13px">On the table (42 items)</strong>
+        <span style="font-size: 13px; color: #4A4D40">Hidden in the webshop while the fair runs · back online automatically when you end the fair</span>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{s2}}" hint-placeholder-val="{{false}}">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 12px; padding: 16px">
+      <div style="display: flex; gap: 12px; background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 10px; padding: 12px">
+        <span style="width: 88px; height: 88px; flex-shrink: 0; border-radius: 6px; background: #C9C7B6"></span>
+        <span style="display: flex; flex-direction: column; gap: 4px">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #7A2420">No. 50160</span>
+          <strong style="font-size: 16px; line-height: 1.25">Stahlhelm M40 Heer, ET64</strong>
+          <span style="font-size: 13px; color: #4A4D40">Listed €1,450 · bought €880</span>
+        </span>
+      </div>
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #4A4D40">Fair price
+        <input type="text" inputmode="decimal" value="€ 1,350" style="height: 52px; border: 1px solid #B7B49F; border-radius: 6px; padding: 0 12px; font: 600 22px 'IBM Plex Sans', sans-serif; color: #1E2119; background: #FFFFFF">
+      </label>
+      <span style="font-size: 12px; color: #4A4D40">Floor you set: €1,250 · margin at this price €470</span>
+      <fieldset style="border: 0; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+        <legend style="font-size: 13px; color: #4A4D40; margin-bottom: 6px">Paid with</legend>
+        <label style="display: flex; align-items: center; justify-content: center; gap: 6px; height: 48px; border: 2px solid #1E2119; border-radius: 6px; background: #FFFFFF; font-weight: 600; font-size: 14px"><input type="radio" name="pay" checked>Card</label>
+        <label style="display: flex; align-items: center; justify-content: center; gap: 6px; height: 48px; border: 1px solid #B7B49F; border-radius: 6px; background: #FFFFFF; font-size: 14px"><input type="radio" name="pay">Cash</label>
+        <label style="display: flex; align-items: center; justify-content: center; gap: 6px; height: 48px; border: 1px solid #B7B49F; border-radius: 6px; background: #FFFFFF; font-size: 14px"><input type="radio" name="pay">Invoice</label>
+      </fieldset>
+      <span style="font-size: 12px; color: #4A4D40">Take the payment on your own card reader or in cash, then confirm here.</span>
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #4A4D40">Buyer e-mail (optional, for receipt and certificate)
+        <input type="email" value="" placeholder="name@example.com" style="height: 44px; border: 1px solid #B7B49F; border-radius: 6px; padding: 0 12px; font: inherit; background: #FFFFFF">
+      </label>
+      <button type="button" onClick="{{next}}" style="margin-top: auto; height: 54px; border: 0; border-radius: 6px; background: #7E5416; color: #FFFFFF; font-weight: 600; font-size: 16px">Paid €1,350 — mark as sold</button>
+    </div>
+  </sc-if>
+
+
+  <sc-if value="{{s4}}" hint-placeholder-val="{{false}}">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px; padding: 24px 16px; align-items: center; text-align: center; justify-content: center">
+      <span style="width: 72px; height: 72px; border-radius: 50%; background: #DCEBD9; color: #2F6B3A; display: grid; place-items: center; font-size: 34px; font-weight: 600">✓</span>
+      <strong style="font-size: 22px">Sold — No. 50160</strong>
+      <span style="color: #4A4D40">Removed from the webshop. Receipt and certificate sent. Synced.</span>
+      <div style="display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 10px">
+        <button type="button" onClick="{{restart}}" style="height: 52px; border: 0; border-radius: 6px; background: #7E5416; color: #FFFFFF; font-weight: 600">Sell the next item</button>
+        <button type="button" style="height: 48px; border: 1px solid #B7B49F; border-radius: 6px; background: #FAFAF6">Print receipt</button>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"offline":{"editor":"boolean","default":false},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+constructor(p) { super(p); this.state = { s: 1 }; }
+renderVals() {
+const s = this.state.s;
+const off = this.props.offline ?? false;
+return {
+s1: s === 1, s2: s === 2, s4: s === 3,
+dot: off ? '#D9A94E' : '#7FBF7F',
+netLabel: off ? 'Offline · 2 sales waiting to sync' : 'Online · all synced',
+next: () => this.setState({ s: Math.min(3, s + 1) }),
+restart: () => this.setState({ s: 1 })
+};
+}
+}
+</script>
+</body>
+</html>

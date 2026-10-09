@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fair mode admin</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ECECE5}
+button{font:inherit;cursor:pointer}
+a{color:#7E5416}a:hover{color:#1E2119}
+</style>
+</helmet>
+<div style="width: 1280px; height: 980px; box-sizing: border-box; background: #ECECE5; color: #1E2119; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; display: flex">
+  <nav aria-label="Admin" style="width: 220px; flex-shrink: 0; background: #2F3526; color: #D9DCCB; padding: 18px 14px; display: flex; flex-direction: column; gap: 4px; box-sizing: border-box">
+    <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: 0.04em; padding: 4px 10px 16px">QUARTERMASTER</span>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; text-decoration: none">Dashboard</a>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; text-decoration: none">Inventory</a>
+    <a href="#" aria-current="page" style="color: #FFFFFF; background: #3E4532; padding: 8px 10px; border-radius: 4px; font-weight: 600; text-decoration: none">Fairs</a>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; text-decoration: none">Orders</a>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; text-decoration: none">Customers</a>
+  </nav>
+
+  <main style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column">
+    <header style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; border-bottom: 1px solid #D7D8CC; background: #FAFAF6">
+      <div>
+        <span style="font-size: 12px; color: #4A4D40">Fairs › [Fair name] · Sat 12 – Sun 13 Oct</span>
+        <h1 style="margin: 2px 0 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px">[Fair name]</h1>
+      </div>
+      <ol style="list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; font-size: 13px">
+        <li style="padding: 6px 12px; border-radius: 999px; background: #DCEBD9; color: #2F6B3A">1 Prepare ✓</li>
+        <li style="padding: 6px 12px; border-radius: 999px; background: #1E2119; color: #FFFFFF; font-weight: 600">2 Live at the fair</li>
+        <li style="padding: 6px 12px; border-radius: 999px; background: #E3E3DA; color: #4A4D40">3 End &amp; report</li>
+      </ol>
+    </header>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 20px 24px">
+      <section style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+        <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #4A4D40">TAKE TO THE FAIR · 42 ITEMS</h2>
+        <label style="display: flex; gap: 8px; align-items: center; font-size: 13px"><input type="checkbox" checked>Hide these from the webshop while the fair is live</label>
+        <label style="display: flex; gap: 8px; align-items: center; font-size: 13px"><input type="checkbox" checked>Let me sell below list price down to a floor</label>
+        <div style="display: flex; flex-direction: column; border-top: 1px solid #E3E3DA">
+          <div style="display: grid; grid-template-columns: 24px 1fr 70px 70px; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #E3E3DA; font-size: 11px; color: #4A4D40; letter-spacing: 0.08em"><span></span><span>ITEM</span><span>LIST</span><span>FLOOR</span></div>
+          <label style="display: grid; grid-template-columns: 24px 1fr 70px 70px; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #E3E3DA"><input type="checkbox" checked><span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #7A2420">No. 50160</span><br>Stahlhelm M40 Heer</span><span>€1,450</span><span>€1,250</span></label>
+          <label style="display: grid; grid-template-columns: 24px 1fr 70px 70px; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #E3E3DA"><input type="checkbox" checked><span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #7A2420">No. 50212</span><br>Iron Cross 2nd class 1914</span><span>€145</span><span>€120</span></label>
+          <label style="display: grid; grid-template-columns: 24px 1fr 70px 70px; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #E3E3DA"><input type="checkbox" checked><span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #7A2420">No. 50172</span><br>Bundeswehr M56 Stahlhelm</span><span>€45</span><span>€35</span></label>
+          <label style="display: grid; grid-template-columns: 24px 1fr 70px 70px; gap: 8px; align-items: center; padding: 8px 0"><input type="checkbox"><span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #7A2420">No. 50234</span><br>Studio portrait US paratrooper</span><span>€95</span><span>—</span></label>
+        </div>
+        <span style="font-size: 12px; color: #4A4D40">Floor: suggested at list −15%, change per item.</span>
+      </section>
+
+      <section style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #4A4D40">QR LABELS</h2>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; background: #FFFFFF; border: 1px solid #D7D8CC; padding: 10px; border-radius: 4px">
+          <div style="border: 1px dashed #B7B49F; padding: 8px; display: flex; gap: 8px; align-items: center">
+            <span style="width: 48px; height: 48px; flex-shrink: 0; background: repeating-linear-gradient(90deg, #1E2119 0 4px, #FFFFFF 4px 7px)"></span>
+            <span style="display: flex; flex-direction: column; gap: 2px; font-size: 11px"><b style="font-family: 'IBM Plex Mono', monospace; color: #7A2420">No. 50160</b>M40 Heer, ET64<b>€1,450</b></span>
+          </div>
+          <div style="border: 1px dashed #B7B49F; padding: 8px; display: flex; gap: 8px; align-items: center">
+            <span style="width: 48px; height: 48px; flex-shrink: 0; background: repeating-linear-gradient(90deg, #1E2119 0 4px, #FFFFFF 4px 7px)"></span>
+            <span style="display: flex; flex-direction: column; gap: 2px; font-size: 11px"><b style="font-family: 'IBM Plex Mono', monospace; color: #7A2420">No. 50212</b>Iron Cross 2nd cl.<b>€145</b></span>
+          </div>
+          <div style="border: 1px dashed #B7B49F; padding: 8px; display: flex; gap: 8px; align-items: center">
+            <span style="width: 48px; height: 48px; flex-shrink: 0; background: repeating-linear-gradient(90deg, #1E2119 0 4px, #FFFFFF 4px 7px)"></span>
+            <span style="display: flex; flex-direction: column; gap: 2px; font-size: 11px"><b style="font-family: 'IBM Plex Mono', monospace; color: #7A2420">No. 50172</b>M56 Stahlhelm<b>€45</b></span>
+          </div>
+          <div style="border: 1px dashed #B7B49F; padding: 8px; display: flex; gap: 8px; align-items: center">
+            <span style="width: 48px; height: 48px; flex-shrink: 0; background: repeating-linear-gradient(90deg, #1E2119 0 4px, #FFFFFF 4px 7px)"></span>
+            <span style="display: flex; flex-direction: column; gap: 2px; font-size: 11px"><b style="font-family: 'IBM Plex Mono', monospace; color: #7A2420">No. 50185</b>Feldbluse M36<b>€890</b></span>
+          </div>
+        </div>
+        <label style="display: flex; flex-direction: column; gap: 4px; font-size: 13px">Label size
+          <select style="height: 36px; border: 1px solid #B7B49F; border-radius: 4px; font: inherit; background: #FFFFFF"><option>A4 sheet, 3 × 8 labels (70 × 37 mm)</option><option>Label printer 62 mm roll</option><option>Hang tags 50 × 30 mm</option></select>
+        </label>
+        <label style="display: flex; gap: 8px; align-items: center; font-size: 13px"><input type="checkbox" checked>Print the price on the label</label>
+        <span style="font-size: 12px; color: #4A4D40">The QR opens the item in fair mode for you, and the public product page for anyone else who scans it.</span>
+        <button type="button" style="height: 40px; border: 0; border-radius: 4px; background: #7E5416; color: #FFFFFF; font-weight: 600">Print 42 labels (PDF)</button>
+        <div style="border-top: 1px solid #E3E3DA; padding-top: 12px; display: flex; flex-direction: column; gap: 8px">
+          <strong style="font-size: 13px">Devices at the stand</strong>
+          <span style="font-size: 13px; color: #4A4D40">Your phone · Stand iPad</span>
+          <a href="#" style="font-size: 13px">Add a helper — one-day login without admin rights</a>
+        </div>
+      </section>
+
+      <section style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #4A4D40">LIVE · DAY 1</h2>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+          <span><b style="display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 34px">7</b><span style="font-size: 12px; color: #4A4D40">items sold</span></span>
+          <span><b style="display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 34px">€2,840</b><span style="font-size: 12px; color: #4A4D40">revenue (card €2,195 · cash €645)</span></span>
+          <span><b style="display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 34px">€1,010</b><span style="font-size: 12px; color: #4A4D40">margin</span></span>
+          <span><b style="display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 34px">−4%</b><span style="font-size: 12px; color: #4A4D40">average below list</span></span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #E3E3DA; padding-top: 10px">
+          <strong style="font-size: 13px">Latest sales</strong>
+          <span style="display: flex; justify-content: space-between; font-size: 13px"><span><span style="font-family: 'IBM Plex Mono', monospace; color: #7A2420">50160</span> M40 Heer · card</span><span>€1,350</span></span>
+          <span style="display: flex; justify-content: space-between; font-size: 13px"><span><span style="font-family: 'IBM Plex Mono', monospace; color: #7A2420">50212</span> Iron Cross · cash</span><span>€140</span></span>
+          <span style="display: flex; justify-content: space-between; font-size: 13px"><span><span style="font-family: 'IBM Plex Mono', monospace; color: #7A2420">50172</span> M56 · cash</span><span>€40</span></span>
+        </div>
+        <div style="background: #F5E7C4; border: 1px solid #E5D3A3; border-radius: 6px; padding: 10px 12px; font-size: 13px; color: #6E4A00">Cash in the box should be €645 — count it before you close the day.</div>
+        <button type="button" style="margin-top: auto; height: 40px; border: 1px solid #1E2119; border-radius: 4px; background: #FFFFFF; font-weight: 600">End fair · put 35 unsold items back online</button>
+        <span style="font-size: 12px; color: #4A4D40">Sold items become normal orders: invoice, stock movement, certificate — same as webshop sales.</span>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":980}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

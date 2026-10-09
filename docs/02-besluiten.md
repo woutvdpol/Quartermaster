@@ -133,3 +133,25 @@ Volgorde: **themabuilder + startwizard** → **AI-plaatsingsassistent + slim zoe
 - **Lokaal model, geen externe AI-dienst, geen API-sleutel en geen kosten per concept.** Draait in een eigen container (Ollama) naast de embedder; alleen modellen met een licentie die commercieel gebruik toestaat.
 - **Geparkeerd (08-10-2026):** lokale vision-modellen op CPU zijn te traag en te onnauwkeurig (ministral-3 3b: ~4 min per concept, 3/7 op de testhelm; Duitse M40 herkend als KNIL-helm). Eigenaar: overslaan. Backend-werk bewaard op lokale branch `parked/ai-listing-assistant` (niet gepusht, migratie niet toegepast).
 - Testshops `demo-onboarding` en `concept500-import` verwijderd uit de dev-database (backup in `.local/backups/`); script `npm run tenant:delete` voor de toekomst.
+
+## Innovatieronde 2 — akkoord eigenaar (09-10-2026)
+Ontwerp goedgekeurd (`docs/design/fair-archive-push-network/`, artifact "Fair mode, sold archive, push & network").
+- **Beursmodus:** verkopen op de telefoon of tablet op een beurs.
+  - QR-labels (A4, labelprinter of hangkaartjes).
+  - Minimumprijs per stuk, beursitems verborgen in de webshop zolang de beurs LIVE is.
+  - Werkt ook offline; synchroniseren met een idempotente `clientRef`.
+  - Afsluiten met een rapport (omzet, marge, kascontrole). Onverkochte stukken komen weer online.
+  - **Betaling alleen registreren:** pin of contant, eigen apparaat. Geen koppeling met een Mollie-terminal.
+  - **Geen helper-login.**
+  - Beursverkopen worden gewone orders (`channel = FAIR`) met factuur, voorraadmutatie en certificaat.
+- **Verkocht-archief:** verkochte stukken blijven als naslag zichtbaar in de shop, met zoeken en filters.
+  - Verkoopprijs **per item** aan te zetten (`showSoldPrice`, standaard uit).
+  - Per item te verbergen (`archiveHidden`).
+  - Op elk verkocht stuk: alert zetten en vergelijkbare stukken die nu te koop zijn.
+- **Pushmeldingen (web push, PWA):** alleen voor ingelogde klanten. Op de iPhone via "Zet op beginscherm".
+  - Waarvoor: nieuwe stukken voor een opgeslagen zoekopdracht, een prijsdaling op de verlanglijst en een reservering die bijna verloopt.
+  - Stille uren en een maximum per dag. Bij biedingen geen push.
+- **Quartermaster-netwerk:** één zoekpagina over alle shops die meedoen, voorlopig op `PLATFORM_HOST/network`.
+  - De domeinnaam is nog te bepalen.
+  - Opt-in per handelaar (`Tenant.networkOptIn`); de koper rekent af in de shop van de handelaar.
+  - Het verdienmodel komt later.

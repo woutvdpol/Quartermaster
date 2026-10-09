@@ -86,6 +86,15 @@ model Tenant {
   leads                 Lead[]
   productEmbeddings     ProductEmbedding[]
   searchIndexRun        SearchIndexRun?
+  fairs                 Fair[]
+  fairItems             FairItem[]
+  pushSubscriptions     PushSubscription[]
+  pushMessages          PushMessage[]
+
+  // Quartermaster network (docs/network.md): stock of opted-in shops appears in the platform-wide
+  // search at PLATFORM_HOST/network; buyers check out in the dealer's own shop.
+  networkOptIn    Boolean   @default(false)
+  networkJoinedAt DateTime?
 
   @@map("tenants")
 }
@@ -360,6 +369,13 @@ model Product {
   acceptsOffers            Boolean       @default(false)
   restrictedSymbols        Boolean       @default(false) // e.g. §86a StGB — compliance display rules
   onSale                   Boolean       @default(false) // legacy "sale_item"
+  // Sold archive (docs/sold-archive.md): sold items stay visible as reference unless hidden;
+  // the sold price is shown only when the dealer ticks it per item.
+  archiveHidden            Boolean       @default(false)
+  showSoldPrice            Boolean       @default(false)
+  // Fair mode (docs/fair-mode.md): set while the item is on a LIVE fair that hides fair stock from
+  // the webshop; cleared when the fair ends or the item is taken off the fair.
+  fairHoldId               String?
   // Phase 5 — provenance & compliance
   provenance               String? // public Markdown provenance (collection history); legacy: none (new)
   authenticityGuaranteed   Boolean       @default(false) // shows the lifetime authenticity guarantee
@@ -384,6 +400,8 @@ model Product {
   tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   category           Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   purchaseRecord     PurchaseRecord?     @relation(fields: [purchaseRecordId], references: [id], onDelete: SetNull)
+  fairHold           Fair?               @relation("FairHold", fields: [fairHoldId], references: [id], onDelete: SetNull)
+  fairItems          FairItem[]
   images             ProductImage[]
   tags               ProductTag[]
   relatedTo          ProductRelation[]   @relation("ProductRelationFrom")
@@ -407,6 +425,7 @@ model Product {
   @@index([tenantId, categoryId, status])
   @@index([tenantId, soldAt])
   @@index([purchaseRecordId])
+  @@index([fairHoldId])
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_title_trgm_idx")
   @@index([description(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_description_trgm_idx")
   @@index([sku(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_sku_trgm_idx")
@@ -624,19 +643,28 @@ model StockMovement {
 
 // Guest or account. Identity per tenant = lower-cased email.
 model Customer {
-  id        String   @id @default(cuid())
-  tenantId  String
-  userId    String?  @unique
-  email     String // lower-case
-  firstName String?
-  lastName  String?
-  phone     String?
-  notes     String? // internal
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  tenantId        String
+  userId          String?  @unique
+  email           String // lower-case
+  firstName       String?
+  lastName        String?
+  phone           String?
+  notes           String? // internal
+  // Push alerts (docs/push.md): quiet hours in minutes after local midnight (tenant timezone),
+  // daily cap, and which non-search alerts may push.
+  pushQuietStart  Int?
+  pushQuietEnd    Int?
+  pushMaxPerDay   Int      @default(5)
+  pushWishlist    Boolean  @default(true) // price drops on wishlist items
+  pushReservation Boolean  @default(true) // "your reservation ends in 3 minutes"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   user                  User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  pushSubscriptions     PushSubscription[]
+  pushMessages          PushMessage[]
   addresses             Address[]
   orders                Order[]
   carts                 Cart[]
@@ -833,6 +861,9 @@ model Order {
   discountTotal       Int               @default(0) // coupon discount (phase 5); total = subtotal - discount + shipping + surcharge
   couponCode          String? // snapshot of the applied code
   offerId             String? // set when the order came from an accepted offer
+  channel             OrderChannel      @default(WEB)
+  fairId              String? // set for sales made in fair mode
+  clientRef           String? // idempotency key from the fair-mode client (offline sales sync exactly once)
   total               Int // subtotal + shipping + surcharge
   paymentStatus       PaymentStatus     @default(PENDING)
   fulfillmentStatus   FulfillmentStatus @default(UNFULFILLED)
@@ -866,6 +897,8 @@ model Order {
   tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   customer       Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
   shippingZone   ShippingZone?   @relation(fields: [shippingZoneId], references: [id], onDelete: SetNull)
+  fair           Fair?           @relation(fields: [fairId], references: [id], onDelete: SetNull)
+  fairItems      FairItem[]
   lines          OrderLine[]
   addresses      OrderAddress[]
   payments       Payment[]
@@ -875,6 +908,8 @@ model Order {
   invoice        Invoice?
 
   @@unique([tenantId, number])
+  @@unique([tenantId, clientRef])
+  @@index([fairId])
   @@index([tenantId, placedAt(sort: Desc)])
   @@index([tenantId, paymentStatus, placedAt(sort: Desc)])
   @@index([tenantId, fulfillmentStatus])
@@ -955,6 +990,12 @@ model OrderEvent {
   @@index([orderId, createdAt])
   @@index([tenantId, createdAt])
   @@map("order_events")
+}
+
+enum OrderChannel {
+  WEB // webshop checkout
+  FAIR // fair mode (docs/fair-mode.md)
+  MANUAL // created in the admin / legacy manual orders
 }
 
 enum PaymentProvider {
@@ -1320,6 +1361,7 @@ model SavedSearch {
   name             String
   query            Json // normalised catalog params: { q, categoryId, facetValueIds[], tagIds[], priceMin, priceMax }
   frequency        AlertFrequency @default(DAILY)
+  push             Boolean        @default(false) // also/instead deliver INSTANT matches as web push (needs a customer with a subscription)
   confirmedAt      DateTime?
   confirmTokenHash String?        @unique
   unsubscribedAt   DateTime?
@@ -1342,6 +1384,7 @@ enum AlertKind {
   SAVED_SEARCH // new product matches a saved search
   BACK_AVAILABLE // wishlist item released from a cart / reservation
   PRICE_DROP // wishlist item price lowered
+  RESERVATION_ENDING // push only: the visitor's cart reservation is about to lapse
 }
 
 /// One row per (alert, product) so nobody gets the same product twice.
@@ -1693,4 +1736,103 @@ model ImportJob {
 
   @@index([tenantId, createdAt])
   @@map("import_jobs")
+}
+
+// ─── Fair mode (docs/fair-mode.md) ──────────────────────────────────────────
+
+enum FairStatus {
+  PREPARING
+  LIVE
+  ENDED
+}
+
+model Fair {
+  id           String     @id @default(cuid())
+  tenantId     String
+  name         String
+  startsOn     DateTime   @db.Date
+  endsOn       DateTime?  @db.Date
+  status       FairStatus @default(PREPARING)
+  hideFromShop Boolean    @default(true) // fair items are hidden in the webshop while LIVE
+  startedAt    DateTime?
+  endedAt      DateTime?
+  notes        String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items        FairItem[]
+  orders       Order[]
+  heldProducts Product[]  @relation("FairHold")
+
+  @@index([tenantId, status])
+  @@index([tenantId, startsOn(sort: Desc)])
+  @@map("fairs")
+}
+
+model FairItem {
+  id         String    @id @default(cuid())
+  tenantId   String
+  fairId     String
+  productId  String
+  floorPrice Int? // minor units; lowest price the seller may enter at the stand
+  soldPrice  Int? // minor units, set when sold at the fair
+  soldAt     DateTime?
+  orderId    String?
+  createdAt  DateTime  @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fair    Fair    @relation(fields: [fairId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@unique([fairId, productId])
+  @@index([productId])
+  @@index([tenantId])
+  @@map("fair_items")
+}
+
+// ─── Web push (docs/push.md) ────────────────────────────────────────────────
+
+model PushSubscription {
+  id         String    @id @default(cuid())
+  tenantId   String
+  customerId String
+  endpoint   String    @unique
+  p256dh     String
+  auth       String
+  userAgent  String?
+  lastUsedAt DateTime?
+  failedAt   DateTime? // set on 404/410 from the push service; the row is then removed
+  createdAt  DateTime  @default(now())
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([tenantId])
+  @@map("push_subscriptions")
+}
+
+/// One row per push sent (daily cap, quiet hours queue, debugging).
+model PushMessage {
+  id         String    @id @default(cuid())
+  tenantId   String
+  customerId String
+  kind       AlertKind
+  title      String
+  body       String
+  url        String
+  dedupeKey  String? // e.g. "reservation:<id>" so one event pushes once
+  queuedFor  DateTime? // held back by quiet hours until this time
+  sentAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, dedupeKey])
+  @@index([tenantId, sentAt])
+  @@index([customerId, createdAt])
+  @@map("push_messages")
 }

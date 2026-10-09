@@ -1,0 +1,22 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-10-09T10:30:00Z" },
+  "title": "Fair mode, sold archive, push & network",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 390, "h": 844, "title": "1 · Fair mode — sell from your phone at the fair", "is_interactive": true },
+    "FairSetup.dc.html": { "x": 470, "y": 0, "w": 1280, "h": 980, "title": "2 · Fair mode — prepare, labels, end-of-fair report" },
+    "SoldArchive.dc.html": { "x": 0, "y": 1300, "w": 1280, "h": 1180, "title": "3 · Sold archive — reference library in the shop", "expand": "fill" },
+    "SoldProduct.dc.html": { "x": 1360, "y": 1300, "w": 390, "h": 844, "title": "4 · Sold archive — a sold piece on the phone" },
+    "Push.dc.html": { "x": 0, "y": 2800, "w": 1000, "h": 844, "title": "5 · Push alerts — install, opt in, the alert" },
+    "Network.dc.html": { "x": 1080, "y": 2800, "w": 1280, "h": 1080, "title": "6 · Quartermaster network — one search across all dealers", "expand": "fill" }
+  },
+  "order": ["Main.dc.html", "FairSetup.dc.html", "SoldArchive.dc.html", "SoldProduct.dc.html", "Push.dc.html", "Network.dc.html"],
+  "notes": {
+    "row1": { "x": 0, "y": -300, "text": "Fair mode", "kind": "title1", "maxW": 1750 },
+    "row2": { "x": 0, "y": 1000, "text": "Sold archive", "kind": "title1", "maxW": 1750 },
+    "row3": { "x": 0, "y": 2500, "text": "Push alerts & Quartermaster network", "kind": "title1", "maxW": 2360 }
+  },
+  "designSystems": []
+}
