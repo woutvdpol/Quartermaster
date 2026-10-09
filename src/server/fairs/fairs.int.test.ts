@@ -42,7 +42,7 @@ describe("fairs", () => {
     expect(sale).toMatchObject({ paymentStatus: "PAID", reused: false });
 
     const order = await db.order.findUniqueOrThrow({ where: { id: sale.orderId }, include: { lines: true, payments: true } });
-    expect(order).toMatchObject({ channel: "FAIR", fairId: fair.id, clientRef: "ref-card-0001", total: 135000, paymentMethod: "card", shippingMethod: "PICKUP" });
+    expect(order).toMatchObject({ channel: "FAIR", fairId: fair.id, clientRef: "ref-card-0001", total: 135000, paymentMethod: "card", shippingMethod: "PICKUP", fulfillmentStatus: "DELIVERED" });
     expect(order.finalizedAt).not.toBeNull();
     expect(order.lines).toHaveLength(1);
     expect(order.lines[0]).toMatchObject({ unitPrice: 135000, purchasePriceSnapshot: 88000 });

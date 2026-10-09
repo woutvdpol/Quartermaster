@@ -534,6 +534,9 @@ export async function recordFairSale(ctx: ServiceContext, input: FairSaleInput):
             paidAt: paid ? now : null,
             paymentMethod: data.method,
             shippingMethod: "PICKUP", // handed over at the stand
+            // The buyer walks away with the item: nothing left to pack or ship (also for invoice sales).
+            fulfillmentStatus: "DELIVERED",
+            deliveredAt: placedAt,
             shippingZoneName: fair.name,
             placedAt,
             lines: {
