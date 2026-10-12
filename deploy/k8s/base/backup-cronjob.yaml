@@ -54,6 +54,13 @@ spec:
                   mkdir -p /backups/db
                   ts="$(date -u +%Y%m%dT%H%M%SZ)"
                   out="/backups/db/quartermaster-${ts}.dump"
+                  # Some CNIs (e.g. k3s' kube-router) only admit a new pod's traffic a few seconds
+                  # after it starts; wait for Postgres instead of failing the backup on that.
+                  for i in $(seq 1 30); do
+                    pg_isready --dbname="${DATABASE_URL}" --timeout=2 > /dev/null && break
+                    [ "$i" -eq 30 ] && { echo "[backup] Postgres not reachable" >&2; exit 1; }
+                    sleep 2
+                  done
                   echo "[backup] pg_dump → ${out}"
                   pg_dump --format=custom --compress=6 --no-owner --no-privileges \
                     --dbname="${DATABASE_URL}" --file="${out}.partial"
