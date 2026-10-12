@@ -12,7 +12,7 @@ import { zonedParts } from "@/server/alerts/schedule";
  *  - One event pushes once: PushMessage (customerId, dedupeKey) is unique; the keys come from here.
  */
 
-export type PushKind = "SAVED_SEARCH" | "BACK_AVAILABLE" | "PRICE_DROP" | "RESERVATION_ENDING";
+export type PushKind = "SAVED_SEARCH" | "BACK_AVAILABLE" | "PRICE_DROP" | "RESERVATION_ENDING" | "AUCTION_OUTBID" | "AUCTION_ENDING" | "AUCTION_WON";
 
 const MINUTE = 60_000;
 const DAY_MINUTES = 24 * 60;

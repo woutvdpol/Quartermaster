@@ -21,7 +21,7 @@ import { verifyWishlistLink } from "./signing";
  */
 
 /** Wishlist mail alerts; RESERVATION_ENDING is push-only (PushMessage, docs/push.md). */
-type WishlistAlertKind = Exclude<AlertKind, "SAVED_SEARCH" | "RESERVATION_ENDING">;
+type WishlistAlertKind = Extract<AlertKind, "BACK_AVAILABLE" | "PRICE_DROP">;
 
 export const COOLDOWN_MS: Record<WishlistAlertKind, number> = {
   BACK_AVAILABLE: 24 * 60 * 60 * 1000,

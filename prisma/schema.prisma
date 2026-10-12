@@ -88,6 +88,11 @@ model Tenant {
   searchIndexRun        SearchIndexRun?
   fairs                 Fair[]
   translations          Translation[]
+  auctions              Auction[]
+  auctionLots           AuctionLot[]
+  bids                  Bid[]
+  auctionBidders        AuctionBidder[]
+  blockedBidders        BlockedBidder[]
   translationTerms      TranslationTerm[]
   searchQueryStats      SearchQueryStat[]
   fairItems             FairItem[]
@@ -382,6 +387,9 @@ model Product {
   // Duplicate check (docs/duplicate-check.md): set when this listing is the same physical piece as an
   // earlier product (bought back / returned), so history and provenance can be followed.
   previousProductId        String?
+  // Auctions (docs/auctions.md): set while the product is a lot in a PUBLISHED/LIVE auction — hidden
+  // from the webshop like fairHoldId; cleared when the lot closes unsold or is removed.
+  auctionHoldId            String?
   // Phase 5 — provenance & compliance
   provenance               String? // public Markdown provenance (collection history); legacy: none (new)
   authenticityGuaranteed   Boolean       @default(false) // shows the lifetime authenticity guarantee
@@ -408,6 +416,8 @@ model Product {
   purchaseRecord     PurchaseRecord?     @relation(fields: [purchaseRecordId], references: [id], onDelete: SetNull)
   fairHold           Fair?               @relation("FairHold", fields: [fairHoldId], references: [id], onDelete: SetNull)
   previousProduct    Product?            @relation("ProductLineage", fields: [previousProductId], references: [id], onDelete: SetNull)
+  auctionHold        Auction?            @relation("AuctionHold", fields: [auctionHoldId], references: [id], onDelete: SetNull)
+  auctionLots        AuctionLot[]
   laterProducts      Product[]           @relation("ProductLineage")
   fairItems          FairItem[]
   images             ProductImage[]
@@ -435,6 +445,7 @@ model Product {
   @@index([purchaseRecordId])
   @@index([fairHoldId])
   @@index([previousProductId])
+  @@index([auctionHoldId])
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_title_trgm_idx")
   @@index([description(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_description_trgm_idx")
   @@index([sku(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_sku_trgm_idx")
@@ -672,6 +683,10 @@ model Customer {
 
   tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   user                  User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  bids                  Bid[]
+  auctionBidders        AuctionBidder[]
+  blockedBidder         BlockedBidder?
+  leadingLots           AuctionLot[]           @relation("LotLeader")
   pushSubscriptions     PushSubscription[]
   pushMessages          PushMessage[]
   addresses             Address[]
@@ -908,6 +923,7 @@ model Order {
   shippingZone   ShippingZone?   @relation(fields: [shippingZoneId], references: [id], onDelete: SetNull)
   fair           Fair?           @relation(fields: [fairId], references: [id], onDelete: SetNull)
   fairItems      FairItem[]
+  auctionLot     AuctionLot?
   lines          OrderLine[]
   addresses      OrderAddress[]
   payments       Payment[]
@@ -1004,6 +1020,7 @@ model OrderEvent {
 enum OrderChannel {
   WEB // webshop checkout
   FAIR // fair mode (docs/fair-mode.md)
+  AUCTION // won auction lot (docs/auctions.md)
   MANUAL // created in the admin / legacy manual orders
 }
 
@@ -1394,6 +1411,9 @@ enum AlertKind {
   BACK_AVAILABLE // wishlist item released from a cart / reservation
   PRICE_DROP // wishlist item price lowered
   RESERVATION_ENDING // push only: the visitor's cart reservation is about to lapse
+  AUCTION_OUTBID // push/mail: someone bid above your maximum
+  AUCTION_ENDING // push: a lot you bid on or watch closes in 5 minutes
+  AUCTION_WON // push/mail: you won a lot — pay link
 }
 
 /// One row per (alert, product) so nobody gets the same product twice.
@@ -1921,4 +1941,150 @@ model SearchQueryStat {
   @@unique([tenantId, day, query])
   @@index([tenantId, day])
   @@map("search_query_stats")
+}
+
+// ─── Auctions (docs/auctions.md, docs/auctions-plan.md) ─────────────────────
+
+enum AuctionType {
+  DAY // auction day: many lots, closing one by one (firstCloseAt + n × gapSeconds)
+  SINGLE // one lot with its own end time (continuous single-lot auctions)
+}
+
+enum AuctionStatus {
+  DRAFT // being prepared; not visible
+  PUBLISHED // visible, bidding not open yet (opensAt in the future)
+  LIVE // bidding open
+  CLOSED // every lot closed
+  CANCELLED
+}
+
+model Auction {
+  id             String        @id @default(cuid())
+  tenantId       String
+  type           AuctionType   @default(DAY)
+  status         AuctionStatus @default(DRAFT)
+  title          String
+  slug           String
+  description    String? // Markdown
+  opensAt        DateTime
+  firstCloseAt   DateTime // DAY: lot 1 closes then; SINGLE: the lot's scheduled end
+  gapSeconds     Int           @default(60)
+  extendSeconds  Int           @default(120) // a bid within this window before closesAt pushes closesAt to now + extendSeconds
+  payDays        Int           @default(5)
+  incrementTable Json? // [{ upTo: minor | null, step: minor }] — null = shop default
+  publishedAt    DateTime?
+  closedAt       DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  tenant       Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lots         AuctionLot[]
+  bidders      AuctionBidder[]
+  heldProducts Product[]       @relation("AuctionHold")
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status, firstCloseAt])
+  @@map("auctions")
+}
+
+enum AuctionLotStatus {
+  OPEN
+  SOLD // closed with a winning bid ≥ reserve (order created, awaiting/after payment)
+  UNSOLD // closed without bids or below reserve — product back to the webshop
+  CANCELLED // removed by staff, or winner did not pay and staff cancelled
+}
+
+model AuctionLot {
+  id              String           @id @default(cuid())
+  tenantId        String
+  auctionId       String
+  productId       String
+  lotNumber       Int
+  startPrice      Int // minor units
+  reservePrice    Int? // minor units, hidden; null = no reserve
+  closesAt        DateTime // scheduled close; moves forward with late-bid extensions
+  extended        Boolean          @default(false)
+  currentBid      Int? // visible price (minor units); null = no bids yet
+  leadingBidderId String? // Customer id of the leader (holder of the highest maximum)
+  leadingMax      Int? // leader's maximum — NEVER exposed publicly
+  bidCount        Int              @default(0)
+  status          AuctionLotStatus @default(OPEN)
+  closedAt        DateTime?
+  orderId         String?          @unique // winner's order (channel AUCTION)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  tenant  Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  auction Auction   @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  product Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  leader  Customer? @relation("LotLeader", fields: [leadingBidderId], references: [id], onDelete: SetNull)
+  order   Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  bids    Bid[]
+
+  @@unique([auctionId, lotNumber])
+  @@unique([auctionId, productId])
+  @@index([tenantId, status, closesAt])
+  @@index([productId])
+  @@map("auction_lots")
+}
+
+model Bid {
+  id         String    @id @default(cuid())
+  tenantId   String
+  lotId      String
+  customerId String
+  amount     Int // the visible bid this row represents (minor units)
+  maxAmount  Int // the bidder's maximum at the time (minor units) — private
+  isAuto     Boolean   @default(false) // placed automatically from a maximum
+  requestId  String? // client idempotency key
+  ipHash     String? // HMAC of the client IP (signals only, never shown)
+  deviceHash String? // HMAC of a first-party device cookie (signals only)
+  voidedAt   DateTime?
+  voidedById String? // staff user id
+  voidReason String?
+  createdAt  DateTime  @default(now())
+
+  tenant   Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lot      AuctionLot @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  customer Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@unique([lotId, requestId])
+  @@index([lotId, createdAt])
+  @@index([customerId])
+  @@index([tenantId, deviceHash])
+  @@map("bids")
+}
+
+/// Per auction: the bidder's public number ("Bidder 7") and acceptance of the auction terms.
+model AuctionBidder {
+  id              String   @id @default(cuid())
+  tenantId        String
+  auctionId       String
+  customerId      String
+  number          Int
+  termsAcceptedAt DateTime
+  createdAt       DateTime @default(now())
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  auction  Auction  @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([auctionId, customerId])
+  @@unique([auctionId, number])
+  @@map("auction_bidders")
+}
+
+model BlockedBidder {
+  id         String   @id @default(cuid())
+  tenantId   String
+  customerId String   @unique
+  reason     String?
+  blockedBy  String? // staff user id
+  createdAt  DateTime @default(now())
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("blocked_bidders")
 }
