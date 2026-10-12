@@ -209,7 +209,7 @@ Voor een team of GitOps: Sealed Secrets, External Secrets Operator of SOPS — d
 3. Overlay invullen: `images:` (registry), `PLATFORM_HOST`/`APP_URL`/`MAIL_FROM_FALLBACK`, `ingress-hosts.yaml`, RWX-storageClass voor uploads.
 4. Namespace + Secrets aanmaken (§5).
 5. `deploy/k8s/rollout.sh overlays/production <tag>` — maakt infra aan, draait de migraties, rolt web + worker uit en wacht tot alles ready is.
-6. Eerste superadmin: er is nog geen los "maak superadmin"-commando. `prisma db seed` (image `migrate`, zelfde opzet als de migrate-Job met `command: ["prisma", "db", "seed"]` en `SEED_SUPERADMIN_*`/`SEED_OWNER_*` als env) maakt de superadmin, maar óók demo-tenants met `*.localhost`-domeinen — die daarna in de admin deactiveren/verwijderen, of eerst een apart seed-script laten bouwen (§19). Tenants zelf komen via de ETL (§17) of de admin.
+6. Eerste superadmin: `scripts/bootstrap-superadmin.ts` (`npm run db:bootstrap-superadmin`) maakt alleen de superadmin aan, zonder demo-tenants. In de cluster als eenmalige Job met het `migrate`-image: zie `deploy/k8s/jobs/bootstrap-superadmin.job.example.yaml` (Secret `quartermaster-superadmin` met `SUPERADMIN_EMAIL`/`SUPERADMIN_PASSWORD`). Idempotent; weigert als er al een andere superadmin is. Daarna inloggen, wachtwoord wijzigen, 2FA aanzetten en de Secret verwijderen. Tenants zelf komen via de ETL (§17) of de admin.
 7. Controle: `curl https://<platform-host>/api/health` en `/api/ready`, admin-login, `E2E_BASE_URL=https://<tenant-host> npm run e2e` (§16).
 
 ## 7. Rollouts & rollback
@@ -467,5 +467,5 @@ Rollback-plan: DNS terug naar de oude server en Concept500 weer schrijfbaar zett
 5. **DB-poolgrootte** instelbaar maken (`DATABASE_POOL_MAX`-achtige env in `src/server/db.ts`) of PgBouncer van de provider gebruiken.
 6. **Turnstile-site-key runtime** maken (server component geeft de key als prop door) zodat het image niet per Turnstile-key gebouwd hoeft te worden.
 7. **Offsite-backupdoel** (welke S3-provider, bewaartermijn, encryptie).
-8. **Superadmin-bootstrap** zonder demo-data (los script i.p.v. de volledige seed, §6).
+8. ~~**Superadmin-bootstrap** zonder demo-data~~ — gebouwd: `scripts/bootstrap-superadmin.ts` (§6).
 9. **CI/CD**: images pushen naar een registry en `rollout.sh` (of Argo CD/Flux) vanuit CI — nog niet ingericht; CI bouwt en valideert nu alleen.

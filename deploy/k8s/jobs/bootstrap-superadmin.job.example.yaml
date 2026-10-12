@@ -1,0 +1,68 @@
+# EXAMPLE — create the first platform superadmin on a fresh installation (scripts/bootstrap-superadmin.ts).
+# No demo tenants or other data; idempotent; refuses when a different superadmin already exists.
+# Not part of any kustomization. Run once, after the first rollout (migrations applied):
+#   kubectl -n quartermaster create secret generic quartermaster-superadmin \
+#     --from-literal=SUPERADMIN_EMAIL=you@example.nl --from-literal=SUPERADMIN_PASSWORD="$(openssl rand -base64 18)"
+#   kubectl -n quartermaster create -f deploy/k8s/jobs/bootstrap-superadmin.job.example.yaml
+#   kubectl -n quartermaster logs -f job/quartermaster-bootstrap-superadmin
+# Read the password from the Secret, log in on PLATFORM_HOST, change it, enable 2FA, then delete
+# the Secret (kubectl -n quartermaster delete secret quartermaster-superadmin).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: quartermaster-bootstrap-superadmin
+  labels:
+    app.kubernetes.io/name: quartermaster
+    app.kubernetes.io/component: bootstrap
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        # Matches the egress NetworkPolicy (Postgres) like the migrate Job.
+        app.kubernetes.io/name: quartermaster
+        app.kubernetes.io/component: bootstrap
+    spec:
+      restartPolicy: Never
+      serviceAccountName: quartermaster
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: bootstrap
+          image: ghcr.io/CHANGE-ME/quartermaster-migrate:CHANGE-ME   # same tag as the running release
+          command: ["tsx", "scripts/bootstrap-superadmin.ts"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: quartermaster-secrets
+                  key: DATABASE_URL
+          envFrom:
+            - secretRef:
+                name: quartermaster-superadmin   # SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD (, SUPERADMIN_NAME)
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
