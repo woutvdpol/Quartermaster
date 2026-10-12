@@ -9,12 +9,19 @@
 #   $CI_REGISTRY_IMAGE/embedder:<tag>   smart-search + translation models service
 # Tags: the short commit SHA always; `main` + `latest` on the default branch; the git tag for tags.
 #
+# Release: pushing a protected `v*` tag (e.g. v0.2.0) builds the images with that tag, then the
+# `release` job pins it in the gitops repo (quartermaster/overlays/k3s); Argo CD syncs from there
+# (migrations first, then the app). Pushes to main only build images, they never deploy.
+#
 # Optional CI/CD variables (Settings → CI/CD → Variables):
 #   NEXT_COMPRESS=false   for images behind an ingress that compresses (docs/deploy.md)
+# Required for `release` (protected + masked, so only protected tags can read it):
+#   GITOPS_DEPLOY_KEY_B64 base64 of the private SSH key of a write deploy key on the gitops repo
 
 stages:
   - check
   - build
+  - release
 
 workflow:
   rules:
@@ -116,3 +123,37 @@ build:embedder:
       changes: [src/embedder/**/*, package.json, package-lock.json, Dockerfile]
       variables: { PUSH_IMAGES: "false" }
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_TAG
+
+# Pin the release tag in the gitops repo. Only for protected v* tags, after every image is pushed.
+release:
+  stage: release
+  image: alpine:3.21
+  needs: [build:app, build:embedder]
+  interruptible: false
+  resource_group: gitops-release
+  variables:
+    GITOPS_REPO: git@gitlab.com:persoonlijk5372342/gitops.git
+    OVERLAY: quartermaster/overlays/k3s/kustomization.yaml
+    # gitlab.com host key (fingerprint SHA256:eUXGGm1YGsMAS7vkcx6JOJdOGHPem5gQp4taiCfCLB8).
+    GITLAB_HOST_KEY: "gitlab.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAfuCHKVTjquxvt6CM6tdG4SLp1Btn/nOeHHE5UOzRdf"
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+.*$/ && $CI_COMMIT_REF_PROTECTED == "true"
+  before_script:
+    - apk add --no-cache git openssh-client > /dev/null
+    - test -n "${GITOPS_DEPLOY_KEY_B64:-}" || { echo "GITOPS_DEPLOY_KEY_B64 is not set (protected variable)"; exit 1; }
+    - install -d -m 700 ~/.ssh
+    - echo "$GITOPS_DEPLOY_KEY_B64" | base64 -d > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+    - echo "$GITLAB_HOST_KEY" > ~/.ssh/known_hosts
+    - git config --global user.name "Quartermaster release"
+    - git config --global user.email "release@noreply.gitlab.com"
+  script:
+    - |
+      set -eu
+      git clone --depth 1 "$GITOPS_REPO" gitops && cd gitops
+      # The overlay's `images:` block is the only place with newTag; all four images share the tag.
+      sed -i -E "s/^(    newTag: ).*/\1${CI_COMMIT_TAG}/" "$OVERLAY"
+      [ "$(grep -c "^    newTag: ${CI_COMMIT_TAG}\$" "$OVERLAY")" -eq 4 ] || { echo "expected 4 image tags in $OVERLAY"; git diff; exit 1; }
+      if git diff --quiet; then echo "gitops already at ${CI_COMMIT_TAG}"; exit 0; fi
+      git commit -qam "Release Quartermaster ${CI_COMMIT_TAG}" -m "From ${CI_PROJECT_URL}/-/tags/${CI_COMMIT_TAG} (${CI_COMMIT_SHORT_SHA})."
+      for i in 1 2 3; do git push origin HEAD:main && exit 0; git pull --rebase -q origin main; done
+      exit 1
