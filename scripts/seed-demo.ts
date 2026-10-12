@@ -8,9 +8,11 @@
 //   npm run db:seed:demo -- --home-only     # re-apply the demo home page composition (idempotent)
 //   npm run db:seed:demo -- --content-only  # shop details (empty fields only), legal/service/FAQ pages, header/footer menus
 //   npm run db:seed:demo -- --refresh       # all three of the above; nothing else is touched
+//   npm run db:seed:demo -- --tenant demo --content-only --home-only   # content + home page for one existing
+//                                           # tenant (any slug); the only mode allowed in production
 //
 // Rules:
-//  - Refuses to run with NODE_ENV=production.
+//  - Refuses to run with NODE_ENV=production, except --tenant with --content-only/--home-only.
 //  - Idempotent per tenant: a tenant with ≥ 10 products is skipped ("demo data already present").
 //  - Writes go through the admin services wherever one exists (catalog, media, purchasing, shipping,
 //    customers, order commands, Mollie status handling, reservations, content, settings, newsletter).
@@ -1779,19 +1781,51 @@ function printSummary(summaries: Summary[]) {
   for (const k of keys) console.log(line(k, summaries.map((s) => String(s[k] ?? "–"))));
 }
 
+/**
+ * `--tenant <slug>`: apply only the shop content (`--content-only`) and/or home page (`--home-only`) to
+ * one existing tenant, using the full Concept content with fictional details. Both only fill empty
+ * settings and sync the demo pages/menus, never products or orders, so this mode is allowed in
+ * production (e.g. a demo shop on a live installation).
+ */
+function tenantArg(): string | null {
+  const i = process.argv.indexOf("--tenant");
+  if (i === -1) return null;
+  const slug = process.argv[i + 1];
+  if (!slug || slug.startsWith("--")) throw new Error("--tenant needs a tenant slug");
+  return slug;
+}
+
 async function main() {
-  if (process.env.NODE_ENV === "production") {
-    console.error("Refusing to seed demo data with NODE_ENV=production.");
+  const refresh = process.argv.includes("--refresh");
+  const images = refresh || process.argv.includes("--images-only");
+  const home = refresh || process.argv.includes("--home-only");
+  const content = refresh || process.argv.includes("--content-only");
+  const tenant = tenantArg();
+  if (tenant && (images || !(home || content))) {
+    console.error("--tenant only works with --content-only and/or --home-only.");
+    process.exitCode = 1;
+    return;
+  }
+  if (process.env.NODE_ENV === "production" && !tenant) {
+    console.error("Refusing to seed demo data with NODE_ENV=production (only --tenant with --content-only/--home-only is allowed).");
     process.exitCode = 1;
     return;
   }
   await loadServices();
   console.log("Quartermaster demo data");
   const summaries: Summary[] = [];
-  const refresh = process.argv.includes("--refresh");
-  const images = refresh || process.argv.includes("--images-only");
-  const home = refresh || process.argv.includes("--home-only");
-  const content = refresh || process.argv.includes("--content-only");
+  if (tenant) {
+    const spec: TenantSpec = {
+      ...CONCEPT,
+      slug: tenant,
+      shopInfo: { ...CONCEPT.shopInfo, email: `info@${tenant}.example` },
+    };
+    const s = await refreshTenant(spec, { images: false, home, content });
+    if (s) summaries.push(s);
+    else process.exitCode = 1;
+    printSummary(summaries);
+    return;
+  }
   if (images || home || content) {
     for (const spec of [CONCEPT, VELDPOST]) {
       const s = await refreshTenant(spec, { images, home, content });
