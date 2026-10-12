@@ -26,6 +26,8 @@ import { ProductGallery, type GalleryImage } from "./ProductGallery";
 import { pickSources } from "@/lib/media/variants";
 import { ShippingHint, localCountryName } from "./ShippingHint";
 import { SoldAlternatives, similarForSale } from "./SoldAlternatives";
+import { ProductAuctionBanner, type ProductAuctionLot } from "@/components/shop/auctions/ProductAuctionBanner";
+import { auctionCopies } from "@/components/shop/auctions/_copy";
 
 /** Visitor-country compliance for this product (src/server/compliance); null/absent = nothing applies. */
 export type ProductGeo = { country: string | null; blurred: boolean; noShipping: boolean };
@@ -47,6 +49,7 @@ export function ProductDetail({
   geo = null,
   display = null,
   translation = null,
+  auctionLot = null,
 }: {
   shop: ShopContext;
   product: PublicProduct;
@@ -58,6 +61,8 @@ export function ProductDetail({
   display?: DisplayCurrency | null;
   /** A translated description exists: show "Translated from English · Show original" (docs/i18n.md). */
   translation?: { descriptionTranslatable: boolean; descriptionTranslated: boolean; original: boolean } | null;
+  /** The piece is a lot in a published/live auction: "Bid now" banner instead of the buy box (docs/auctions.md). */
+  auctionLot?: ProductAuctionLot | null;
 }) {
   const { catalog, legal, checkout, general } = shop.settings;
   const currency = shop.tenant.currency;
@@ -139,12 +144,16 @@ export function ProductDetail({
                   <Price cents={product.price} currency={currency} display={display} locale={locale} size="xl" />
                 ) : null}
                 <div className="flex flex-wrap gap-1.5">
-                  <StatusBadge status={status} soldIn={soldIn} locale={locale} />
+                  {auctionLot ? <Badge tone="accent">{pickCopy(auctionCopies, locale).productBanner.badge}</Badge> : <StatusBadge status={status} soldIn={soldIn} locale={locale} />}
                   {product.onSale && status !== "sold" ? <Badge tone="accent">{copy.product.sale}</Badge> : null}
                 </div>
               </div>
 
-              {status === "reserved" ? (
+              {auctionLot ? (
+                <div className="mt-7">
+                  <ProductAuctionBanner lot={auctionLot} currency={currency} locale={locale} timeZone={shop.tenant.timezone} />
+                </div>
+              ) : status === "reserved" ? (
                 <p className={`mt-5 bg-shop-warn-soft text-shop-warn ${notice}`}>{copy.product.reservedHint}</p>
               ) : status === "sold" ? (
                 <p className="mt-5 text-sm text-shop-muted">{copy.product.soldHint}</p>
@@ -156,7 +165,7 @@ export function ProductDetail({
                 </p>
               ) : null}
 
-              {status !== "sold" ? (
+              {auctionLot ? null : status !== "sold" ? (
                 <div className="mt-7 flex flex-col gap-3">
                   <ProductBuyBox product={product} available={status === "available" && !inCart} />
                   {status === "available" && !inCart ? (
@@ -278,7 +287,7 @@ export function ProductDetail({
                 HTML (docs/seo-geo.md). Its data is cached per tenant, so this costs no extra query. */}
             <ProvenanceBlock productId={product.id} />
 
-            {status === "reserved" ? (
+            {status === "reserved" && !auctionLot ? (
               <section className="flex flex-col gap-4 rounded-shop border border-shop-line p-6" aria-labelledby="pd-notify">
                 <div>
                   <h2 id="pd-notify" className="text-xl text-shop-ink">
@@ -417,7 +426,7 @@ async function SimilarProducts({ shop, product, country, display }: { shop: Shop
  * Gallery props are serialised into the RSC payload: send only the widths the gallery can use (the
  * "wide" profile) instead of every stored variant.
  */
-function galleryImages(images: PublicImage[]): GalleryImage[] {
+export function galleryImages(images: PublicImage[]): GalleryImage[] {
   return images.map(({ id, alt, width, height, thumb, card, large, blurDataUrl, sources }) => ({
     id,
     alt,

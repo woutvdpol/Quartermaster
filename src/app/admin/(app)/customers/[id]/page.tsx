@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cache } from "react";
+import { cache, Suspense } from "react";
 import {
   Card,
   ConfirmDialog,
@@ -25,6 +25,7 @@ import { requireTenantDisplay } from "@/server/tenant-display";
 import { customerCopy as t, customersCopy } from "../_copy";
 import { anonymizeCustomerAction } from "./actions";
 import { ProfileForm } from "./_components/ProfileForm";
+import { CustomerAuctions } from "../../auctions/_ext/CustomerAuctions";
 
 type OrderRow = CustomerDetail["orders"][number];
 
@@ -187,6 +188,10 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
                 </ul>
               )}
             </Card>
+
+            <Suspense fallback={null}>
+              <CustomerAuctions customerId={c.id} timeZone={tz} disabled={c.anonymized} />
+            </Suspense>
 
             {!c.anonymized && (
               <Card title={t.anonymize.title}>

@@ -28,6 +28,7 @@ import { shopOgDefaults } from "@/lib/seo/metadata";
 import { ShopLocaleProvider } from "@/components/shop/i18n/ShopLocale";
 import { getRequestLocale } from "@/server/i18n/locale";
 import { translateMenus } from "@/server/storefront/translate";
+import { hasVisibleAuctions } from "@/components/shop/auctions/server";
 import "./shop.css";
 
 /*
@@ -89,13 +90,15 @@ export default async function ShopLayout({ children }: LayoutProps<"/">) {
     );
   }
   const notLive = launch.prelaunch;
-  const [menus, allLegalLinks, ageOk] = await Promise.all([
+  const [menus, allLegalLinks, ageOk, auctions] = await Promise.all([
     // Menu labels in the shop language (approved translations only; docs/i18n.md).
     getPublicMenus(shop.tenant.id).then((m) => translateMenus(shop.tenant.id, shop.locale, m)),
     getLegalLinks(shop.tenant.id),
     legal.ageVerification === "popup"
       ? hasConfirmedAge(legal.minimumAge)
       : Promise.resolve(true),
+    // "Auctions" in the header/footer only while an auction is published or live (cached, docs/auctions.md).
+    hasVisibleAuctions(shop.tenant.id).catch(() => false),
   ]);
   // Pages the footer menu already links (e.g. a "Service" column) are not repeated in the legal row.
   const legalLinks = withoutMenuDuplicates(allLegalLinks, menus.footer);
@@ -127,11 +130,12 @@ export default async function ShopLayout({ children }: LayoutProps<"/">) {
               shopName={shop.shopName}
               logoPath={appearance.logoPath}
               menu={menus.header}
+              auctions={auctions}
             />
             <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
               {children}
             </main>
-            <Footer shop={shop} menu={menus.footer} legalLinks={legalLinks} />
+            <Footer shop={shop} menu={menus.footer} legalLinks={legalLinks} auctions={auctions} />
             {!ageOk ? (
               <AgeGate shopName={shop.shopName} minimumAge={legal.minimumAge} />
             ) : null}

@@ -55,8 +55,9 @@ import type {
 
 export type CatalogMode = "shop" | "archive";
 
-// Items on a LIVE fair that hides fair stock (Product.fairHoldId, docs/fair-mode.md) are not listed.
-const VISIBLE_SHOP = Prisma.sql`((p.status = 'RESERVED' OR (p.status = 'ACTIVE' AND p.quantity > 0)) AND p."fairHoldId" IS NULL)`;
+// Items on a LIVE fair that hides fair stock (Product.fairHoldId, docs/fair-mode.md) and lots of a
+// published/live auction (Product.auctionHoldId, docs/auctions.md) are not listed.
+const VISIBLE_SHOP = Prisma.sql`((p.status = 'RESERVED' OR (p.status = 'ACTIVE' AND p.quantity > 0)) AND p."fairHoldId" IS NULL AND p."auctionHoldId" IS NULL)`;
 const VISIBLE_ARCHIVE = Prisma.sql`(p.status = 'SOLD' AND NOT p."archiveHidden")`;
 
 function visibleSql(mode: CatalogMode) {
@@ -773,6 +774,7 @@ export async function getPublicProduct(
       archiveHidden: true,
       showSoldPrice: true,
       fairHoldId: true,
+      auctionHoldId: true,
       updatedAt: true,
       seoTitle: true,
       seoDescription: true,
@@ -814,8 +816,9 @@ export async function getPublicProduct(
     description: p.description,
     specifications: parseSpecs(p.specifications),
     price: priceVisible(p) ? p.price : 0,
-    // On a fair (held from the shop): reachable via its QR label, but shown as not purchasable.
-    status: p.fairHoldId && p.status === "ACTIVE" ? "reserved" : baseStatus(p.status),
+    // On a fair (held from the shop): reachable via its QR label, but shown as not purchasable. Same for
+    // an auction lot (the product page links to the lot: lotForProduct in src/server/auctions).
+    status: (p.fairHoldId || p.auctionHoldId) && p.status === "ACTIVE" ? "reserved" : baseStatus(p.status),
     onSale: p.onSale,
     weightGrams: p.weightGrams,
     blurred: p.blurred,

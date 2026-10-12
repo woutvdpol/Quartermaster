@@ -29,6 +29,9 @@ import { translateProduct } from "@/server/storefront/translate";
 import { ORIGINAL_PARAM, wantsOriginal } from "@/components/shop/i18n/TranslatedNote";
 import { blockedShippingCountries, deliveryCountries, loadSeoShop } from "@/server/seo";
 import { priceVisible, soldPageNoindex } from "@/server/storefront-catalog/sold";
+import { loadPublicLot, lotForProduct } from "@/server/auctions/public";
+import { lotHref } from "@/components/shop/auctions/server";
+import type { ProductAuctionLot } from "@/components/shop/auctions/ProductAuctionBanner";
 
 type Props = PageProps<"/product/[stockCode]/[[...slug]]">;
 
@@ -156,7 +159,11 @@ export default async function ProductPage({ params, searchParams }: Props) {
     getVisitorDisplayCurrency(shop.tenant.id),
     loadSeoShop(shop),
   ]);
-  const blocked = await blockedShippingCountries(shop.tenant.id, product, deliveryCountries(seo.zones, ""));
+  const [blocked, auctionLot] = await Promise.all([
+    blockedShippingCountries(shop.tenant.id, product, deliveryCountries(seo.zones, "")),
+    // Held for an auction (Product.auctionHoldId): the page links to the lot instead of the buy box.
+    product.status === "reserved" ? productAuctionLot(shop.tenant.id, product.id) : Promise.resolve(null),
+  ]);
   // Held by this visitor's own cart: shown as for sale, with "In your cart" in the buy box.
   const inCart = own.has(product.id);
   const status: PublicStatus =
@@ -197,7 +204,26 @@ export default async function ProductPage({ params, searchParams }: Props) {
         geo={geo}
         display={display}
         translation={translation}
+        auctionLot={auctionLot}
       />
     </>
   );
+}
+
+/** The open auction lot of a held product (banner on the product page), or null. */
+async function productAuctionLot(tenantId: string, productId: string): Promise<ProductAuctionLot | null> {
+  const ref = await lotForProduct(tenantId, productId);
+  if (!ref) return null;
+  const lot = await loadPublicLot(tenantId, ref.lotId);
+  if (!lot) return null;
+  return {
+    auctionTitle: ref.auctionTitle,
+    lotNumber: ref.lotNumber,
+    href: lotHref(ref.auctionSlug, ref.lotNumber),
+    opensAt: ref.opensAt,
+    closesAt: lot.closesAt,
+    price: lot.currentBid ?? lot.startPrice,
+    bidCount: lot.bidCount,
+    serverTime: new Date().toISOString(),
+  };
 }

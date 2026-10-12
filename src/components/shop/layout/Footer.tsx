@@ -8,12 +8,13 @@ import { MenuLink } from "./MenuLink";
 import { NewsletterForm } from "./NewsletterForm";
 import { pickCopy } from "@/lib/i18n/shop-copy";
 import { layoutCopies } from "./_copy";
+import { auctionCopies } from "@/components/shop/auctions/_copy";
 
 /**
  * Footer ("gallery"): thin top rule, optional newsletter strip, then columns: brand + business
  * details, one column per FOOTER menu root, legal links. Below: the footer disclaimer and credits.
  */
-export function Footer({ shop, menu, legalLinks }: { shop: ShopContext; menu: PublicMenuItem[]; legalLinks: LegalLink[] }) {
+export function Footer({ shop, menu, legalLinks, auctions = false }: { shop: ShopContext; menu: PublicMenuItem[]; legalLinks: LegalLink[]; auctions?: boolean }) {
   const t = pickCopy(layoutCopies, shop.locale).footer;
   const { general, legal, features } = shop.settings;
   const addressLines = [general.address.line1, general.address.line2, [general.address.postalCode, general.address.city].filter(Boolean).join(" ")].filter(Boolean);
@@ -24,6 +25,9 @@ export function Footer({ shop, menu, legalLinks }: { shop: ShopContext; menu: Pu
   // Sold archive (docs/sold-archive.md): a default link unless the dealer's footer menu already has one.
   const hasArchiveLink = (items: PublicMenuItem[]): boolean => items.some((i) => i.href === ARCHIVE_PATH || hasArchiveLink(i.children));
   const archiveLink = shop.settings.catalog.publicArchive && !hasArchiveLink(menu);
+  // Auctions (docs/auctions.md): while one is published or live, unless the footer menu links it already.
+  const hasAuctionsLink = (items: PublicMenuItem[]): boolean => items.some((i) => i.href === "/auctions" || hasAuctionsLink(i.children));
+  const auctionsLink = auctions && !hasAuctionsLink(menu);
   const heading = "mb-3 text-sm font-semibold text-shop-ink";
 
   return (
@@ -65,8 +69,15 @@ export function Footer({ shop, menu, legalLinks }: { shop: ShopContext; menu: Pu
               ) : null}
             </address>
           ) : null}
-          {archiveLink ? (
+          {auctionsLink ? (
             <p className="mt-4">
+              <Link href="/auctions" className={link}>
+                {pickCopy(auctionCopies, shop.locale).nav}
+              </Link>
+            </p>
+          ) : null}
+          {archiveLink ? (
+            <p className={auctionsLink ? "mt-2" : "mt-4"}>
               <Link href={ARCHIVE_PATH} className={link}>
                 {t.soldArchive}
               </Link>

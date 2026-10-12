@@ -22,6 +22,7 @@ import LeadReceivedConfirmation, { leadReceivedConfirmationSubject } from "@/ema
 import { leadAdminPath, loadLeadMailData } from "@/server/leads/mail-data";
 import { OPS_MAIL_BUILDERS } from "./builders-ops";
 import { COMMERCE_MAIL_BUILDERS } from "./builders-commerce";
+import { AUCTION_MAIL_BUILDERS } from "./builders-auctions";
 import { ONBOARDING_MAIL_BUILDERS } from "./builders-onboarding";
 import { ALERT_MAIL_BUILDERS } from "@/server/alerts/mail";
 
@@ -168,6 +169,7 @@ export const MAIL_BUILDERS: { [T in MailTemplateName]: Builder<T> } = {
   // admin-ops templates: order-shipped, owner-invite, customer-email-verification
   ...OPS_MAIL_BUILDERS,
   ...COMMERCE_MAIL_BUILDERS,
+  ...AUCTION_MAIL_BUILDERS, // auction-outbid, auction-won, auction-payment-reminder
   ...ONBOARDING_MAIL_BUILDERS,
   ...ALERT_MAIL_BUILDERS, // alert-confirm, alert-new-arrivals, alert-back-available, alert-price-drop
 

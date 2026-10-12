@@ -45,8 +45,8 @@ function visibleWhere(tenantId: string, includeSold: boolean): Prisma.ProductWhe
   return {
     tenantId,
     blurred: false,
-    // fairHoldId: on a LIVE fair that hides fair stock (docs/fair-mode.md).
-    OR: [{ status: "ACTIVE", quantity: { gt: 0 }, fairHoldId: null }, { status: "RESERVED" }, ...(includeSold ? [{ status: "SOLD" as const, archiveHidden: false }] : [])],
+    // fairHoldId: on a LIVE fair that hides fair stock (docs/fair-mode.md); auctionHoldId: a lot (docs/auctions.md).
+    OR: [{ status: "ACTIVE", quantity: { gt: 0 }, fairHoldId: null, auctionHoldId: null }, { status: "RESERVED" }, ...(includeSold ? [{ status: "SOLD" as const, archiveHidden: false }] : [])],
   };
 }
 
@@ -98,6 +98,7 @@ function feedWhere(tenantId: string): Prisma.ProductWhereInput {
     status: "ACTIVE",
     quantity: { gt: 0 },
     fairHoldId: null, // not buyable while on a fair (docs/fair-mode.md)
+    auctionHoldId: null, // not buyable while it is an auction lot (docs/auctions.md)
     blurred: false,
     ageRestricted: false,
     restrictedSymbols: false,

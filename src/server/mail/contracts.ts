@@ -38,6 +38,10 @@ export const MAIL_TEMPLATE_PROPS = {
   "offer-countered": z.object({ offerId: id, tokenEnc: z.string().min(1) }),
   "offer-rejected": z.object({ offerId: id }),
   "abandoned-cart": z.object({ cartId: id }),
+  // ── auctions (docs/auctions.md); builders in ./builders-auctions.tsx ──
+  "auction-outbid": z.object({ lotId: id, customerId: id }),
+  "auction-won": z.object({ lotId: id }),
+  "auction-payment-reminder": z.object({ lotId: id }),
   // ── onboarding (dealer sign-up → approval → setup wizard); builders in ./builders-onboarding.tsx ──
   /** Platform mail to the applicant: "we received your application, confirm your email". */
   "dealer-application-verify": z.object({ applicationId: id, tokenEnc: z.string().min(1) }),

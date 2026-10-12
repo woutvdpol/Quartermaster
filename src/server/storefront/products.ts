@@ -131,7 +131,7 @@ export async function liveReservedIds(tenantId: string, ids: string[]): Promise<
 /** Latest ACTIVE products (newest listing first). Uncached; see `getNewItems`. */
 export async function queryNewItems(tenantId: string, count: number): Promise<ProductCardRowJson[]> {
   const rows = await db.product.findMany({
-    where: { tenantId, status: "ACTIVE", quantity: { gt: 0 }, fairHoldId: null },
+    where: { tenantId, status: "ACTIVE", quantity: { gt: 0 }, fairHoldId: null, auctionHoldId: null },
     orderBy: [{ publishedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
     take: Math.min(Math.max(count, 1), 48),
     select: productCardSelect,
@@ -181,7 +181,7 @@ export async function queryCategoryTiles(tenantId: string, ids: string[]): Promi
     return out;
   };
   const cats = ids.length ? ids.flatMap((id) => all.filter((c) => c.id === id)) : all.filter((c) => c.parentId === null);
-  const counts = await db.product.groupBy({ by: ["categoryId"], where: { tenantId, status: "ACTIVE", fairHoldId: null }, _count: { _all: true } });
+  const counts = await db.product.groupBy({ by: ["categoryId"], where: { tenantId, status: "ACTIVE", fairHoldId: null, auctionHoldId: null }, _count: { _all: true } });
   const countBy = new Map(counts.map((r) => [r.categoryId, r._count._all]));
   return Promise.all(
     cats.map(async (c) => {

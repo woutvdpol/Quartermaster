@@ -8,6 +8,7 @@ import { importImagesJob, importRunJob } from "@/server/import/jobs";
 import { SEARCH_JOBS } from "@/server/search/jobs";
 import { PUSH_JOBS } from "@/server/push/jobs";
 import { TRANSLATION_JOBS } from "@/server/translations/jobs";
+import { AUCTION_JOBS } from "@/server/auctions/jobs";
 import { defineJob } from "./registry";
 import { CRON_TASKS, runCronTask, type CronTaskName } from "./cron";
 
@@ -35,6 +36,7 @@ export const CRON_JOBS = {
   "cron.push.reservations": cronJob("push.reservations"),
   "cron.push.flush": cronJob("push.flush"),
   "cron.translations.sync": cronJob("translations.sync"),
+  "cron.auctions.tick": cronJob("auctions.tick"),
 } satisfies { [K in CronTaskName as `cron.${K}`]: unknown };
 
 export const JOBS = {
@@ -49,6 +51,7 @@ export const JOBS = {
   ...SEARCH_JOBS, // search.embed-product, search.reindex-tenant
   ...PUSH_JOBS, // push.send
   ...TRANSLATION_JOBS, // translations.sync, translations.translate
+  ...AUCTION_JOBS, // auctions.close-lot, auctions.notify
   ...CRON_JOBS,
 };
 

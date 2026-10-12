@@ -209,8 +209,8 @@ export function restrictedMessage(countryCode: string, items: RestrictedItem[]):
   return `Can't be shipped to ${countryName(countryCode)} (local regulations): ${items.map((i) => i.title).join(", ")}. Remove ${items.length > 1 ? "them" : "it"} from your cart or choose pickup.`;
 }
 
-/** Cart items that compliance rules forbid shipping to `countryCode`. */
-async function restrictedItemsFor(tenantId: string, lines: { productId: string; title: string }[], countryCode: string): Promise<RestrictedItem[]> {
+/** Cart items that compliance rules forbid shipping to `countryCode`. (Also used by the auction payment page.) */
+export async function restrictedItemsFor(tenantId: string, lines: { productId: string; title: string }[], countryCode: string): Promise<RestrictedItem[]> {
   if (!lines.length || !isCountryCode(countryCode)) return [];
   const verdicts = await resolveCompliance(
     tenantId,
@@ -220,7 +220,8 @@ async function restrictedItemsFor(tenantId: string, lines: { productId: string; 
   return lines.filter((l) => verdicts[l.productId]?.noShipping).map((l) => ({ productId: l.productId, title: l.title }));
 }
 
-function buildQuote(
+/** Shipping options + totals for a set of prices (also used by the auction payment page, src/server/auctions/pay.ts). */
+export function buildQuote(
   prices: number[],
   weightGrams: number,
   zones: Awaited<ReturnType<typeof loadQuoteZones>>,

@@ -15,7 +15,7 @@ import { MenuLink } from "./MenuLink";
  * from the platform). Closes on navigation. `search` is the search field (suggestions flow below it in the drawer).
  * The language switcher sits at the bottom of the drawer (the header bar hides it on small phones).
  */
-export function MobileNav({ items, shopName, search }: { items: PublicMenuItem[]; shopName: string; search: React.ReactNode }) {
+export function MobileNav({ items, shopName, search, auctionsLabel = null }: { items: PublicMenuItem[]; shopName: string; search: React.ReactNode; auctionsLabel?: string | null }) {
   const t = useShopCopy(layoutCopies).header;
   const dialog = useRef<HTMLDialogElement>(null);
   const pathname = usePathname();
@@ -56,6 +56,13 @@ export function MobileNav({ items, shopName, search }: { items: PublicMenuItem[]
                 {t.shop}
               </Link>
             </li>
+            {auctionsLabel ? (
+              <li>
+                <Link href="/auctions" className="block rounded-shop-sm px-3 py-3 text-[1.05rem] font-medium hover:bg-shop-sunken">
+                  {auctionsLabel}
+                </Link>
+              </li>
+            ) : null}
             {items.map((item) => (
               <li key={item.id}>
                 {item.href ? (

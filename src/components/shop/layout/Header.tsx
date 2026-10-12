@@ -13,6 +13,7 @@ import { HeaderSearch } from "./HeaderSearch";
 import { SearchBox } from "./SearchBox";
 import { StickyHeader } from "./StickyHeader";
 import { layoutCopies } from "./_copy";
+import { auctionCopies } from "@/components/shop/auctions/_copy";
 
 const topLink = "flex items-center py-2 text-shop-ink-2 transition-colors hover:text-shop-primary";
 
@@ -29,17 +30,21 @@ export async function Header({
   shopName,
   logoPath,
   menu,
+  auctions = false,
 }: {
   tenantId: string;
   shopName: string;
   logoPath: string | null;
   menu: PublicMenuItem[];
+  /** A published/live auction exists: "Auctions" after "Shop" (unless the menu links it already). */
+  auctions?: boolean;
 }) {
   const t = (await shopCopy(layoutCopies)).header;
+  const auctionsLabel = auctions && !linksTo(menu, "/auctions") ? (await shopCopy(auctionCopies)).nav : null;
   return (
     <StickyHeader>
       <Container className="flex min-h-16 items-center gap-1.5 py-2.5 transition-[padding] duration-200 sm:gap-3 lg:min-h-20 lg:gap-x-6 lg:py-4 lg:group-data-[scrolled]/header:py-2.5 xl:gap-x-8">
-        <MobileNav items={menu} shopName={shopName} search={<SearchBox id="shop-search-mobile" variant="sheet" />} />
+        <MobileNav items={menu} shopName={shopName} auctionsLabel={auctionsLabel} search={<SearchBox id="shop-search-mobile" variant="sheet" />} />
         <Link href="/" className="mr-auto flex min-w-0 shrink-0 items-center gap-3 xl:mr-0" aria-label={`${shopName} ${t.homeLabel}`}>
           {logoPath ? (
             // eslint-disable-next-line @next/next/no-img-element -- stored branding asset, already sized
@@ -60,6 +65,13 @@ export async function Header({
                 {t.shop}
               </Link>
             </li>
+            {auctionsLabel ? (
+              <li className="flex">
+                <Link href="/auctions" className={topLink}>
+                  {auctionsLabel}
+                </Link>
+              </li>
+            ) : null}
             {menu.map((item) => (
               <li key={item.id} className="group/item relative flex items-center gap-1">
                 {item.href ? (
@@ -98,4 +110,9 @@ export async function Header({
       </Container>
     </StickyHeader>
   );
+}
+
+/** Does the (two-level) menu already link `href`? */
+function linksTo(items: PublicMenuItem[], href: string): boolean {
+  return items.some((i) => i.href === href || linksTo(i.children, href));
 }

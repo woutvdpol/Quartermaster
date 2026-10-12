@@ -11,6 +11,7 @@ import {
   type SeoProductRow,
 } from "@/server/seo";
 import { ARCHIVE_PATH, SHOP_PATH, categoryHref, facetValueHref, flattenTree, getCategoryTree, productHref } from "@/server/storefront-catalog";
+import { sitemapAuctionEntries } from "@/components/shop/auctions/server";
 import { PRODUCTS_PER_SITEMAP, localizedSitemapUrls, parseSitemapFile, urlsetXml, type SitemapUrl } from "@/lib/seo/sitemap-xml";
 
 /*
@@ -31,13 +32,15 @@ export async function GET(_req: Request, ctx: { params: Promise<{ file: string }
 
   switch (file.kind) {
     case "pages": {
-      const pages = await getSitemapPages(id);
+      const [pages, auctions] = await Promise.all([getSitemapPages(id), sitemapAuctionEntries(id).catch(() => [])]);
       entries = [
         // Home redirects to the catalog when content.homeRedirectsToShop is on: list only the target.
         ...(shop.settings.content.homeRedirectsToShop ? [] : [{ path: "/" }]),
         { path: SHOP_PATH },
         ...(archive ? [{ path: ARCHIVE_PATH }] : []),
         ...pages.map((p) => ({ path: p.href, lastmod: p.updatedAt })),
+        // Published/live auctions (docs/auctions.md).
+        ...auctions,
       ];
       break;
     }

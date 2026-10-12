@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { cache } from "react";
+import { cache, Suspense } from "react";
 import { notFound } from "next/navigation";
 import { requireStaffContext, ServiceError } from "@/server/context";
 import { getProduct, statusBlocker, type ProductDetail } from "@/server/catalog/products";
@@ -22,6 +22,7 @@ import { ProvenanceCard } from "./_ext/provenance/ProvenanceCard";
 import { FacetsCard } from "./_ext/facets/FacetsCard";
 import { TranslationsCard } from "./_ext/translations/TranslationsCard";
 import { Lineage } from "./_ext/duplicates/Lineage";
+import { ProductAuctionNotice } from "../../auctions/_ext/ProductAuctionNotice";
 
 /** `[id]` is the product id; a plain number is accepted as stockCode (e.g. /admin/inventory/50231). */
 const loadProduct = cache(async (id: string): Promise<{ ctx: Awaited<ReturnType<typeof requireStaffContext>>; product: ProductDetail }> => {
@@ -129,16 +130,21 @@ export default async function ProductEditPage({ params }: PageProps<"/admin/inve
           />
         ),
         status: (
-          <StatusCard
-            productId={product.id}
-            status={product.status}
-            activeBlocker={statusBlocker(product, "ACTIVE")}
-            publishedAt={product.publishedAt}
-            soldAt={product.soldAt}
-            reservation={product.reservation ? { expiresAt: product.reservation.expiresAt } : null}
-            wishlistCount={wishlistCount}
-            timeZone={tenant.timeZone}
-          />
+          <>
+            <Suspense fallback={null}>
+              <ProductAuctionNotice productId={product.id} />
+            </Suspense>
+            <StatusCard
+              productId={product.id}
+              status={product.status}
+              activeBlocker={statusBlocker(product, "ACTIVE")}
+              publishedAt={product.publishedAt}
+              soldAt={product.soldAt}
+              reservation={product.reservation ? { expiresAt: product.reservation.expiresAt } : null}
+              wishlistCount={wishlistCount}
+              timeZone={tenant.timeZone}
+            />
+          </>
         ),
         stock: (
           <StockControl

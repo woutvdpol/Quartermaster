@@ -3,7 +3,17 @@ import webpush, { WebPushError } from "web-push";
 import { db } from "@/server/db";
 import { enqueue } from "@/server/jobs/queue";
 import { vapidConfig } from "./config";
-import { STALE_AFTER_MS, buildPushPayload, decidePush, pushTtlSeconds, startOfLocalDay } from "./rules";
+import {
+  ACTIVE_BIDDER_MS,
+  STALE_AFTER_MS,
+  UNCAPPED_KINDS,
+  auctionLotIdFromDedupeKey,
+  buildPushPayload,
+  decidePush,
+  isLiveAuctionKind,
+  pushTtlSeconds,
+  startOfLocalDay,
+} from "./rules";
 
 /*
  * Delivery of PushMessage rows (worker only; docs/push.md). `push.send` → sendPushMessage():
@@ -36,6 +46,7 @@ export async function sendPushMessage(messageId: string, now = new Date()): Prom
       title: true,
       body: true,
       url: true,
+      dedupeKey: true,
       queuedFor: true,
       sentAt: true,
       createdAt: true,
@@ -61,13 +72,27 @@ export async function sendPushMessage(messageId: string, now = new Date()): Prom
   if (!subs.length) return drop("no-devices");
 
   const timeZone = msg.tenant.timezone;
-  const sentToday =
-    msg.kind === "RESERVATION_ENDING"
-      ? 0
-      : await db.pushMessage.count({
-          where: { customerId: msg.customerId, kind: { not: "RESERVATION_ENDING" }, sentAt: { gte: startOfLocalDay(now, timeZone) } },
-        });
+  // Live auction pushes (docs/auctions.md): pointless once the lot closed; TTL runs until the close.
+  let lotClosesAt: Date | null = null;
+  let activelyBidding = false;
+  if (isLiveAuctionKind(msg.kind)) {
+    const lotId = auctionLotIdFromDedupeKey(msg.dedupeKey);
+    const lot = lotId ? await db.auctionLot.findFirst({ where: { id: lotId, tenantId: msg.tenantId }, select: { status: true, closesAt: true } }) : null;
+    if (!lot || lot.status !== "OPEN" || lot.closesAt.getTime() <= now.getTime()) return drop("stale");
+    lotClosesAt = lot.closesAt;
+    const recent = await db.bid.findFirst({
+      where: { tenantId: msg.tenantId, customerId: msg.customerId, createdAt: { gte: new Date(now.getTime() - ACTIVE_BIDDER_MS) } },
+      select: { id: true },
+    });
+    activelyBidding = !!recent;
+  }
+  const sentToday = UNCAPPED_KINDS.includes(msg.kind)
+    ? 0
+    : await db.pushMessage.count({
+        where: { customerId: msg.customerId, kind: { notIn: [...UNCAPPED_KINDS] }, sentAt: { gte: startOfLocalDay(now, timeZone) } },
+      });
   const decision = decidePush({
+    activelyBidding,
     kind: msg.kind,
     now,
     timeZone,
@@ -87,8 +112,8 @@ export async function sendPushMessage(messageId: string, now = new Date()): Prom
 
   const payload = buildPushPayload(msg, { icon: PUSH_ICON_PATH });
   const options: webpush.RequestOptions = {
-    TTL: pushTtlSeconds(msg.kind, now),
-    urgency: msg.kind === "RESERVATION_ENDING" ? "high" : "normal",
+    TTL: pushTtlSeconds(msg.kind, now, lotClosesAt),
+    urgency: msg.kind === "RESERVATION_ENDING" || isLiveAuctionKind(msg.kind) ? "high" : "normal",
     vapidDetails: { subject: vapid.subject, publicKey: vapid.publicKey, privateKey: vapid.privateKey },
     timeout: 10_000,
   };

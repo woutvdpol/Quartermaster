@@ -21,8 +21,13 @@ import type { CountryOption } from "./CartSummary";
 import { cartCopies } from "./_copy";
 import { localizeServerMessage } from "./server-messages";
 
+/*
+ * The field/section helpers below are exported for the auction payment page
+ * (src/components/shop/auctions/AuctionPayForm.tsx), which uses the same form parts.
+ */
+
 /** Radio card (shipping option, payment method): panel radius, ink border + ring when selected. */
-const radioCardClass =
+export const radioCardClass =
   "flex min-h-14 cursor-pointer items-center gap-3 rounded-shop border border-shop-line bg-shop-surface px-4 py-3 transition-colors " +
   "hover:border-shop-line-strong has-checked:border-shop-ink has-checked:ring-1 has-checked:ring-shop-ink has-focus-visible:outline-2 " +
   "has-focus-visible:outline-offset-2 has-focus-visible:outline-shop-primary";
@@ -46,7 +51,7 @@ export type CheckoutFormProps = {
 };
 
 /** A payment surcharge rule in the shop language: "2,5% + € 0,25 (max. € 5,00)". */
-function describeSurcharge(
+export function describeSurcharge(
   rule: { percentBps: number; fixed: number; cap: number | null },
   money: (minor: number) => string,
   locale: ShopLocale,
@@ -62,7 +67,7 @@ function describeSurcharge(
 
 const idOf = (name: string) => `co-${name.replace(/\./g, "-")}`;
 
-function getPath(values: Record<string, unknown> | undefined, path: string): string | undefined {
+export function getPath(values: Record<string, unknown> | undefined, path: string): string | undefined {
   let node: unknown = values;
   for (const p of path.split(".")) {
     if (!node || typeof node !== "object") return undefined;
@@ -71,7 +76,7 @@ function getPath(values: Record<string, unknown> | undefined, path: string): str
   return typeof node === "string" ? node : undefined;
 }
 
-function Text({
+export function Text({
   name,
   label,
   errors,
@@ -172,7 +177,7 @@ function CountrySelect({
   );
 }
 
-function AddressFields({
+export function AddressFields({
   prefix,
   errors,
   values,
@@ -217,7 +222,7 @@ function AddressFields({
   );
 }
 
-function Section({ title, children, n }: { title: string; children: ReactNode; n: number }) {
+export function Section({ title, children, n }: { title: string; children: ReactNode; n: number }) {
   return (
     <section aria-labelledby={`co-sec-${n}`} className="border-t border-shop-line pt-7 sm:pt-9">
       <h2 id={`co-sec-${n}`} className="mb-5 flex items-baseline gap-3 text-2xl sm:mb-6">
@@ -241,7 +246,7 @@ function SubmitButton({ disabled, label }: { disabled: boolean; label: string })
   );
 }
 
-function splitName(name: string | null | undefined) {
+export function splitName(name: string | null | undefined) {
   const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return { firstName: undefined, lastName: undefined };
   return { firstName: parts[0], lastName: parts.slice(1).join(" ") || undefined };
@@ -640,7 +645,7 @@ export function CheckoutForm(props: CheckoutFormProps) {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+export function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-4">
       <dt className="text-shop-ink-2">{label}</dt>
@@ -649,7 +654,7 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Check({
+export function Check({
   name,
   children,
   error,

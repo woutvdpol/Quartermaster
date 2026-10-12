@@ -10,6 +10,10 @@ import { zonedParts } from "@/server/alerts/schedule";
  *  - Daily cap: Customer.pushMaxPerDay pushes per local calendar day. RESERVATION_ENDING doesn't
  *    count and is never capped. Over the cap a push waits for the next local day (after quiet hours).
  *  - One event pushes once: PushMessage (customerId, dedupeKey) is unique; the keys come from here.
+ *  - Auctions (docs/auctions.md): AUCTION_OUTBID / AUCTION_ENDING are only useful while the lot is
+ *    open. In quiet hours they are sent only when the customer is actively bidding (placed a bid in
+ *    the last ACTIVE_BIDDER_MS), otherwise dropped. AUCTION_WON waits for the end of quiet hours like
+ *    other alerts. No auction push counts toward the daily cap or is capped.
  */
 
 export type PushKind = "SAVED_SEARCH" | "BACK_AVAILABLE" | "PRICE_DROP" | "RESERVATION_ENDING" | "AUCTION_OUTBID" | "AUCTION_ENDING" | "AUCTION_WON";
@@ -31,6 +35,17 @@ export const DEFAULT_MAX_PER_DAY = 5;
 export const RESERVATION_WARNING_MS = 3 * MINUTE;
 /** …but not when less than this is left (the scan runs every minute; no "0 minutes left"). */
 export const RESERVATION_MIN_LEFT_MS = 45_000;
+
+/** A customer who bid within this window counts as "actively bidding" (auction pushes ignore quiet hours). */
+export const ACTIVE_BIDDER_MS = 30 * MINUTE;
+
+/** Kinds that never count toward, nor are held back by, the daily cap. */
+export const UNCAPPED_KINDS: readonly PushKind[] = ["RESERVATION_ENDING", "AUCTION_OUTBID", "AUCTION_ENDING", "AUCTION_WON"];
+
+/** Time-critical auction pushes: useless after the lot closes (high urgency, TTL until the close). */
+export function isLiveAuctionKind(kind: PushKind): kind is "AUCTION_OUTBID" | "AUCTION_ENDING" {
+  return kind === "AUCTION_OUTBID" || kind === "AUCTION_ENDING";
+}
 
 /** Unsent messages older than this are dropped by the flush cron (a "new item" from 2 days ago is stale). */
 export const STALE_AFTER_MS = 48 * 60 * MINUTE;
@@ -84,15 +99,19 @@ export type PushDecisionInput = {
   timeZone: string;
   quietStart: number | null;
   quietEnd: number | null;
-  /** Pushes already sent today (local day), RESERVATION_ENDING excluded. */
+  /** Pushes already sent today (local day), UNCAPPED_KINDS excluded. */
   sentToday: number;
   maxPerDay: number;
+  /** Auctions: the customer placed a bid recently (ACTIVE_BIDDER_MS) — live auction pushes then ignore quiet hours. */
+  activelyBidding?: boolean;
 };
 
 export function decidePush(i: PushDecisionInput): PushDecision {
   const quietUntil = quietHoursEnd(i.now, i.timeZone, i.quietStart, i.quietEnd);
   if (i.kind === "RESERVATION_ENDING") return quietUntil ? { action: "drop", reason: "quiet" } : { action: "send" };
+  if (isLiveAuctionKind(i.kind)) return quietUntil && !i.activelyBidding ? { action: "drop", reason: "quiet" } : { action: "send" };
   if (quietUntil) return { action: "defer", until: quietUntil, reason: "quiet" };
+  if (UNCAPPED_KINDS.includes(i.kind)) return { action: "send" };
   const max = Math.max(1, Math.trunc(i.maxPerDay || DEFAULT_MAX_PER_DAY));
   if (i.sentToday >= max) {
     const tomorrow = new Date(startOfLocalDay(i.now, i.timeZone).getTime() + DAY_MINUTES * MINUTE);
@@ -110,7 +129,19 @@ export const dedupeKeys = {
   priceDrop: (productId: string, newPrice: number) => `price:${productId}:${newPrice}`,
   /** One push per cart per expiry minute (an extended hold warns again). */
   reservation: (cartId: string, expiresAt: Date) => `reservation:${cartId}:${Math.floor(expiresAt.getTime() / MINUTE)}`,
+  /** Outbid: at most one push per lot per 2 minutes (a bidding war doesn't spam). */
+  auctionOutbid: (lotId: string, at: Date) => `auction-outbid:${lotId}:${Math.floor(at.getTime() / (2 * MINUTE))}`,
+  /** "Closes in 5 minutes": once per lot. */
+  auctionEnding: (lotId: string) => `auction-ending:${lotId}`,
+  /** "You won": once per lot. */
+  auctionWon: (lotId: string) => `auction-won:${lotId}`,
 };
+
+/** The lot id inside an auction dedupe key (null for other keys). */
+export function auctionLotIdFromDedupeKey(key: string | null | undefined): string | null {
+  const m = key ? /^auction-(?:outbid|ending|won):([A-Za-z0-9_-]{1,64})(?::|$)/.exec(key) : null;
+  return m ? m[1] : null;
+}
 
 // ─── Payload (what public/sw.js receives) ──────────────────────────────────
 
@@ -127,15 +158,20 @@ export function safePushUrl(url: string): string {
 }
 
 /** JSON for `event.data.json()` in public/sw.js. Kept small: push services cap payloads at ~4 kB. */
-export function buildPushPayload(msg: { id: string; kind: PushKind; title: string; body: string; url: string }, opts: { icon?: string | null } = {}): string {
+export function buildPushPayload(
+  msg: { id: string; kind: PushKind; title: string; body: string; url: string; dedupeKey?: string | null },
+  opts: { icon?: string | null } = {},
+): string {
+  const lotId = isLiveAuctionKind(msg.kind) ? auctionLotIdFromDedupeKey(msg.dedupeKey) : null;
   const payload: PushPayload = {
     title: clip(msg.title, 120),
     body: clip(msg.body, 240),
     url: safePushUrl(msg.url),
-    // Same tag = the newer notification replaces the older one (reservation warnings, one per cart).
-    tag: msg.kind === "RESERVATION_ENDING" ? "reservation" : `qm-${msg.id}`,
+    // Same tag = the newer notification replaces the older one (reservation warnings, one per cart;
+    // live auction pushes, one per lot).
+    tag: msg.kind === "RESERVATION_ENDING" ? "reservation" : lotId ? `auction-${lotId}` : `qm-${msg.id}`,
     ...(opts.icon ? { icon: opts.icon } : {}),
-    ...(msg.kind === "RESERVATION_ENDING" ? { urgent: true } : {}),
+    ...(msg.kind === "RESERVATION_ENDING" || isLiveAuctionKind(msg.kind) ? { urgent: true } : {}),
   };
   return JSON.stringify(payload);
 }
@@ -144,6 +180,11 @@ export function buildPushPayload(msg: { id: string; kind: PushKind; title: strin
 export function pushTtlSeconds(kind: PushKind, now: Date, expiresAt?: Date | null): number {
   if (kind === "RESERVATION_ENDING") {
     const left = expiresAt ? Math.floor((expiresAt.getTime() - now.getTime()) / 1000) : 120;
+    return Math.max(30, left);
+  }
+  // Live auction pushes: until the lot closes (expiresAt = closesAt).
+  if (isLiveAuctionKind(kind)) {
+    const left = expiresAt ? Math.floor((expiresAt.getTime() - now.getTime()) / 1000) : 5 * 60;
     return Math.max(30, left);
   }
   return kind === "SAVED_SEARCH" ? 6 * 60 * 60 : 24 * 60 * 60;

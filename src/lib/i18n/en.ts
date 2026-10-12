@@ -36,6 +36,7 @@ export const en = {
       orders: "Orders",
       shippingBoard: "Shipping board",
       fairs: "Fairs",
+      auctions: "Auctions",
       offers: "Offers",
       coupons: "Coupons",
       customers: "Customers",

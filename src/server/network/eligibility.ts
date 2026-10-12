@@ -156,7 +156,7 @@ export function networkProductWhere(input: NetworkWhereInput): Prisma.Sql {
   const parts: Prisma.Sql[] = [
     Prisma.sql`p."tenantId" = ANY(${[...input.tenantIds]}::text[])`,
     Prisma.sql`p.status = 'ACTIVE' AND p.quantity > 0`,
-    Prisma.sql`p."fairHoldId" IS NULL`,
+    Prisma.sql`p."fairHoldId" IS NULL AND p."auctionHoldId" IS NULL`,
     Prisma.sql`NOT p.blurred AND NOT p."ageRestricted" AND NOT p."restrictedSymbols"`,
   ];
   for (const tenantId of [...input.tenantIds].sort()) {
