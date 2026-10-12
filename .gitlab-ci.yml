@@ -65,7 +65,9 @@ check:
     DOCKER_BUILDKIT: "1"
   before_script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-    - docker buildx create --use --driver docker-container --name qm
+    # buildx can't build a builder from the dind TLS environment directly: wrap it in a context first.
+    - docker context create qm-ctx
+    - docker buildx create --use --driver docker-container --name qm qm-ctx
   script:
     - |
       set -eu
