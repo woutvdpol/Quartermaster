@@ -114,6 +114,27 @@ Belangrijk:
 - `next build` haalt Google Fonts op (`next/font/google`); de build heeft dus internet nodig en faalt bij een netwerkstoring naar `fonts.gstatic.com` — gewoon opnieuw bouwen.
 - `HEALTHCHECK` in de Dockerfile geldt alleen voor Docker/Compose; Kubernetes gebruikt de probes.
 
+### Images bouwen in GitLab
+
+`.gitlab-ci.yml` bouwt bij elke push naar `main` (en bij git-tags) de vier images en pusht ze naar de container-registry van het GitLab-project:
+
+- web: `$CI_REGISTRY_IMAGE`
+- worker: `$CI_REGISTRY_IMAGE/worker`
+- migrate: `$CI_REGISTRY_IMAGE/migrate`
+- embedder: `$CI_REGISTRY_IMAGE/embedder`
+
+**Tags:** altijd de korte commit-SHA. Op `main` ook `main` en `latest`, en bij een git-tag ook die tag.
+
+**Volgorde:** eerst draait een snelle check (lint, typecheck, unittests). De volledige suite (integratie, e2e, k8s) draait op GitHub Actions.
+
+**Merge requests:** die bouwen de images wel, maar pushen ze niet.
+
+**Cache:** de layer-cache staat in de registry onder `…/cache:<target>`.
+
+**`NEXT_COMPRESS`:** zet de CI/CD-variabele `NEXT_COMPRESS=false` voor images achter een ingress die zelf comprimeert.
+
+**Uitrol uit deze registry:** het cluster heeft een pull-secret nodig: een GitLab deploy token met `read_registry`.
+
 ## 4. Clustervoorwaarden
 
 Eenmalig per cluster:

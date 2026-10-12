@@ -1,0 +1,116 @@
+# GitLab CI: quick checks, then build the four container images and push them to this project's
+# container registry ($CI_REGISTRY_IMAGE). The full suite (integration tests against Postgres, e2e,
+# Kubernetes manifest validation) runs on GitHub Actions (.github/workflows/ci.yml).
+#
+# Images (all from one Dockerfile, same commit, same tag):
+#   $CI_REGISTRY_IMAGE:<tag>            web (Next.js standalone, target runner)
+#   $CI_REGISTRY_IMAGE/worker:<tag>     pg-boss worker
+#   $CI_REGISTRY_IMAGE/migrate:<tag>    prisma migrate deploy / ETL
+#   $CI_REGISTRY_IMAGE/embedder:<tag>   smart-search + translation models service
+# Tags: the short commit SHA always; `main` + `latest` on the default branch; the git tag for tags.
+#
+# Optional CI/CD variables (Settings → CI/CD → Variables):
+#   NEXT_COMPRESS=false   for images behind an ingress that compresses (docs/deploy.md)
+
+stages:
+  - check
+  - build
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+default:
+  interruptible: true
+
+variables:
+  NEXT_TELEMETRY_DISABLED: "1"
+  # onnxruntime-node (embedder dependency) would download CUDA libraries on linux/x64.
+  ONNXRUNTIME_NODE_INSTALL: skip
+
+check:
+  stage: check
+  image: node:24-bookworm-slim
+  timeout: 20m
+  variables:
+    # Only read at import time by a few modules; no database is used by these checks.
+    DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+    PLATFORM_HOST: localhost:3000
+  cache:
+    key:
+      files: [package-lock.json]
+    paths: [.npm/]
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends openssl ca-certificates > /dev/null
+    - export APP_ENCRYPTION_KEY="$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))")"
+    - npm ci --cache .npm --prefer-offline --no-audit --no-fund
+  script:
+    - npm run lint
+    - npx next typegen
+    - npm run typecheck
+    - npm test
+
+.build:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  timeout: 45m
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_BUILDKIT: "1"
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - docker buildx create --use --driver docker-container --name qm
+  script:
+    - |
+      set -eu
+      TAGS="$CI_COMMIT_SHORT_SHA"
+      if [ "${CI_COMMIT_BRANCH:-}" = "$CI_DEFAULT_BRANCH" ]; then TAGS="$TAGS main latest"; fi
+      if [ -n "${CI_COMMIT_TAG:-}" ]; then TAGS="$TAGS $CI_COMMIT_TAG"; fi
+      PUSH="${PUSH_IMAGES:-true}"
+      CACHE="$CI_REGISTRY_IMAGE/cache"
+      build() { # build <target> <image>
+        target="$1"; image="$2"; tag_args=""
+        for t in $TAGS; do tag_args="$tag_args -t $image:$t"; done
+        docker buildx build . \
+          --target "$target" \
+          --build-arg NEXT_DEPLOYMENT_ID="$CI_COMMIT_SHORT_SHA" \
+          --build-arg NEXT_COMPRESS="${NEXT_COMPRESS:-true}" \
+          --cache-from "type=registry,ref=$CACHE:$target" \
+          --cache-to "type=registry,ref=$CACHE:$target,mode=max" \
+          --label "org.opencontainers.image.revision=$CI_COMMIT_SHA" \
+          --label "org.opencontainers.image.source=$CI_PROJECT_URL" \
+          $tag_args \
+          $( [ "$PUSH" = "true" ] && echo --push || echo --load )
+      }
+      for spec in $IMAGES; do
+        target="${spec%%=*}"; suffix="${spec#*=}"
+        build "$target" "$CI_REGISTRY_IMAGE$suffix"
+      done
+      echo "Built: $IMAGES with tags: $TAGS"
+
+# Web + worker + migrate share the deps/build stages, so they build in one job (one layer cache).
+build:app:
+  extends: .build
+  variables:
+    IMAGES: "runner= worker=/worker migrate=/migrate"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      variables: { PUSH_IMAGES: "false" }
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_TAG
+
+# The embedder has its own small dependency set; models are not baked in (fetched into a volume).
+build:embedder:
+  extends: .build
+  variables:
+    IMAGES: "embedder=/embedder"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [src/embedder/**/*, package.json, package-lock.json, Dockerfile]
+      variables: { PUSH_IMAGES: "false" }
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_TAG
