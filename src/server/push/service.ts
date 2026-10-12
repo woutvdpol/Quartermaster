@@ -4,17 +4,28 @@ import { db } from "@/server/db";
 import { audit } from "@/server/audit";
 import { ServiceError } from "@/server/context";
 import { enqueue } from "@/server/jobs/queue";
+import { getEntitlements, hasModule } from "@/server/modules";
 import type { Prisma } from "@/generated/prisma/client";
 import { productHref } from "@/server/storefront-catalog/urls";
 import { isPushConfigured } from "./config";
 import { pushCopy } from "./copy";
-import { MAX_PER_DAY_OPTIONS, dedupeKeys, hasQuietHours, safePushUrl, type PushKind } from "./rules";
+import { MAX_PER_DAY_OPTIONS, dedupeKeys, hasQuietHours, pushModuleFor, safePushUrl, type PushKind } from "./rules";
 
 /*
  * Web push for logged-in shop customers (docs/push.md): subscriptions (one row per browser/device),
  * preferences, and queueing a PushMessage. Sending is the `push.send` job (./send.ts, worker only).
  * Every query is scoped by tenant + customer from the session — never from the client.
+ *
+ * Web push is part of the paid `alerts` module (docs/modules.md); auction pushes also work with the
+ * `auctions` module alone. Without either a shop gets no new subscriptions and queues no pushes
+ * (per kind: pushModuleFor). Existing subscriptions are kept; turning push off always works.
  */
+
+/** Does the shop have a module that uses web push (`alerts` or `auctions`)? */
+async function pushEntitled(tenantId: string): Promise<boolean> {
+  const { modules } = await getEntitlements(tenantId);
+  return modules.has("alerts") || modules.has("auctions");
+}
 
 export type PushOwner = { tenantId: string; customerId: string };
 
@@ -32,6 +43,9 @@ export type PushSubscriptionInput = z.input<typeof subscriptionSchema>;
  */
 export async function savePushSubscription(owner: PushOwner, input: unknown, opts: { userAgent?: string | null } = {}): Promise<{ id: string }> {
   if (!isPushConfigured()) throw new ServiceError("UNAVAILABLE", "Push alerts are not available");
+  if (!(await pushEntitled(owner.tenantId))) {
+    throw new ServiceError("UNAVAILABLE", "Push alerts are not part of this shop's package", { module: "alerts" });
+  }
   const parsed = subscriptionSchema.safeParse(input);
   if (!parsed.success) throw new ServiceError("INVALID", "Invalid push subscription", parsed.error.issues);
   const { endpoint, keys } = parsed.data;
@@ -62,7 +76,7 @@ export async function removePushSubscription(owner: PushOwner, endpoint: string 
 // ─── Preferences ───────────────────────────────────────────────────────────
 
 export type PushPrefs = {
-  /** Push configured on the platform (VAPID keys). */
+  /** Push configured on the platform (VAPID keys) and the shop has `alerts` or `auctions`. */
   available: boolean;
   devices: number;
   /** Is this endpoint (the current browser) one of the customer's devices? */
@@ -88,7 +102,7 @@ export async function getPushPrefs(owner: PushOwner, endpoint?: string | null): 
   });
   if (!c) throw new ServiceError("NOT_FOUND", "Customer not found");
   return {
-    available: isPushConfigured(),
+    available: isPushConfigured() && (await pushEntitled(owner.tenantId)),
     devices: c.pushSubscriptions.length,
     thisDevice: !!endpoint && c.pushSubscriptions.some((s) => s.endpoint === endpoint),
     quietStart: hasQuietHours(c.pushQuietStart, c.pushQuietEnd) ? c.pushQuietStart : null,
@@ -141,7 +155,8 @@ export async function pushRecipients(
   client: Prisma.TransactionClient = db,
 ): Promise<Set<string>> {
   const ids = [...new Set(customerIds)].filter(Boolean);
-  if (!ids.length || !isPushConfigured()) return new Set();
+  // Kind-specific module check happens in queuePush; here only "does this shop use push at all".
+  if (!ids.length || !isPushConfigured() || !(await pushEntitled(tenantId))) return new Set();
   const rows = await client.customer.findMany({
     where: { tenantId, id: { in: ids }, ...(pref ? { [pref]: true } : {}), pushSubscriptions: { some: { failedAt: null } } },
     select: { id: true },
@@ -161,9 +176,10 @@ export type QueuePushInput = {
 
 /**
  * Creates the PushMessage (once per customer + dedupeKey) and queues `push.send`. Pass `tx` to make
- * both part of the caller's transaction. Returns false for a duplicate event.
+ * both part of the caller's transaction. Returns false for a duplicate event (or a shop without the kind's module).
  */
 export async function queuePush(input: QueuePushInput, opts: { tx?: Prisma.TransactionClient } = {}): Promise<boolean> {
+  if (!(await hasModule(input.tenantId, pushModuleFor(input.kind)))) return false;
   const client = opts.tx ?? db;
   const created = await client.pushMessage.createManyAndReturn({
     data: [

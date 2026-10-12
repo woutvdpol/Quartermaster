@@ -11,6 +11,7 @@ import { findOrCreateGuestCustomer } from "@/server/customers";
 import { imageUrl, variantKey } from "@/server/media/product-images";
 import { hostToBaseUrl } from "@/server/mail/urls";
 import { getTenantDisplay } from "@/server/tenant-display";
+import { assertModule, hasModule } from "@/server/modules";
 import type { Prisma } from "@/generated/prisma/client";
 import type { FairStatus, PaymentStatus, ProductStatus } from "@/generated/prisma/enums";
 import {
@@ -110,6 +111,7 @@ export type FairRow = {
 };
 
 export async function listFairs(ctx: ServiceContext): Promise<FairRow[]> {
+  await assertModule(ctx, "fairs");
   const fairs = await db.fair.findMany({
     where: { tenantId: ctx.tenantId },
     orderBy: [{ startsOn: "desc" }, { createdAt: "desc" }],
@@ -164,6 +166,24 @@ export type FairDetail = {
 };
 
 export async function getFair(ctx: ServiceContext, fairId: string): Promise<FairDetail> {
+  await assertModule(ctx, "fairs");
+  return loadFair(ctx, fairId);
+}
+
+/**
+ * Wind-down (docs/modules.md, like auctions): a fair that is already running may finish after the
+ * shop loses the "fairs" module. Passes when the shop has the module or the fair is in `statuses`;
+ * otherwise throws UNAVAILABLE. New activity (create, start, add items, …) keeps plain assertModule.
+ */
+async function assertFairsOrRunning(ctx: ServiceContext, fairId: string, statuses: readonly FairStatus[]): Promise<void> {
+  if (await hasModule(ctx.tenantId, "fairs")) return;
+  const id = idSchema.safeParse(fairId);
+  const fair = id.success ? await db.fair.findFirst({ where: { id: id.data, tenantId: ctx.tenantId }, select: { status: true } }) : null;
+  if (fair && statuses.includes(fair.status)) return;
+  await assertModule(ctx, "fairs");
+}
+
+async function loadFair(ctx: ServiceContext, fairId: string): Promise<FairDetail> {
   const id = idSchema.parse(fairId);
   const fair = await db.fair.findFirst({
     where: { id, tenantId: ctx.tenantId },
@@ -221,6 +241,7 @@ export type FairCandidate = { id: string; stockCode: number; title: string; pric
 
 /** ACTIVE, in-stock products not yet on this fair, matching `q` (title / stock number / SKU). */
 export async function searchFairCandidates(ctx: ServiceContext, fairId: string, q: string, limit = 30): Promise<FairCandidate[]> {
+  await assertModule(ctx, "fairs");
   const id = idSchema.parse(fairId);
   const query = z.string().trim().max(100).parse(q ?? "");
   const code = /^\d{1,9}$/.test(query) ? Number(query) : null;
@@ -244,6 +265,7 @@ export async function searchFairCandidates(ctx: ServiceContext, fairId: string, 
 // ─── Fair lifecycle ─────────────────────────────────────────────────────────
 
 export async function createFair(ctx: ServiceContext, input: FairInput) {
+  await assertModule(ctx, "fairs");
   const data = parseInput(fairSchema, input);
   const fair = await db.fair.create({
     data: { tenantId: ctx.tenantId, name: data.name, startsOn: data.startsOn, endsOn: data.endsOn ?? null, hideFromShop: data.hideFromShop, notes: data.notes || null },
@@ -255,6 +277,7 @@ export async function createFair(ctx: ServiceContext, input: FairInput) {
 
 /** Edits name/dates/notes/hide toggle. On a LIVE fair the hide toggle applies or releases holds immediately. */
 export async function updateFair(ctx: ServiceContext, fairId: string, input: FairInput) {
+  await assertModule(ctx, "fairs");
   const id = idSchema.parse(fairId);
   const data = parseInput(fairSchema, input);
   const result = await db.$transaction(async (tx) => {
@@ -277,6 +300,7 @@ export async function updateFair(ctx: ServiceContext, fairId: string, input: Fai
 
 /** Deletes a fair that never went live (no sales possible yet). */
 export async function deleteFair(ctx: ServiceContext, fairId: string) {
+  await assertModule(ctx, "fairs");
   const id = idSchema.parse(fairId);
   const name = await db.$transaction(async (tx) => {
     const fair = await lockFair(tx, ctx.tenantId, id);
@@ -289,6 +313,7 @@ export async function deleteFair(ctx: ServiceContext, fairId: string) {
 
 /** PREPARING → LIVE. Hides the unsold items from the shop when `hideFromShop`. */
 export async function startFair(ctx: ServiceContext, fairId: string) {
+  await assertModule(ctx, "fairs");
   const id = idSchema.parse(fairId);
   const held = await db.$transaction(async (tx) => {
     const fair = await lockFair(tx, ctx.tenantId, id);
@@ -300,7 +325,11 @@ export async function startFair(ctx: ServiceContext, fairId: string) {
   return { held };
 }
 
-/** LIVE → ENDED. Releases every hold: unsold items are for sale in the shop again right away. */
+/**
+ * LIVE → ENDED. Releases every hold: unsold items are for sale in the shop again right away.
+ * Deliberately NOT module-gated (docs/modules.md): a shop that lost "fairs" must still be able to end a
+ * live fair so its held items return to the shop.
+ */
 export async function endFair(ctx: ServiceContext, fairId: string) {
   const id = idSchema.parse(fairId);
   const released = await db.$transaction(async (tx) => {
@@ -322,6 +351,7 @@ const addItemsSchema = z.object({ productIds: z.array(idSchema).min(1, "Choose a
  * defaults to list −15%, rounded. On a LIVE hiding fair the new items are held immediately.
  */
 export async function addFairItems(ctx: ServiceContext, fairId: string, productIds: string[]) {
+  await assertModule(ctx, "fairs");
   const id = idSchema.parse(fairId);
   const { productIds: ids } = parseInput(addItemsSchema, { productIds });
   const result = await db.$transaction(async (tx) => {
@@ -342,7 +372,7 @@ export async function addFairItems(ctx: ServiceContext, fairId: string, productI
   return result;
 }
 
-/** Takes an unsold item off the fair (and out of its hold). */
+/** Takes an unsold item off the fair (and out of its hold). Not module-gated: it only releases a hold (wind-down). */
 export async function removeFairItem(ctx: ServiceContext, fairId: string, productId: string) {
   const id = idSchema.parse(fairId);
   const pid = idSchema.parse(productId);
@@ -359,6 +389,7 @@ export async function removeFairItem(ctx: ServiceContext, fairId: string, produc
 
 /** Sets (or clears: null = list price is the minimum) an item's floor price. */
 export async function setFairItemFloor(ctx: ServiceContext, fairId: string, productId: string, floorPrice: number | null) {
+  await assertModule(ctx, "fairs");
   const id = idSchema.parse(fairId);
   const pid = idSchema.parse(productId);
   const floor = moneySchema.nullable().parse(floorPrice);
@@ -389,8 +420,10 @@ export type FairSellData = {
   }[];
 };
 
+/** Without the module only for a LIVE fair (wind-down: the stand may finish the fair). */
 export async function getFairSellData(ctx: ServiceContext, fairId: string): Promise<FairSellData> {
-  const fair = await getFair(ctx, fairId);
+  await assertFairsOrRunning(ctx, fairId, ["LIVE"]);
+  const fair = await loadFair(ctx, fairId);
   const display = await getTenantDisplay(ctx.tenantId);
   return {
     fair: { id: fair.id, name: fair.name, status: fair.status, hideFromShop: fair.hideFromShop, startsOn: fair.startsOn.toISOString().slice(0, 10) },
@@ -461,6 +494,8 @@ async function existingSale(tx: Tx | typeof db, tenantId: string, clientRef: str
  */
 export async function recordFairSale(ctx: ServiceContext, input: FairSaleInput): Promise<FairSaleResult> {
   const data = parseInput(saleSchema, input);
+  // Wind-down: sales at a LIVE fair, and sales queued offline before it ended, sync without the module.
+  await assertFairsOrRunning(ctx, data.fairId, ["LIVE", "ENDED"]);
   const tenantId = ctx.tenantId;
 
   const pre = await existingSale(db, tenantId, data.clientRef);
@@ -628,6 +663,7 @@ export async function recordFairSale(ctx: ServiceContext, input: FairSaleInput):
 
 /** Live / end-of-fair figures: the fair's orders that were not canceled. */
 export async function getFairReport(ctx: ServiceContext, fairId: string): Promise<FairReport & { unsold: number; items: number }> {
+  await assertModule(ctx, "fairs");
   const id = idSchema.parse(fairId);
   const [orders, items, sold] = await Promise.all([
     db.order.findMany({
@@ -668,6 +704,7 @@ export type FairLabel = { stockCode: number; title: string; price: number; url: 
  * product URL on the shop's primary domain; fair mode reads the stock code from that URL.
  */
 export async function getFairLabels(ctx: ServiceContext, fairId: string, productIds?: string[]): Promise<{ fairName: string; currency: string; labels: FairLabel[] }> {
+  await assertModule(ctx, "fairs");
   const fair = await getFair(ctx, fairId);
   const display = await getTenantDisplay(ctx.tenantId);
   const base = display?.primaryHost ? hostToBaseUrl(display.primaryHost) : (process.env.APP_URL ?? "").replace(/\/$/, "");

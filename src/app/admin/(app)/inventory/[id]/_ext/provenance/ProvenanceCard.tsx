@@ -5,6 +5,7 @@ import { listProductDocuments } from "@/server/provenance/documents";
 import { CERTIFICATE_STATUSES, listCertificates } from "@/server/provenance/certificates";
 import { MAX_DOCUMENT_IMAGE_BYTES, MAX_PDF_BYTES } from "@/server/provenance/files";
 import { requireTenantDisplay } from "@/server/tenant-display";
+import { hasModule } from "@/server/modules";
 import { CertificatesPanel } from "./CertificatesPanel";
 import { DocumentsPanel } from "./DocumentsPanel";
 import { ProvenanceForm } from "./ProvenanceForm";
@@ -24,12 +25,13 @@ export async function ProvenanceCard({ productId }: { productId: string }) {
       listProductDocuments(ctx, productId),
       listCertificates(ctx, productId),
       requireTenantDisplay(ctx.tenantId),
+      hasModule(ctx.tenantId, "provenance"),
     ]);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") return null;
     throw err;
   }
-  const [provenance, documents, certificates, tenant] = data;
+  const [provenance, documents, certificates, tenant, hasProvenance] = data;
   const canIssue = (CERTIFICATE_STATUSES as readonly string[]).includes(provenance.status);
   const validCount = certificates.filter((c) => c.valid).length;
 
@@ -57,6 +59,7 @@ export async function ProvenanceCard({ productId }: { productId: string }) {
             timeZone={tenant.timeZone}
             maxPdfBytes={MAX_PDF_BYTES}
             maxImageBytes={MAX_DOCUMENT_IMAGE_BYTES}
+            locked={!hasProvenance}
           />
         </section>
 
@@ -67,6 +70,7 @@ export async function ProvenanceCard({ productId }: { productId: string }) {
           <CertificatesPanel
             productId={productId}
             canIssue={canIssue}
+            locked={!hasProvenance}
             timeZone={tenant.timeZone}
             certificates={certificates.map((c) => ({
               id: c.id,

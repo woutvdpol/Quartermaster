@@ -25,6 +25,7 @@ import { filterCounts, formatPercent, matchesFilter, parseResultFilter, resultKi
 import { getAuctionResults } from "../../_service";
 import type { ResultRow } from "../../_types";
 import { cancelWonLotAction, sendReminderAction } from "../../actions";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 export const metadata: Metadata = { title: "Auction results" };
 
@@ -40,6 +41,7 @@ const PAY_TONE: Record<ResultKind, string> = {
 };
 
 export default async function AuctionResultsPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<SearchParamsRecord> }) {
+  if (await moduleLocked("auctions")) return null; // ModuleGate in layout.tsx shows the upsell
   const [{ id }, sp, ctx] = await Promise.all([params, searchParams, requireStaffContext()]);
   const [data, tenant] = await Promise.all([
     getAuctionResults(ctx, id).catch((err) => {

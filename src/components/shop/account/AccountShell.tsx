@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Container } from "@/components/shop/ui/Container";
 import { cn } from "@/components/shop/ui/cn";
 import { shopCopy } from "@/server/i18n/locale";
+import { requireShop } from "@/server/storefront/context";
 import { accountCopies } from "./_copy";
 import { logoutCustomerAction } from "./actions";
 
@@ -20,14 +21,16 @@ const NAV: Array<{ key: AccountSection; href: string }> = [
 
 /** Account page frame: sidebar navigation on desktop, horizontal tabs on phones. No session read (only the request language). */
 export async function AccountShell({ active, title, children }: { active: AccountSection; title: string; children: ReactNode }) {
-  const t = (await shopCopy(accountCopies)).account.nav;
+  const [t, shop] = await Promise.all([shopCopy(accountCopies).then((c) => c.account.nav), requireShop()]);
+  // "Alerts" belongs to the alerts module (docs/modules.md).
+  const nav = shop.settings.features.alerts ? NAV : NAV.filter((n) => n.key !== "alerts");
   return (
     <Container className="py-8 sm:py-14">
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[220px_minmax(0,1fr)] md:gap-14">
         <aside className="min-w-0">
           <nav aria-label={t.label} className="md:sticky md:top-24">
             <ul className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-col md:overflow-visible md:px-0">
-              {NAV.map((n) => (
+              {nav.map((n) => (
                 <li key={n.key}>
                   <Link
                     href={n.href}

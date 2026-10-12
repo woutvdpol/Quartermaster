@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/server/db";
 import { audit } from "@/server/audit";
 import { ServiceError, type ServiceContext } from "@/server/context";
+import { assertModule, hasModule } from "@/server/modules";
 import { isUniqueViolation, parseInput } from "@/server/catalog/errors";
 import { Prisma } from "@/generated/prisma/client";
 import { COUPON_CODE_PATTERN, evaluateCouponRule, normalizeCouponCode, type CouponOutcome, type CouponRule, type CouponUsage } from "./evaluate";
@@ -71,9 +72,14 @@ export type EvaluateInput = {
   email: string | null;
 };
 
+/*
+ * Paid module "coupons" (docs/modules.md): without it every code evaluates as unknown, so cart, quote
+ * and placeOrder show their usual "invalid code" refusal. Existing redemptions (orders) are untouched.
+ */
+
 /** Read-only evaluation (cart, quote). placeOrder re-evaluates under a row lock (evaluateCouponForOrderTx). */
 export async function evaluateCoupon(tenantId: string, code: string, input: EvaluateInput, formatMoney?: (n: number) => string): Promise<CouponOutcome> {
-  const coupon = await findCouponByCode(db, tenantId, code);
+  const coupon = (await hasModule(tenantId, "coupons")) ? await findCouponByCode(db, tenantId, code) : null;
   const usage = coupon ? await countCouponUsage(db, coupon.id, input.email?.toLowerCase() ?? null) : { total: 0, byEmail: null };
   return evaluateCouponRule(coupon as CouponRule | null, { code, eligibleSubtotal: input.subtotal, shippingPrice: input.shippingPrice, usage }, formatMoney);
 }
@@ -90,7 +96,7 @@ export async function evaluateCouponForOrderTx(
   formatMoney?: (n: number) => string,
 ): Promise<{ couponId: string | null; outcome: CouponOutcome }> {
   const normalized = normalizeCouponCode(code);
-  const locked = COUPON_CODE_PATTERN.test(normalized)
+  const locked = COUPON_CODE_PATTERN.test(normalized) && (await hasModule(tenantId, "coupons"))
     ? await tx.$queryRaw<{ id: string }[]>`SELECT id FROM coupons WHERE "tenantId" = ${tenantId} AND code = ${normalized} FOR UPDATE`
     : [];
   const coupon = locked.length ? await tx.coupon.findUniqueOrThrow({ where: { id: locked[0].id }, select: ruleSelect }) : null;
@@ -179,6 +185,7 @@ function viewWhere(view: z.output<typeof listSchema>["view"]) {
 }
 
 export async function listCoupons(ctx: ServiceContext, query: z.input<typeof listSchema> = {}) {
+  await assertModule(ctx, "coupons");
   const q = listSchema.parse(query);
   const term = q.q ? `%${q.q.replace(/[\\%_]/g, (m) => `\\${m}`)}%` : null;
   const search = term ? Prisma.sql`AND (c.code ILIKE ${term} OR c.description ILIKE ${term})` : Prisma.empty;
@@ -218,6 +225,7 @@ export async function listCoupons(ctx: ServiceContext, query: z.input<typeof lis
 }
 
 export async function getCoupon(ctx: ServiceContext, id: string) {
+  await assertModule(ctx, "coupons");
   const coupon = await db.coupon.findFirst({ where: { id: idSchema.parse(id), tenantId: ctx.tenantId } });
   if (!coupon) throw new ServiceError("NOT_FOUND", "Coupon not found");
   const usage = await countCouponUsage(db, coupon.id, null);
@@ -226,6 +234,7 @@ export async function getCoupon(ctx: ServiceContext, id: string) {
 }
 
 export async function createCoupon(ctx: ServiceContext, input: CouponInput) {
+  await assertModule(ctx, "coupons");
   const data = parseInput(couponInputSchema, input);
   try {
     const coupon = await db.coupon.create({ data: { tenantId: ctx.tenantId, ...data } });
@@ -239,6 +248,7 @@ export async function createCoupon(ctx: ServiceContext, input: CouponInput) {
 
 /** Updates a coupon. The code (and type) can only change while nothing was redeemed yet. */
 export async function updateCoupon(ctx: ServiceContext, id: string, input: CouponInput) {
+  await assertModule(ctx, "coupons");
   const data = parseInput(couponInputSchema, input);
   const existing = await db.coupon.findFirst({ where: { id: idSchema.parse(id), tenantId: ctx.tenantId }, include: { _count: { select: { redemptions: true } } } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Coupon not found");
@@ -258,6 +268,7 @@ export async function updateCoupon(ctx: ServiceContext, id: string, input: Coupo
 
 /** Activates / deactivates a coupon (coupons with redemptions are never deleted). */
 export async function setCouponActive(ctx: ServiceContext, id: string, isActive: boolean) {
+  await assertModule(ctx, "coupons");
   const res = await db.coupon.updateMany({ where: { id: idSchema.parse(id), tenantId: ctx.tenantId }, data: { isActive } });
   if (res.count === 0) throw new ServiceError("NOT_FOUND", "Coupon not found");
   await audit({ action: isActive ? "coupon.activate" : "coupon.deactivate", tenantId: ctx.tenantId, actorId: ctx.actor.id, entity: "coupon", entityId: id });
@@ -265,6 +276,7 @@ export async function setCouponActive(ctx: ServiceContext, id: string, isActive:
 
 /** Deletes a coupon that was never redeemed. */
 export async function deleteCoupon(ctx: ServiceContext, id: string) {
+  await assertModule(ctx, "coupons");
   const coupon = await db.coupon.findFirst({ where: { id: idSchema.parse(id), tenantId: ctx.tenantId }, include: { _count: { select: { redemptions: true } } } });
   if (!coupon) throw new ServiceError("NOT_FOUND", "Coupon not found");
   if (coupon._count.redemptions > 0) throw new ServiceError("CONFLICT", "This coupon has been used — deactivate it instead");
@@ -284,6 +296,7 @@ export type RedemptionRow = {
 };
 
 export async function listRedemptions(ctx: ServiceContext, couponId: string, query: z.input<typeof redemptionsSchema> = {}) {
+  await assertModule(ctx, "coupons");
   const q = redemptionsSchema.parse(query);
   const coupon = await db.coupon.findFirst({ where: { id: idSchema.parse(couponId), tenantId: ctx.tenantId }, select: { id: true } });
   if (!coupon) throw new ServiceError("NOT_FOUND", "Coupon not found");

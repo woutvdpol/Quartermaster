@@ -36,6 +36,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (error instanceof AuthError) {
       return error.code === "UNAUTHENTICATED" ? Response.redirect(new URL("/admin/login", request.url), 303) : new Response("Forbidden", { status: 403 });
     }
+    // Paid module "fairs" missing: the fairs screen (ModuleGate) explains it.
+    if (error instanceof ServiceError && error.code === "UNAVAILABLE") return Response.redirect(new URL("/admin/fairs", request.url), 303);
     if ((error instanceof ServiceError && error.code === "NOT_FOUND") || (error instanceof Error && error.name === "ZodError")) {
       return new Response("Fair not found", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
     }

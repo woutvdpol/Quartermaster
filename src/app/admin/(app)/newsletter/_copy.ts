@@ -28,6 +28,7 @@ export const copy = {
     quotaUnlimited: (used: string) => `${used} mails sent this month`,
     quotaPeriod: "Resets on",
     meterLabel: "Monthly newsletter quota used",
+    credits: (n: string) => `+ ${n} extra mails (credits), used after the monthly quota`,
   },
 
   tabs: {

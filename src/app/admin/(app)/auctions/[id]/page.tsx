@@ -14,6 +14,7 @@ import { auctionsCopy as t } from "../_copy";
 import { AUCTION_STATUS_TONE, dateToLocalInput, formatSeconds, isEditable } from "../_lib";
 import { getAuctionAdmin, getBidSignals, shopAuctionUrl, shopTermsUrl } from "../_service";
 import { cancelAuctionAction, publishAuctionAction } from "../actions";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 const load = cache(async (id: string) => {
   const ctx = await requireStaffContext();
@@ -32,6 +33,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 }
 
 export default async function AuctionPage({ params }: { params: Promise<{ id: string }> }) {
+  if (await moduleLocked("auctions")) return null; // ModuleGate in layout.tsx shows the upsell
   const { id } = await params;
   const { ctx, auction: a, tenant } = await load(id);
   const showSignals = a.status === "LIVE" || a.status === "CLOSED";

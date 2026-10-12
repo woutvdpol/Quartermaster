@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/server/db";
 import { audit } from "@/server/audit";
 import { ServiceError } from "@/server/context";
+import { assertModule } from "@/server/modules";
 import { getSettings } from "@/server/settings";
 import { take } from "@/server/auth/rate-limit";
 import { enqueue } from "@/server/jobs/queue";
@@ -125,6 +126,7 @@ async function assertProductAllowed(ctx: ShopCustomerContext, bidder: Bidder, pr
 
 /** Registers the customer for the auction: accepts the auction terms and assigns the public bidder number. */
 export async function acceptAuctionTerms(ctx: ShopCustomerContext, auctionId: string): Promise<{ bidderNumber: number }> {
+  await assertModule(ctx, "auctions");
   const id = idSchema.parse(auctionId);
   const auction = await db.auction.findFirst({ where: { id, tenantId: ctx.tenantId }, select: { id: true, status: true } });
   if (!auction || !["PUBLISHED", "LIVE"].includes(auction.status)) throw new AuctionError("LOT_CLOSED", "This auction is not open for registration");
@@ -174,6 +176,7 @@ export function assertBiddable(lot: { status: string; closesAt: Date; auction: {
  * Refusals throw AuctionError (reason in `.reason` / `details.reason`); BELOW_MINIMUM carries `details.minimum`.
  */
 export async function placeBid(ctx: ShopCustomerContext, input: PlaceBidInput): Promise<PlaceBidResult> {
+  await assertModule(ctx, "auctions");
   const parsed = bidSchema.safeParse(input);
   if (!parsed.success) throw new ServiceError("INVALID", parsed.error.issues[0]?.message ?? "Invalid bid", parsed.error.issues);
   const data = parsed.data;

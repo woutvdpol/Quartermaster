@@ -5,6 +5,7 @@ import { requireTenantDisplay } from "@/server/tenant-display";
 import { audit } from "@/server/audit";
 import { ServiceError, type ServiceContext } from "@/server/context";
 import { Prisma } from "@/generated/prisma/client";
+import { assertModule, hasModule } from "@/server/modules";
 
 /*
  * Purchasing (decision 12): suppliers ("product origins"), purchase records (one invoice/lot →
@@ -14,6 +15,11 @@ import { Prisma } from "@/generated/prisma/client";
  * OrderLine snapshots it (`purchasePriceSnapshot`). The report only reads snapshots, so later
  * price edits don't rewrite history — except that `setPurchasePrices` back-fills snapshots that are
  * still NULL (cost entered after the sale, common for unique items), unless told not to.
+ *
+ * Paid module "provenance" (docs/modules.md): suppliers, purchase records, cost allocation and the
+ * margin report call assertModule. NOT gated: setPurchasePrices (Product.purchasePrice is a core
+ * product field; margin KPIs elsewhere read it) and listPurchaseRecords, which the core inventory
+ * screens call — without the module it returns an empty page instead of throwing.
  */
 
 const idSchema = z.string().trim().min(1).max(64);
@@ -36,6 +42,7 @@ const supplierSchema = z.object({
 export type SupplierInput = z.input<typeof supplierSchema>;
 
 export async function listSuppliers(ctx: ServiceContext, query: { search?: string } = {}) {
+  await assertModule(ctx, "provenance");
   const search = z.string().trim().max(200).optional().parse(query.search);
   const rows = await db.supplier.findMany({
     where: { tenantId: ctx.tenantId, ...(search && { name: { contains: search, mode: "insensitive" } }) },
@@ -46,6 +53,7 @@ export async function listSuppliers(ctx: ServiceContext, query: { search?: strin
 }
 
 export async function getSupplier(ctx: ServiceContext, supplierId: string) {
+  await assertModule(ctx, "provenance");
   const s = await db.supplier.findFirst({
     where: { id: idSchema.parse(supplierId), tenantId: ctx.tenantId },
     include: { purchaseRecords: { orderBy: { purchasedAt: "desc" }, include: { _count: { select: { products: true } } } } },
@@ -55,6 +63,7 @@ export async function getSupplier(ctx: ServiceContext, supplierId: string) {
 }
 
 export async function createSupplier(ctx: ServiceContext, input: SupplierInput) {
+  await assertModule(ctx, "provenance");
   const data = supplierSchema.parse(input);
   const s = await conflictOnUnique(
     db.supplier.create({ data: { tenantId: ctx.tenantId, name: data.name, contact: data.contact || null, notes: data.notes || null } }),
@@ -65,6 +74,7 @@ export async function createSupplier(ctx: ServiceContext, input: SupplierInput) 
 }
 
 export async function updateSupplier(ctx: ServiceContext, supplierId: string, input: Partial<SupplierInput>) {
+  await assertModule(ctx, "provenance");
   const id = idSchema.parse(supplierId);
   const data = supplierSchema.partial().parse(input);
   const res = await conflictOnUnique(
@@ -85,6 +95,7 @@ export async function updateSupplier(ctx: ServiceContext, supplierId: string, in
 
 /** Deleting is only allowed while no purchase record references the supplier (keeps margin-by-supplier intact). */
 export async function deleteSupplier(ctx: ServiceContext, supplierId: string) {
+  await assertModule(ctx, "provenance");
   const id = idSchema.parse(supplierId);
   await db.$transaction(async (tx) => {
     const s = await tx.supplier.findFirst({ where: { id, tenantId: ctx.tenantId }, include: { _count: { select: { purchaseRecords: true } } } });
@@ -133,6 +144,7 @@ const listRecordsSchema = z.object({
 
 export async function listPurchaseRecords(ctx: ServiceContext, query: z.input<typeof listRecordsSchema> = {}) {
   const q = listRecordsSchema.parse(query);
+  if (!(await hasModule(ctx.tenantId, "provenance"))) return { items: [], total: 0, page: q.page, pageSize: q.pageSize, pageCount: 1 };
   const where: Prisma.PurchaseRecordWhereInput = {
     tenantId: ctx.tenantId,
     ...(q.supplierId && { supplierId: q.supplierId }),
@@ -166,6 +178,7 @@ export async function listPurchaseRecords(ctx: ServiceContext, query: z.input<ty
 
 /** Record with its products and the allocated cost (Σ product purchasePrice) vs invoiced totalCost. */
 export async function getPurchaseRecord(ctx: ServiceContext, recordId: string) {
+  await assertModule(ctx, "provenance");
   const r = await db.purchaseRecord.findFirst({
     where: { id: idSchema.parse(recordId), tenantId: ctx.tenantId },
     include: {
@@ -182,6 +195,7 @@ export async function getPurchaseRecord(ctx: ServiceContext, recordId: string) {
 }
 
 export async function createPurchaseRecord(ctx: ServiceContext, input: PurchaseRecordInput) {
+  await assertModule(ctx, "provenance");
   const data = recordSchema.parse(input);
   const record = await db.$transaction(async (tx) => {
     await assertSupplier(tx, ctx.tenantId, data.supplierId);
@@ -206,6 +220,7 @@ export async function createPurchaseRecord(ctx: ServiceContext, input: PurchaseR
 
 /** Updates fields; when `productIds` is given it REPLACES the linked product set. */
 export async function updatePurchaseRecord(ctx: ServiceContext, recordId: string, input: Partial<PurchaseRecordInput>) {
+  await assertModule(ctx, "provenance");
   const id = idSchema.parse(recordId);
   const data = recordSchema.partial().parse(input);
   const record = await db.$transaction(async (tx) => {
@@ -238,6 +253,7 @@ export async function updatePurchaseRecord(ctx: ServiceContext, recordId: string
 
 /** Deletes the record; linked products are unlinked (their purchasePrice is kept). */
 export async function deletePurchaseRecord(ctx: ServiceContext, recordId: string) {
+  await assertModule(ctx, "provenance");
   const id = idSchema.parse(recordId);
   const res = await db.purchaseRecord.deleteMany({ where: { id, tenantId: ctx.tenantId } });
   if (res.count === 0) throw new ServiceError("NOT_FOUND", "Purchase record not found");
@@ -245,6 +261,7 @@ export async function deletePurchaseRecord(ctx: ServiceContext, recordId: string
 }
 
 export async function linkProductsToPurchaseRecord(ctx: ServiceContext, recordId: string, productIds: string[]) {
+  await assertModule(ctx, "provenance");
   const id = idSchema.parse(recordId);
   const ids = z.array(idSchema).max(1000).parse(productIds);
   const count = await db.$transaction(async (tx) => {
@@ -257,6 +274,7 @@ export async function linkProductsToPurchaseRecord(ctx: ServiceContext, recordId
 }
 
 export async function unlinkProductsFromPurchaseRecord(ctx: ServiceContext, recordId: string, productIds: string[]) {
+  await assertModule(ctx, "provenance");
   const id = idSchema.parse(recordId);
   const ids = z.array(idSchema).max(1000).parse(productIds);
   const res = await db.product.updateMany({
@@ -314,6 +332,7 @@ export async function setPurchasePrices(
  * first products so the allocation sums exactly to totalCost.
  */
 export async function allocatePurchaseRecordCost(ctx: ServiceContext, recordId: string, method: "equal" | "byPrice" = "equal") {
+  await assertModule(ctx, "provenance");
   const id = idSchema.parse(recordId);
   const m = z.enum(["equal", "byPrice"]).parse(method);
   const r = await db.purchaseRecord.findFirst({
@@ -368,6 +387,7 @@ export type MarginRow = {
 const NET_LINE = Prisma.sql`(ol."lineTotal" - COALESCE(o."discountTotal"::numeric * ol."lineTotal" / NULLIF(o.subtotal, 0), 0))`;
 
 export async function marginReport(ctx: ServiceContext, input: z.input<typeof marginSchema>) {
+  await assertModule(ctx, "provenance");
   const q = marginSchema.parse(input);
   const tenant = await requireTenantDisplay(ctx.tenantId);
   const tz = tenant.timeZone;

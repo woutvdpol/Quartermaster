@@ -23,9 +23,12 @@ export function CertificatesPanel({
   certificates,
   canIssue,
   timeZone,
+  locked = false,
 }: {
   productId: string;
   certificates: CertificateRow[];
+  /** The shop lacks the provenance module (docs/modules.md): existing certificates only, no issuing. */
+  locked?: boolean;
   /** Product status allows issuing (ACTIVE / RESERVED / SOLD). */
   canIssue: boolean;
   timeZone: string;
@@ -84,7 +87,9 @@ export function CertificatesPanel({
         </ul>
       )}
 
-      {!hasValid ? (
+      {locked ? (
+        <p className="text-xs text-muted">Issuing certificates is part of the Provenance &amp; certificates module. Existing certificates stay valid and can still be revoked.</p>
+      ) : !hasValid ? (
         <div>
           <ConfirmDialog
             trigger={t.issue}

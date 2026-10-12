@@ -7,6 +7,7 @@ import { encrypt } from "@/server/auth/encryption";
 import { generateToken, hashToken } from "@/server/auth/tokens";
 import * as rateLimit from "@/server/auth/rate-limit";
 import { queueMail } from "@/server/mail/queue";
+import { assertModule } from "@/server/modules";
 import type { Prisma } from "@/generated/prisma/client";
 import type { AlertFrequency } from "@/generated/prisma/enums";
 import { queryKey, normalizeQuery, type SavedSearchQuery } from "./match";
@@ -23,6 +24,9 @@ import { verifyAlertLink } from "./signing";
  * Guests confirm by mail (token hash, valid CONFIRM_TTL_DAYS after creation, confirmed only by POST);
  * signed-in customers are confirmed at once. Unconfirmed rows older than the TTL are deleted by the
  * `alerts.scan` cron.
+ *
+ * Paid module `alerts` (docs/modules.md): creating, confirming, resuming and the admin views need it.
+ * Stopping (signed unsubscribe / manage links, pausing, deleting) always works — also without it.
  */
 
 export const CONFIRM_TTL_DAYS = 7;
@@ -89,6 +93,7 @@ export async function createSavedSearch(
   input: CreateSavedSearchInput,
   opts: { ip?: string | null } = {},
 ): Promise<CreateSavedSearchResult> {
+  await assertModule({ tenantId }, "alerts");
   await assertShopActive(tenantId);
   const frequency = frequencySchema.catch("DAILY").parse(input.frequency ?? "DAILY");
   const nameParsed = nameSchema.safeParse(input.name ?? "");
@@ -167,6 +172,7 @@ export async function confirmSavedSearch(token: string, opts: { tenantId?: strin
   const row = await db.savedSearch.findUnique({ where: { confirmTokenHash: tokenHash } });
   if (!row || (opts.tenantId && row.tenantId !== opts.tenantId)) return { ok: false, error: "invalid" };
   if (row.createdAt.getTime() + CONFIRM_TTL_MS < Date.now()) return { ok: false, error: "expired", tenantId: row.tenantId };
+  await assertModule({ tenantId: row.tenantId }, "alerts");
   const customer = await db.customer.findFirst({ where: { tenantId: row.tenantId, email: row.email }, select: { id: true } });
   const res = await db.savedSearch.updateMany({
     where: { id: row.id, confirmTokenHash: tokenHash },
@@ -270,6 +276,7 @@ export async function stopFromManageLink(input: { tenantId: string; savedSearchI
 export type CustomerOwner = { tenantId: string; customerId: string };
 
 export async function listCustomerSearches(owner: CustomerOwner): Promise<PublicSearchRow[]> {
+  await assertModule(owner, "alerts");
   const rows = await db.savedSearch.findMany({
     where: { tenantId: owner.tenantId, customerId: owner.customerId, confirmedAt: { not: null } },
     select: publicSelect,
@@ -292,6 +299,9 @@ export async function updateCustomerSearch(owner: CustomerOwner, id: string, pat
   const parsed = updateSchema.safeParse(patch);
   if (!parsed.success) throw new ServiceError("INVALID", parsed.error.issues[0]?.message ?? "Invalid input", parsed.error.issues);
   const { active, ...rest } = parsed.data;
+  // Opting out (pause, push off) always works; anything that (re)starts or changes deliveries needs the module.
+  const optOutOnly = active !== true && rest.push !== true && rest.name === undefined && rest.frequency === undefined;
+  if (!optOutOnly) await assertModule(owner, "alerts");
   if (active === true) {
     const row = await db.savedSearch.findFirst({ where: { id, tenantId: owner.tenantId, customerId: owner.customerId }, select: { email: true, unsubscribedAt: true } });
     if (!row) return false;
@@ -349,6 +359,7 @@ function statusWhere(status: SavedSearchStatus | "all"): Prisma.SavedSearchWhere
 export type AdminSearchRow = PublicSearchRow & { emailMasked: string; isCustomer: boolean; deliveries: number };
 
 export async function adminListSavedSearches(ctx: ServiceContext, query: AdminSearchListQuery = {}) {
+  await assertModule(ctx, "alerts");
   const q = adminListSchema.parse(query);
   const where: Prisma.SavedSearchWhereInput = {
     tenantId: ctx.tenantId,
@@ -397,6 +408,7 @@ export type AlertStats = {
 };
 
 export async function adminAlertStats(ctx: ServiceContext): Promise<AlertStats> {
+  await assertModule(ctx, "alerts");
   const tenantId = ctx.tenantId;
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const active = statusWhere("active");

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { Container } from "@/components/shop/ui/Container";
 import { ButtonLink } from "@/components/shop/ui/Button";
 import { EmptyState } from "@/components/shop/ui/EmptyState";
@@ -21,6 +22,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function CounterOfferPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const shop = await requireShop();
+  // Paid module "offers" (docs/modules.md): no counter offers without it. Counters accepted before
+  // the module ended were already turned into a checkout link (/offer/<token>), which keeps working.
+  if (!shop.settings.features.offers) notFound();
   const locale = shop.locale;
   const t = pickCopy(offerCopies, locale);
   const [view, viewer] = await Promise.all([getCounterView(shop.tenant.id, token), getShopViewer(shop.tenant.id)]);

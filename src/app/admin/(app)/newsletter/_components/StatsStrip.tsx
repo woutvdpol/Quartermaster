@@ -9,6 +9,8 @@ export type QuotaInfo = {
   unlimited: boolean;
   used: number;
   remaining: number | null;
+  /** Purchased mails, used after the monthly quota (docs/modules.md). */
+  credits?: number;
   periodEnd: Date;
 };
 
@@ -92,6 +94,9 @@ function QuotaCard({
         {t.quotaPeriod}{" "}
         <DateTime value={quota.periodEnd} format="date" timeZone={timeZone} />
       </p>
+      {!quota.unlimited && (quota.credits ?? 0) > 0 && (
+        <p className="mt-0.5 text-xs text-muted">{t.credits(formatCount(quota.credits ?? 0))}</p>
+      )}
     </div>
   );
 }

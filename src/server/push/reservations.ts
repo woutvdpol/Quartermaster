@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/server/db";
+import { tenantsWithModule } from "@/server/modules";
 import { isPushConfigured } from "./config";
 import { pushCopy } from "./copy";
 import { queuePush } from "./service";
@@ -10,12 +11,15 @@ import { RESERVATION_MIN_LEFT_MS, RESERVATION_WARNING_MS, dedupeKeys, quietHours
  * (pushReservation on, at least one device) whose earliest ACTIVE hold lapses within
  * RESERVATION_WARNING_MS and that are not in checkout (reservation not moved to an order).
  * Once per cart per expiry minute (dedupe key); skipped in the customer's quiet hours (a late warning
- * is useless, so it is not queued).
+ * is useless, so it is not queued). Only shops with the paid `alerts` module (docs/modules.md).
  */
 export async function scanEndingReservations(now = new Date()): Promise<{ carts: number; queued: number }> {
   if (!isPushConfigured()) return { carts: 0, queued: 0 };
+  const entitled = await tenantsWithModule("alerts");
+  if (!entitled.size) return { carts: 0, queued: 0 };
   const rows = await db.reservation.findMany({
     where: {
+      tenantId: { in: [...entitled] },
       status: "ACTIVE",
       orderId: null,
       expiresAt: { gt: new Date(now.getTime() + RESERVATION_MIN_LEFT_MS), lte: new Date(now.getTime() + RESERVATION_WARNING_MS) },

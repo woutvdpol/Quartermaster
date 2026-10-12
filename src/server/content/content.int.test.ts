@@ -186,8 +186,9 @@ describe("content pages", () => {
 
   it("requires the newsletter feature for NEWSLETTER_SIGNUP blocks", async () => {
     const page = await createPage(ctx, { title: "N" });
+    await db.tenantPlan.update({ where: { tenantId: ctx.tenantId }, data: { plan: "START" } }); // no newsletter module
     await expectError(addBlock(ctx, page.id, { type: "NEWSLETTER_SIGNUP" }), "FORBIDDEN");
-    await db.setting.create({ data: { tenantId: ctx.tenantId, group: "platform", data: { newsletterEnabled: true } } });
+    await db.tenantPlan.update({ where: { tenantId: ctx.tenantId }, data: { plan: "COMPLETE" } });
     expect((await addBlock(ctx, page.id, { type: "NEWSLETTER_SIGNUP" })).type).toBe("NEWSLETTER_SIGNUP");
   });
 

@@ -4,6 +4,7 @@ import { audit } from "@/server/audit";
 import { nextSequenceValue } from "@/server/sequence";
 import { variantKey } from "@/server/media/product-images";
 import { enqueue } from "@/server/jobs/queue";
+import { tenantsWithModule } from "@/server/modules";
 import { closesAsSold } from "./engine";
 import { auctionChannel, notifyLot, DAY_MS, type Tx } from "./shared";
 import { scanEndingLots } from "./notify";
@@ -140,9 +141,13 @@ async function closeAuctionIfDone(tx: Tx, auctionId: string, now: Date): Promise
   return closed.count > 0;
 }
 
-/** PUBLISHED auctions whose opensAt passed → LIVE. */
-async function openDueAuctions(now: Date): Promise<number> {
-  const due = await db.auction.findMany({ where: { status: "PUBLISHED", opensAt: { lte: now } }, select: { id: true, tenantId: true }, take: 200 });
+/**
+ * PUBLISHED auctions whose opensAt passed → LIVE — only for shops with the auctions module (opening is new
+ * activity). A published auction of a shop without it stays PUBLISHED; closeDueLots still closes its lots.
+ */
+async function openDueAuctions(now: Date, entitled: ReadonlySet<string>): Promise<number> {
+  if (!entitled.size) return 0;
+  const due = await db.auction.findMany({ where: { status: "PUBLISHED", opensAt: { lte: now }, tenantId: { in: [...entitled] } }, select: { id: true, tenantId: true }, take: 200 });
   let opened = 0;
   for (const a of due) {
     const res = await db.$transaction(async (tx) => {
@@ -219,13 +224,20 @@ export async function reconcileWonLots(): Promise<{ released: number; cancelled:
   return { released, cancelled: dead.length };
 }
 
-/** One pass of the scheduler (tests call this directly). */
+/**
+ * One pass of the scheduler (tests call this directly).
+ * Module gating (docs/modules.md § Jobs en crons): opening auctions and the "closes in 5 minutes" pushes
+ * (both invite new bidding) only run for shops with the auctions module. Closing due lots, closing empty
+ * auctions and the hold bookkeeping of won lots run for every shop, so auctions that were already running
+ * when the module went away still finish and their winners can pay.
+ */
 export async function tickOnce(opts: { now?: Date; ending?: boolean } = {}) {
   const now = opts.now ?? new Date();
-  const opened = await openDueAuctions(now);
+  const entitled = await tenantsWithModule("auctions");
+  const opened = await openDueAuctions(now, entitled);
   const closed = await closeDueLots(now);
   const emptied = await closeEmptyAuctions(now);
-  const ending = opts.ending === false ? { lots: 0, queued: 0 } : await scanEndingLots(now);
+  const ending = opts.ending === false ? { lots: 0, queued: 0 } : await scanEndingLots(now, entitled);
   const won = opts.ending === false ? { released: 0, cancelled: 0 } : await reconcileWonLots();
   return { opened, ...closed, emptied, endingQueued: ending.queued, holdsReleased: won.released, wonCancelled: won.cancelled };
 }

@@ -14,10 +14,12 @@ export async function resetDb() {
 let counter = 0;
 
 /** Creates a tenant plus an OWNER and returns a ServiceContext acting as that owner. */
-export async function createTenantContext(opts: { slug?: string; role?: Extract<Role, "OWNER" | "SUPERADMIN"> } = {}): Promise<ServiceContext> {
+export async function createTenantContext(opts: { slug?: string; role?: Extract<Role, "OWNER" | "SUPERADMIN">; plan?: "START" | "PRO" | "COMPLETE" } = {}): Promise<ServiceContext> {
   counter += 1;
   const slug = opts.slug ?? `shop-${counter}`;
   const tenant = await db.tenant.create({ data: { slug, name: `Shop ${counter}` } });
+  // Every module by default, so service tests are not gated; module tests set their own plan.
+  await db.tenantPlan.create({ data: { tenantId: tenant.id, plan: opts.plan ?? "COMPLETE" } });
   const role = opts.role ?? "OWNER";
   const user = await db.user.create({
     data: { role, tenantId: role === "SUPERADMIN" ? null : tenant.id, email: `${role.toLowerCase()}-${counter}@test.local` },

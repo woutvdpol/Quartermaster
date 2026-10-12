@@ -6,10 +6,12 @@ import { listGlossary } from "@/server/translations/service";
 import { enabledLocales } from "@/server/translations/sync";
 import { GlossaryEditor } from "../_components/GlossaryEditor";
 import { TranslationsTabs } from "../_components/TranslationsTabs";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 export const metadata: Metadata = { title: "Translation glossary" };
 
 export default async function GlossaryPage() {
+  if (await moduleLocked("translations")) return null; // ModuleGate in layout.tsx shows the upsell
   const ctx = await requireStaffContext();
   const [terms, enabled] = await Promise.all([listGlossary(ctx), enabledLocales(ctx.tenantId)]);
   const locales = enabled.length ? enabled : [...TRANSLATION_LOCALES];

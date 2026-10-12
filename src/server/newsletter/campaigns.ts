@@ -3,7 +3,6 @@ import { z } from "zod";
 import { db } from "@/server/db";
 import { requireTenantDisplay } from "@/server/tenant-display";
 import { audit } from "@/server/audit";
-import { getSettings } from "@/server/settings";
 import { ServiceError, type ServiceContext } from "@/server/context";
 import type { Prisma } from "@/generated/prisma/client";
 import type { CampaignStatus } from "@/generated/prisma/enums";
@@ -13,6 +12,7 @@ import { CAMPAIGN_BATCH_SIZE } from "./jobs";
 import { renderMarkdown } from "./markdown";
 import { checkQuota, monthWindow } from "./quota";
 import { assertNewsletterEnabled, emailSchema, statusWhere } from "./subscribers";
+import { getEntitlements } from "@/server/modules";
 
 const campaignInput = z.object({
   subject: z.string().trim().min(1, "Subject is required").max(200),
@@ -111,25 +111,28 @@ async function usedThisMonth(client: Prisma.TransactionClient | typeof db, tenan
   const window = monthWindow(now, timeZone);
   const agg = await client.newsletterCampaign.aggregate({
     where: { tenantId, sentAt: { gte: window.start, lt: window.end } },
-    _sum: { recipientCount: true },
+    _sum: { recipientCount: true, creditsUsed: true },
   });
-  return { used: agg._sum.recipientCount ?? 0, window };
+  return { used: Math.max(0, (agg._sum.recipientCount ?? 0) - (agg._sum.creditsUsed ?? 0)), window };
 }
 
 /** Quota overview for the admin (see quota.ts for how usage is counted). */
 export async function getNewsletterQuota(ctx: ServiceContext) {
-  const [platform, tenant] = await Promise.all([
-    getSettings(ctx.tenantId, "platform"),
+  const [entitlements, tenant, plan] = await Promise.all([
+    getEntitlements(ctx.tenantId),
     requireTenantDisplay(ctx.tenantId),
+    db.tenantPlan.findUnique({ where: { tenantId: ctx.tenantId }, select: { newsletterCredits: true } }),
   ]);
   const { used, window } = await usedThisMonth(db, ctx.tenantId, tenant.timeZone);
-  const quota = platform.newsletterQuota;
+  const quota = entitlements.limits.newsletterQuota ?? -1;
   return {
-    enabled: platform.newsletterEnabled,
+    enabled: entitlements.modules.has("newsletter"),
     quota,
     unlimited: quota === -1,
     used,
     remaining: quota === -1 ? null : Math.max(0, quota - used),
+    /** Purchased mails, used after the monthly quota (docs/modules.md). */
+    credits: plan?.newsletterCredits ?? 0,
     periodStart: window.start,
     periodEnd: window.end,
   };
@@ -183,12 +186,18 @@ export async function sendCampaign(ctx: ServiceContext, id: string): Promise<Sen
       if (recipients.length === 0) throw new ServiceError("INVALID", "There are no active subscribers");
 
       const { used } = await usedThisMonth(tx, ctx.tenantId, tenant.timezone);
-      const quota = checkQuota({ quota: platform.newsletterQuota, used, needed: recipients.length });
+      const plan = await tx.tenantPlan.findUnique({ where: { tenantId: ctx.tenantId }, select: { newsletterCredits: true } });
+      const credits = plan?.newsletterCredits ?? 0;
+      const quota = checkQuota({ quota: platform.newsletterQuota, used, needed: recipients.length, credits });
       if (!quota.ok) throw new ServiceError("CONFLICT", "Monthly newsletter quota exceeded", quota);
+      if (quota.fromCredits > 0) {
+        // The advisory lock above serializes sends per tenant, so the balance cannot go negative.
+        await tx.tenantPlan.update({ where: { tenantId: ctx.tenantId }, data: { newsletterCredits: { decrement: quota.fromCredits } } });
+      }
 
       await tx.newsletterCampaign.update({
         where: { id },
-        data: { status: "SENDING", sentAt: new Date(), recipientCount: recipients.length, sentCount: 0, failedCount: 0 },
+        data: { status: "SENDING", sentAt: new Date(), recipientCount: recipients.length, creditsUsed: quota.fromCredits, sentCount: 0, failedCount: 0 },
       });
 
       const batches: { tenantId: string; campaignId: string; subscriberIds: string[] }[] = [];

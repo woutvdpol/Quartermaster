@@ -4,7 +4,6 @@ import path from "node:path";
 import sharp from "sharp";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
-import type { Prisma } from "@/generated/prisma/client";
 import { ServiceError, type ServiceContext } from "@/server/context";
 import { LocalDriver, setStorageForTests } from "@/server/media/storage";
 import {
@@ -49,8 +48,9 @@ async function jpeg(width = 1200, height = 800) {
   return { name: `photo-${width}.jpg`, type: "image/jpeg", bytes: new Uint8Array(bytes) };
 }
 
-async function setPlatform(ctx: ServiceContext, data: Prisma.InputJsonObject) {
-  await db.setting.create({ data: { tenantId: ctx.tenantId, group: "platform", data } });
+/** Package limit overrides (docs/modules.md). */
+async function setPlatform(ctx: ServiceContext, data: { photoLimit?: number; storageQuotaGb?: number }) {
+  await db.tenantPlan.update({ where: { tenantId: ctx.tenantId }, data: { photoLimit: data.photoLimit, storageGb: data.storageQuotaGb } });
 }
 
 const filesUnder = async (dir: string): Promise<string[]> =>

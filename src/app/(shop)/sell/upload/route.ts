@@ -1,4 +1,5 @@
 import { deleteDraftPhoto, uploadLeadPhoto, LEAD_PHOTO_MAX_BYTES } from "@/server/leads";
+import { hasModule } from "@/server/modules";
 // Not while the shop is "coming soon" (src/server/storefront/launch.ts).
 import { getOpenShopTenant as getRequestTenant } from "@/server/storefront/launch";
 import { clientIpFromHeaders, isSameOrigin } from "@/server/request-meta";
@@ -25,7 +26,8 @@ export async function POST(request: Request) {
   const t = (await shopCopy(leadsCopies)).errors;
   if (!isSameOrigin(request)) return json({ ok: false, message: t.unexpected }, 403);
   const tenant = await getRequestTenant();
-  if (!tenant) return json({ ok: false, message: t.unexpected }, 404);
+  // Paid module `leads` (docs/modules.md); uploadLeadPhoto enforces it too.
+  if (!tenant || !(await hasModule(tenant.id, "leads"))) return json({ ok: false, message: t.unexpected }, 404);
 
   // Public route: without a Content-Length (chunked) the body would be buffered unbounded by formData().
   const lengthHeader = request.headers.get("content-length");

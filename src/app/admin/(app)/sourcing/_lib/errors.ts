@@ -9,6 +9,8 @@ export function failFrom(e: unknown, messages: Partial<Record<ServiceError["code
   if (e instanceof AuthError) return actionFail("You don't have access to this shop. Sign in again or switch shop.");
   if (e instanceof ZodError) return actionFail("Some values are not valid. Check the form and try again.");
   if (e instanceof ServiceError) {
+    // assertModule: the shop's package lost the module (message names it), not a temporary outage.
+    if (e.code === "UNAVAILABLE" && e.details && typeof e.details === "object" && "module" in e.details) return actionFail(e.message);
     const fallback: Record<ServiceError["code"], string> = {
       NOT_FOUND: "This item no longer exists. Reload the page.",
       CONFLICT: "This conflicts with existing data.",

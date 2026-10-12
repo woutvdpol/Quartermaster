@@ -106,6 +106,8 @@ export async function createAlertAction(input: unknown): Promise<CreateAlertResu
     return "id" in res ? { status: res.status, id: res.id } : { status: res.status };
   } catch (err) {
     if (err instanceof ServiceError && err.code === "INVALID") return { status: "invalid", message: err.message };
+    // The shop does not have the alerts module (docs/modules.md); the button is hidden, so only stale pages get here.
+    if (err instanceof ServiceError && err.code === "UNAVAILABLE") return { status: "error" };
     console.error("createAlertAction failed", err);
     return { status: "error" };
   }

@@ -1,8 +1,8 @@
 import "server-only";
 import { db } from "@/server/db";
 import { audit } from "@/server/audit";
-import { getSettings } from "@/server/settings";
 import { subscribe, subscriberStatus, type SubscriberStatus } from "@/server/newsletter";
+import { hasModule } from "@/server/modules";
 
 /*
  * Newsletter preference on the account page. Subscribing always goes through double opt-in
@@ -12,9 +12,11 @@ import { subscribe, subscriberStatus, type SubscriberStatus } from "@/server/new
 export type NewsletterPreference = { enabled: boolean; status: SubscriberStatus | "none" };
 
 export async function getNewsletterPreference(tenantId: string, email: string): Promise<NewsletterPreference> {
-  const platform = await getSettings(tenantId, "platform");
-  const row = await db.newsletterSubscriber.findUnique({ where: { tenantId_email: { tenantId, email } } });
-  return { enabled: platform.newsletterEnabled, status: row ? subscriberStatus(row) : "none" };
+  const [enabled, row] = await Promise.all([
+    hasModule(tenantId, "newsletter"),
+    db.newsletterSubscriber.findUnique({ where: { tenantId_email: { tenantId, email } } }),
+  ]);
+  return { enabled, status: row ? subscriberStatus(row) : "none" };
 }
 
 export type SetNewsletterResult = { ok: true; status: SubscriberStatus | "none" } | { ok: false; error: "unavailable" | "rate_limited" };

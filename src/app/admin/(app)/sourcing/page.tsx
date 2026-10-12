@@ -24,6 +24,7 @@ import { requireTenantDisplay } from "@/server/tenant-display";
 import { todayIn } from "./_lib/time";
 import { RecordFormDrawer } from "./_components/RecordFormDrawer";
 import { SourcingTabs } from "./_components/SourcingTabs";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 export const metadata: Metadata = { title: `${copy.tabs.records} · ${copy.title}` };
 
@@ -31,6 +32,7 @@ const PAGE_SIZE = 25;
 const BASE = "/admin/sourcing";
 
 export default async function PurchaseRecordsPage({ searchParams }: PageProps<"/admin/sourcing">) {
+  if (await moduleLocked("provenance")) return null; // ModuleGate in layout.tsx shows the upsell
   const sp = await searchParams;
   const page = parsePage(sp.page);
   const q = getParam(sp, "q")?.slice(0, 200);

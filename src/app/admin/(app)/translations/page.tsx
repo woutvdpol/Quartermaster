@@ -18,6 +18,7 @@ import { getTranslationOverview, listTranslations, type ReviewView } from "@/ser
 import { ReviewList } from "./_components/ReviewList";
 import { RetranslateButton } from "./_components/RetranslateButton";
 import { TranslationsTabs } from "./_components/TranslationsTabs";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 export const metadata: Metadata = { title: "Translations" };
 
@@ -31,6 +32,7 @@ const VIEWS: { value: ReviewView; label: string }[] = [
 ];
 
 export default async function TranslationsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  if (await moduleLocked("translations")) return null; // ModuleGate in layout.tsx shows the upsell
   const sp = await searchParams;
   const ctx = await requireStaffContext();
   const overview = await getTranslationOverview(ctx);

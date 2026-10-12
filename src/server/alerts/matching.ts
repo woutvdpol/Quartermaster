@@ -3,6 +3,7 @@ import { db } from "@/server/db";
 import { audit } from "@/server/audit";
 import type { ServiceContext } from "@/server/context";
 import { queueMail } from "@/server/mail/queue";
+import { assertModule, tenantsWithModule } from "@/server/modules";
 import { pushRecipients, queueSavedSearchPush } from "@/server/push";
 import { MAX_DIGEST_DELIVERIES } from "./mail-contracts";
 import { matchesQuery, normalizeQuery, type MatchLookups, type ProductFacts } from "./match";
@@ -21,6 +22,9 @@ import { digestSlotDue } from "./schedule";
  * — a new alert reports what arrives from now on, not the existing stock.
  * SAVED_SEARCH deliveries keep customerId NULL so (kind, customerId, productId) never collides when
  * one customer has several searches matching the same product.
+ *
+ * Paid module `alerts` (docs/modules.md): the jobs check it per shop (./jobs.ts); the sweeps below
+ * only serve shops that have it. Searches of other shops are kept, they just get no deliveries.
  */
 
 /** Public-visibility predicate for "new arrival" products. */
@@ -163,10 +167,12 @@ export async function matchRecentProducts(tenantId: string, opts: { since?: Date
   return total;
 }
 
-/** Every tenant with active searches (cron). */
+/** Every tenant with active searches and the `alerts` module (cron). */
 export async function matchRecentProductsAllTenants(since?: Date) {
+  const entitled = await tenantsWithModule("alerts");
+  if (!entitled.size) return { tenants: 0, created: 0 };
   const tenants = await db.savedSearch.findMany({
-    where: { confirmedAt: { not: null }, unsubscribedAt: null, tenant: { status: "ACTIVE" } },
+    where: { confirmedAt: { not: null }, unsubscribedAt: null, tenantId: { in: [...entitled] }, tenant: { status: "ACTIVE" } },
     distinct: ["tenantId"],
     select: { tenantId: true },
   });
@@ -177,6 +183,7 @@ export async function matchRecentProductsAllTenants(since?: Date) {
 
 /** Admin "Run matching now": products published in the last `days` days (default 7), then due digests. */
 export async function runMatchingNow(ctx: ServiceContext, opts: { days?: number } = {}) {
+  await assertModule(ctx, "alerts");
   const days = Math.min(Math.max(Math.trunc(opts.days ?? 7), 1), 90);
   const result = await matchRecentProducts(ctx.tenantId, { since: new Date(Date.now() - days * 24 * 60 * 60 * 1000), limit: 5000 });
   const digests = await sendDueDigests({ tenantId: ctx.tenantId });
@@ -193,11 +200,15 @@ export async function runMatchingNow(ctx: ServiceContext, opts: { days?: number 
  */
 export async function sendDueDigests(opts: { now?: Date; tenantId?: string } = {}): Promise<{ searches: number; mails: number }> {
   const now = opts.now ?? new Date();
+  // Only shops with the `alerts` module (docs/modules.md); unsent deliveries of others wait (and go out if the module returns).
+  const entitled = await tenantsWithModule("alerts");
+  const tenantIds = opts.tenantId ? (entitled.has(opts.tenantId) ? [opts.tenantId] : []) : [...entitled];
+  if (!tenantIds.length) return { searches: 0, mails: 0 };
   const pending = await db.alertDelivery.findMany({
     where: {
       kind: "SAVED_SEARCH",
       sentAt: null,
-      ...(opts.tenantId ? { tenantId: opts.tenantId } : {}),
+      tenantId: { in: tenantIds },
       savedSearch: { frequency: { in: ["DAILY", "WEEKLY"] }, confirmedAt: { not: null }, unsubscribedAt: null },
     },
     distinct: ["savedSearchId"],

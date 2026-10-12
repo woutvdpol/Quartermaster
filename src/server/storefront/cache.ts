@@ -89,6 +89,7 @@ export function shopTagsForAction(tenantId: string, action: string): string[] {
     case "translation": // approved shop translations, all languages (src/server/translations/read.ts)
       return [translationsTag(tenantId)];
     case "settings":
+    case "plan": // package / modules changed (src/server/modules): storefront feature flags
     case "shipping":
     case "payments":
     case "tenant":

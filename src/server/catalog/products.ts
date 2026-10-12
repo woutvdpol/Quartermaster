@@ -12,6 +12,7 @@ import type { ProductStatus } from "@/generated/prisma/enums";
 import { isUniqueViolation, notFound, parseInput } from "./errors";
 import { adjustPriceByPercent, margin } from "./pricing";
 import { nextFreeSlug, slugify } from "./slug";
+import { assertProductCapacity } from "@/server/modules/limits";
 
 /*
  * Product admin services.
@@ -450,6 +451,7 @@ async function createInTx(tx: Tx, ctx: ServiceContext, data: CreateData, note: s
     // A new product has no documents yet, so the deactivation certificate can't be on file.
     throw new ServiceError("INVALID", "Upload the deactivation certificate before activating this product");
   }
+  if (data.status === "ACTIVE") await assertProductCapacity(tx, ctx.tenantId, 1);
   const stockCode = await nextSequenceValue(tx, ctx.tenantId, "product.stockCode");
   const slug = await uniqueProductSlug(tx, ctx.tenantId, data.slug || data.title);
   const product = await tx.product.create({
@@ -656,6 +658,9 @@ export async function setStatus(ctx: ServiceContext, ids: string[], status: Prod
     }
     const ids = rows.filter((p) => p.status !== data.status).map((p) => p.id);
     if (!ids.length) return [];
+    if (data.status === "ACTIVE") {
+      await assertProductCapacity(tx, ctx.tenantId, rows.filter((p) => ids.includes(p.id) && p.quantity > 0).length);
+    }
     const now = new Date();
     const where = { tenantId: ctx.tenantId, id: { in: ids } };
     await tx.product.updateMany({ where, data: { status: data.status } });

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/server/db";
 import { audit } from "@/server/audit";
 import { ServiceError, type ServiceContext } from "@/server/context";
+import { assertModule, hasModule } from "@/server/modules";
 import { getSettings } from "@/server/settings";
 import { encrypt } from "@/server/auth/encryption";
 import { generateToken, hashToken } from "@/server/auth/tokens";
@@ -83,6 +84,7 @@ export type SubmitOfferResult =
 
 /** Whether (and from what amount) the product page may show the offer button. */
 export async function getOfferEligibility(tenantId: string, productId: string) {
+  if (!(await hasModule(tenantId, "offers"))) return null; // paid module: no button without it
   const [product, catalog, tenant] = await Promise.all([
     db.product.findFirst({ where: { id: productId, tenantId }, select: { id: true, price: true, status: true, quantity: true, acceptsOffers: true } }),
     getSettings(tenantId, "catalog"),
@@ -98,6 +100,8 @@ export async function getOfferEligibility(tenantId: string, productId: string) {
  * Queues the owner notification (OfferReceived) and the customer confirmation (OfferSubmitted).
  */
 export async function submitOffer(tenantId: string, raw: SubmitOfferInput, meta: { ip?: string | null } = {}): Promise<SubmitOfferResult> {
+  // Paid module "offers" (docs/modules.md). Returned like every other refusal (the dialog shows it).
+  if (!(await hasModule(tenantId, "offers"))) return { ok: false, code: "UNAVAILABLE", message: "This item doesn't accept offers" };
   const parsed = submitSchema.safeParse(raw);
   if (!parsed.success) {
     const errors: Record<string, string> = {};
@@ -211,6 +215,7 @@ const productSelect = {
 };
 
 export async function listOffers(ctx: ServiceContext, query: z.input<typeof listSchema> = {}) {
+  await assertModule(ctx, "offers");
   const q = listSchema.parse(query);
   const where: Prisma.OfferWhereInput = { tenantId: ctx.tenantId, status: { in: [...OFFER_VIEWS[q.view]] } };
   if (q.q) {
@@ -270,6 +275,7 @@ export async function listOffers(ctx: ServiceContext, query: z.input<typeof list
 }
 
 export async function getOfferDetail(ctx: ServiceContext, id: string) {
+  await assertModule(ctx, "offers");
   const offer = await db.offer.findFirst({
     where: { id: idSchema.parse(id), tenantId: ctx.tenantId },
     include: { product: { select: productSelect }, customer: { select: { id: true, email: true, firstName: true, lastName: true } } },
@@ -346,6 +352,7 @@ const noteSchema = z
 
 /** Accept the customer's amount: issues the 48 h personal checkout link (OfferAccepted mail). */
 export async function acceptOffer(ctx: ServiceContext, id: string, input: { note?: string | null } = {}) {
+  await assertModule(ctx, "offers");
   const { note } = parseInput(z.object({ note: noteSchema }), input);
   const token = generateToken();
   await db.$transaction(async (tx) => {
@@ -371,6 +378,7 @@ export async function acceptOffer(ctx: ServiceContext, id: string, input: { note
 
 /** Propose another price (between the offer and the list price). The customer accepts/declines via a 72 h link. */
 export async function counterOffer(ctx: ServiceContext, id: string, input: { counterAmount: number; note?: string | null }) {
+  await assertModule(ctx, "offers");
   const data = parseInput(z.object({ counterAmount: z.coerce.number().int().min(1, "Enter an amount"), note: noteSchema }), input);
   const token = generateToken();
   await db.$transaction(async (tx) => {
@@ -404,6 +412,7 @@ export async function counterOffer(ctx: ServiceContext, id: string, input: { cou
 
 /** Decline (also withdraws a counter or an accepted-but-unused link). Mails the customer (OfferRejected). */
 export async function rejectOffer(ctx: ServiceContext, id: string, input: { note?: string | null } = {}) {
+  await assertModule(ctx, "offers");
   const { note } = parseInput(z.object({ note: noteSchema }), input);
   await db.$transaction(async (tx) => {
     const offer = await lockOffer(tx, ctx.tenantId, id);
@@ -419,6 +428,7 @@ export async function rejectOffer(ctx: ServiceContext, id: string, input: { note
 
 /** Sidebar badge: offers waiting for an answer. */
 export async function pendingOfferCount(ctx: ServiceContext): Promise<number> {
+  if (!(await hasModule(ctx.tenantId, "offers"))) return 0;
   return db.offer.count({ where: { tenantId: ctx.tenantId, status: "PENDING" } });
 }
 
@@ -477,6 +487,7 @@ export type CounterView = {
 
 /** /offer/counter/<token>. Null for unknown tokens (other tenant, rotated, malformed). Read-only. */
 export async function getCounterView(tenantId: string, token: string): Promise<CounterView | null> {
+  if (!(await hasModule(tenantId, "offers"))) return null;
   const offer = await findByToken(db, tenantId, token);
   if (!offer || offer.counterAmount === null) return null;
   const expired = !offer.checkoutExpiresAt || offer.checkoutExpiresAt.getTime() <= Date.now();
@@ -501,6 +512,7 @@ export type CounterResponse =
 /** Customer accepts (→ ACCEPTED at the counter price, new 48 h checkout link + mail) or declines (→ WITHDRAWN). */
 export async function respondToCounter(tenantId: string, token: string, decision: "accept" | "decline"): Promise<CounterResponse> {
   if (decision !== "accept" && decision !== "decline") return { ok: false, message: "Unknown choice" };
+  if (decision === "accept" && !(await hasModule(tenantId, "offers"))) return { ok: false, message: "This link is no longer valid" };
   const next = generateToken();
   const result = await db.$transaction(async (tx): Promise<CounterResponse> => {
     const found = await findByToken(tx, tenantId, token);
@@ -509,6 +521,7 @@ export async function respondToCounter(tenantId: string, token: string, decision
     if (offer.status !== "COUNTERED" || offer.checkoutTokenHash !== hashToken(token)) return { ok: false, message: "This counter offer was already answered" };
     if (!offer.checkoutExpiresAt || offer.checkoutExpiresAt.getTime() <= Date.now()) return { ok: false, message: "This counter offer has expired" };
     if (decision === "decline") {
+      // Declining stays possible without the module (wind-down); accepting starts a new checkout.
       await tx.offer.update({ where: { id: offer.id }, data: { status: "WITHDRAWN", checkoutTokenHash: null, checkoutExpiresAt: null } });
       return { ok: true, decision: "decline", offerId: offer.id };
     }
@@ -532,7 +545,11 @@ export type OfferCheckoutView = {
   product: ReturnType<typeof publicProduct>;
 };
 
-/** /offer/<token>: the agreed price and whether "Buy now" is possible. Null for unknown tokens. */
+/**
+ * /offer/<token>: the agreed price and whether "Buy now" is possible. Null for unknown tokens.
+ * Not module-gated, like buyOffer and the checkout hooks below: an offer the shop already accepted is a
+ * promise to the customer and can still be bought after the "offers" module ends (docs/modules.md).
+ */
 export async function getOfferCheckoutView(tenantId: string, token: string): Promise<OfferCheckoutView | null> {
   let offer = await findByToken(db, tenantId, token);
   if (!offer || offer.agreedAmount === null) return null;
@@ -615,7 +632,7 @@ export async function reviveOffers(opts: { offerId?: string } = {}): Promise<{ r
   return { reverted, relinked };
 }
 
-/** Cron `offers.expire` (hourly): unanswered and run-out offers → EXPIRED, then reviveOffers(). */
+/** Cron `offers.expire` (hourly): unanswered and run-out offers → EXPIRED, then reviveOffers(). Runs for every shop (cleanup, not module-gated). */
 export async function expireOffers(): Promise<{ expired: number; reverted: number; relinked: number }> {
   const now = new Date();
   const pendingCutoff = new Date(now.getTime() - OFFER_PENDING_TTL_HOURS * 60 * 60 * 1000);

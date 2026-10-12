@@ -8,6 +8,7 @@ import { parseInput } from "@/server/catalog/errors";
 import { updateProduct } from "@/server/catalog/products";
 import { shopTag, tenantTag } from "@/server/storefront/cache";
 import { requireTenantDisplay } from "@/server/tenant-display";
+import { assertModule } from "@/server/modules";
 import { DEFAULT_STALE_DAYS, INSIGHT_PERIODS, STALE_DAY_OPTIONS, localDay, periodBounds, type InsightPeriod } from "./pure";
 import { loadBuyMore, loadOverview, loadStale, type BuyMore, type InsightsOverview, type StaleList } from "./queries";
 
@@ -23,6 +24,10 @@ import { loadBuyMore, loadOverview, loadStale, type BuyMore, type InsightsOvervi
  * Reads are data-cached per tenant for INSIGHTS_CACHE_SECONDS (tagged with the tenant's catalog tag,
  * so any product / order change that refreshes the shop also refreshes these figures). Pass
  * `{ cached: false }` outside a Next request (tests, scripts).
+ *
+ * Paid module "insights" (docs/modules.md): the three reads and the reprice call assertModule.
+ * Search statistics (search-stats.ts) keep being recorded for every shop, so the figures are there
+ * the day a shop adds the module.
  */
 
 export * from "./pure";
@@ -51,6 +56,7 @@ function cachedRead<R>(name: string, tenantId: string, key: unknown[], fn: () =>
 }
 
 async function setup(ctx: ServiceContext, input: InsightsQuery, opts: Opts) {
+  await assertModule(ctx, "insights");
   const q = parseInput(querySchema, input);
   const { timeZone } = await requireTenantDisplay(ctx.tenantId);
   const now = opts.now ?? new Date();
@@ -95,6 +101,7 @@ const repriceSchema = z.object({
  * wishlist PRICE_DROP alerts behave exactly as for an edit in the product form.
  */
 export async function repriceStaleItem(ctx: ServiceContext, input: z.input<typeof repriceSchema>) {
+  await assertModule(ctx, "insights");
   const d = parseInput(repriceSchema, input);
   const current = await db.product.findFirst({ where: { id: d.productId, tenantId: ctx.tenantId }, select: { status: true, price: true } });
   if (!current) throw new ServiceError("NOT_FOUND", "Product not found");

@@ -104,7 +104,74 @@ model Tenant {
   networkOptIn    Boolean   @default(false)
   networkJoinedAt DateTime?
 
+  // Paid modules (docs/modules.md): package + limits, and modules bought on top of it.
+  plan    TenantPlan?
+  modules TenantModule[]
+
   @@map("tenants")
+}
+
+// ─── Plans & modules (docs/modules.md) ──────────────────────────────────────
+
+enum PlanId {
+  START
+  PRO
+  COMPLETE
+}
+
+/** Who granted an entitlement: by hand (superadmin), a paid subscription (phase 3) or a migration. */
+enum EntitlementSource {
+  MANUAL
+  SUBSCRIPTION
+  LEGACY
+}
+
+/** TRIAL, ACTIVE and PAST_DUE (grace period) grant the module; CANCELLED does not. */
+enum ModuleStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+}
+
+/**
+ * The package of a shop. No row = START (fail closed); new shops get a row on creation.
+ * Limit columns override the package default; null = package default.
+ */
+model TenantPlan {
+  tenantId        String            @id
+  plan            PlanId            @default(START)
+  productLimit    Int?
+  photoLimit      Int?
+  storageGb       Float?
+  newsletterQuota Int?
+  /// Purchased newsletter mails (one-off packs), used only after the monthly quota is exhausted; never expire.
+  newsletterCredits Int             @default(0)
+  source          EntitlementSource @default(MANUAL)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_plans")
+}
+
+/** A module bought or trialled on top of the package. `moduleId` is an id from src/server/modules/catalog.ts. */
+model TenantModule {
+  id           String            @id @default(cuid())
+  tenantId     String
+  moduleId     String
+  status       ModuleStatus
+  source       EntitlementSource @default(MANUAL)
+  trialEndsAt  DateTime?
+  periodEndsAt DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, moduleId])
+  @@map("tenant_modules")
 }
 
 model TenantDomain {
@@ -1261,6 +1328,8 @@ model NewsletterCampaign {
   scheduledAt    DateTime?
   sentAt         DateTime?
   recipientCount Int            @default(0)
+  /// Part of recipientCount paid from purchased credits instead of the monthly quota (docs/modules.md).
+  creditsUsed    Int            @default(0)
   sentCount      Int            @default(0)
   failedCount    Int            @default(0)
   createdById    String?

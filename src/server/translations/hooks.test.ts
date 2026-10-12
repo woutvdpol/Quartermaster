@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const enqueue = vi.fn(async () => "job");
 let locales: string[] = ["nl"];
+let entitled = true;
 vi.mock("@/server/jobs/queue", () => ({ enqueue }));
+vi.mock("@/server/modules", () => ({ hasModule: vi.fn(async () => entitled) }));
 vi.mock("@/server/settings", () => ({ getSettings: vi.fn(async () => ({ locales })) }));
 
 const { onAudited, translationHookFor } = await import("./hooks");
@@ -30,6 +32,7 @@ describe("onAudited", () => {
   beforeEach(() => {
     enqueue.mockClear();
     locales = ["nl"];
+    entitled = true;
   });
 
   it("enqueues a debounced sync per entity", async () => {
@@ -39,6 +42,12 @@ describe("onAudited", () => {
 
   it("does nothing for shops without extra languages", async () => {
     locales = [];
+    await onAudited({ action: "product.update", tenantId: "t1", entity: "Product", entityId: ID });
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  it("does nothing for shops without the Translations module", async () => {
+    entitled = false;
     await onAudited({ action: "product.update", tenantId: "t1", entity: "Product", entityId: ID });
     expect(enqueue).not.toHaveBeenCalled();
   });

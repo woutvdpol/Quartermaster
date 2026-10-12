@@ -286,7 +286,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
           </div>
         )}
         <div className="w-full lg:max-w-md">
-          <SearchBox action={basePath} params={params} defaultSort={defaultSort} locale={locale} />
+          <SearchBox action={basePath} params={params} defaultSort={defaultSort} locale={locale} photoSearch={shop.settings.features.smartSearch} />
         </div>
       </header>
 
@@ -320,7 +320,7 @@ export async function CatalogView({ shop, mode, basePath, category, searchParams
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {mode === "shop" ? <SaveSearchButton query={saveQuery} /> : null}
+              {mode === "shop" && shop.settings.features.alerts ? <SaveSearchButton query={saveQuery} /> : null}
               <SortSelect action={basePath} value={params.sort} options={sortOptions}>
                 <HiddenParams params={params} keep={["q", "facets", "tags", "min", "max", "view"]} defaultSort={defaultSort} />
               </SortSelect>

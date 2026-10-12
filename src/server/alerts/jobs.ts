@@ -7,6 +7,13 @@ import { defineJob } from "@/server/jobs/registry";
  */
 const id = z.string().min(1).max(64);
 
+/** Paid module `alerts` (docs/modules.md): a shop without it gets no alerts — the job ends quietly (no retry). */
+async function entitled(tenantId: string): Promise<boolean> {
+  const { hasModule } = await import("@/server/modules");
+  return hasModule(tenantId, "alerts");
+}
+const SKIPPED = { skipped: "module" } as const;
+
 const ALERT_QUEUE = { retryLimit: 3, retryDelay: 30, retryBackoff: true, expireInSeconds: 10 * 60, deleteAfterSeconds: 24 * 60 * 60 };
 
 /** A product was published / bumped → match it against saved searches. */
@@ -14,6 +21,7 @@ export const alertsMatchProductJob = defineJob(
   "alerts.match-product",
   z.object({ tenantId: id, productId: id }),
   async ({ tenantId, productId }) => {
+    if (!(await entitled(tenantId))) return SKIPPED;
     const { matchProduct } = await import("./matching");
     return matchProduct(tenantId, productId);
   },
@@ -25,6 +33,7 @@ export const alertsBackAvailableJob = defineJob(
   "alerts.back-available",
   z.object({ tenantId: id, productId: id, excludeCustomerId: id.nullable().optional() }),
   async ({ tenantId, productId, excludeCustomerId }) => {
+    if (!(await entitled(tenantId))) return SKIPPED;
     const { processBackAvailable } = await import("./wishlist-alerts");
     return { mails: await processBackAvailable(tenantId, productId, { excludeCustomerId }) };
   },
@@ -36,6 +45,7 @@ export const alertsPriceDropJob = defineJob(
   "alerts.price-drop",
   z.object({ tenantId: id, productId: id, oldPrice: z.number().int().min(0), newPrice: z.number().int().min(0) }),
   async ({ tenantId, productId, oldPrice, newPrice }) => {
+    if (!(await entitled(tenantId))) return SKIPPED;
     const { processPriceDrop } = await import("./wishlist-alerts");
     return { mails: await processPriceDrop(tenantId, productId, oldPrice, newPrice) };
   },
@@ -53,6 +63,7 @@ export const ALERT_JOBS = {
  *   alerts.digest  hourly — DAILY (07:00 tenant time) / WEEKLY (Monday 07:00) digests
  *   alerts.scan    every 5 min — safety net: match recently published products, wishlist
  *                  back-available for recently released reservations, purge expired opt-ins
+ * Both only serve shops with the `alerts` module (the purge of unconfirmed opt-ins runs for everyone).
  */
 export const ALERT_CRON_TASKS = {
   "alerts.digest": {

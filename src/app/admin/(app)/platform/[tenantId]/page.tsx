@@ -4,13 +4,15 @@ import { notFound } from "next/navigation";
 import { Card, ConfirmDialog, DateTime, KeyValue, PageHeader, StatusPill } from "@/components/admin/ui";
 import { queryPlatformAuditLog } from "@/server/auditlog";
 import { ServiceError } from "@/server/context";
-import { getTenant, listTenants, requirePlatformContext } from "@/server/platform";
+import { getTenant, getTenantPlan, listTenants, requirePlatformContext } from "@/server/platform";
+import { MODULES, MODULE_IDS, PLANS, PLAN_IDS } from "@/server/modules/catalog";
 import { toRows } from "../../audit-log/_data";
 import { AuditList } from "../../audit-log/_components/AuditList";
 import { getSettings } from "@/server/settings";
-import { addDomainAction, allowNetworkAction, removeFromNetworkAction, loadMorePlatformAuditAction, removeDomainAction, setPrimaryDomainAction, setTenantStatusAction, updateTenantAction } from "../actions";
+import { addNewsletterCreditsAction, setTenantModuleAction, setTenantPlanAction, addDomainAction, allowNetworkAction, removeFromNetworkAction, loadMorePlatformAuditAction, removeDomainAction, setPrimaryDomainAction, setTenantStatusAction, updateTenantAction } from "../actions";
 import { AddDomainForm } from "../_components/AddDomainForm";
 import { TenantForm } from "../_components/TenantForm";
+import { CreditsForm, PlanForm } from "../_components/PlanForms";
 import { STATUS_EFFECT, STATUS_LABEL, STATUS_TONE, timeZoneOptions, type TenantStatusValue } from "../_shared";
 
 export const metadata: Metadata = { title: "Platform · Shop" };
@@ -33,10 +35,11 @@ export default async function PlatformTenantPage({ params }: PageProps<"/admin/p
   const tenant = await loadTenant(ctx, tenantId);
   if (!tenant) notFound();
 
-  const [stats, audit, platformSettings] = await Promise.all([
+  const [stats, audit, platformSettings, planInfo] = await Promise.all([
     listTenants(ctx, { search: tenant.slug }).then((list) => list.find((t) => t.id === tenant.id) ?? null),
     queryPlatformAuditLog(ctx, { tenantId: tenant.id, limit: 25 }),
     getSettings(tenant.id, "platform"),
+    getTenantPlan(ctx, tenant.id),
   ]);
   const currencyLocked = (stats?.productCount ?? 0) > 0;
   const status = tenant.status as TenantStatusValue;
@@ -76,13 +79,7 @@ export default async function PlatformTenantPage({ params }: PageProps<"/admin/p
                 { label: "Last activity", value: stats?.lastActivityAt ? <DateTime value={stats.lastActivityAt} /> : "—" },
               ]}
             />
-            <p className="mt-2 text-xs text-muted">
-              Plan and limits live in the shop&apos;s settings. Switch to this shop in the sidebar, then open{" "}
-              <Link href="/admin/settings/platform" className="text-accent underline-offset-2 hover:underline">
-                Settings → Platform
-              </Link>
-              .
-            </p>
+            <p className="mt-2 text-xs text-muted">Package, limits and modules: see Package &amp; modules below.</p>
           </Card>
 
           <Card title="Quartermaster network" aside={tenant.networkOptIn ? <StatusPill tone="ok">Listed</StatusPill> : <StatusPill tone="mute">Not listed</StatusPill>}>
@@ -140,6 +137,8 @@ export default async function PlatformTenantPage({ params }: PageProps<"/admin/p
           </Card>
         </div>
 
+        <PackageCard tenantId={tenant.id} info={planInfo} />
+
         <Card title="Domains" aside={`${tenant.domains.length} ${tenant.domains.length === 1 ? "domain" : "domains"}`} className="lg:col-span-2">
           <div className="grid gap-4">
             <ul className="divide-y divide-line rounded-control border border-line">
@@ -195,5 +194,113 @@ export default async function PlatformTenantPage({ params }: PageProps<"/admin/p
         </section>
       </div>
     </>
+  );
+}
+
+// ─── Package & modules (docs/modules.md) ────────────────────────────────────
+
+const euros = (cents: number) => `€${(cents / 100).toLocaleString("en-NL")}`;
+
+function PackageCard({ tenantId, info }: { tenantId: string; info: Awaited<ReturnType<typeof getTenantPlan>> }) {
+  const { plan, modules: extras, entitlements } = info;
+  const planDef = PLANS[entitlements.plan];
+  const l = entitlements.limits;
+  const defaults = `${planDef.name} defaults: ${planDef.limits.productLimit ?? "unlimited"} products, ${planDef.limits.photoLimit} photos per product, ${planDef.limits.storageGb} GB, ${planDef.limits.newsletterQuota ?? "unlimited"} mails per month.`;
+  const extraById = new Map(extras.map((m) => [m.moduleId, m]));
+  return (
+    <Card
+      title="Package & modules"
+      aside={<StatusPill tone="ok">{planDef.name}{plan?.source === "LEGACY" ? " · migrated" : ""}</StatusPill>}
+      className="lg:col-span-2"
+    >
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid content-start gap-3">
+          <PlanForm
+            action={setTenantPlanAction.bind(null, tenantId)}
+            values={{
+              plan: entitlements.plan,
+              productLimit: plan?.productLimit ?? null,
+              photoLimit: plan?.photoLimit ?? null,
+              storageGb: plan?.storageGb ?? null,
+              newsletterQuota: plan?.newsletterQuota ?? null,
+            }}
+            plans={PLAN_IDS.map((id) => ({ value: id, label: `${PLANS[id].name} (${euros(PLANS[id].priceCents)}/month)` }))}
+            defaults={defaults}
+          />
+          <p className="text-[13px] text-ink-2">
+            In effect: {l.productLimit ?? "unlimited"} products for sale, {l.photoLimit} photos per product, {l.storageGb} GB storage,{" "}
+            {l.newsletterQuota ?? "unlimited"} newsletter mails per month. Newsletter credits: {(plan?.newsletterCredits ?? 0).toLocaleString("en-NL")}.
+          </p>
+          <CreditsForm action={addNewsletterCreditsAction.bind(null, tenantId)} />
+        </div>
+        <ul className="grid content-start divide-y divide-line rounded-card border border-line">
+          {MODULE_IDS.map((id) => {
+            const def = MODULES[id];
+            const inPackage = planDef.modules.includes(id);
+            const extra = extraById.get(id);
+            const extraLive = extra && extra.status !== "CANCELLED" && entitlements.modules.has(id);
+            const label = inPackage
+              ? "In package"
+              : extraLive
+                ? extra.status === "TRIAL"
+                  ? "Trial"
+                  : extra.status === "PAST_DUE"
+                    ? "Extra · payment due"
+                    : "Extra"
+                : "Not included";
+            return (
+              <li key={id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium text-ink">{def.name} <span className="text-muted">· {euros(def.priceCents)}/month</span></p>
+                  <p className="text-xs text-muted">
+                    {label}
+                    {extraLive && extra.status === "TRIAL" && extra.trialEndsAt ? <> until <DateTime value={extra.trialEndsAt} format="date" /></> : null}
+                  </p>
+                </div>
+                {!inPackage && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {extraLive ? (
+                      <ConfirmDialog
+                        trigger="Remove"
+                        triggerSize="sm"
+                        tone="danger"
+                        title={`Remove ${def.name}?`}
+                        description="The module's screens and storefront parts disappear. Its data is kept and comes back when the module is added again."
+                        confirmLabel="Remove"
+                        action={setTenantModuleAction}
+                        fields={{ tenantId, moduleId: id, status: "" }}
+                      />
+                    ) : (
+                      <>
+                        <ConfirmDialog
+                          trigger="Trial"
+                          triggerSize="sm"
+                          tone="primary"
+                          title={`Start a 14-day trial of ${def.name}?`}
+                          description="The shop can use the module for 14 days. It switches off by itself afterwards; data is kept."
+                          confirmLabel="Start trial"
+                          action={setTenantModuleAction}
+                          fields={{ tenantId, moduleId: id, status: "TRIAL" }}
+                        />
+                        <ConfirmDialog
+                          trigger="Add"
+                          triggerSize="sm"
+                          tone="primary"
+                          title={`Add ${def.name}?`}
+                          description={`The shop gets ${def.name} until you remove it (${euros(def.priceCents)}/month, invoiced outside Quartermaster for now).`}
+                          confirmLabel="Add module"
+                          action={setTenantModuleAction}
+                          fields={{ tenantId, moduleId: id, status: "ACTIVE" }}
+                        />
+                      </>
+                    )}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </Card>
   );
 }

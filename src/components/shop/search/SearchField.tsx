@@ -49,8 +49,11 @@ export function SearchField({
   autoFocus,
   className,
   children,
+  photoSearch = true,
 }: {
   id: string;
+  /** Camera button for search by photo — the smartSearch module (docs/modules.md). */
+  photoSearch?: boolean;
   action?: string;
   variant?: SearchFieldVariant;
   defaultValue?: string;
@@ -121,21 +124,23 @@ export function SearchField({
             onKeyDown={(e) => handlers.current?.keyDown(e)}
             className="h-full min-w-0 flex-1 appearance-none bg-transparent pl-2.5 text-[0.95rem] text-shop-ink placeholder:text-shop-muted focus:outline-none! [&::-webkit-search-cancel-button]:hidden"
           />
-          <button
-            type="button"
-            aria-label={t.photo}
-            title={t.photo}
-            aria-haspopup="dialog"
-            onPointerEnter={() => void loadPhoto()}
-            onFocus={() => void loadPhoto()}
-            onClick={() => setPhoto(true)}
-            className={cn(
-              "grid shrink-0 place-items-center rounded-shop-control text-shop-ink-2 transition-colors hover:bg-shop-line hover:text-shop-ink",
-              header ? "size-9" : "size-10",
-            )}
-          >
-            <CameraIcon />
-          </button>
+          {photoSearch ? (
+            <button
+              type="button"
+              aria-label={t.photo}
+              title={t.photo}
+              aria-haspopup="dialog"
+              onPointerEnter={() => void loadPhoto()}
+              onFocus={() => void loadPhoto()}
+              onClick={() => setPhoto(true)}
+              className={cn(
+                "grid shrink-0 place-items-center rounded-shop-control text-shop-ink-2 transition-colors hover:bg-shop-line hover:text-shop-ink",
+                header ? "size-9" : "size-10",
+              )}
+            >
+              <CameraIcon />
+            </button>
+          ) : null}
           {variant === "catalog" ? (
             <button type="submit" className="h-10 shrink-0 rounded-shop-control bg-shop-primary px-4 text-sm font-semibold text-shop-on-primary transition-colors hover:bg-shop-primary-strong">
               {t.submit}

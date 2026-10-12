@@ -35,6 +35,7 @@ import { CampaignStatusPill } from "./_components/CampaignStatusPill";
 import { StatsStrip } from "./_components/StatsStrip";
 import { SubscriberBulkBar } from "./_components/SubscriberBulkBar";
 import { formatCount } from "./_components/format";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 export const metadata: Metadata = { title: copy.title };
 
@@ -57,6 +58,7 @@ const SUB_TONE: Record<SubscriberStatus, StatusTone> = {
 export default async function NewsletterPage({
   searchParams,
 }: PageProps<"/admin/newsletter">) {
+  if (await moduleLocked("newsletter")) return null; // ModuleGate in layout.tsx shows the upsell
   const sp = (await searchParams) as SearchParamsRecord;
   const ctx = await requireStaffContext();
   const [quota, tenant] = await Promise.all([

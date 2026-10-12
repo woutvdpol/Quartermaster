@@ -7,17 +7,24 @@
  * `recipientCount` is fixed when sending starts and lowered for recipients that unsubscribed before
  * their batch ran, so failed deliveries still count (they were attempted). Test sends and
  * double-opt-in/transactional mails do not count.
+ *
+ * Purchased credits (TenantPlan.newsletterCredits, docs/modules.md) top up a campaign that does not fit
+ * the remaining monthly quota. The part paid from credits is stored on the campaign (`creditsUsed`)
+ * and does not count towards the monthly quota.
  */
 export type QuotaCheck =
-  | { ok: true; unlimited: boolean; quota: number; used: number; remaining: number | null }
-  | { ok: false; quota: number; used: number; remaining: number; needed: number };
+  | { ok: true; unlimited: boolean; quota: number; used: number; remaining: number | null; fromCredits: number }
+  | { ok: false; quota: number; used: number; remaining: number; needed: number; credits: number };
 
-export function checkQuota(input: { quota: number; used: number; needed: number }): QuotaCheck {
+export function checkQuota(input: { quota: number; used: number; needed: number; credits?: number }): QuotaCheck {
   const { quota, used, needed } = input;
-  if (quota === -1) return { ok: true, unlimited: true, quota, used, remaining: null };
+  const credits = Math.max(0, input.credits ?? 0);
+  if (quota === -1) return { ok: true, unlimited: true, quota, used, remaining: null, fromCredits: 0 };
   const remaining = Math.max(0, quota - used);
-  if (needed > remaining) return { ok: false, quota, used, remaining, needed };
-  return { ok: true, unlimited: false, quota, used, remaining: remaining - needed };
+  if (needed <= remaining) return { ok: true, unlimited: false, quota, used, remaining: remaining - needed, fromCredits: 0 };
+  const fromCredits = needed - remaining;
+  if (fromCredits > credits) return { ok: false, quota, used, remaining, needed, credits };
+  return { ok: true, unlimited: false, quota, used, remaining: 0, fromCredits };
 }
 
 /** Offset of `timeZone` from UTC at `date`, in ms (positive east of UTC). */

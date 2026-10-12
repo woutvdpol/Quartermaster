@@ -8,12 +8,14 @@ import { auctionsCopy as t } from "./_copy";
 import { AUCTION_STATUS_TONE, suggestSchedule } from "./_lib";
 import { listAuctionsAdmin } from "./_service";
 import type { AuctionListRow } from "./_types";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 export const metadata: Metadata = { title: "Auctions" };
 
 const BASE = "/admin/auctions";
 
 export default async function AuctionsPage() {
+  if (await moduleLocked("auctions")) return null; // ModuleGate in layout.tsx shows the upsell
   const ctx = await requireStaffContext();
   const [rows, tenant] = await Promise.all([listAuctionsAdmin(ctx), requireTenantDisplay(ctx.tenantId)]);
   const tz = tenant.timeZone;

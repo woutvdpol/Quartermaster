@@ -281,17 +281,19 @@ export async function reindexTenant(
  * Safety net (cron): products without a text embedding, edited after their embedding, embedded with
  * another model, or with a photo added since the last pass but no image embedding. Grouped per tenant.
  */
-export async function findOutdated(textModel: string, limit = 500): Promise<{ tenantId: string; productIds: string[] }[]> {
+export async function findOutdated(textModel: string, limit = 500, tenantIds?: readonly string[]): Promise<{ tenantId: string; productIds: string[] }[]> {
+  // `tenantIds`: only these shops (the cron passes the shops with Smart search, so others never fill the limit).
+  const scope = tenantIds ? Prisma.sql`p."tenantId" = ANY(${[...tenantIds]}::text[]) AND` : Prisma.empty;
   const rows = await db.$queryRaw<{ tenantId: string; id: string }[]>`
     SELECT p."tenantId", p.id
     FROM products p
     LEFT JOIN product_embeddings t ON t."productId" = p.id AND t.kind = 'text'
     LEFT JOIN product_embeddings i ON i."productId" = p.id AND i.kind = 'image'
-    WHERE t."productId" IS NULL
+    WHERE ${scope} (t."productId" IS NULL
        OR t."updatedAt" < p."updatedAt"
        OR t.model <> ${textModel}
        -- a photo added after the last indexing pass (a photo that failed to embed is not retried forever)
-       OR (i."productId" IS NULL AND EXISTS (SELECT 1 FROM product_images pi WHERE pi."productId" = p.id AND pi."createdAt" > t."updatedAt"))
+       OR (i."productId" IS NULL AND EXISTS (SELECT 1 FROM product_images pi WHERE pi."productId" = p.id AND pi."createdAt" > t."updatedAt")))
     ORDER BY p."updatedAt" DESC
     LIMIT ${limit}`;
   const by = new Map<string, string[]>();

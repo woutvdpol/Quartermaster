@@ -130,7 +130,7 @@ describe("documents", () => {
     await expect(addProductDocument(other, product.id, { kind: "OTHER", file: pdfBytes() })).rejects.toMatchObject({ code: "NOT_FOUND" });
 
     // Quota includes images + documents.
-    await db.setting.create({ data: { tenantId: ctx.tenantId, group: "platform", data: { storageQuotaGb: 100_000 / 1024 ** 3 } } });
+    await db.tenantPlan.update({ where: { tenantId: ctx.tenantId }, data: { storageGb: 100_000 / 1024 ** 3 } });
     await addProductImages(ctx, product.id, [{ type: "image/jpeg", ...(await jpegBytes("a.jpg")) }]);
     const big = { name: "big.pdf", bytes: new Uint8Array(Buffer.concat([Buffer.from("%PDF-1.4\n"), Buffer.alloc(120_000, 32)])) };
     await expect(addProductDocument(ctx, product.id, { kind: "OTHER", file: big })).rejects.toMatchObject({ code: "CONFLICT", message: "Storage quota exceeded" });

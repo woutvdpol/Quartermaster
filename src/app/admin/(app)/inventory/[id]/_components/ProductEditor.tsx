@@ -110,6 +110,7 @@ export function ProductEditor({
   purchaseRecords,
   tagSuggestions,
   slots,
+  sourcing = true,
 }: {
   product: EditorProduct;
   currency: string;
@@ -120,6 +121,8 @@ export function ProductEditor({
   purchaseRecords: PurchaseRecordOption[];
   tagSuggestions: string[];
   slots: Slots;
+  /** The shop has the provenance module (purchase records); without it the link is kept but not editable. */
+  sourcing?: boolean;
 }) {
   const { state, formAction, pending, error } = useActionForm(saveProductAction);
   const [dirty, setDirty] = useState(false);
@@ -282,16 +285,21 @@ export function ProductEditor({
 
             <Card title={copy.cards.provenance} aside={copy.cards.provenanceAside}>
               <div className="grid gap-3">
-                <Select
-                  form={F}
-                  label={f.purchaseRecord}
-                  name="purchaseRecordId"
-                  value={recordId}
-                  onChange={(e) => setRecordId(e.target.value)}
-                  options={[{ value: "", label: f.noPurchaseRecord }, ...purchaseRecords.map((r) => ({ value: r.id, label: r.label }))]}
-                  error={error("purchaseRecordId")}
-                />
-                {record && (
+                {sourcing ? (
+                  <Select
+                    form={F}
+                    label={f.purchaseRecord}
+                    name="purchaseRecordId"
+                    value={recordId}
+                    onChange={(e) => setRecordId(e.target.value)}
+                    options={[{ value: "", label: f.noPurchaseRecord }, ...purchaseRecords.map((r) => ({ value: r.id, label: r.label }))]}
+                    error={error("purchaseRecordId")}
+                  />
+                ) : (
+                  // Without the provenance module (docs/modules.md): keep the existing link on save.
+                  <input type="hidden" form={F} name="purchaseRecordId" value={recordId} />
+                )}
+                {record && sourcing && (
                   <Link href={`/admin/sourcing/records/${record.id}`} className="justify-self-start text-xs text-info hover:underline">
                     {copy.provenance.openRecord}
                   </Link>

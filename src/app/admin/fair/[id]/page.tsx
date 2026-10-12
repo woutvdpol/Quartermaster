@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireAdminPage } from "@/server/auth/guards";
 import { ServiceError, requireStaffContext } from "@/server/context";
 import { getFairSellData } from "@/server/fairs";
@@ -18,6 +18,9 @@ export default async function FairModePage({ params }: { params: Promise<{ id: s
   const [{ id }, ctx] = await Promise.all([params, requireStaffContext()]);
   const data = await getFairSellData(ctx, id).catch((err) => {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    // Paid module "fairs" missing and the fair is not LIVE (a live fair may finish without it, see
+    // getFairSellData): /admin/fairs (ModuleGate) explains what the module is and how to get it.
+    if (err instanceof ServiceError && err.code === "UNAVAILABLE") redirect("/admin/fairs");
     throw err;
   });
   return <FairSell initial={data} />;

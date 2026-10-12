@@ -7,12 +7,14 @@ import { auctionsCopy as t } from "../_copy";
 import { listBlockedBidders } from "../_service";
 import type { BlockedBidderRow } from "../_types";
 import { unblockBidderAction } from "../actions";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 export const metadata: Metadata = { title: "Blocked bidders" };
 
 const b = t.blocked;
 
 export default async function BlockedBiddersPage() {
+  if (await moduleLocked("auctions")) return null; // ModuleGate in layout.tsx shows the upsell
   const ctx = await requireStaffContext();
   const [rows, tenant] = await Promise.all([listBlockedBidders(ctx), requireTenantDisplay(ctx.tenantId)]);
 

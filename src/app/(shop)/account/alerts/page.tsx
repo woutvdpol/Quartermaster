@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { ButtonLink } from "@/components/shop/ui/Button";
 import { Suspense } from "react";
 import { AccountShell } from "@/components/shop/account/AccountShell";
@@ -12,6 +13,7 @@ import { accountCopies } from "@/components/shop/account/_copy";
 import { alertsCopies } from "@/components/shop/alerts/_copy";
 import { INTL_LOCALE } from "@/lib/i18n/shop-locales";
 import { getRequestLocale, shopCopy } from "@/server/i18n/locale";
+import { requireShop } from "@/server/storefront/context";
 import { AlertRow } from "./AlertRow";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -20,6 +22,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AccountAlertsPage() {
+  // Paid module `alerts` (docs/modules.md). Alert mails link to /alerts/manage, which always works.
+  if (!(await requireShop()).settings.features.alerts) notFound();
   const title = (await shopCopy(accountCopies)).account.nav.alerts;
   return (
     <AccountShell active="alerts" title={title}>

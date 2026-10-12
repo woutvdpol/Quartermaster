@@ -15,6 +15,7 @@ import { getNetworkMembership } from "@/server/network/admin";
 import { NetworkMembershipCard } from "../_components/NetworkMembershipCard";
 import { TranslateStockCard } from "../_components/TranslateStockCard";
 import { getTranslationOverview } from "@/server/translations/service";
+import { hasModule } from "@/server/modules";
 
 export async function generateMetadata({ params }: PageProps<"/admin/settings/[group]">): Promise<Metadata> {
   const { group } = await params;
@@ -28,13 +29,16 @@ export default async function SettingsGroupPage({ params }: PageProps<"/admin/se
   const ctx = await requireStaffContext();
   const isSuper = ctx.actor.role === "SUPERADMIN";
   if (!isSettingsGroup(group) || (PLATFORM_ONLY_GROUPS.has(group) && !isSuper)) notFound();
+  // Package, limits and modules moved to the shop's platform page (docs/modules.md).
+  if (group === "platform") redirect(`/admin/platform/${ctx.tenantId}`);
 
   const [values, tenant, searchIndex, network, translations] = await Promise.all([
     getSettings(ctx.tenantId, group),
     requireTenantDisplay(ctx.tenantId),
-    group === "catalog" ? getSearchIndexOverview(ctx) : Promise.resolve(null),
+    // Module cards (docs/modules.md): only for shops with Smart search / Translations.
+    group === "catalog" && (await hasModule(ctx.tenantId, "smartSearch")) ? getSearchIndexOverview(ctx) : Promise.resolve(null),
     group === "general" ? getNetworkMembership(ctx) : Promise.resolve(null),
-    group === "i18n" ? getTranslationOverview(ctx) : Promise.resolve(null),
+    group === "i18n" && (await hasModule(ctx.tenantId, "translations")) ? getTranslationOverview(ctx) : Promise.resolve(null),
   ]);
   const meta = SETTINGS_FORMS[group];
   const formId = `settings-${group}`;

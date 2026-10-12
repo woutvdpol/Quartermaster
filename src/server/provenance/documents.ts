@@ -12,6 +12,7 @@ import { assertValidKey, getStorage } from "@/server/media/storage";
 import type { Prisma, ProductDocument } from "@/generated/prisma/client";
 import type { ProductDocumentKind } from "@/generated/prisma/enums";
 import { DocumentFileError, prepareDocumentFile } from "./files";
+import { assertModule, getEntitlements } from "@/server/modules";
 
 /*
  * Provenance documents (letters, photos, deactivation certificates, historic invoices).
@@ -28,6 +29,10 @@ import { DocumentFileError, prepareDocumentFile } from "./files";
  * Quota: document bytes count against the tenant storage quota together with product images
  * (media's tenantStorageUsage counts images only; tenantTotalStorageUsage adds documents). Uploads
  * take the same per-tenant advisory lock as image uploads, so the two cannot race past the quota.
+ *
+ * Paid module "provenance" (docs/modules.md): uploading and editing need it. Wind-down after a
+ * downgrade stays possible: listing, deleting, making a document private again, and serving the
+ * existing (public) documents through /api/documents/[id] are not gated.
  */
 
 export const DOCUMENT_KINDS = ["PROVENANCE", "DEACTIVATION_CERT", "INVOICE_HISTORIC", "OTHER"] as const satisfies readonly ProductDocumentKind[];
@@ -114,8 +119,8 @@ export async function tenantTotalStorageUsage(tenantId: string, client: Prisma.T
 }
 
 async function quotaBytes(tenantId: string): Promise<number> {
-  const platform = await getSettings(tenantId, "platform");
-  return Math.floor(platform.storageQuotaGb * 1024 ** 3);
+  const { limits } = await getEntitlements(tenantId);
+  return Math.floor(limits.storageGb * 1024 ** 3);
 }
 
 // ─── Staff API ───────────────────────────────────────────────────────────────
@@ -132,6 +137,7 @@ export async function listProductDocuments(ctx: ServiceContext, productId: strin
 
 /** Validates, stores and registers one document. Enforces the tenant storage quota. */
 export async function addProductDocument(ctx: ServiceContext, productId: string, input: DocumentUpload): Promise<ProductDocumentDto> {
+  await assertModule(ctx, "provenance");
   productId = idSchema.parse(productId);
   const parsed = z
     .object({
@@ -208,6 +214,9 @@ export async function updateProductDocument(ctx: ServiceContext, documentId: str
   if (!parsed.success) {
     throw new ServiceError("INVALID", parsed.error.issues[0]?.message ?? "Invalid document", parsed.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })));
   }
+  // Un-publishing only is wind-down and stays allowed without the module; any other edit needs it.
+  const unpublishOnly = parsed.data.isPublic === false && parsed.data.title === undefined && parsed.data.kind === undefined;
+  if (!unpublishOnly) await assertModule(ctx, "provenance");
   const found = await db.productDocument.findFirst({ where: { id: documentId, tenantId: ctx.tenantId } });
   if (!found) throw new ServiceError("NOT_FOUND", "Document not found");
   const row = await db.productDocument.update({ where: { id: found.id }, data: parsed.data });

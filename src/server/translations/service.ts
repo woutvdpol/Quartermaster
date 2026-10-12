@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/server/db";
 import { audit } from "@/server/audit";
 import { ServiceError, type ServiceContext } from "@/server/context";
+import { assertModule } from "@/server/modules";
 import { enqueue } from "@/server/jobs/queue";
 import type { Prisma } from "@/generated/prisma/client";
 import { parseInput } from "@/server/catalog/errors";
@@ -28,6 +29,10 @@ import { getTranslator, TranslatorUnavailableError } from "./translator";
  * approve (the only way a translation reaches the shop), "Translate again", glossary, bulk queueing.
  * Every function is tenant-scoped through ctx; mutations are audited ("translation.*", which also
  * invalidates the shop caches — src/server/storefront/cache.ts).
+ *
+ * Translations module (docs/modules.md): every entry point asserts it (ServiceError UNAVAILABLE),
+ * except getEntityTranslations — the product editor card — which reports no languages instead, so the
+ * card simply does not render. Existing translation rows are kept when the module is switched off.
  */
 
 const entityEnum = z.enum(TRANSLATION_ENTITIES as [TranslationEntityName, ...TranslationEntityName[]]);
@@ -47,6 +52,7 @@ export type TranslationOverview = {
 };
 
 export async function getTranslationOverview(ctx: ServiceContext): Promise<TranslationOverview> {
+  await assertModule(ctx, "translations");
   const [locales, grouped, stale] = await Promise.all([
     enabledLocales(ctx.tenantId),
     db.translation.groupBy({ by: ["locale", "status"], where: { tenantId: ctx.tenantId }, _count: { _all: true } }),
@@ -155,6 +161,7 @@ export async function listTranslations(
   ctx: ServiceContext,
   input: z.input<typeof listSchema>,
 ): Promise<{ rows: ReviewRow[]; total: number; counts: Record<ReviewView, number> }> {
+  await assertModule(ctx, "translations");
   const f = parseInput(listSchema, input);
   const base: Prisma.TranslationWhereInput = {
     tenantId: ctx.tenantId,
@@ -241,6 +248,7 @@ async function currentSource(ctx: ServiceContext, entity: TranslationEntityName,
  * text. From now on the shop shows it in that language.
  */
 export async function approveTranslation(ctx: ServiceContext, input: z.input<typeof approveSchema>): Promise<{ id: string }> {
+  await assertModule(ctx, "translations");
   const data = parseInput(approveSchema, input);
   const value = data.value.replace(/\r\n?/g, "\n").trim();
   if (!value) throw new ServiceError("INVALID", "Enter a translation before approving.");
@@ -269,6 +277,7 @@ export async function approveTranslation(ctx: ServiceContext, input: z.input<typ
  * "still correct" (keeps the value, confirms it for the current English text).
  */
 export async function approveMany(ctx: ServiceContext, ids: string[]): Promise<{ approved: number; skipped: number }> {
+  await assertModule(ctx, "translations");
   const list = parseInput(z.array(cuid).min(1).max(200), ids);
   const rows = await db.translation.findMany({ where: { tenantId: ctx.tenantId, id: { in: list } } });
   let approved = 0;
@@ -292,6 +301,7 @@ export async function approveMany(ctx: ServiceContext, ids: string[]): Promise<{
 
 /** Takes an approved translation offline again (back to an unreviewed proposal). */
 export async function withdrawTranslation(ctx: ServiceContext, input: z.input<typeof cellSchema>): Promise<void> {
+  await assertModule(ctx, "translations");
   const data = parseInput(cellSchema, input);
   const done = await db.translation.updateMany({
     where: { tenantId: ctx.tenantId, entity: data.entity, entityId: data.entityId, field: data.field, locale: data.locale, status: "APPROVED" },
@@ -309,6 +319,7 @@ export async function withdrawTranslation(ctx: ServiceContext, input: z.input<ty
  * suggestion for the editor (what is online changes only on approve).
  */
 export async function suggestTranslation(ctx: ServiceContext, input: z.input<typeof cellSchema>): Promise<{ value: string; missing: number; stored: boolean }> {
+  await assertModule(ctx, "translations");
   const data = parseInput(cellSchema, input);
   const source = await currentSource(ctx, data.entity, data.entityId, data.field);
   const translator = getTranslator();
@@ -335,6 +346,7 @@ export async function suggestTranslation(ctx: ServiceContext, input: z.input<typ
 
 /** After glossary changes: send every unreviewed proposal of a language through the translator again. */
 export async function retranslateUnreviewed(ctx: ServiceContext, locale: TranslationLocale): Promise<{ queued: number }> {
+  await assertModule(ctx, "translations");
   const l = parseInput(localeEnum, locale);
   const done = await db.translation.updateMany({ where: { tenantId: ctx.tenantId, locale: l, status: "MACHINE" }, data: { status: "QUEUED" } });
   if (done.count) {
@@ -349,6 +361,7 @@ export async function retranslateUnreviewed(ctx: ServiceContext, locale: Transla
  * products with `includeSold`) for the enabled languages. Runs in the background.
  */
 export async function queueExisting(ctx: ServiceContext, opts: { includeSold?: boolean } = {}): Promise<void> {
+  await assertModule(ctx, "translations");
   if (!(await enabledLocales(ctx.tenantId)).length) throw new ServiceError("INVALID", "Switch on a shop language first.");
   await enqueue("translations.sync", { tenantId: ctx.tenantId, scope: opts.includeSold ? "all" : "stock" }, { singletonKey: `tenant:${ctx.tenantId}` });
   await audit({ action: "translation.queue_existing", tenantId: ctx.tenantId, actorId: ctx.actor.id, entity: "Tenant", entityId: ctx.tenantId, data: { includeSold: !!opts.includeSold } });
@@ -359,6 +372,7 @@ export async function queueExisting(ctx: ServiceContext, opts: { includeSold?: b
 export type GlossaryRow = { id: string; locale: TranslationLocale; source: string; target: string | null };
 
 export async function listGlossary(ctx: ServiceContext, locale?: TranslationLocale): Promise<GlossaryRow[]> {
+  await assertModule(ctx, "translations");
   const rows = await db.translationTerm.findMany({
     where: { tenantId: ctx.tenantId, ...(locale ? { locale: parseInput(localeEnum, locale) } : {}) },
     orderBy: [{ locale: "asc" }, { source: "asc" }],
@@ -380,6 +394,7 @@ const termSchema = z.object({
 
 /** Adds or changes a term (one per English term and language, case-insensitive). */
 export async function saveGlossaryTerm(ctx: ServiceContext, input: z.input<typeof termSchema>): Promise<GlossaryRow> {
+  await assertModule(ctx, "translations");
   const data = parseInput(termSchema, input);
   const existing = await db.translationTerm.findFirst({
     where: { tenantId: ctx.tenantId, locale: data.locale, source: { equals: data.source, mode: "insensitive" } },
@@ -392,6 +407,7 @@ export async function saveGlossaryTerm(ctx: ServiceContext, input: z.input<typeo
 }
 
 export async function deleteGlossaryTerm(ctx: ServiceContext, id: string): Promise<void> {
+  await assertModule(ctx, "translations");
   const done = await db.translationTerm.deleteMany({ where: { tenantId: ctx.tenantId, id: parseInput(cuid, id) } });
   if (!done.count) throw new ServiceError("NOT_FOUND", "Term not found");
   await audit({ action: "translation.term_delete", tenantId: ctx.tenantId, actorId: ctx.actor.id, entity: "TranslationTerm", entityId: id });
@@ -399,6 +415,7 @@ export async function deleteGlossaryTerm(ctx: ServiceContext, id: string): Promi
 
 /** Adds the suggested collector terms (never-translate names and term translations) that are not in the glossary yet. */
 export async function addSuggestedTerms(ctx: ServiceContext, locale: TranslationLocale): Promise<{ added: number }> {
+  await assertModule(ctx, "translations");
   const l = parseInput(localeEnum, locale);
   const have = new Set((await db.translationTerm.findMany({ where: { tenantId: ctx.tenantId, locale: l }, select: { source: true } })).map((t) => t.source.toLowerCase()));
   const suggested = [...SUGGESTED_KEEP_TERMS.map((source) => ({ source, target: null as string | null })), ...SUGGESTED_MAPPED_TERMS[l]];

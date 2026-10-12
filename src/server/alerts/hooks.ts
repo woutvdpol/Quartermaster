@@ -1,5 +1,6 @@
 import "server-only";
 import { enqueue, type EnqueueOptions } from "@/server/jobs/queue";
+import { hasModule } from "@/server/modules";
 
 /*
  * Entry points for other modules (catalog, stock, orders). Each only ENQUEUES a job, so callers stay
@@ -9,12 +10,15 @@ import { enqueue, type EnqueueOptions } from "@/server/jobs/queue";
  *
  * The `alerts.scan` cron catches anything a missing hook would miss (published products and released
  * reservations of the last minutes), so the hooks only make alerts faster — not correct.
+ *
+ * Shops without the paid `alerts` module (docs/modules.md) enqueue nothing; the jobs check again.
  */
 
 type HookOpts = Pick<EnqueueOptions, "tx">;
 
-async function safeEnqueue(fn: () => Promise<unknown>, what: string) {
+async function safeEnqueue(tenantId: string, fn: () => Promise<unknown>, what: string) {
   try {
+    if (!(await hasModule(tenantId, "alerts"))) return;
     await fn();
   } catch (err) {
     console.error(`[alerts] ${what} failed`, err);
@@ -23,11 +27,12 @@ async function safeEnqueue(fn: () => Promise<unknown>, what: string) {
 
 /** A product became ACTIVE/published or was bumped (publishedAt set or moved forward). */
 export async function onProductPublished(tenantId: string, productId: string, opts: HookOpts = {}): Promise<void> {
-  await safeEnqueue(() => enqueue("alerts.match-product", { tenantId, productId }, opts), "onProductPublished");
+  await safeEnqueue(tenantId, () => enqueue("alerts.match-product", { tenantId, productId }, opts), "onProductPublished");
 }
 
 /** Several products at once (bulk status change / bump). */
 export async function onProductsPublished(tenantId: string, productIds: string[], opts: HookOpts = {}): Promise<void> {
+  if (!productIds.length || !(await hasModule(tenantId, "alerts").catch(() => false))) return;
   for (const productId of productIds) await onProductPublished(tenantId, productId, opts);
 }
 
@@ -42,6 +47,7 @@ export async function onReservationReleased(
 ): Promise<void> {
   const { excludeCustomerId, ...rest } = opts;
   await safeEnqueue(
+    tenantId,
     // Small delay: the product page / cart settle first, and a quick re-add by the same visitor wins.
     () => enqueue("alerts.back-available", { tenantId, productId, excludeCustomerId: excludeCustomerId ?? null }, { ...rest, startAfter: 60 }),
     "onReservationReleased",
@@ -51,5 +57,5 @@ export async function onReservationReleased(
 /** The price of a product changed (minor units). Only decreases trigger alerts. */
 export async function onPriceChanged(tenantId: string, productId: string, oldPrice: number, newPrice: number, opts: HookOpts = {}): Promise<void> {
   if (!(newPrice < oldPrice) || newPrice <= 0) return;
-  await safeEnqueue(() => enqueue("alerts.price-drop", { tenantId, productId, oldPrice, newPrice }, opts), "onPriceChanged");
+  await safeEnqueue(tenantId, () => enqueue("alerts.price-drop", { tenantId, productId, oldPrice, newPrice }, opts), "onPriceChanged");
 }

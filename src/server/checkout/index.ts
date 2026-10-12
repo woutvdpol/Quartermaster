@@ -24,6 +24,7 @@ import { convertOffersTx, lockApplicableOffersTx } from "@/server/offers";
 import { formatMoney } from "@/components/shop/ui/money";
 import { getSurchargeRules } from "@/server/payments/mollie-config";
 import { applySurcharge, type SurchargedTotals, type SurchargeRules } from "@/server/payments/surcharge";
+import { hasModule } from "@/server/modules";
 
 export { getPaymentSetup, methodLabel, isDevSimulationAllowed, type PaymentSetup, type PaymentMethodOption } from "./payment-methods";
 export { startOrderPayment, retryOrderPayment, simulateDevPayment, type StartPaymentResult, type RetryResult } from "./payment";
@@ -108,12 +109,12 @@ export async function getCheckoutContext(
   viewer: ShopViewer | null,
   preloaded?: PreloadedCart,
 ): Promise<CheckoutContext> {
-  const [cart, checkout, legal, general, platform, zones, payment, currency] = await Promise.all([
+  const [cart, checkout, legal, general, newsletterEnabled, zones, payment, currency] = await Promise.all([
     preloaded ? preloaded.cart : getCart(tenantId, token),
     getSettings(tenantId, "checkout"),
     getSettings(tenantId, "legal"),
     getSettings(tenantId, "general"),
-    getSettings(tenantId, "platform"),
+    hasModule(tenantId, "newsletter"),
     requestQuoteZones(tenantId),
     getPaymentSetup(tenantId),
     getTenantCurrency(tenantId),
@@ -134,7 +135,7 @@ export async function getCheckoutContext(
     disclaimer: legal.disclaimers.checkout,
     freeShippingThreshold: checkout.freeShippingThresholdCents,
     minimumOrder: checkout.minimumOrderCents,
-    newsletterEnabled: platform.newsletterEnabled,
+    newsletterEnabled,
     viewer: viewer ? { email: viewer.email, name: viewer.name } : null,
   };
 }

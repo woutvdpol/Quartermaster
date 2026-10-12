@@ -22,6 +22,7 @@ import { requireTenantDisplay } from "@/server/tenant-display";
 import { CouponDrawer } from "./_components/CouponDrawer";
 import { couponsCopy as t } from "./_copy";
 import { couponState, describeDiscount, STATE_TONE } from "./_format";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 export const metadata: Metadata = { title: "Coupons" };
 
@@ -31,6 +32,7 @@ const VIEWS = ["all", "active", "scheduled", "ended", "inactive"] as const;
 type View = (typeof VIEWS)[number];
 
 export default async function CouponsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  if (await moduleLocked("coupons")) return null; // ModuleGate in layout.tsx shows the upsell
   const sp = await searchParams;
   const ctx = await requireStaffContext();
   const v = getParam(sp, "view");

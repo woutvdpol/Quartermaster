@@ -172,6 +172,7 @@ export const auctionCopyNl: CopyShape<typeof auctionCopy> = {
     wrongAccountBody: "U bent ingelogd met een ander account dan het account dat deze kavel heeft gewonnen. Log uit, of log in als de winnaar, en open de link opnieuw.",
     toAccount: "Naar uw account",
     toAuctions: "Naar de veilingen",
+    toShop: "Verder winkelen",
     unexpected: "Er ging iets mis. Probeer het opnieuw.",
   },
   productBanner: {

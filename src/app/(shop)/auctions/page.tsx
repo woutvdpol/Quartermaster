@@ -10,7 +10,7 @@ import { AUCTIONS_PATH, auctionCovers, auctionHref, auctionSlugs, lotCardImage, 
 import { auctionCopies } from "@/components/shop/auctions/_copy";
 import { listPublicAuctions, type AuctionSummary } from "@/server/auctions/public";
 import { resolveCompliance, visitorCountry } from "@/server/compliance";
-import { requireShop } from "@/server/storefront/context";
+import { requireAuctionShop } from "./_load";
 import { getShopViewer } from "@/server/storefront/viewer";
 import { collectionPageJsonLd } from "@/lib/seo/json-ld";
 import { shopAlternates, shopOgDefaults } from "@/lib/seo/metadata";
@@ -26,7 +26,7 @@ import { metaDescription } from "@/lib/seo/text";
 const DATE_OPTS: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" };
 
 export async function generateMetadata(): Promise<Metadata> {
-  const shop = await requireShop();
+  const shop = await requireAuctionShop();
   const t = pickCopy(auctionCopies, shop.locale);
   const description = metaDescription(t.index.metaDescription(shop.shopName));
   const alternates = shopAlternates(shop, AUCTIONS_PATH);
@@ -39,7 +39,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AuctionsPage() {
-  const shop = await requireShop();
+  const shop = await requireAuctionShop();
   const tenantId = shop.tenant.id;
   const t = pickCopy(auctionCopies, shop.locale);
   const { live, upcoming, singles: allSingles } = await listPublicAuctions(tenantId);

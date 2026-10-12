@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { leadsCopies } from "@/components/shop/leads/_copy";
 import { localizedUrl } from "@/lib/i18n/shop-locales";
@@ -18,6 +19,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function SellPage() {
   const shop = await requireShop();
+  // Paid module `leads` (docs/modules.md).
+  if (!shop.settings.features.leads) notFound();
   const t = pickCopy(leadsCopies, shop.locale);
   return (
     <Container className="py-10 sm:py-16">

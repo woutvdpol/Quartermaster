@@ -13,6 +13,9 @@ import {
   setPrimaryDomain,
   setTenantStatus,
   updateTenant,
+  setTenantPlan,
+  setTenantModule,
+  addNewsletterCredits,
 } from "@/server/platform";
 import { allowNetwork, removeFromNetwork } from "@/server/network/admin";
 import { fail, failFrom } from "../_system/errors";
@@ -173,4 +176,57 @@ export async function allowNetworkAction(formData: FormData): Promise<ActionResu
   }
   revalidatePath(BASE, "layout");
   return actionOk("The owner can join the network again.");
+}
+
+// ─── Package & modules (docs/modules.md) ────────────────────────────────────
+
+/** Empty field = package default (null); otherwise a number. */
+function optionalInt(formData: FormData, name: string): number | null {
+  const raw = formString(formData, name).trim();
+  return raw === "" ? null : Number(raw);
+}
+
+export async function setTenantPlanAction(tenantId: string, _prev: ActionState, formData: FormData): Promise<ActionResult> {
+  try {
+    await setTenantPlan(await requirePlatformContext(), tenantId, {
+      plan: formString(formData, "plan") as "START" | "PRO" | "COMPLETE",
+      productLimit: optionalInt(formData, "productLimit"),
+      photoLimit: optionalInt(formData, "photoLimit"),
+      storageGb: optionalInt(formData, "storageGb"),
+      newsletterQuota: optionalInt(formData, "newsletterQuota"),
+    });
+  } catch (err) {
+    const failure = failFrom(err);
+    return fail(failure.message, failure.fieldErrors);
+  }
+  revalidatePath(BASE, "layout");
+  revalidatePath("/admin", "layout");
+  return actionOk("Package saved.");
+}
+
+export async function setTenantModuleAction(formData: FormData): Promise<ActionResult> {
+  const status = formString(formData, "status");
+  try {
+    await setTenantModule(await requirePlatformContext(), formString(formData, "tenantId"), {
+      moduleId: formString(formData, "moduleId") as never,
+      status: status === "TRIAL" || status === "ACTIVE" ? status : null,
+    });
+  } catch (err) {
+    return failFrom(err);
+  }
+  revalidatePath(BASE, "layout");
+  revalidatePath("/admin", "layout");
+  return actionOk(status === "TRIAL" ? "14-day trial started." : status === "ACTIVE" ? "Module added." : "Module removed.");
+}
+
+export async function addNewsletterCreditsAction(tenantId: string, _prev: ActionState, formData: FormData): Promise<ActionResult> {
+  let balance: number;
+  try {
+    ({ balance } = await addNewsletterCredits(await requirePlatformContext(), tenantId, Number(formString(formData, "amount"))));
+  } catch (err) {
+    const failure = failFrom(err);
+    return fail(failure.message, failure.fieldErrors);
+  }
+  revalidatePath(BASE, "layout");
+  return actionOk(`Credits updated. Balance: ${balance.toLocaleString("en-NL")} mails.`);
 }

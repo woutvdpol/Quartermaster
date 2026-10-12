@@ -37,6 +37,7 @@ export const TENANT_SCOPED_MODELS: ReadonlySet<string> = new Set([
   "NewsletterCampaign", "PageView", "Facet", "FacetValue", "ProductFacetValue", "SavedSearch", "AlertDelivery",
   "ProductDocument", "Certificate", "ComplianceRule", "Offer", "Coupon", "CouponRedemption", "Lead", "Redirect",
   "ImportJob", "ProductEmbedding", "SearchIndexRun", "Fair", "FairItem", "PushSubscription", "PushMessage", "Translation", "TranslationTerm", "SearchQueryStat", "Auction", "AuctionLot", "Bid", "AuctionBidder", "BlockedBidder",
+  "TenantPlan", "TenantModule",
 ]);
 
 export class TenantScopeError extends Error {

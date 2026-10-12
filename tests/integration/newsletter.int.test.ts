@@ -101,7 +101,7 @@ describe("double opt-in", () => {
   });
 
   it("requires the newsletter to be enabled and a valid email", async () => {
-    const ctx = await createTenantContext();
+    const ctx = await createTenantContext({ plan: "START" }); // no newsletter module (docs/modules.md)
     await expectServiceError(subscribe(ctx.tenantId, "a@example.test"), "UNAVAILABLE");
     await enableNewsletter(ctx.tenantId);
     await expectServiceError(subscribe(ctx.tenantId, "not-an-email"), "INVALID");
@@ -307,7 +307,7 @@ describe("campaigns", () => {
   });
 
   it("refuses to send without subscribers or when disabled; test sends go to one address", async () => {
-    const ctx = await createTenantContext();
+    const ctx = await createTenantContext({ plan: "START" }); // no newsletter module (docs/modules.md)
     const c = await createCampaign(ctx, { subject: "Hello", body: "Body" });
     await expectServiceError(sendCampaign(ctx, c.id), "UNAVAILABLE");
     await enableNewsletter(ctx.tenantId);

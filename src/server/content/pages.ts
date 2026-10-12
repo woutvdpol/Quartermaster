@@ -3,7 +3,6 @@ import { z } from "zod";
 import { db } from "@/server/db";
 import { audit } from "@/server/audit";
 import { ServiceError, type ServiceContext } from "@/server/context";
-import { getSettings } from "@/server/settings";
 import { isUniqueViolation, notFound, parseInput } from "@/server/catalog/errors";
 import { nextFreeSlug, slugify } from "@/server/catalog/slug";
 import type { Prisma } from "@/generated/prisma/client";
@@ -19,6 +18,7 @@ import {
 } from "./blocks";
 import { MAX_PAGE_SLUG_LENGTH, RESERVED_SLUGS, SYSTEM_PAGE_KEYS, SYSTEM_PAGES, type SystemPageKey } from "./rules";
 import { SYSTEM_PAGE_STARTER_BLOCKS } from "./starter";
+import { hasModule } from "@/server/modules";
 
 /*
  * Block CMS pages. One page = ordered ContentBlocks (sortOrder 0..n-1, renumbered on every change).
@@ -200,8 +200,7 @@ async function validateBlockData(tenantId: string, type: ContentBlockType, data:
 
 async function assertFeature(tenantId: string, type: ContentBlockType) {
   if (catalogEntry(type).requiresFeature === "newsletter") {
-    const platform = await getSettings(tenantId, "platform");
-    if (!platform.newsletterEnabled) throw new ServiceError("FORBIDDEN", "The newsletter is not enabled for this shop");
+    if (!(await hasModule(tenantId, "newsletter"))) throw new ServiceError("FORBIDDEN", "The newsletter is not part of this shop's package");
   }
 }
 

@@ -16,7 +16,7 @@ const CATALOG_PREFIXES = ["/shop", "/search", "/archive"];
  * full-screen sheet with the same field (suggestions flow below it, full width). Hidden on catalog
  * pages, which have their own search box next to the heading (docs/design/search/Results.dc.html).
  */
-export function HeaderSearch() {
+export function HeaderSearch({ photoSearch = true }: { photoSearch?: boolean }) {
   const t = useShopCopy(fieldCopies);
   const pathname = usePathname();
   const sheet = useRef<HTMLDialogElement>(null);
@@ -31,7 +31,7 @@ export function HeaderSearch() {
   if (CATALOG_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return null;
   return (
     <>
-      <SearchField id="shop-search" className="hidden w-full max-w-[22rem] min-w-[150px] lg:block" />
+      <SearchField id="shop-search" className="hidden w-full max-w-[22rem] min-w-[150px] lg:block" photoSearch={photoSearch} />
       <button
         type="button"
         className="grid size-11 shrink-0 place-items-center rounded-shop-control text-shop-ink hover:bg-shop-sunken lg:hidden"
@@ -49,7 +49,7 @@ export function HeaderSearch() {
           className="m-0 h-dvh max-h-none w-full max-w-none bg-shop-bg p-0 text-shop-ink backdrop:bg-shop-scrim open:flex open:flex-col"
         >
           <div className="flex min-h-0 flex-1 items-start gap-1 overflow-y-auto py-3 pr-2 pl-4">
-            <SearchField id="shop-search-sheet" variant="sheet" autoFocus className="min-w-0 flex-1" />
+            <SearchField id="shop-search-sheet" variant="sheet" autoFocus className="min-w-0 flex-1" photoSearch={photoSearch} />
             <button type="button" className="grid size-11 shrink-0 place-items-center rounded-shop-control hover:bg-shop-sunken" aria-label={t.close} onClick={() => sheet.current?.close()}>
               <CloseIcon />
             </button>

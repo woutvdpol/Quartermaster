@@ -7,12 +7,14 @@ import { requireTenantDisplay } from "@/server/tenant-display";
 import { FairDrawer } from "./_components/FairDrawer";
 import { fairsCopy as t } from "./_copy";
 import { FAIR_STATUS_TONE as STATUS_TONE } from "./_lib";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 export const metadata: Metadata = { title: "Fairs" };
 
 const BASE = "/admin/fairs";
 
 export default async function FairsPage() {
+  if (await moduleLocked("fairs")) return null; // ModuleGate in layout.tsx shows the upsell
   const ctx = await requireStaffContext();
   const [rows, tenant] = await Promise.all([listFairs(ctx), requireTenantDisplay(ctx.tenantId)]);
 

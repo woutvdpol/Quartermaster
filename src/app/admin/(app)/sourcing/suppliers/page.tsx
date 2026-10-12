@@ -18,10 +18,12 @@ import { copy } from "../_copy";
 import { SourcingTabs } from "../_components/SourcingTabs";
 import { deleteSupplierAction } from "./actions";
 import { SupplierDrawer } from "./SupplierDrawer";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 export const metadata: Metadata = { title: `${copy.tabs.suppliers} · ${copy.title}` };
 
 export default async function SuppliersPage({ searchParams }: PageProps<"/admin/sourcing/suppliers">) {
+  if (await moduleLocked("provenance")) return null; // ModuleGate in layout.tsx shows the upsell
   const sp = await searchParams;
   const q = getParam(sp, "q")?.slice(0, 200);
   const ctx = await requireStaffContext();

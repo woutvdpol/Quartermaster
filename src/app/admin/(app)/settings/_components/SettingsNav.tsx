@@ -28,7 +28,7 @@ export function SettingsNav({ active, showPlatform }: { active: SettingsGroup | 
           <p className="type-label flex items-center gap-1.5 px-2.5 text-[11px] text-muted">
             <LockIcon /> Superadmin only
           </p>
-          <ul className="grid gap-0.5">{link("/admin/settings/platform", SETTINGS_FORMS.platform.label, active === "platform")}</ul>
+          <ul className="grid gap-0.5">{link("/admin/settings/platform", "Package & modules →", false)}</ul>
         </div>
       )}
       <div className="grid gap-1 border-t border-line pt-2.5">

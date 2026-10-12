@@ -23,6 +23,7 @@ import { FacetsCard } from "./_ext/facets/FacetsCard";
 import { TranslationsCard } from "./_ext/translations/TranslationsCard";
 import { Lineage } from "./_ext/duplicates/Lineage";
 import { ProductAuctionNotice } from "../../auctions/_ext/ProductAuctionNotice";
+import { hasModule } from "@/server/modules";
 
 /** `[id]` is the product id; a plain number is accepted as stockCode (e.g. /admin/inventory/50231). */
 const loadProduct = cache(async (id: string): Promise<{ ctx: Awaited<ReturnType<typeof requireStaffContext>>; product: ProductDetail }> => {
@@ -51,11 +52,12 @@ export default async function ProductEditPage({ params }: PageProps<"/admin/inve
     listPurchaseRecords(ctx, { pageSize: 200 }),
     requireTenantDisplay(ctx.tenantId),
     photoLimit(ctx),
+    hasModule(ctx.tenantId, "provenance"),
   ]);
   shared.catch(() => {}); // rethrown by the await below; avoids an unhandled rejection on notFound()
   const { product } = await loadProduct(id);
 
-  const [[tree, tags, records, tenant, limit], [images, movements, wishlistCount]] = await Promise.all([
+  const [[tree, tags, records, tenant, limit, hasSourcing], [images, movements, wishlistCount]] = await Promise.all([
     shared,
     Promise.all([listProductImages(ctx, product.id), listMovements(ctx, product.id, { limit: 50 }), countWishlisted(ctx, product.id)]),
   ]);
@@ -117,6 +119,7 @@ export default async function ProductEditPage({ params }: PageProps<"/admin/inve
       shopName={tenant.name}
       categories={categoryOptions(tree)}
       purchaseRecords={recordOptions}
+      sourcing={hasSourcing}
       tagSuggestions={tags.map((t) => t.name)}
       slots={{
         photos: (

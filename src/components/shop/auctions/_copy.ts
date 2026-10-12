@@ -175,6 +175,7 @@ export const auctionCopy = {
     wrongAccountBody: "You are logged in with a different account than the one that won this lot. Log out, or log in as the winner, and open the link again.",
     toAccount: "Go to your account",
     toAuctions: "Browse the auctions",
+    toShop: "Continue shopping",
     unexpected: "Something went wrong. Please try again.",
   },
   productBanner: {

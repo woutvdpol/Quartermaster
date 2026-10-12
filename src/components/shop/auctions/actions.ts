@@ -49,6 +49,8 @@ function failure(err: unknown): BidFailure {
     if (details.reason === "RATE_LIMITED") return { ok: false, code: "RATE_LIMITED" };
     if (err.code === "INVALID") return { ok: false, code: "INVALID_AMOUNT" };
     if (err.code === "NOT_FOUND") return { ok: false, code: "LOT_CLOSED" };
+    // The shop no longer has the auctions module (docs/modules.md): bidding has stopped.
+    if (err.code === "UNAVAILABLE") return { ok: false, code: "LOT_CLOSED" };
     return { ok: false, code: "GENERIC" };
   }
   console.error("[auctions] shop action failed", err instanceof Error ? err.message : err);

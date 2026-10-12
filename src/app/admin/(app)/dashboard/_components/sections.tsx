@@ -25,6 +25,7 @@ import { copy } from "../_copy";
 import { MarginBars } from "./MarginBars";
 import { RevenueChart } from "./RevenueChart";
 import { Sparkline } from "./Sparkline";
+import { hasModule } from "@/server/modules";
 
 /** Runs a loader; on failure logs and returns null so one broken card doesn't take the page down. */
 async function safe<T>(label: string, fn: () => Promise<T>): Promise<{ ok: true; value: T } | { ok: false }> {
@@ -375,6 +376,8 @@ export async function StockSection({ ctx }: { ctx: ServiceContext }) {
 const MARGIN_ROWS = 6;
 
 export async function MarginSection({ ctx }: { ctx: ServiceContext }) {
+  // The margin report belongs to the provenance module (docs/modules.md).
+  if (!(await hasModule(ctx.tenantId, "provenance"))) return null;
   const fmt = await requireTenantDisplay(ctx.tenantId);
   const today = todayIn(fmt.timeZone);
   const from = startOfLocalDay(addDays(today, -29), fmt.timeZone);

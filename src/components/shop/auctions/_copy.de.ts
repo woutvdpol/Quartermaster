@@ -172,6 +172,7 @@ export const auctionCopyDe: CopyShape<typeof auctionCopy> = {
     wrongAccountBody: "Sie sind mit einem anderen Konto angemeldet als dem, das dieses Los gewonnen hat. Melden Sie sich ab oder als Gewinner an und öffnen Sie den Link erneut.",
     toAccount: "Zu Ihrem Konto",
     toAuctions: "Zu den Auktionen",
+    toShop: "Weiter einkaufen",
     unexpected: "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
   },
   productBanner: {

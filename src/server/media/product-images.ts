@@ -4,11 +4,11 @@ import { z } from "zod";
 import { db } from "@/server/db";
 import { audit } from "@/server/audit";
 import { ServiceError, type ServiceContext } from "@/server/context";
-import { getSettings } from "@/server/settings";
 import type { Prisma } from "@/generated/prisma/client";
 import { ImageProcessingError, MAX_UPLOAD_BYTES, VARIANT_NAMES, processImage, type VariantName } from "./images";
 import { assertValidKey, getStorage } from "./storage";
 import { manifestBytes, stripExt, storeProcessedImage, variantKey, type VariantManifest } from "./store";
+import { getEntitlements } from "@/server/modules";
 
 export { contentManifestKey, manifestBytes, storeContentImage, storeProcessedImage, variantKey } from "./store";
 export type { ContentManifest, ManifestEntry, VariantManifest } from "./store";
@@ -23,7 +23,7 @@ export type { ContentManifest, ManifestEntry, VariantManifest } from "./store";
  * own `bytes`. Tenant usage = Σ byteSize + Σ manifest bytes (see tenantStorageUsage).
  */
 
-/** Hard ceiling when the platform setting `photoLimit` is null (= no plan limit). */
+/** Hard ceiling on photos per product, whatever the package allows (docs/modules.md). */
 export const HARD_MAX_IMAGES_PER_PRODUCT = 100;
 export const MAX_FILES_PER_UPLOAD = 50;
 
@@ -147,10 +147,10 @@ export async function tenantStorageUsage(tenantId: string, client: Prisma.Transa
 }
 
 async function limitsFor(tenantId: string) {
-  const platform = await getSettings(tenantId, "platform");
+  const { limits } = await getEntitlements(tenantId);
   return {
-    maxImages: Math.min(platform.photoLimit ?? HARD_MAX_IMAGES_PER_PRODUCT, HARD_MAX_IMAGES_PER_PRODUCT),
-    quotaBytes: Math.floor(platform.storageQuotaGb * 1024 ** 3),
+    maxImages: Math.min(limits.photoLimit, HARD_MAX_IMAGES_PER_PRODUCT),
+    quotaBytes: Math.floor(limits.storageGb * 1024 ** 3),
   };
 }
 

@@ -53,9 +53,12 @@ export function DocumentsPanel({
   timeZone,
   maxPdfBytes,
   maxImageBytes,
+  locked = false,
 }: {
   productId: string;
   documents: DocumentRow[];
+  /** The shop lacks the provenance module (docs/modules.md): list, unpublish and delete only. */
+  locked?: boolean;
   timeZone: string;
   maxPdfBytes: number;
   maxImageBytes: number;
@@ -122,32 +125,36 @@ export function DocumentsPanel({
         </ul>
       )}
 
-      <form action={formAction} className="grid gap-3 rounded-control border border-dashed border-line p-3" noValidate>
-        <input type="hidden" name="productId" value={productId} />
-        <ActionMessage state={state} showSuccess={false} />
-        <ActionToast state={state} errors={false} />
-        <Field label={t.file} hint={t.fileHint} error={clientError ?? error("file")} required>
-          {(control) => (
-            <FileInput {...control} ref={fileRef} name="file" accept={ACCEPT} required onChange={checkFile} />
-          )}
-        </Field>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <TextInput label={t.title} name="title" hint={t.titleHint} maxLength={200} error={error("title")} />
-          <Select
-            label={t.kind}
-            name="kind"
-            defaultValue="PROVENANCE"
-            error={error("kind")}
-            options={Object.entries(t.kinds).map(([value, label]) => ({ value, label }))}
-          />
-        </div>
-        <Checkbox name="isPublic" label={t.isPublic} />
-        <FormActions>
-          <SubmitButton size="sm" pendingLabel={t.uploading} disabled={!!clientError}>
-            {t.upload}
-          </SubmitButton>
-        </FormActions>
-      </form>
+      {locked ? (
+        <p className="text-xs text-muted">Uploading documents is part of the Provenance &amp; certificates module. Existing documents stay available.</p>
+      ) : (
+        <form action={formAction} className="grid gap-3 rounded-control border border-dashed border-line p-3" noValidate>
+          <input type="hidden" name="productId" value={productId} />
+          <ActionMessage state={state} showSuccess={false} />
+          <ActionToast state={state} errors={false} />
+          <Field label={t.file} hint={t.fileHint} error={clientError ?? error("file")} required>
+            {(control) => (
+              <FileInput {...control} ref={fileRef} name="file" accept={ACCEPT} required onChange={checkFile} />
+            )}
+          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <TextInput label={t.title} name="title" hint={t.titleHint} maxLength={200} error={error("title")} />
+            <Select
+              label={t.kind}
+              name="kind"
+              defaultValue="PROVENANCE"
+              error={error("kind")}
+              options={Object.entries(t.kinds).map(([value, label]) => ({ value, label }))}
+            />
+          </div>
+          <Checkbox name="isPublic" label={t.isPublic} />
+          <FormActions>
+            <SubmitButton size="sm" pendingLabel={t.uploading} disabled={!!clientError}>
+              {t.upload}
+            </SubmitButton>
+          </FormActions>
+        </form>
+      )}
     </div>
   );
 }

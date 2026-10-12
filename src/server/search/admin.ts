@@ -3,6 +3,7 @@ import { db } from "@/server/db";
 import { audit } from "@/server/audit";
 import { enqueue } from "@/server/jobs/queue";
 import type { ServiceContext } from "@/server/context";
+import { assertModule, tenantsWithModule } from "@/server/modules";
 import { IMAGE_MODEL, TEXT_MODEL } from "./embedder";
 import { findOutdated, indexStatus, reindexTenant, type IndexStatus } from "./indexing";
 
@@ -51,6 +52,7 @@ function toDto(r: NonNullable<Awaited<ReturnType<typeof db.searchIndexRun.findUn
 
 /** Coverage of the index + the latest rebuild (admin card). Staff of the tenant only (caller checks). */
 export async function getSearchIndexOverview(ctx: ServiceContext): Promise<SearchIndexOverview> {
+  await assertModule(ctx, "smartSearch");
   const [status, run] = await Promise.all([
     indexStatus(ctx.tenantId, { text: TEXT_MODEL.key, image: IMAGE_MODEL.key }),
     db.searchIndexRun.findUnique({ where: { tenantId: ctx.tenantId } }),
@@ -63,6 +65,7 @@ export async function getSearchIndexOverview(ctx: ServiceContext): Promise<Searc
  * re-embeds everything (after a model change); otherwise only changed products are embedded.
  */
 export async function requestReindex(ctx: ServiceContext, opts: { force?: boolean } = {}): Promise<SearchIndexRunDto> {
+  await assertModule(ctx, "smartSearch");
   const existing = await db.searchIndexRun.findUnique({ where: { tenantId: ctx.tenantId } });
   const active = existing && (existing.status === "queued" || existing.status === "running") && Date.now() - existing.updatedAt.getTime() < STALE_MS;
   if (active) return toDto(existing);
@@ -133,9 +136,14 @@ export async function runReindexSlice(
   }
 }
 
-/** Cron safety net: queues embed jobs for products the hooks missed. Runs fine in the web process. */
+/**
+ * Cron safety net: queues embed jobs for products the hooks missed. Runs fine in the web process.
+ * Only shops with the Smart search module (no embedder work for the others).
+ */
 export async function syncOutdated(): Promise<Record<string, unknown>> {
-  const groups = await findOutdated(TEXT_MODEL.key, 500);
+  const tenantIds = [...(await tenantsWithModule("smartSearch"))];
+  if (!tenantIds.length) return { tenants: 0, queued: 0 };
+  const groups = await findOutdated(TEXT_MODEL.key, 500, tenantIds);
   let queued = 0;
   for (const g of groups) {
     for (const productId of g.productIds) {

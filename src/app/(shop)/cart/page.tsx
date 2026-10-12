@@ -139,11 +139,14 @@ async function CartContent() {
           initialCountry={country}
           initialQuote={quote}
         />
-        <CouponForm
-          code={cart.couponCode}
-          problem={quote?.coupon && !quote.coupon.ok ? localizeServerMessage(quote.coupon.message, locale) : null}
-          hasOfferLines={cart.lines.some((l) => l.offerApplied)}
-        />
+        {/* Coupons module (docs/modules.md); a code already in the cart stays visible so it can be removed. */}
+        {shop.settings.features.coupons || cart.couponCode ? (
+          <CouponForm
+            code={cart.couponCode}
+            problem={quote?.coupon && !quote.coupon.ok ? localizeServerMessage(quote.coupon.message, locale) : null}
+            hasOfferLines={cart.lines.some((l) => l.offerApplied)}
+          />
+        ) : null}
         <CheckoutButton disabled={!canCheckout} />
         <p className="-mt-1 text-center text-xs text-shop-muted">{t.totalNote}</p>
         <ButtonLink href="/shop" variant="link" size="sm" className="min-h-11 self-center text-shop-ink! no-underline hover:underline">

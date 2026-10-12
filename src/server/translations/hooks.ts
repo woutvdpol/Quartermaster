@@ -1,13 +1,15 @@
 import "server-only";
 import { enqueue } from "@/server/jobs/queue";
 import { getSettings } from "@/server/settings";
+import { hasModule } from "@/server/modules";
 import type { TranslationEntityName } from "./fields";
 
 /*
  * Keeps translations current. Called from `audit()` (src/server/audit.ts) after every admin mutation
  * has committed — services need no translation calls of their own. Only enqueues (a debounced
  * `translations.sync` job); never throws, so a translation problem can never break a save.
- * Does nothing for shops without extra languages (settings.i18n.locales = []).
+ * Does nothing for shops without extra languages (settings.i18n.locales = []) or without the
+ * Translations module.
  */
 
 const ENTITY_ACTIONS: Record<string, { model: string; entity: TranslationEntityName }> = {
@@ -55,7 +57,7 @@ export async function onAudited(entry: { action: string; tenantId?: string | nul
   const hook = translationHookFor(entry.action, entry.entity, entry.entityId);
   if (!hook) return;
   try {
-    if (!(await getSettings(entry.tenantId, "i18n")).locales.length) return;
+    if (!(await getSettings(entry.tenantId, "i18n")).locales.length || !(await hasModule(entry.tenantId, "translations"))) return;
     if (hook.kind === "entity") {
       await enqueue(
         "translations.sync",

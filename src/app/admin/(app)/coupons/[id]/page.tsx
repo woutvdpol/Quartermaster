@@ -26,11 +26,13 @@ import { deleteCouponAction, setCouponActiveAction } from "../actions";
 import { couponsCopy as t } from "../_copy";
 import { couponState, describeDiscount, STATE_TONE } from "../_format";
 import { dateToLocalInput } from "../_lib";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 export const metadata: Metadata = { title: "Coupon" };
 const PAGE_SIZE = 50;
 
 export default async function CouponPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  if (await moduleLocked("coupons")) return null; // ModuleGate in layout.tsx shows the upsell
   const [{ id }, sp, ctx] = await Promise.all([params, searchParams, requireStaffContext()]);
   const page = parsePage(sp.page);
   const [coupon, redemptions, tenant] = await Promise.all([

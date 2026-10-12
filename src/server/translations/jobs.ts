@@ -11,8 +11,15 @@ import { defineJob } from "@/server/jobs/registry";
  *   translations.translate  QUEUED → MACHINE through the embedder, per tenant (stately singleton:
  *                           one running + one queued), 4-minute slices that continue themselves.
  *                           Embedder down → retries with backoff; the hourly cron nudges it again.
+ *
+ * Both return early (no error, no translator work) for shops without the Translations module.
  */
 const id = z.string().min(1).max(64);
+async function entitled(tenantId: string): Promise<boolean> {
+  const { hasModule } = await import("@/server/modules");
+  return hasModule(tenantId, "translations");
+}
+
 const entity = z.enum(["PRODUCT", "CATEGORY", "FACET", "FACET_VALUE", "CONTENT_PAGE", "MENU_ITEM"]);
 
 export const translationsSyncJob = defineJob(
@@ -24,6 +31,7 @@ export const translationsSyncJob = defineJob(
     scope: z.enum(["stock", "all", "recent"]).optional(),
   }),
   async ({ tenantId, entity, entityIds, scope }, ctx) => {
+    if (!(await entitled(tenantId))) return { skipped: "module" };
     const { syncEntity, syncTenant } = await import("./sync");
     if (entity && entityIds) return syncEntity(tenantId, entity, entityIds);
     return syncTenant(tenantId, scope ?? "stock", { signal: ctx.signal });
@@ -35,6 +43,7 @@ export const translationsTranslateJob = defineJob(
   "translations.translate",
   z.object({ tenantId: id }),
   async ({ tenantId }, ctx) => {
+    if (!(await entitled(tenantId))) return { skipped: "module" };
     const { processQueue } = await import("./machine");
     return processQueue(tenantId, { signal: ctx.signal });
   },
@@ -57,7 +66,7 @@ export const TRANSLATION_JOBS = {
 export const TRANSLATION_CRON_TASKS = {
   "translations.sync": {
     schedule: "23 * * * *",
-    description: "Queue translations for recently changed texts, prune deleted entities, resume translating (tenants with shop languages).",
+    description: "Queue translations for recently changed texts, prune deleted entities, resume translating (tenants with shop languages and the Translations module).",
     run: async () => {
       const { syncAllTenants } = await import("./cron");
       return syncAllTenants();

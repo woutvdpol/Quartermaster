@@ -10,10 +10,12 @@ import { FloorInput, ItemPicker, RemoveItemButton } from "../_components/ItemCon
 import { deleteFairAction, endFairAction, startFairAction } from "../actions";
 import { fairsCopy as t } from "../_copy";
 import { FAIR_STATUS_TONE, dayInput } from "../_lib";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 export const metadata: Metadata = { title: "Fair" };
 
 export default async function FairPage({ params }: { params: Promise<{ id: string }> }) {
+  if (await moduleLocked("fairs")) return null; // ModuleGate in layout.tsx shows the upsell
   const [{ id }, ctx] = await Promise.all([params, requireStaffContext()]);
   const [fair, report, tenant] = await Promise.all([
     getFair(ctx, id).catch((err) => {

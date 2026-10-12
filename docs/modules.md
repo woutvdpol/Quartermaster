@@ -1,7 +1,7 @@
 # Modules en pakketten
 
 Shop-eigenaren kopen functionaliteit per module, als pakket of als compleet pakket ("click and buy").
-Status: **ontwerp, nog niet gebouwd.** De richting is akkoord (13-10-2026). Prijzen en de punten onder
+Status: **fase 1 gebouwd** (branch `feature/modules-phase1`); fase 2–4 nog niet. De richting is akkoord (13-10-2026). Prijzen en de punten onder
 "Aannames" zijn voorlopig: de eigenaar liet ze aan Claude over en kan ze later aanpassen.
 
 ## Uitgangssituatie (13-10-2026)
@@ -84,6 +84,14 @@ Extra's:
 
 Slim zoeken en Vertalingen zijn duurder omdat ze rekenkracht van de embedder gebruiken.
 
+### Nieuwsbriefcredits
+
+Naast het maandquotum kan een shop credits hebben: losse pakketten mails die niet verlopen
+(`TenantPlan.newsletterCredits`). Een campagne gebruikt eerst het maandquotum en betaalt alleen het deel
+dat niet meer past uit de credits. Dat deel staat op de campagne (`creditsUsed`) en telt niet mee voor het
+maandquotum. In fase 1 vult de superadmin credits met de hand aan. In fase 3 koopt de eigenaar ze zelf
+op de nieuwsbriefpagina ("Credits kopen", eenmalige Mollie-betaling, bijvoorbeeld 5.000 mails voor €5).
+
 ## Aannames (voorlopig)
 
 1. **Basis/module-grens** zoals hierboven.
@@ -122,6 +130,7 @@ model TenantPlan {
   photoLimit    Int?
   storageGb     Int?
   newsletterQuota Int?
+  newsletterCredits Int @default(0) // gekochte mails, gebruikt na het maandquotum
   source        EntitlementSource // MANUAL | SUBSCRIPTION | LEGACY
   updatedAt     DateTime @updatedAt
 }
@@ -175,8 +184,11 @@ gecachet, net als `getRequestScope` en de storefront-instellingen.
   (bronze → START, silver → PRO, gold → COMPLETE) en neemt de limieten mee als overschrijving.
 - `platform.newsletterEnabled = true` wordt een `TenantModule` `newsletter` (ACTIVE, MANUAL), tenzij het pakket
   hem al bevat.
-- Bestaande shops op deze installatie (cardshop, demo, test) krijgen **Compleet** (MANUAL), zodat er niets
-  verdwijnt.
+- **Alle bestaande shops krijgen Compleet** (bron LEGACY): vóór deze migratie was er niets afgeschermd
+  behalve de nieuwsbrief, dus zo verdwijnt er niets. Limieten die in de oude `platform`-instellingen
+  bewust afweken van de standaard, worden overschrijvingen. Concept500-shops via de ETL krijgen hun eigen
+  pakket uit `subscription_type` (`src/server/modules/legacy.ts`).
+- Nieuwe shops (platform-admin, goedgekeurde aanmelding) krijgen **Start**. Geen rij = Start.
 - De velden in `platformSchema` blijven één release staan (alleen lezen) en gaan daarna weg.
 
 ### Superadmin
@@ -192,6 +204,24 @@ verlengen. Elke wijziging komt in het platform-auditlog.
   zonder recht → 404.
 - Productlimiet: aanmaken en activeren boven de limiet worden geweigerd; bestaande producten blijven online.
 - Migratie: bronze/silver/gold en `newsletterEnabled` komen goed over.
+
+### Afbouwen bij verlies van een module (gebouwd)
+
+Algemene regel: nieuwe activiteit stopt, lopende zaken worden afgemaakt, gegevens blijven.
+
+| Module | Blijft werken zonder module |
+|---|---|
+| Veilingen | lopende kavels sluiten af, winnaars betalen (`pay/[token]`), voorwaardenpagina, uitslagmeldingen |
+| Beursmodus | een beurs die LIVE is: verkopen (ook offline wachtrij) en beëindigen vanuit de beursmodus |
+| Bod doen | geaccepteerde biedingen afrekenen, aflopen van oude biedingen |
+| Kortingscodes | codes op bestaande orders; een code in de winkelwagen kan nog verwijderd worden |
+| Alerts & push | afmelden, voorkeuren uitzetten, push uitzetten |
+| Herkomst & certificaten | uitgegeven certificaten blijven verifieerbaar, intrekken, documenten verwijderen of privé maken |
+| Vertalingen | gegevens blijven; de shop toont alleen de basistaal |
+| Slim zoeken | zoeken valt terug op tekst en facetten |
+
+Webpush hoort bij Alerts, maar veilingmeldingen (overboden, bijna afgelopen, gewonnen) werken ook met
+alleen Veilingen.
 
 ## Latere fases
 

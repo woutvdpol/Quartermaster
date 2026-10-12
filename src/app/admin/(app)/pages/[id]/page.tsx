@@ -6,13 +6,13 @@ import { requireStaffContext } from "@/server/context";
 import { listCategoryTree, type CategoryNode } from "@/server/catalog/categories";
 import { getPage, listPages } from "@/server/content/pages";
 import { contentPageHref } from "@/server/content/rules";
-import { getSettings } from "@/server/settings";
 import { copy } from "../_copy";
 import { isNotFound } from "../_lib/errors";
 import { productSummaries } from "./_data";
 import { deletePageFromEditorAction } from "./actions";
 import { PageEditor } from "./_components/PageEditor";
 import type { EditorCategory } from "./_components/types";
+import { hasModule } from "@/server/modules";
 
 const t = copy.editor;
 
@@ -46,10 +46,10 @@ export default async function PageEditorPage({ params }: PageProps<"/admin/pages
   const productIds = page.blocks.flatMap((b) =>
     b.type === "TEXT_PRODUCT" && b.data && typeof (b.data as { productId?: unknown }).productId === "string" ? [(b.data as { productId: string }).productId] : [],
   );
-  const [tree, products, platform, allPages] = await Promise.all([
+  const [tree, products, newsletterEnabled, allPages] = await Promise.all([
     listCategoryTree(ctx),
     productSummaries(ctx, productIds),
-    getSettings(ctx.tenantId, "platform"),
+    hasModule(ctx.tenantId, "newsletter"),
     listPages(ctx),
   ]);
 
@@ -101,7 +101,7 @@ export default async function PageEditorPage({ params }: PageProps<"/admin/pages
         blocks={page.blocks.map((b) => ({ id: b.id, type: b.type, isVisible: b.isVisible, data: b.data, valid: b.valid, issues: b.issues }))}
         categories={flatten(tree)}
         products={products}
-        newsletterEnabled={platform.newsletterEnabled === true}
+        newsletterEnabled={newsletterEnabled}
         roleHolders={roleHolders}
         tenantId={ctx.tenantId}
       />

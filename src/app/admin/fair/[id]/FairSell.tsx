@@ -8,6 +8,7 @@ import { FAIR_METHOD_LABELS, FAIR_PAYMENT_METHODS, stockCodeFromScan, type FairP
 import { enqueueSale, retryDelay, syncOutcome, type QueuedSale } from "@/server/fairs/queue";
 import { kvGet, kvSet } from "./storage";
 import { sellCopy as t } from "./_copy";
+import { endFairFromSellAction } from "./actions";
 
 /*
  * Fair-mode client (docs/fair-mode.md, design board "Main"): scan → item → sold.
@@ -184,6 +185,27 @@ export function FairSell({ initial }: { initial: FairSellData }) {
   const today = new Date().toDateString();
   const todayLog = log.filter((e) => new Date(e.at).toDateString() === today);
   const canSell = data.fair.status === "LIVE";
+  const [ending, setEnding] = useState(false);
+  const [endError, setEndError] = useState<string | null>(null);
+  const canEnd = canSell && online && !authNeeded && pendingCount === 0 && !ending;
+
+  async function endFairNow() {
+    if (!canEnd || !window.confirm(t.end.confirm(data.fair.hideFromShop))) return;
+    setEnding(true);
+    setEndError(null);
+    try {
+      const res = await endFairFromSellAction(fairId);
+      if (!res.ok) return setEndError(res.message ?? t.end.failed);
+      const ended: FairSellData = { ...data, fair: { ...data.fair, status: "ENDED" } };
+      setData(ended);
+      setScreen({ kind: "scan" });
+      void kvSet(key(fairId, "data"), ended);
+    } catch {
+      setEndError(t.end.failed);
+    } finally {
+      setEnding(false);
+    }
+  }
 
   function lookup(text: string) {
     const code = stockCodeFromScan(text);
@@ -260,6 +282,16 @@ export function FairSell({ initial }: { initial: FairSellData }) {
           status={data.fair.status}
           onLookup={lookup}
         />
+      ) : null}
+      {screen.kind === "scan" && canSell ? (
+        // Ending works here even without the "fairs" module (wind-down; /admin/fairs shows the gate then).
+        <section className="mt-auto grid gap-1.5 border-t border-line px-4 py-3 text-sm">
+          {endError ? <p className="text-crit" role="alert">{endError}</p> : null}
+          {pendingCount > 0 ? <p className="text-muted">{t.end.waitSync}</p> : null}
+          <Button variant="secondary" disabled={!canEnd} onClick={() => void endFairNow()}>
+            {ending ? t.end.busy : t.end.button}
+          </Button>
+        </section>
       ) : null}
       {screen.kind === "item"
         ? (() => {

@@ -287,7 +287,7 @@ export function ProductDetail({
                 HTML (docs/seo-geo.md). Its data is cached per tenant, so this costs no extra query. */}
             <ProvenanceBlock productId={product.id} />
 
-            {status === "reserved" && !auctionLot ? (
+            {status === "reserved" && !auctionLot && shop.settings.features.alerts ? (
               <section className="flex flex-col gap-4 rounded-shop border border-shop-line p-6" aria-labelledby="pd-notify">
                 <div>
                   <h2 id="pd-notify" className="text-xl text-shop-ink">

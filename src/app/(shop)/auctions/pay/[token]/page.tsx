@@ -43,12 +43,14 @@ export default async function AuctionPayPage({ params }: { params: Promise<{ tok
     </Container>
   );
 
-  if (!view) return notice(t.invalidTitle, t.invalidBody, { href: AUCTIONS_PATH, label: t.toAuctions });
+  // Without the auctions module (docs/modules.md) the auctions overview 404s: send them to the shop instead.
+  const back = shop.settings.features.auctions ? { href: AUCTIONS_PATH, label: t.toAuctions } : { href: "/shop", label: t.toShop };
+  if (!view) return notice(t.invalidTitle, t.invalidBody, back);
   if ((await payAccess(tenantId, view.lot.id)) !== "ok") return notice(t.wrongAccountTitle, t.wrongAccountBody, { href: "/account", label: t.toAccount });
   const orderHref = orderStatusPath(view.order.uuid);
   if (view.state === "paid") return notice(t.paidTitle, t.paidBody, { href: orderHref, label: t.viewOrder });
   if (view.state === "processing") return notice(t.processingTitle, t.processingBody, { href: orderHref, label: t.viewOrder });
-  if (view.state === "cancelled") return notice(t.cancelledTitle, t.cancelledBody, { href: AUCTIONS_PATH, label: t.toAuctions });
+  if (view.state === "cancelled") return notice(t.cancelledTitle, t.cancelledBody, back);
 
   const [quote, legalLinks, viewer] = await Promise.all([
     view.defaultCountry

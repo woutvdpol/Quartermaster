@@ -45,8 +45,14 @@ export async function setSettings(tenantId: string, group: string, data: Prisma.
   });
 }
 
+/** Grants the newsletter module (docs/modules.md) with a monthly quota override (-1 = unlimited). */
 export async function enableNewsletter(tenantId: string, quota = 1000) {
-  await setSettings(tenantId, "platform", { newsletterEnabled: true, newsletterQuota: quota });
+  await db.tenantModule.upsert({
+    where: { tenantId_moduleId: { tenantId, moduleId: "newsletter" } },
+    create: { tenantId, moduleId: "newsletter", status: "ACTIVE" },
+    update: { status: "ACTIVE" },
+  });
+  await db.tenantPlan.upsert({ where: { tenantId }, create: { tenantId, newsletterQuota: quota }, update: { newsletterQuota: quota } });
 }
 
 /** First URL in a mail's HTML that contains `needle`. */

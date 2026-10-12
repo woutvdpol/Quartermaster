@@ -2,6 +2,7 @@ import Link from "next/link";
 import { logoutAction } from "@/app/admin/login/actions";
 import type { AdminThemePreference } from "@/lib/admin-theme";
 import type { AdminTenantContext } from "@/lib/admin-tenant";
+import type { NavItemKey } from "@/lib/admin-nav";
 import { getDictionary } from "@/lib/i18n";
 import type { SessionUser } from "@/server/auth/session";
 import { LogoMark } from "./AdminShell";
@@ -16,10 +17,12 @@ type SidebarProps = {
   user: Pick<SessionUser, "role" | "name" | "email">;
   tenants: AdminTenantContext;
   theme: AdminThemePreference;
+  /** Nav items of paid modules the active shop does not have (shown with a lock). */
+  lockedNav?: readonly NavItemKey[];
 };
 
 /** Design A rail: logo, shop switcher, search, grouped navigation, user block. */
-export function Sidebar({ user, tenants, theme }: SidebarProps) {
+export function Sidebar({ user, tenants, theme, lockedNav = [] }: SidebarProps) {
   const roleLabel = user.role === "SUPERADMIN" ? t.user.roleSuperadmin : t.user.roleOwner;
   return (
     <>
@@ -41,7 +44,7 @@ export function Sidebar({ user, tenants, theme }: SidebarProps) {
         label={t.nav.search}
       />
 
-      <SidebarNav role={user.role} />
+      <SidebarNav role={user.role} locked={lockedNav} />
 
       <div className="mt-auto grid gap-3 border-t border-rail-line px-2 pt-3">
         <Link href="/admin/account" className="-mx-1 block rounded-control px-1 py-0.5 text-xs hover:bg-rail-raised">

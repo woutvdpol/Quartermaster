@@ -25,6 +25,7 @@ import { NewsletterDisabled } from "../../_components/NewsletterDisabled";
 import { PreviewFrame } from "../../_components/PreviewFrame";
 import { TestSendForm } from "../../_components/TestSendForm";
 import { formatCount } from "../../_components/format";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 export const metadata: Metadata = { title: "Campaign" };
 
@@ -54,6 +55,7 @@ async function loadCampaign(
 export default async function CampaignPage({
   params,
 }: PageProps<"/admin/newsletter/campaigns/[id]">) {
+  if (await moduleLocked("newsletter")) return null; // ModuleGate in layout.tsx shows the upsell
   const { id } = await params;
   const ctx = await requireStaffContext();
   const [campaign, quota, counts, tenant] = await Promise.all([

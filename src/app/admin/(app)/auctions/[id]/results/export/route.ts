@@ -52,7 +52,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (error instanceof AuthError) {
       return error.code === "UNAUTHENTICATED" ? Response.redirect(new URL("/admin/login", request.url), 303) : new Response("Forbidden", { status: 403 });
     }
-    if ((error instanceof ServiceError && (error.code === "NOT_FOUND" || error.code === "INVALID")) || (error instanceof Error && error.name === "ZodError")) {
+    // UNAVAILABLE: the shop lacks the auctions module (route handlers are not wrapped by the ModuleGate layout).
+    if ((error instanceof ServiceError && (error.code === "NOT_FOUND" || error.code === "INVALID" || error.code === "UNAVAILABLE")) || (error instanceof Error && error.name === "ZodError")) {
       return new Response("Auction not found", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
     }
     throw error;

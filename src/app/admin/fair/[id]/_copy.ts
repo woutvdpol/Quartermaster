@@ -51,4 +51,13 @@ export const sellCopy = {
     title: "Needs attention",
     dismiss: "Dismiss",
   },
+  end: {
+    button: "End fair",
+    confirm: (hidden: boolean) =>
+      hidden ? "End the fair? Unsold items go back online in the webshop right away." : "End the fair? Selling in fair mode stops.",
+    waitSync: "Sync the queued sales before ending the fair.",
+    busy: "Ending…",
+    done: "The fair has ended.",
+    failed: "The fair could not be ended. Try again.",
+  },
 } as const;

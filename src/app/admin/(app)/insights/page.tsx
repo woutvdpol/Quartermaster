@@ -7,10 +7,12 @@ import { copy } from "./_copy";
 import { PeriodLinks, StaleLinks } from "./_components/PeriodLinks";
 import { BuyMoreSection, CategorySection, KpiSection, StaleSection } from "./_components/sections";
 import { CardSkeleton, KpiSkeleton, ListSkeleton } from "../dashboard/_components/skeletons";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 export const metadata: Metadata = { title: copy.metaTitle };
 
 export default async function InsightsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  if (await moduleLocked("insights")) return null; // ModuleGate in layout.tsx shows the upsell
   const sp = await searchParams;
   const period = parseInsightPeriod(sp.period);
   const staleDays = parseStaleDays(sp.stale);

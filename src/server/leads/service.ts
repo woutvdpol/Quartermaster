@@ -7,6 +7,7 @@ import { ServiceError, type ServiceContext } from "@/server/context";
 import { hit, isLimited, take, type RateLimitRule } from "@/server/auth/rate-limit";
 import { queueMail } from "@/server/mail";
 import { getStorage } from "@/server/media/storage";
+import { assertModule } from "@/server/modules";
 import { verifyTurnstile } from "@/server/turnstile";
 import { issueDraftToken, verifyDraftToken } from "./draft";
 import { LeadPhotoError, processLeadPhoto } from "./photos";
@@ -22,6 +23,9 @@ import { LEAD_LIMITS, leadNoteSchema, leadStatusSchema, validateLeadInput, type 
  * (lead-received-confirmation), queued in the same transaction as the row.
  *
  * Admin flow: listLeads / getLead / setLeadStatus / saveLeadNote (tenant-scoped, audited "lead.*").
+ *
+ * Paid module `leads` (docs/modules.md): uploading, submitting and every admin entry point need it
+ * (UNAVAILABLE otherwise). Removing a draft photo and the orphan-photo cleanup always work.
  */
 
 export const LEAD_RULES = {
@@ -43,6 +47,7 @@ export type UploadLeadPhotoResult =
   | { ok: false; error: "expired" | "rate_limited" | "invalid"; message?: string };
 
 export async function uploadLeadPhoto(input: { tenantId: string; draftToken: unknown; bytes: Uint8Array; ip: string | null }): Promise<UploadLeadPhotoResult> {
+  await assertModule(input, "leads");
   const leadId = verifyDraftToken(input.tenantId, input.draftToken);
   if (!leadId) return { ok: false, error: "expired" };
   const ipKey = `lead-photo:ip:${input.ip ?? "unknown"}`;
@@ -95,6 +100,7 @@ export async function submitLead(input: {
   ip: string | null;
   turnstileToken: string | null;
 }): Promise<SubmitLeadResult> {
+  await assertModule(input, "leads");
   const parsed = validateLeadInput(input.data);
   if (!parsed.ok) return { ok: false, error: "invalid", fieldErrors: parsed.fieldErrors };
   const data = parsed.data;
@@ -168,6 +174,7 @@ export async function listLeads(
   ctx: ServiceContext,
   opts: { status?: LeadStatus | null; q?: string | null; page?: number; pageSize?: number } = {},
 ): Promise<{ items: LeadListItem[]; total: number; counts: LeadCounts }> {
+  await assertModule(ctx, "leads");
   const pageSize = Math.min(Math.max(opts.pageSize ?? 25, 1), 100);
   const page = Math.max(opts.page ?? 1, 1);
   const q = opts.q?.trim().slice(0, 200);
@@ -229,6 +236,7 @@ export type LeadDetail = {
 };
 
 export async function getLead(ctx: ServiceContext, id: string): Promise<LeadDetail | null> {
+  await assertModule(ctx, "leads");
   if (typeof id !== "string" || id.length > 64) return null;
   const lead = await db.lead.findFirst({ where: { id, tenantId: ctx.tenantId } });
   if (!lead) return null;
@@ -258,6 +266,7 @@ export async function getLead(ctx: ServiceContext, id: string): Promise<LeadDeta
 }
 
 export async function setLeadStatus(ctx: ServiceContext, id: string, status: unknown): Promise<void> {
+  await assertModule(ctx, "leads");
   const next = leadStatusSchema.safeParse(status);
   if (!next.success) throw new ServiceError("INVALID", "Unknown status.");
   const lead = await db.lead.findFirst({ where: { id, tenantId: ctx.tenantId }, select: { status: true } });
@@ -275,6 +284,7 @@ export async function setLeadStatus(ctx: ServiceContext, id: string, status: unk
 }
 
 export async function saveLeadNote(ctx: ServiceContext, id: string, note: unknown): Promise<void> {
+  await assertModule(ctx, "leads");
   const parsed = leadNoteSchema.safeParse(typeof note === "string" ? note : "");
   if (!parsed.success) throw new ServiceError("INVALID", parsed.error.issues[0]?.message);
   const res = await db.lead.updateMany({ where: { id, tenantId: ctx.tenantId }, data: { note: parsed.data } });

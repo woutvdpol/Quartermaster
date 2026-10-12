@@ -325,7 +325,7 @@ export const SETTINGS_FORMS: Record<SettingsGroup, GroupMeta> = {
   },
   platform: {
     label: "Platform",
-    description: "Plan and limits for this shop. Only Quartermaster admins can see and change these.",
+    description: "Replaced by Package & modules on the shop's platform page (docs/modules.md); this page redirects there.",
     sections: [
       {
         title: "Plan & limits",

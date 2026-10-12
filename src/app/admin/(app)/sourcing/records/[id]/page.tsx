@@ -20,6 +20,7 @@ import { RecordFormDrawer } from "../../_components/RecordFormDrawer";
 import { allocateCostAction, deleteRecordAction } from "./actions";
 import { LinkedProducts } from "./LinkedProducts";
 import { ProductPicker } from "./ProductPicker";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 async function load(id: string) {
   const ctx = await requireStaffContext();
@@ -45,6 +46,7 @@ export async function generateMetadata({ params }: PageProps<"/admin/sourcing/re
 }
 
 export default async function PurchaseRecordPage({ params }: PageProps<"/admin/sourcing/records/[id]">) {
+  if (await moduleLocked("provenance")) return null; // ModuleGate in layout.tsx shows the upsell
   const { id } = await params;
   const { record: r, suppliers, fmt } = await load(id);
   const currency = r.currency;

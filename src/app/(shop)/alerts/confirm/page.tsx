@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { AuthPanel } from "@/components/shop/account/AuthPanel";
 import { Alert, SubmitButton } from "@/components/shop/account/form";
 import { FormSkeleton } from "@/components/shop/account/FormSkeleton";
 import { shopCopy } from "@/server/i18n/locale";
+import { requireShop } from "@/server/storefront/context";
 import { alertPagesCopies } from "../_copy";
 import { confirmAlertAction } from "./actions";
 
@@ -15,6 +17,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /** Landing page of the confirmation mail. Shows a button; nothing changes until it is pressed (POST). */
 export default async function AlertConfirmPage({ searchParams }: PageProps<"/alerts/confirm">) {
+  // Confirming starts an alert: paid module `alerts` (docs/modules.md). Unsubscribe / manage pages always work.
+  if (!(await requireShop()).settings.features.alerts) notFound();
   const t = await shopCopy(alertPagesCopies);
   return (
     <AuthPanel title={t.confirmTitle}>

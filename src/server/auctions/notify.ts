@@ -120,10 +120,15 @@ export async function notifyPaymentReminder(lotId: string): Promise<{ mail: bool
   return { mail: true };
 }
 
-/** Tick: "closes in 5 minutes" pushes (once per lot per bidder with push). */
-export async function scanEndingLots(now = new Date()): Promise<{ lots: number; queued: number }> {
+/**
+ * Tick: "closes in 5 minutes" pushes (once per lot per bidder with push). `tenantIds` limits the scan to
+ * shops with the auctions module (the push invites bidding, which needs the module).
+ */
+export async function scanEndingLots(now = new Date(), tenantIds?: ReadonlySet<string>): Promise<{ lots: number; queued: number }> {
+  if (tenantIds && !tenantIds.size) return { lots: 0, queued: 0 };
   const lots = await db.auctionLot.findMany({
     where: {
+      ...(tenantIds ? { tenantId: { in: [...tenantIds] } } : {}),
       status: "OPEN",
       closesAt: { gt: new Date(now.getTime() + ENDING_MIN_LEFT_MS), lte: new Date(now.getTime() + ENDING_WINDOW_MS) },
       auction: { status: "LIVE" },

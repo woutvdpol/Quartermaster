@@ -9,10 +9,10 @@ import { catalogCopies } from "./_copy";
  * Catalog search (GET ?q=) — the same smart-search field as the header (suggestions, photo search),
  * keeping facets/tags/price/sort/view of the current scope; resets paging.
  */
-export function SearchBox({ action, params, defaultSort, id = "catalog-q", locale }: { action: string; params: CatalogParams; defaultSort: CatalogSort; id?: string; locale: ShopLocale }) {
+export function SearchBox({ action, params, defaultSort, id = "catalog-q", locale, photoSearch }: { action: string; params: CatalogParams; defaultSort: CatalogSort; id?: string; locale: ShopLocale; photoSearch?: boolean }) {
   const copy = pickCopy(catalogCopies, locale);
   return (
-    <SearchField key={params.q ?? ""} id={id} action={action} variant="catalog" defaultValue={params.q ?? ""} placeholder={copy.search.placeholder} className="w-full max-w-xl">
+    <SearchField key={params.q ?? ""} id={id} action={action} variant="catalog" defaultValue={params.q ?? ""} placeholder={copy.search.placeholder} className="w-full max-w-xl" photoSearch={photoSearch}>
       <HiddenParams params={params} keep={["facets", "tags", "min", "max", "sort", "view"]} defaultSort={defaultSort} />
     </SearchField>
   );

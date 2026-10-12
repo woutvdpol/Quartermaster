@@ -25,6 +25,7 @@ import { requireStaffContext } from "@/server/context";
 import { requireTenantDisplay } from "@/server/tenant-display";
 import { copy } from "./_copy";
 import { disableAlertAction, runMatchingAction } from "./actions";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 export const metadata: Metadata = { title: copy.title };
 
@@ -36,6 +37,7 @@ const TONE: Record<SavedSearchStatus, StatusTone> = { active: "ok", pending: "wa
 const n = (v: number) => new Intl.NumberFormat("en-NL").format(v);
 
 export default async function AlertsAdminPage({ searchParams }: PageProps<"/admin/alerts">) {
+  if (await moduleLocked("alerts")) return null; // ModuleGate in layout.tsx shows the upsell
   const sp = (await searchParams) as SearchParamsRecord;
   const ctx = await requireStaffContext();
   const viewParam = getParam(sp, "view");

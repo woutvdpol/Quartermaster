@@ -2,6 +2,7 @@ import "server-only";
 import webpush, { WebPushError } from "web-push";
 import { db } from "@/server/db";
 import { enqueue } from "@/server/jobs/queue";
+import { hasModule, tenantsWithModule } from "@/server/modules";
 import { vapidConfig } from "./config";
 import {
   ACTIVE_BIDDER_MS,
@@ -11,8 +12,10 @@ import {
   buildPushPayload,
   decidePush,
   isLiveAuctionKind,
+  pushModuleFor,
   pushTtlSeconds,
   startOfLocalDay,
+  type PushKind,
 } from "./rules";
 
 /*
@@ -22,6 +25,8 @@ import {
  *      when due (RESERVATION_ENDING in quiet hours is deleted instead)
  *   3. claim (sentAt) → web-push to every device; 404/410 = the subscription is gone → row deleted.
  *      Nothing delivered and only transient errors → unclaim and throw (pg-boss retries).
+ * A message whose module (pushModuleFor: `auctions` for AUCTION_*, else `alerts`; docs/modules.md) the
+ * shop lacks is dropped ("disabled") and the flush cron skips it; subscriptions are kept.
  */
 
 /** Pushes per message shown as the notification icon (generated from the shop logo, src/app/pwa-icon). */
@@ -34,6 +39,7 @@ export type SendResult =
   | { status: "skipped" };
 
 const GONE = new Set([404, 410]);
+const AUCTION_KINDS = ["AUCTION_OUTBID", "AUCTION_ENDING", "AUCTION_WON"] as const satisfies readonly PushKind[];
 
 export async function sendPushMessage(messageId: string, now = new Date()): Promise<SendResult> {
   const msg = await db.pushMessage.findUnique({
@@ -63,6 +69,7 @@ export async function sendPushMessage(messageId: string, now = new Date()): Prom
   };
   const vapid = vapidConfig();
   if (!vapid || msg.tenant.status !== "ACTIVE") return drop("disabled");
+  if (!(await hasModule(msg.tenantId, pushModuleFor(msg.kind)))) return drop("disabled");
   if (now.getTime() - msg.createdAt.getTime() > STALE_AFTER_MS) return drop("stale");
 
   const subs = await db.pushSubscription.findMany({
@@ -154,9 +161,20 @@ export async function sendPushMessage(messageId: string, now = new Date()): Prom
  */
 export async function flushQueuedPush(now = new Date()): Promise<{ queued: number; stale: number }> {
   const stale = await db.pushMessage.deleteMany({ where: { sentAt: null, createdAt: { lt: new Date(now.getTime() - STALE_AFTER_MS) } } });
+  // Only messages whose module the shop has; others expire through the stale cleanup above.
+  const [alerts, auctions] = await Promise.all([tenantsWithModule("alerts"), tenantsWithModule("auctions")]);
+  if (!alerts.size && !auctions.size) return { queued: 0, stale: stale.count };
   const due = await db.pushMessage.findMany({
     where: {
       sentAt: null,
+      AND: [
+        {
+          OR: [
+            { kind: { in: [...AUCTION_KINDS] }, tenantId: { in: [...auctions] } },
+            { kind: { notIn: [...AUCTION_KINDS] }, tenantId: { in: [...alerts] } },
+          ],
+        },
+      ],
       OR: [
         { queuedFor: { lte: now } },
         { queuedFor: null, createdAt: { lt: new Date(now.getTime() - 10 * 60 * 1000), gte: new Date(now.getTime() - 60 * 60 * 1000) } },

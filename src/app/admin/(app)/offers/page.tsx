@@ -23,6 +23,7 @@ import { requireTenantDisplay } from "@/server/tenant-display";
 import { ServiceError } from "@/server/context";
 import { OfferDrawer } from "./_components/OfferDrawer";
 import { OFFER_STATUS_TONE, offersCopy as t } from "./_copy";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 export const metadata: Metadata = { title: "Offers" };
 
@@ -34,6 +35,7 @@ function isView(v: string | undefined): v is OfferView {
 }
 
 export default async function OffersPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  if (await moduleLocked("offers")) return null; // ModuleGate in layout.tsx shows the upsell
   const sp = await searchParams;
   const ctx = await requireStaffContext();
   const viewParam = getParam(sp, "view");

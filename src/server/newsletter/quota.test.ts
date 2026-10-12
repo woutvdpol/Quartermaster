@@ -7,12 +7,12 @@ describe("checkQuota", () => {
   });
 
   it("allows sends that fit and reports what remains", () => {
-    expect(checkQuota({ quota: 1000, used: 400, needed: 600 })).toEqual({ ok: true, unlimited: false, quota: 1000, used: 400, remaining: 0 });
+    expect(checkQuota({ quota: 1000, used: 400, needed: 600 })).toEqual({ ok: true, unlimited: false, quota: 1000, used: 400, remaining: 0, fromCredits: 0 });
     expect(checkQuota({ quota: 1000, used: 0, needed: 1 })).toMatchObject({ ok: true, remaining: 999 });
   });
 
   it("refuses sends that exceed the remaining quota (all-or-nothing)", () => {
-    expect(checkQuota({ quota: 1000, used: 400, needed: 601 })).toEqual({ ok: false, quota: 1000, used: 400, remaining: 600, needed: 601 });
+    expect(checkQuota({ quota: 1000, used: 400, needed: 601 })).toEqual({ ok: false, quota: 1000, used: 400, remaining: 600, needed: 601, credits: 0 });
     expect(checkQuota({ quota: 0, used: 0, needed: 1 })).toMatchObject({ ok: false, remaining: 0 });
     // Over-used (quota lowered after sending) never goes negative.
     expect(checkQuota({ quota: 100, used: 150, needed: 1 })).toMatchObject({ ok: false, remaining: 0 });
@@ -42,5 +42,20 @@ describe("monthWindow", () => {
   it("computes offsets", () => {
     expect(timeZoneOffsetMs(new Date("2026-07-01T00:00:00Z"), "Europe/Amsterdam")).toBe(2 * 3600_000);
     expect(timeZoneOffsetMs(new Date("2026-07-01T00:00:00Z"), "America/New_York")).toBe(-4 * 3600_000);
+  });
+});
+
+describe("checkQuota with purchased credits", () => {
+  it("uses credits only for the part that does not fit the monthly quota", () => {
+    expect(checkQuota({ quota: 1000, used: 900, needed: 300, credits: 500 })).toMatchObject({ ok: true, remaining: 0, fromCredits: 200 });
+    expect(checkQuota({ quota: 1000, used: 0, needed: 300, credits: 500 })).toMatchObject({ ok: true, fromCredits: 0 });
+  });
+
+  it("refuses when quota and credits together are not enough", () => {
+    expect(checkQuota({ quota: 1000, used: 900, needed: 300, credits: 150 })).toMatchObject({ ok: false, remaining: 100, credits: 150 });
+  });
+
+  it("never touches credits when the quota is unlimited", () => {
+    expect(checkQuota({ quota: -1, used: 5, needed: 300, credits: 10 })).toMatchObject({ ok: true, fromCredits: 0 });
   });
 });

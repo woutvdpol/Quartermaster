@@ -43,6 +43,14 @@ export const ACTIVE_BIDDER_MS = 30 * MINUTE;
 export const UNCAPPED_KINDS: readonly PushKind[] = ["RESERVATION_ENDING", "AUCTION_OUTBID", "AUCTION_ENDING", "AUCTION_WON"];
 
 /** Time-critical auction pushes: useless after the lot closes (high urgency, TTL until the close). */
+/**
+ * Paid module a push kind belongs to (docs/modules.md): web push is part of `alerts`, but auction
+ * pushes also go out for a shop with `auctions` alone.
+ */
+export function pushModuleFor(kind: PushKind): "alerts" | "auctions" {
+  return kind === "AUCTION_OUTBID" || kind === "AUCTION_ENDING" || kind === "AUCTION_WON" ? "auctions" : "alerts";
+}
+
 export function isLiveAuctionKind(kind: PushKind): kind is "AUCTION_OUTBID" | "AUCTION_ENDING" {
   return kind === "AUCTION_OUTBID" || kind === "AUCTION_ENDING";
 }

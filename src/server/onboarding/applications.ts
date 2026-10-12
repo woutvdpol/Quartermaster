@@ -334,6 +334,7 @@ export async function approveApplication(ctx: PlatformContext, id: string) {
         data: { slug, name: app.shopName, timezone: defaultTimeZone(app.country), setupState: {} },
       });
       const domain = await tx.tenantDomain.create({ data: { tenantId: tenant.id, host, isPrimary: true } });
+      await tx.tenantPlan.create({ data: { tenantId: tenant.id, plan: "START" } }); // docs/modules.md
       await tx.setting.createMany({ data: initialSettings(app).map((s) => ({ tenantId: tenant.id, ...s })) });
       const owner = await tx.user.create({
         data: { tenantId: tenant.id, role: "OWNER", email: app.email, name: app.applicantName, emailVerifiedAt: app.emailVerifiedAt },

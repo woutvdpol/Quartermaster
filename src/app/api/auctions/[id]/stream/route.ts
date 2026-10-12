@@ -1,6 +1,8 @@
 import { connection } from "next/server";
 import { getRequestTenant } from "@/server/tenant";
 import { getPublicAuctionById } from "@/server/auctions";
+import { hasModule } from "@/server/modules";
+import { ServiceError } from "@/server/context";
 import { freshPublicLot } from "@/server/auctions/live";
 import { subscribeAuction, type AuctionEvent } from "@/server/auctions/realtime";
 
@@ -26,7 +28,8 @@ const notFound = () => Response.json({ error: "not_found" }, { status: 404, head
 export async function GET(request: Request, ctx: { params: Promise<{ id: string }> }) {
   await connection();
   const tenant = await getRequestTenant();
-  if (!tenant) return notFound();
+  // 404 without the auctions module (docs/modules.md); getPublicAuctionById would throw UNAVAILABLE.
+  if (!tenant || !(await hasModule(tenant.id, "auctions"))) return notFound();
   const { id } = await ctx.params;
   const auction = await getPublicAuctionById(tenant.id, id);
   if (!auction) return notFound();
@@ -74,6 +77,8 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
             if (lot && lot.auctionId === auctionId) send("lot", { lot, serverTime: serverTime() });
           }
         } catch (err) {
+          // The shop lost the auctions module while the stream was open: end it (EventSource then gets 404s).
+          if (err instanceof ServiceError && err.code === "UNAVAILABLE") return close();
           console.warn("[auctions:sse] update failed", err instanceof Error ? err.message : err);
         }
       };

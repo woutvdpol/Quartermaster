@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/server/db";
 import { getSettings } from "@/server/settings";
+import { hasModule } from "@/server/modules";
 import { enqueue } from "@/server/jobs/queue";
 import { TRANSLATABLE_FIELDS, TRANSLATION_ENTITIES, type TranslationEntityName, type TranslationLocale } from "./fields";
 import { loadSources, ENTITY_TABLES, type SourceFilter, type SourceRow } from "./sources";
@@ -16,8 +17,13 @@ export type SyncCounts = { created: number; requeued: number; staleChanged: numb
 
 const empty = (): SyncCounts => ({ created: 0, requeued: 0, staleChanged: 0, deleted: 0 });
 
+/**
+ * The extra languages translations are kept for: settings.i18n.locales, or none without the
+ * Translations module (the settings are kept, so switching the module back on restores them).
+ */
 export async function enabledLocales(tenantId: string): Promise<TranslationLocale[]> {
-  return (await getSettings(tenantId, "i18n")).locales;
+  const [settings, entitled] = await Promise.all([getSettings(tenantId, "i18n"), hasModule(tenantId, "translations")]);
+  return entitled ? settings.locales : [];
 }
 
 /** Applies planSync() to a batch of source rows. */

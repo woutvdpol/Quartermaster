@@ -1,4 +1,5 @@
 import { take } from "@/server/auth/rate-limit";
+import { hasModule } from "@/server/modules";
 import { clientIpFromHeaders, isSameOrigin } from "@/server/request-meta";
 import { SEARCH_IMAGE_MAX_BYTES, SearchImageError, SearchUnavailableError, decodeSearchImage, searchByImage, searchRequestContext, toPublicCards } from "@/server/search";
 import { servedLocaleParam } from "@/lib/i18n/shop-locales";
@@ -15,7 +16,8 @@ import { MAX_QUERY_LENGTH, parseCatalogParams } from "@/server/storefront-catalo
  *
  * The photo is processed in memory only (decoded + resized to the model input, then dropped) —
  * never stored or logged. Same-origin only; rate limited per IP with the atomic DB limiter (photo
- * search costs ~60 ms CPU per call). Shop hosts only; 404 while "coming soon" for visitors.
+ * search costs ~60 ms CPU per call). Shop hosts only; 404 while "coming soon" for visitors and for
+ * shops without the Smart search module.
  */
 
 const headers = { "Cache-Control": "private, no-store" };
@@ -29,7 +31,7 @@ function error(status: number, body: SearchErrorResponse) {
 export async function POST(request: Request) {
   if (!isSameOrigin(request)) return error(403, { error: "bad_request", message: "Forbidden" });
   const ctx = await searchRequestContext();
-  if (!ctx) return error(404, { error: "not_found", message: "Not found" });
+  if (!ctx || !(await hasModule(ctx.shop.tenant.id, "smartSearch"))) return error(404, { error: "not_found", message: "Not found" });
 
   // Public route: refuse unbounded (chunked) bodies before formData() buffers them.
   const lengthHeader = request.headers.get("content-length");
@@ -83,6 +85,7 @@ export async function POST(request: Request) {
     return Response.json(body, { headers: { ...headers, "Server-Timing": `search;dur=${res.timing.totalMs}` } });
   } catch (err) {
     if (err instanceof SearchImageError) return error(err.code === "too_large" ? 413 : 422, { error: err.code, message: err.message });
+    if (err instanceof SearchUnavailableError && err.reason === "module") return error(404, { error: "not_found", message: "Not found" });
     if (err instanceof SearchUnavailableError) return error(503, { error: "unavailable", message: err.message });
     console.error("[search/image] failed:", err instanceof Error ? err.message : err);
     return error(500, { error: "unavailable", message: "Photo search failed" });

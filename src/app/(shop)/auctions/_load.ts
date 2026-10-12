@@ -15,8 +15,18 @@ import { getShopViewer } from "@/server/storefront/viewer";
  * their lot page 404s), like products.
  */
 
-export const loadAuction = cache(async (slug: string) => {
+/**
+ * The shop context for an auction page; 404 when the shop lacks the auctions module (docs/modules.md).
+ * Not used by /auctions/pay/<token> (winners of finished lots can still pay) and /auctions/terms.
+ */
+export async function requireAuctionShop() {
   const shop = await requireShop();
+  if (!shop.settings.features.auctions) notFound();
+  return shop;
+}
+
+export const loadAuction = cache(async (slug: string) => {
+  const shop = await requireAuctionShop();
   const auction = await getPublicAuction(shop.tenant.id, slug);
   if (!auction) notFound();
   const country = visitorCountry(await headers());

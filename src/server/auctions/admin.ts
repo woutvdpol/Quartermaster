@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/server/db";
 import { audit } from "@/server/audit";
 import { ServiceError, type ServiceContext } from "@/server/context";
+import { assertModule } from "@/server/modules";
 import { parseInput, isUniqueViolation } from "@/server/catalog/errors";
 import { slugify } from "@/server/catalog/slug";
 import { imageUrl } from "@/server/media/product-images";
@@ -89,6 +90,7 @@ async function uniqueSlug(tenantId: string, base: string, exceptId?: string, exp
 // ─── Auction CRUD ───────────────────────────────────────────────────────────
 
 export async function createAuction(ctx: ServiceContext, input: AuctionInput): Promise<{ id: string; slug: string }> {
+  await assertModule(ctx, "auctions");
   const data = parseInput(auctionSchema, input);
   checkSchedule(data.opensAt, data.firstCloseAt);
   const slug = await uniqueSlug(ctx.tenantId, data.slug || data.title, undefined, !!data.slug);
@@ -132,6 +134,7 @@ async function rescheduleLots(tx: Tx, auction: { id: string; type: AuctionType; 
  * and increments only before the auction is LIVE (lot closes are recomputed).
  */
 export async function updateAuction(ctx: ServiceContext, auctionId: string, input: AuctionPatch) {
+  await assertModule(ctx, "auctions");
   const id = idSchema.parse(auctionId);
   const data = parseInput(auctionPatchSchema, input);
   const slug = data.slug ? await uniqueSlug(ctx.tenantId, data.slug, id, true) : undefined;
@@ -204,6 +207,7 @@ const candidateSelect = { id: true, stockCode: true, status: true, quantity: tru
 
 /** Adds products as lots (appended). Defaults: start = 60% of list price, reserve = purchase price + 10%. */
 export async function addLots(ctx: ServiceContext, auctionId: string, productIds: string[]): Promise<{ added: number; lotIds: string[] }> {
+  await assertModule(ctx, "auctions");
   const id = idSchema.parse(auctionId);
   const ids = [...new Set(parseInput(z.array(idSchema).min(1, "Choose at least one item").max(500), productIds))];
   const result = await db.$transaction(
@@ -261,6 +265,7 @@ const lotPatchSchema = z.object({
 
 /** Start/reserve price and position of a lot — before the auction is LIVE, or (prices) while it has no bid yet. */
 export async function updateLot(ctx: ServiceContext, lotId: string, input: z.input<typeof lotPatchSchema>) {
+  await assertModule(ctx, "auctions");
   const id = idSchema.parse(lotId);
   const data = parseInput(lotPatchSchema, input);
   let reorderTo: number | null = null;
@@ -294,6 +299,7 @@ export async function updateLot(ctx: ServiceContext, lotId: string, input: z.inp
 
 /** Renumbers lots 1..n in the given order (cancelled lots go last) and recomputes the closes. Before LIVE only. */
 export async function reorderLots(ctx: ServiceContext, auctionId: string, lotIds: string[]) {
+  await assertModule(ctx, "auctions");
   const id = idSchema.parse(auctionId);
   const order = parseInput(z.array(idSchema).max(10_000), lotIds);
   await db.$transaction(async (tx) => {
@@ -315,6 +321,7 @@ export async function reorderLots(ctx: ServiceContext, auctionId: string, lotIds
 
 /** Removes a lot: deleted while DRAFT; otherwise CANCELLED (only without bids) and the product goes back to the shop. */
 export async function removeLot(ctx: ServiceContext, lotId: string) {
+  await assertModule(ctx, "auctions");
   const id = idSchema.parse(lotId);
   const out = await db.$transaction(async (tx) => {
     const lot = await lockLotRow(tx, ctx.tenantId, id);
@@ -341,6 +348,7 @@ export async function removeLot(ctx: ServiceContext, lotId: string) {
  * hold (hidden from the shop, not reservable), the closes are fixed and a close job is queued per lot.
  */
 export async function publishAuction(ctx: ServiceContext, auctionId: string) {
+  await assertModule(ctx, "auctions");
   const id = idSchema.parse(auctionId);
   const res = await db.$transaction(
     async (tx) => {
@@ -367,6 +375,7 @@ export async function publishAuction(ctx: ServiceContext, auctionId: string) {
 
 /** Cancels an auction (before CLOSED): open lots → CANCELLED, their products back in the shop. Won lots are not touched. */
 export async function cancelAuction(ctx: ServiceContext, auctionId: string) {
+  await assertModule(ctx, "auctions");
   const id = idSchema.parse(auctionId);
   const res = await db.$transaction(async (tx) => {
     const a = await lockAuction(tx, ctx.tenantId, id);
@@ -433,6 +442,7 @@ export type AuctionAdmin = {
 const name = (c: { firstName: string | null; lastName: string | null; email: string }) => [c.firstName, c.lastName].filter(Boolean).join(" ") || c.email;
 
 export async function getAuctionAdmin(ctx: ServiceContext, auctionId: string): Promise<AuctionAdmin> {
+  await assertModule(ctx, "auctions");
   const id = idSchema.parse(auctionId);
   const a = await db.auction.findFirst({ where: { id, tenantId: ctx.tenantId } });
   if (!a) throw new ServiceError("NOT_FOUND", "Auction not found");
@@ -517,6 +527,7 @@ export type AuctionListItem = {
 };
 
 export async function listAuctionsAdmin(ctx: ServiceContext): Promise<AuctionListItem[]> {
+  await assertModule(ctx, "auctions");
   const auctions = await db.auction.findMany({
     where: { tenantId: ctx.tenantId },
     orderBy: [{ firstCloseAt: "desc" }, { createdAt: "desc" }],
@@ -560,6 +571,7 @@ export type AuctionResultRow = {
 };
 
 export async function getAuctionResults(ctx: ServiceContext, auctionId: string) {
+  await assertModule(ctx, "auctions");
   const id = idSchema.parse(auctionId);
   const a = await db.auction.findFirst({ where: { id, tenantId: ctx.tenantId }, select: { id: true, title: true, status: true, payDays: true, closedAt: true } });
   if (!a) throw new ServiceError("NOT_FOUND", "Auction not found");
@@ -618,6 +630,7 @@ export type AuctionResults = Awaited<ReturnType<typeof getAuctionResults>>;
 
 /** Full bid list of a lot for staff (incl. maxima, voided rows and the bidder). */
 export async function listLotBidsAdmin(ctx: ServiceContext, lotId: string) {
+  await assertModule(ctx, "auctions");
   const id = idSchema.parse(lotId);
   const lot = await db.auctionLot.findFirst({ where: { id, tenantId: ctx.tenantId }, select: { auctionId: true } });
   if (!lot) throw new ServiceError("NOT_FOUND", "Lot not found");
@@ -651,6 +664,7 @@ export async function listLotBidsAdmin(ctx: ServiceContext, lotId: string) {
  * the replay are written again at their original moments; submission rows get their recomputed amount.
  */
 export async function voidBid(ctx: ServiceContext, bidId: string, reason: string) {
+  await assertModule(ctx, "auctions");
   const id = idSchema.parse(bidId);
   const why = parseInput(z.string().trim().min(2, "Give a reason").max(500), reason);
   const res = await db.$transaction(
@@ -710,6 +724,12 @@ export async function voidBid(ctx: ServiceContext, bidId: string, reason: string
 // ─── Blocked bidders ────────────────────────────────────────────────────────
 
 export async function blockBidder(ctx: ServiceContext, customerId: string, reason?: string | null) {
+  await assertModule(ctx, "auctions");
+  await blockBidderRow(ctx, customerId, reason);
+}
+
+/** Block without the module check: cancelWonLot (wind-down of a won lot) also blocks after the module is gone. */
+async function blockBidderRow(ctx: ServiceContext, customerId: string, reason?: string | null) {
   const id = idSchema.parse(customerId);
   const why = reason ? z.string().trim().max(500).parse(reason) || null : null;
   const customer = await db.customer.findFirst({ where: { id, tenantId: ctx.tenantId }, select: { id: true } });
@@ -723,6 +743,7 @@ export async function blockBidder(ctx: ServiceContext, customerId: string, reaso
 }
 
 export async function unblockBidder(ctx: ServiceContext, customerId: string) {
+  await assertModule(ctx, "auctions");
   const id = idSchema.parse(customerId);
   const res = await db.blockedBidder.deleteMany({ where: { tenantId: ctx.tenantId, customerId: id } });
   if (res.count) await audit({ action: "auction.bidder.unblock", ...ACTOR(ctx), entity: "Customer", entityId: id });
@@ -730,6 +751,7 @@ export async function unblockBidder(ctx: ServiceContext, customerId: string) {
 }
 
 export async function listBlockedBidders(ctx: ServiceContext) {
+  await assertModule(ctx, "auctions");
   const rows = await db.blockedBidder.findMany({
     where: { tenantId: ctx.tenantId },
     orderBy: { createdAt: "desc" },
@@ -759,6 +781,7 @@ export type BidSignalRow = {
  * (households, offices, mobile carriers).
  */
 export async function getBidSignals(ctx: ServiceContext, auctionId: string): Promise<BidSignalRow[]> {
+  await assertModule(ctx, "auctions");
   const id = idSchema.parse(auctionId);
   const a = await db.auction.findFirst({ where: { id, tenantId: ctx.tenantId }, select: { id: true } });
   if (!a) throw new ServiceError("NOT_FOUND", "Auction not found");
@@ -818,6 +841,7 @@ export async function getBidSignals(ctx: ServiceContext, auctionId: string): Pro
 // ─── Won lots ───────────────────────────────────────────────────────────────
 
 /**
+ * Not module-gated (wind-down): a won lot can still be cancelled after the shop lost the auctions module.
  * The winner didn't pay (or the sale is undone before payment): cancels the order through the normal
  * order cancel path, sets the lot CANCELLED and puts the product back in the shop. Optionally blocks
  * the bidder. Paid orders can't be cancelled here (CONFLICT from cancelOrder).
@@ -836,11 +860,11 @@ export async function cancelWonLot(ctx: ServiceContext, lotId: string, opts: { b
     await tx.product.updateMany({ where: { id: locked.productId, auctionHoldId: locked.auctionId }, data: { auctionHoldId: null } });
     await notifyLot(tx, locked.auctionId, id);
   });
-  if (opts.blockBidder && lot.leadingBidderId) await blockBidder(ctx, lot.leadingBidderId, reason);
+  if (opts.blockBidder && lot.leadingBidderId) await blockBidderRow(ctx, lot.leadingBidderId, reason);
   await audit({ action: "auction.lot.cancel", ...ACTOR(ctx), entity: "AuctionLot", entityId: id, data: { orderId: lot.orderId, blocked: !!opts.blockBidder, reason } });
 }
 
-/** Sends the payment reminder mail again (won lot, unpaid). */
+/** Sends the payment reminder mail again (won lot, unpaid). Not module-gated: wind-down of a finished result. */
 export async function sendPaymentReminder(ctx: ServiceContext, lotId: string) {
   const id = idSchema.parse(lotId);
   const lot = await db.auctionLot.findFirst({ where: { id, tenantId: ctx.tenantId }, select: { status: true, order: { select: { paymentStatus: true, canceledAt: true, finalizedAt: true } } } });

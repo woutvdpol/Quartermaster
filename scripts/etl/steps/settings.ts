@@ -1,6 +1,7 @@
 import type { SettingsGroup } from "../../../src/server/settings/schema";
 import { json, stableJson, type EtlContext } from "../context";
 import { mapLegacySettings, mergeAndValidate } from "../transforms/settings";
+import { planFromLegacy, type LegacyPlatformSettings } from "../../../src/server/modules/legacy";
 
 /** Legacy `settings` (+ `currencies` for display currencies) → Setting rows and Tenant columns. */
 export async function settingsStep(ctx: EtlContext) {
@@ -25,6 +26,26 @@ export async function settingsStep(ctx: EtlContext) {
       report.created("settings (groups)");
     }
   }
+
+  // Package (docs/modules.md): the Concept500 tier and limits, now in the platform group, → TenantPlan.
+  const platform = await tx.setting.findUnique({ where: { tenantId_group: { tenantId, group: "platform" } } });
+  const legacy = planFromLegacy((platform?.data ?? {}) as LegacyPlatformSettings);
+  const planData = {
+    plan: legacy.plan,
+    productLimit: legacy.productLimit,
+    photoLimit: legacy.photoLimit,
+    newsletterQuota: legacy.newsletterQuota,
+    source: "LEGACY" as const,
+  };
+  await tx.tenantPlan.upsert({ where: { tenantId }, create: { tenantId, ...planData }, update: planData });
+  if (legacy.newsletterModule) {
+    await tx.tenantModule.upsert({
+      where: { tenantId_moduleId: { tenantId, moduleId: "newsletter" } },
+      create: { tenantId, moduleId: "newsletter", status: "ACTIVE", source: "LEGACY" },
+      update: { status: "ACTIVE", source: "LEGACY" },
+    });
+  }
+  report.note("Pakket", `${legacy.plan}${legacy.newsletterModule ? " + nieuwsbrief" : ""} (uit Concept500-abonnement)`);
 
   const tenantPatch: { currency?: string; timezone?: string } = {};
   const tenant = await tx.tenant.findUniqueOrThrow({ where: { id: tenantId } });

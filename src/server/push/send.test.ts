@@ -22,7 +22,7 @@ type Msg = {
   id: string;
   tenantId: string;
   customerId: string;
-  kind: "SAVED_SEARCH" | "PRICE_DROP" | "RESERVATION_ENDING" | "BACK_AVAILABLE";
+  kind: "SAVED_SEARCH" | "PRICE_DROP" | "RESERVATION_ENDING" | "BACK_AVAILABLE" | "AUCTION_WON";
   title: string;
   body: string;
   url: string;
@@ -66,6 +66,11 @@ vi.mock("@/server/db", () => ({
   },
 }));
 vi.mock("@/server/jobs/queue", () => ({ enqueue: vi.fn() }));
+const entitlement: Record<string, boolean> = { alerts: true, auctions: false };
+vi.mock("@/server/modules", () => ({
+  hasModule: async (_tenantId: string, id: string) => !!entitlement[id],
+  tenantsWithModule: async (id: string) => new Set(entitlement[id] ? ["t1"] : []),
+}));
 
 const { sendPushMessage } = await import("./send");
 const { WebPushError } = await import("web-push");
@@ -100,6 +105,8 @@ beforeEach(() => {
   ];
   state.sentToday = 0;
   state.customer = { pushQuietStart: null, pushQuietEnd: null, pushMaxPerDay: 5 };
+  entitlement.alerts = true;
+  entitlement.auctions = false;
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -170,6 +177,25 @@ describe("sendPushMessage", () => {
 
     state.msg = message();
     vi.stubEnv("VAPID_PRIVATE_KEY", "");
+    expect(await sendPushMessage("m1", NOON)).toEqual({ status: "dropped", reason: "disabled" });
+  });
+
+  it("drops without the alerts module (paid module, docs/modules.md); subscriptions stay", async () => {
+    entitlement.alerts = false;
+    expect(await sendPushMessage("m1", NOON)).toEqual({ status: "dropped", reason: "disabled" });
+    expect(sendNotification).not.toHaveBeenCalled();
+    expect(state.subs).toHaveLength(2);
+  });
+
+  it("auction pushes need `auctions`, not `alerts`", async () => {
+    entitlement.alerts = false;
+    entitlement.auctions = true;
+    state.msg = message({ kind: "AUCTION_WON", url: "/auctions/lot/l1" });
+    expect(await sendPushMessage("m1", NOON)).toMatchObject({ status: "sent" });
+
+    entitlement.auctions = false;
+    entitlement.alerts = true;
+    state.msg = message({ kind: "AUCTION_WON", url: "/auctions/lot/l1" });
     expect(await sendPushMessage("m1", NOON)).toEqual({ status: "dropped", reason: "disabled" });
   });
 });

@@ -54,6 +54,8 @@ async function seedTenant(t: TenantSeed) {
     create: { slug: t.slug, name: t.name },
     update: { name: t.name },
   });
+  // Local development: every module (docs/modules.md).
+  await db.tenantPlan.upsert({ where: { tenantId: tenant.id }, create: { tenantId: tenant.id, plan: "COMPLETE" }, update: {} });
   for (const d of t.domains) {
     await db.tenantDomain.upsert({
       where: { host: d.host },

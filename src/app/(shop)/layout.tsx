@@ -30,6 +30,7 @@ import { getRequestLocale } from "@/server/i18n/locale";
 import { translateMenus } from "@/server/storefront/translate";
 import { hasVisibleAuctions } from "@/components/shop/auctions/server";
 import "./shop.css";
+import { withoutLockedLinks } from "@/server/modules/paths";
 
 /*
  * Storefront shell for every route in the (shop) group.
@@ -92,13 +93,17 @@ export default async function ShopLayout({ children }: LayoutProps<"/">) {
   const notLive = launch.prelaunch;
   const [menus, allLegalLinks, ageOk, auctions] = await Promise.all([
     // Menu labels in the shop language (approved translations only; docs/i18n.md).
-    getPublicMenus(shop.tenant.id).then((m) => translateMenus(shop.tenant.id, shop.locale, m)),
+    getPublicMenus(shop.tenant.id)
+      .then((m) => translateMenus(shop.tenant.id, shop.locale, m))
+      // Links to paid modules the shop lacks would 404 (docs/modules.md).
+      .then((m) => ({ ...m, header: withoutLockedLinks(m.header, shop.settings.features), footer: withoutLockedLinks(m.footer, shop.settings.features) })),
     getLegalLinks(shop.tenant.id),
     legal.ageVerification === "popup"
       ? hasConfirmedAge(legal.minimumAge)
       : Promise.resolve(true),
     // "Auctions" in the header/footer only while an auction is published or live (cached, docs/auctions.md).
-    hasVisibleAuctions(shop.tenant.id).catch(() => false),
+    // Only for shops with the auctions module (docs/modules.md).
+    shop.settings.features.auctions ? hasVisibleAuctions(shop.tenant.id).catch(() => false) : Promise.resolve(false),
   ]);
   // Pages the footer menu already links (e.g. a "Service" column) are not repeated in the legal row.
   const legalLinks = withoutMenuDuplicates(allLegalLinks, menus.footer);
@@ -131,6 +136,7 @@ export default async function ShopLayout({ children }: LayoutProps<"/">) {
               logoPath={appearance.logoPath}
               menu={menus.header}
               auctions={auctions}
+              photoSearch={shop.settings.features.smartSearch}
             />
             <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
               {children}

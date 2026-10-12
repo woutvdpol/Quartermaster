@@ -2,7 +2,6 @@ import "server-only";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { audit } from "@/server/audit";
-import { getSettings } from "@/server/settings";
 import { ServiceError, type ServiceContext } from "@/server/context";
 import { encrypt } from "@/server/auth/encryption";
 import { generateToken, hashToken } from "@/server/auth/tokens";
@@ -10,6 +9,7 @@ import * as rateLimit from "@/server/auth/rate-limit";
 import type { Prisma } from "@/generated/prisma/client";
 import { queueMail } from "@/server/mail/queue";
 import { verifyUnsubscribe } from "./signing";
+import { getEntitlements } from "@/server/modules";
 
 /*
  * Subscriber lifecycle (status is derived, see prisma/schema.prisma):
@@ -54,9 +54,10 @@ export function statusWhere(status: SubscriberStatus | "all"): Prisma.Newsletter
 export async function assertNewsletterEnabled(tenantId: string) {
   const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { status: true } });
   if (!tenant || tenant.status !== "ACTIVE") throw new ServiceError("NOT_FOUND", "Shop not found");
-  const platform = await getSettings(tenantId, "platform");
-  if (!platform.newsletterEnabled) throw new ServiceError("UNAVAILABLE", "The newsletter is not enabled for this shop");
-  return platform;
+  const { modules, limits } = await getEntitlements(tenantId);
+  if (!modules.has("newsletter")) throw new ServiceError("UNAVAILABLE", "The newsletter is not part of this shop's package", { module: "newsletter" });
+  // Mails per month in the quota.ts convention: -1 = unlimited.
+  return { newsletterQuota: limits.newsletterQuota ?? -1 };
 }
 
 // ─── Public (storefront) ────────────────────────────────────────────────────

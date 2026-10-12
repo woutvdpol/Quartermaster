@@ -194,6 +194,7 @@ export async function createTenant(ctx: PlatformContext, input: CreateTenantInpu
         data: { slug: data.slug, name: data.name, currency: data.currency, timezone: data.timezone },
       });
       const domain = await tx.tenantDomain.create({ data: { tenantId: tenant.id, host: data.primaryHost, isPrimary: true } });
+      await tx.tenantPlan.create({ data: { tenantId: tenant.id, plan: "START" } }); // docs/modules.md
       await tx.setting.createMany({ data: initialSettings(data.name).map((s) => ({ tenantId: tenant.id, ...s })) });
       const invite = await createOwnerInvite(tx, { tenantId: tenant.id, email: data.ownerEmail, name: data.ownerName });
       return { tenant, domain, invite };

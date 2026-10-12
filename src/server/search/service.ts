@@ -6,6 +6,7 @@ import { resolveFacetSelection, tokensForValueIds } from "@/server/storefront-ca
 import { PAGE_SIZE, MAX_SHOW, facetToken, type CatalogParams, type CatalogSort } from "@/server/storefront-catalog/params";
 import type { CatalogCard, CatalogFacets, PublicTaxonomy } from "@/server/storefront-catalog/types";
 import { getEmbedder, type Embedder, type EmbedderPart, type RgbImage } from "./embedder";
+import { embedderForTenant, smartSearchEnabled, tenantsWithSmartSearch } from "./entitlement";
 import { searchMetrics } from "./metrics";
 import { getShopDictionary, parseWith, type ShopDictionary } from "./dictionary";
 import { TtlLru } from "./lru";
@@ -29,6 +30,9 @@ import { FUSION_K, IMAGE_MARGIN, IMAGE_MIN_SIMILARITY, IMAGE_TEXT_LIMIT, SIMILAR
  * category, compliance, visibility) are the catalog's own WHERE clause, so search never shows more
  * than the catalog. Models that are not warm yet are skipped (lexical still answers) and warmed in
  * the background — page renders never wait for a model.
+ *
+ * Shops without the "Smart search" module (./entitlement.ts) take the same path as "no embedder":
+ * lexical + facets only, no photo search, no similar items.
  */
 
 // ─── Limits (thresholds and weights: ./ranking.ts) ──────────────────────────
@@ -309,7 +313,8 @@ export async function searchProducts(tenantId: string, input: SearchInput): Prom
   const requestedSort = input.sort ?? "relevance";
   const sort: CatalogSort = requestedSort === "relevance" && parsed.sort ? parsed.sort : requestedSort;
 
-  const embedder = await getEmbedder();
+  // Without the Smart search module: no embedder → the lexical fallback (states "off").
+  const embedder = await embedderForTenant(tenantId);
   const planFor = (p: ParsedQuery): Plan => ({
     tenantId,
     scope,
@@ -504,7 +509,7 @@ export async function suggest(tenantId: string, q: string, opts: { scope?: Parti
   let semantic: ScoredId[] = [];
   const words = parsed.text.split(" ").filter(Boolean).length;
   if (hasText && (words >= 3 || lex.length === 0)) {
-    const embedder = await getEmbedder();
+    const embedder = await embedderForTenant(tenantId);
     const { vector, state } = await embedIfWarm(embedder, "text", semanticText(parsed));
     semanticState = state;
     if (vector && embedder) semantic = keepSemantic(await vectorSearch(tenantId, where, vector, { kind: "text", dim: embedder.textDim, limit: 60 }), new Set(lex.map((h) => h.id)));
@@ -546,9 +551,12 @@ export async function suggest(tenantId: string, q: string, opts: { scope?: Parti
 // ─── searchByImage ──────────────────────────────────────────────────────────
 
 export class SearchUnavailableError extends Error {
-  constructor(message: string) {
+  /** "module": the shop does not have Smart search (route handlers answer 404); "embedder": down/cold. */
+  readonly reason: "module" | "embedder";
+  constructor(message: string, reason: "module" | "embedder" = "embedder") {
     super(message);
     this.name = "SearchUnavailableError";
+    this.reason = reason;
   }
 }
 
@@ -557,11 +565,12 @@ export type ImageSearchInput = Omit<SearchInput, "q" | "interpret" | "fallbackSo
 /**
  * Products whose main photo looks like `image` (decoded RGB, see ./image-input.ts). With `q`, the
  * text refines the result (its understood filters apply; its lexical/semantic ranks fuse in).
- * Photo search has no lexical fallback: throws SearchUnavailableError when the embedder is not
- * configured, down or slower than its photo timeout (2 s).
+ * Photo search has no lexical fallback: throws SearchUnavailableError when the shop does not have
+ * the Smart search module, or the embedder is not configured, down or slower than its photo timeout (2 s).
  */
 export async function searchByImage(tenantId: string, image: RgbImage, input: ImageSearchInput = {}): Promise<SearchResult> {
   const started = performance.now();
+  if (!(await smartSearchEnabled(tenantId))) throw new SearchUnavailableError("Photo search is not part of this shop's package", "module");
   const embedder = await getEmbedder();
   if (!embedder) throw new SearchUnavailableError("Photo search is not available");
   if (embedder.status("image") !== "ready") {
@@ -641,10 +650,11 @@ export async function searchByImage(tenantId: string, image: RgbImage, input: Im
  * never the product itself. Each neighbour list is scored as z-scores among its own candidates and
  * the two are summed — an item must look alike AND/OR read alike clearly more than the rest
  * (neighbour cosines are dense: 0.85–0.92 for everything shot the same way). Empty when the product
- * has no embeddings yet or nothing stands out.
+ * has no embeddings yet, nothing stands out, or the shop does not have the Smart search module.
  */
 export async function similarProducts(tenantId: string, productId: string, opts: { limit?: number; scope?: Partial<ListScope> } = {}): Promise<CatalogCard[]> {
   const limit = opts.limit ?? 8;
+  if (!(await smartSearchEnabled(tenantId))) return [];
   const vectors = await productVectors(tenantId, productId);
   if (!vectors.text && !vectors.image) return [];
   const scope: ListScope = { mode: "shop", categoryIds: null, ...opts.scope };
@@ -671,6 +681,8 @@ export async function similarProducts(tenantId: string, productId: string, opts:
  * as a shop search, over several shops at once. Facets, synonyms and price phrases are per shop, so
  * the query is parsed without a shop dictionary: free text + stock numbers only. The caller supplies
  * the product predicate (`where`, over `products p`), which must restrict to `tenantIds` itself.
+ * Vector retrieval only covers shops with the Smart search module (their embeddings are kept
+ * current); the others are found lexically.
  */
 
 const NO_TAXONOMY: PublicTaxonomy = { facets: [], values: [] };
@@ -712,9 +724,10 @@ export async function searchAcrossTenants(input: AcrossTenantsInput): Promise<Ac
     const ids = await listIds(input.where, orderSql(sort === "relevance" ? "newest" : sort, "shop"));
     return { ...base, ids, timing: { totalMs: ms(started), lexicalMs: ms(t), semanticMs: 0, imageMs: 0, semantic: "skipped", imageText: "skipped" } };
   }
+  const vectorTenantIds = await tenantsWithSmartSearch(input.tenantIds);
   const plan: Plan = {
     tenantId: input.tenantIds[0],
-    vectorTenantIds: input.tenantIds,
+    vectorTenantIds,
     scope: { mode: "shop", categoryIds: null },
     tokens: [],
     tags: [],
@@ -722,7 +735,7 @@ export async function searchAcrossTenants(input: AcrossTenantsInput): Promise<Ac
     max: null,
     tax: NO_TAXONOMY,
   };
-  const r = await retrieve(plan, input.where, parsed, await getEmbedder());
+  const r = await retrieve(plan, input.where, parsed, vectorTenantIds.length ? await getEmbedder() : null);
   const ids = sort === "relevance" ? r.fused : await orderIds(r.fused, orderSql(sort, "shop"));
   return {
     ...base,
@@ -733,23 +746,25 @@ export async function searchAcrossTenants(input: AcrossTenantsInput): Promise<Ac
 
 /**
  * Photo search over several shops (same thresholds as searchByImage). Returns ids in visual order with
- * their cosine similarity. Throws SearchUnavailableError like searchByImage.
+ * their cosine similarity. Throws SearchUnavailableError like searchByImage. Only shops with the
+ * Smart search module take part (none → no results).
  */
 export async function searchImageAcrossTenants(input: { tenantIds: readonly string[]; where: Prisma.Sql; image: RgbImage }): Promise<{ ids: string[]; scores: Record<string, number> }> {
   const embedder = await getEmbedder();
+  const tenantIds = await tenantsWithSmartSearch(input.tenantIds);
   if (!embedder) throw new SearchUnavailableError("Photo search is not available");
   if (embedder.status("image") !== "ready") {
     embedder.warm("image");
     throw new SearchUnavailableError("Photo search is not available right now");
   }
+  if (!tenantIds.length) return { ids: [], scores: {} };
   let vector: number[];
   try {
     vector = await embedder.embedImage(input.image);
   } catch {
     throw new SearchUnavailableError("Photo search is not available right now");
   }
-  if (!input.tenantIds.length) return { ids: [], scores: {} };
-  const candidates = await vectorSearch(input.tenantIds, input.where, vector, { kind: "image", dim: embedder.imageDim, limit: 96, minSimilarity: IMAGE_MIN_SIMILARITY });
+  const candidates = await vectorSearch(tenantIds, input.where, vector, { kind: "image", dim: embedder.imageDim, limit: 96, minSimilarity: IMAGE_MIN_SIMILARITY });
   const visual = candidates.filter((h) => h.score >= (candidates[0]?.score ?? 1) - IMAGE_MARGIN);
   return { ids: visual.map((h) => h.id), scores: Object.fromEntries(visual.map((h) => [h.id, h.score])) };
 }

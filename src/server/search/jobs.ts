@@ -11,13 +11,22 @@ import { defineJob } from "@/server/jobs/registry";
  *   search.reindex-tenant  admin "Rebuild search index" / bulk changes (facet renames, imports).
  *                          Policy "stately" per tenant (one queued + one running: repeated requests
  *                          collapse); continues itself in 4-minute slices.
+ *
+ * Both return early (no error, no embedder work) for shops without the Smart search module; the
+ * enqueue sites (audit hook, catalog services) need no check of their own.
  */
 const id = z.string().min(1).max(64);
+
+async function entitled(tenantId: string): Promise<boolean> {
+  const { hasModule } = await import("@/server/modules");
+  return hasModule(tenantId, "smartSearch");
+}
 
 export const searchEmbedProductJob = defineJob(
   "search.embed-product",
   z.object({ tenantId: id, productId: id }),
   async ({ tenantId, productId }) => {
+    if (!(await entitled(tenantId))) return { skipped: "module" };
     const { indexProducts } = await import("./indexing");
     return indexProducts(tenantId, [productId]);
   },
@@ -28,6 +37,7 @@ export const searchReindexTenantJob = defineJob(
   "search.reindex-tenant",
   z.object({ tenantId: id, after: id.nullable().optional(), force: z.boolean().optional() }),
   async ({ tenantId, after, force }, ctx) => {
+    if (!(await entitled(tenantId))) return { skipped: "module" };
     const { runReindexSlice } = await import("./admin");
     return runReindexSlice(tenantId, { after: after ?? null, force: force ?? false, signal: ctx.signal, isFinalAttempt: ctx.isFinalAttempt });
   },
@@ -42,6 +52,7 @@ export const SEARCH_JOBS = {
 /**
  * Cron (spread into CRON_TASKS): search.sync every 10 minutes — embeds products the hooks missed
  * (imports, ETL, seeds, direct SQL): no text embedding, edited since, other model, new photo.
+ * Shops with the Smart search module only.
  */
 export const SEARCH_CRON_TASKS = {
   "search.sync": {

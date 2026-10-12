@@ -17,7 +17,12 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t.checkoutTitle, robots: { index: false, follow: false }, referrer: "no-referrer" };
 }
 
-/** Personal checkout link of an accepted offer. Read-only; "Buy now" is a POST (server action). */
+/**
+ * Personal checkout link of an accepted offer. Read-only; "Buy now" is a POST (server action).
+ * Deliberately NOT gated on the "offers" module: an offer the shop already accepted must stay
+ * buyable after the module ends (wind-down, docs/modules.md). Only ACCEPTED/CONVERTED offers have a
+ * link here, and no new ones are issued without the module (acceptOffer/respondToCounter are gated).
+ */
 export default async function OfferCheckoutPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const shop = await requireShop();

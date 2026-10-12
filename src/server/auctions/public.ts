@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/server/db";
+import { assertModule, hasModule } from "@/server/modules";
 import type { Prisma } from "@/generated/prisma/client";
 import type { AuctionLotStatus, AuctionStatus, AuctionType } from "@/generated/prisma/enums";
 import { nextMinimum, tableOrDefault } from "./increments";
@@ -198,6 +199,11 @@ async function toSummaries(rows: SummaryRow[]): Promise<AuctionSummary[]> {
 
 /** Public auction page by slug (lots ordered by lot number, cancelled lots left out). */
 export async function getPublicAuction(tenantId: string, slug: string): Promise<PublicAuction | null> {
+  await assertModule({ tenantId }, "auctions");
+  return loadPublicAuction(tenantId, slug);
+}
+
+async function loadPublicAuction(tenantId: string, slug: string): Promise<PublicAuction | null> {
   const a = await db.auction.findFirst({
     where: { tenantId, slug: String(slug ?? "").slice(0, 200), status: { in: PUBLIC_STATUSES } },
     select: { id: true, type: true, status: true, title: true, slug: true, description: true, opensAt: true, firstCloseAt: true, gapSeconds: true, extendSeconds: true, payDays: true },
@@ -224,8 +230,9 @@ export async function getPublicAuction(tenantId: string, slug: string): Promise<
 
 /** Public auction by id (same as getPublicAuction) — for the SSE/JSON endpoints. */
 export async function getPublicAuctionById(tenantId: string, auctionId: string): Promise<PublicAuction | null> {
+  await assertModule({ tenantId }, "auctions");
   const a = await db.auction.findFirst({ where: { id: String(auctionId ?? "").slice(0, 64), tenantId, status: { in: PUBLIC_STATUSES } }, select: { slug: true } });
-  return a ? getPublicAuction(tenantId, a.slug) : null;
+  return a ? loadPublicAuction(tenantId, a.slug) : null;
 }
 
 /**
@@ -233,6 +240,7 @@ export async function getPublicAuctionById(tenantId: string, auctionId: string):
  * lots of live single-lot auctions (soonest close first).
  */
 export async function listPublicAuctions(tenantId: string): Promise<{ live: AuctionSummary[]; upcoming: AuctionSummary[]; singles: PublicLot[] }> {
+  await assertModule({ tenantId }, "auctions");
   const [live, upcoming] = await Promise.all([
     db.auction.findMany({ where: { tenantId, status: "LIVE", type: "DAY" }, orderBy: [{ firstCloseAt: "asc" }], select: summarySelect, take: 50 }),
     db.auction.findMany({ where: { tenantId, status: "PUBLISHED" }, orderBy: [{ opensAt: "asc" }], select: summarySelect, take: 50 }),
@@ -244,6 +252,7 @@ export async function listPublicAuctions(tenantId: string): Promise<{ live: Auct
 
 /** Lot page: the lot, its auction and the latest 50 visible bids (newest first). */
 export async function getPublicLot(tenantId: string, lotId: string): Promise<(PublicLot & { auction: AuctionSummary; history: PublicBid[] }) | null> {
+  await assertModule({ tenantId }, "auctions");
   const lot = await loadPublicLot(tenantId, String(lotId ?? "").slice(0, 64));
   if (!lot) return null;
   const [auctionRow, history] = await Promise.all([
@@ -287,11 +296,15 @@ export async function getMyLotState(
   return { isLeading, myMax, outbid: !isLeading && myMax !== null, bidderNumber: bidder?.number ?? null, termsAccepted: !!bidder?.termsAcceptedAt };
 }
 
-/** The auction lot a product currently is (PUBLISHED/LIVE auction, lot OPEN) — the product page links to it. */
+/**
+ * The auction lot a product currently is (PUBLISHED/LIVE auction, lot OPEN) — the product page links to it.
+ * Null without the auctions module (no throw: the product page must keep rendering).
+ */
 export async function lotForProduct(
   tenantId: string,
   productId: string,
 ): Promise<{ lotId: string; auctionId: string; auctionSlug: string; auctionTitle: string; lotNumber: number; closesAt: string; opensAt: string; status: AuctionStatus } | null> {
+  if (!(await hasModule(tenantId, "auctions"))) return null;
   const lot = await db.auctionLot.findFirst({
     where: { tenantId, productId, status: "OPEN", auction: { status: { in: ["PUBLISHED", "LIVE"] } } },
     orderBy: { createdAt: "desc" },

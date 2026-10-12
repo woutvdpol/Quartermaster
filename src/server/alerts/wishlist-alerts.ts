@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@/server/db";
 import { audit } from "@/server/audit";
 import { queueMail } from "@/server/mail/queue";
+import { tenantsWithModule } from "@/server/modules";
 import { queuePriceDropPushes } from "@/server/push";
 import type { Prisma } from "@/generated/prisma/client";
 import type { AlertKind } from "@/generated/prisma/enums";
@@ -108,11 +109,15 @@ export async function processPriceDrop(tenantId: string, productId: string, oldP
  * Safety net (cron `alerts.scan`): reservations released or expired in the window whose product is
  * wishlisted. Catches every release path (cart remove, order cancel, expiry sweeper, admin release,
  * status change) without hooks; the cooldown makes overlapping windows harmless.
+ * Only shops with the `alerts` module (docs/modules.md).
  */
 export async function scanReleasedReservations(opts: { since?: Date } = {}): Promise<{ products: number; mails: number }> {
   const since = opts.since ?? new Date(Date.now() - 15 * 60 * 1000);
+  const entitled = await tenantsWithModule("alerts");
+  if (!entitled.size) return { products: 0, mails: 0 };
   const rows = await db.reservation.findMany({
     where: {
+      tenantId: { in: [...entitled] },
       status: { in: ["RELEASED", "EXPIRED"] },
       releasedAt: { gte: since },
       product: { status: "ACTIVE", wishlistItems: { some: {} } },

@@ -23,6 +23,7 @@ import { getLead, listLeads, LEAD_STATUSES, LEAD_STATUS_LABEL, type LeadListItem
 import { requireTenantDisplay } from "@/server/tenant-display";
 import { copy } from "./_copy";
 import { LeadDrawer, type LeadDrawerData } from "./_components/LeadDrawer";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 export const metadata: Metadata = { title: copy.title };
 
@@ -39,6 +40,7 @@ function excerpt(text: string, max = 110): string {
 }
 
 export default async function LeadsPage({ searchParams }: PageProps<"/admin/leads">) {
+  if (await moduleLocked("leads")) return null; // ModuleGate in layout.tsx shows the upsell
   const sp = await searchParams;
   const page = parsePage(sp.page);
   const view = getParam(sp, "view");

@@ -7,6 +7,7 @@ import { ServiceError, type ServiceContext } from "@/server/context";
 import { getStorage } from "@/server/media/storage";
 import { variantKey } from "@/server/media/store";
 import { getEmbedder, type Embedder, type RgbImage } from "@/server/search/embedder";
+import { smartSearchEnabled } from "@/server/search/entitlement";
 import { toRgb } from "@/server/search/indexing";
 import { vectorSearch } from "@/server/search/retrieval";
 import { CLOSE, selectCandidates, type DuplicateHit, type SimilarityBand } from "./bands";
@@ -18,6 +19,7 @@ import { CLOSE, selectCandidates, type DuplicateHit, type SimilarityBand } from 
  * archive alike (product_embeddings, kind "image"). Read-only and best effort: when the embedder
  * is off, down, cold or slower than the time budget, the answer is "no candidates" — the upload
  * itself is never blocked or delayed (it has already been saved when this runs).
+ * Part of the Smart search module: without it the check reports nothing (state "unavailable").
  */
 
 /** Total time budget for one check (embedding + kNN). */
@@ -130,6 +132,8 @@ export async function checkDuplicates(ctx: ServiceContext, input: CheckDuplicate
   if (!parsed.success) throw new ServiceError("INVALID", parsed.error.issues[0]?.message ?? "Invalid input");
   const { productId, imageIds, imageBuffers } = parsed.data;
   const timeoutMs = parsed.data.timeoutMs ?? CHECK_TIMEOUT_MS;
+  // Not in the package: no candidates, quietly (the editor panel simply does not appear).
+  if (!(await smartSearchEnabled(ctx.tenantId))) return EMPTY("unavailable");
 
   let previousProductId: string | null = null;
   if (productId) {

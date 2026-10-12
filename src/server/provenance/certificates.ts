@@ -15,6 +15,7 @@ import { assertValidKey, getStorage } from "@/server/media/storage";
 import { Prisma, type Certificate } from "@/generated/prisma/client";
 import { generateCertificateCode, normalizeCertificateCode } from "./code";
 import { excerpt, markdownToPlainText } from "./excerpt";
+import { assertModule } from "@/server/modules";
 
 /*
  * Certificates of authenticity.
@@ -29,6 +30,9 @@ import { excerpt, markdownToPlainText } from "./excerpt";
  * - Public verification (`verifyCertificate`) is tenant-scoped (a code of another shop is "unknown")
  *   and returns no personal data (no buyer, no issuer, no revocation reason).
  * - The PDF is rendered on demand (certificate-pdf.tsx) and cached under storageKey while valid.
+ * - Paid module "provenance" (docs/modules.md): only ISSUING needs it. Certificates already handed to
+ *   buyers keep working after a downgrade: verification, the staff PDF, listing and revoking (a
+ *   dealer must still be able to withdraw a wrong certificate) are deliberately not gated.
  */
 
 export const CERTIFICATE_STATUSES = ["ACTIVE", "RESERVED", "SOLD"] as const;
@@ -196,6 +200,7 @@ export async function listCertificates(ctx: ServiceContext, productId: string): 
 }
 
 export async function issueCertificate(ctx: ServiceContext, productId: string): Promise<CertificateDto> {
+  await assertModule(ctx, "provenance");
   productId = idSchema.parse(productId);
   const tenantId = ctx.tenantId;
   const product = await db.product.findFirst({

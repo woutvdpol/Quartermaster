@@ -7,7 +7,9 @@ import { getSettings } from "@/server/settings";
 import { getThemePreview } from "@/server/theme/preview";
 import { shopCache } from "./cache";
 import { getRequestLocale } from "@/server/i18n/locale";
-import { servedLocales, type ShopLocale } from "@/lib/i18n/shop-locales";
+import { type ShopLocale } from "@/lib/i18n/shop-locales";
+import { entitledServedLocales } from "@/server/i18n/served-locales";
+import { moduleFeatures } from "@/server/modules";
 
 /*
  * The shop a request is for, plus the PUBLIC subset of its settings. Never put purchase/platform
@@ -36,7 +38,7 @@ export type ShopContext = {
 };
 
 async function loadPublicSettings(tenantId: string) {
-  const [general, appearance, catalog, checkout, content, legal, analytics, platform, i18n] = await Promise.all([
+  const [general, appearance, catalog, checkout, content, legal, analytics, i18n, features] = await Promise.all([
     getSettings(tenantId, "general"),
     getSettings(tenantId, "appearance"),
     getSettings(tenantId, "catalog"),
@@ -44,8 +46,8 @@ async function loadPublicSettings(tenantId: string) {
     getSettings(tenantId, "content"),
     getSettings(tenantId, "legal"),
     getSettings(tenantId, "analytics"),
-    getSettings(tenantId, "platform"),
     getSettings(tenantId, "i18n"),
+    moduleFeatures(tenantId),
   ]);
   return {
     general: {
@@ -83,7 +85,8 @@ async function loadPublicSettings(tenantId: string) {
     content,
     legal,
     analytics: { provider: analytics.provider },
-    features: { newsletter: platform.newsletterEnabled },
+    // One flag per paid module (docs/modules.md); a module's storefront parts render only when true.
+    features,
     i18n: { locales: i18n.locales },
   };
 }
@@ -124,7 +127,8 @@ export const getShopContext = cache(async (): Promise<ShopContext | null> => {
     themePreview: preview ? { hasDraft: preview.draft !== null } : null,
     locale,
     // `?? []`: entries cached before the i18n group existed.
-    locales: servedLocales(settings.i18n?.locales ?? []),
+    // Extra languages need the translations module (docs/modules.md).
+    locales: entitledServedLocales(settings.i18n?.locales ?? [], settings.features?.translations === true),
   };
 });
 

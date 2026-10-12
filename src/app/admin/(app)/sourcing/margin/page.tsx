@@ -22,6 +22,7 @@ import { copy } from "../_copy";
 import { requireTenantDisplay } from "@/server/tenant-display";
 import { addDays, isYmd, startOfLocalDay, todayIn } from "../_lib/time";
 import { SourcingTabs } from "../_components/SourcingTabs";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 export const metadata: Metadata = { title: `${copy.margin.title} · ${copy.title}` };
 
@@ -54,6 +55,7 @@ const monthLabel = (ym: string) =>
 const pctText = (p: number | null) => (p == null ? copy.margin.noCost : `${p.toLocaleString("en-NL", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`);
 
 export default async function MarginReportPage({ searchParams }: PageProps<"/admin/sourcing/margin">) {
+  if (await moduleLocked("provenance")) return null; // ModuleGate in layout.tsx shows the upsell
   const sp = await searchParams;
   const ctx = await requireStaffContext();
   const fmt = await requireTenantDisplay(ctx.tenantId);

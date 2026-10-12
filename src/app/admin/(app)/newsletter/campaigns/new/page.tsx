@@ -6,10 +6,12 @@ import { getNewsletterQuota } from "@/server/newsletter";
 import { copy } from "../../_copy";
 import { CampaignEditor } from "../../_components/CampaignEditor";
 import { NewsletterDisabled } from "../../_components/NewsletterDisabled";
+import { moduleLocked } from "@/components/admin/ModuleGate";
 
 export const metadata: Metadata = { title: copy.editor.titleNew };
 
 export default async function NewCampaignPage() {
+  if (await moduleLocked("newsletter")) return null; // ModuleGate in layout.tsx shows the upsell
   const ctx = await requireStaffContext();
   const quota = await getNewsletterQuota(ctx);
   return (
