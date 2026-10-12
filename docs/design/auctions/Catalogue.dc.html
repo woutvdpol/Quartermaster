@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Auction catalogue</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=Instrument+Serif:ital@0;1&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFFFF}
+button{font:inherit;cursor:pointer}
+a{color:#1E2119}a:hover{color:#1F4D3A}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #FFFFFF; color: #1E2119; font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 15px">
+  <header style="border-bottom: 1px solid #E8E8E2">
+    <div style="max-width: 1240px; margin: 0 auto; padding: 16px 24px; display: flex; flex-wrap: wrap; gap: 14px 26px; align-items: center">
+      <strong style="font-size: 19px">Concept Militaria</strong>
+      <nav aria-label="Shop" style="display: flex; flex-wrap: wrap; gap: 18px; font-size: 14px; flex-grow: 1">
+        <a href="#" style="text-decoration: none">Shop</a><a href="#" style="text-decoration: none">Helmets</a><a href="#" aria-current="page" style="text-decoration: none; font-weight: 600">Auctions</a><a href="#" style="text-decoration: none">Archive</a>
+      </nav>
+    </div>
+  </header>
+
+  <main style="max-width: 1240px; margin: 0 auto; padding: 28px 24px 64px; display: flex; flex-direction: column; gap: 24px">
+    <section style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 20px; align-items: flex-end; background: #F3F3EE; border-radius: 14px; padding: 24px 28px">
+      <div style="max-width: 640px; display: flex; flex-direction: column; gap: 8px">
+        <span style="font: 400 12px 'IBM Plex Mono', monospace; letter-spacing: 0.12em; color: #7A2420">LIVE NOW · CLOSING TONIGHT</span>
+        <h1 style="margin: 0; font-size: 42px; line-height: 1.05; font-weight: 600">Autumn Auction <span style="font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400">2026</span></h1>
+        <span style="color: #4A4D40">80 lots · WW1 to Cold War · lots close one by one from <b>Sun 9 Nov, 20:00</b>, one minute apart. A late bid adds 2 minutes to that lot only.</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px; text-align: right">
+        <span style="font-size: 13px; color: #6B6E60">Lot 1 closes in</span>
+        <span style="font: 600 30px 'IBM Plex Mono', monospace">00:42:18</span>
+        <a href="#" style="font-size: 13px">Add to calendar</a>
+      </div>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+      <button type="button" style="height: 38px; padding: 0 16px; border: 1px solid #1E2119; border-radius: 999px; background: #1E2119; color: #FFFFFF">All lots · 80</button>
+      <button type="button" style="height: 38px; padding: 0 16px; border: 1px solid #D4D4CC; border-radius: 999px; background: #FFFFFF">My bids · 3</button>
+      <button type="button" style="height: 38px; padding: 0 16px; border: 1px solid #D4D4CC; border-radius: 999px; background: #FFFFFF">Watching · 5</button>
+      <button type="button" style="height: 38px; padding: 0 16px; border: 1px solid #D4D4CC; border-radius: 999px; background: #FFFFFF">Helmets</button>
+      <button type="button" style="height: 38px; padding: 0 16px; border: 1px solid #D4D4CC; border-radius: 999px; background: #FFFFFF">Insignia</button>
+      <span style="margin-left: auto; font-size: 13px; color: #6B6E60">Sorted by lot number</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 26px 20px">
+      <sc-for list="{{lots}}" as="l" hint-placeholder-count="8">
+        <a href="Main.dc.html" style="display: flex; flex-direction: column; gap: 7px; text-decoration: none; color: #1E2119">
+          <span style="position: relative; aspect-ratio: 4 / 5; border-radius: 8px; background: {{l.tone}}; display: block">
+            <span style="position: absolute; left: 10px; top: 10px; background: #FFFFFF; border: 1px solid #D4D4CC; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600">Lot {{l.lot}}</span>
+            <span style="position: absolute; right: 10px; top: 10px; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600; background: {{l.chipBg}}; color: {{l.chipFg}}">{{l.chip}}</span>
+          </span>
+          <span style="font: 400 12px 'IBM Plex Mono', monospace; color: #7A2420">No. {{l.no}}</span>
+          <span style="font-weight: 500; line-height: 1.3">{{l.title}}</span>
+          <span style="display: flex; justify-content: space-between; gap: 8px; font-size: 14px"><b>{{l.bid}}</b><span style="color: #6B6E60">{{l.bids}}</span></span>
+          <span style="font: 500 13px 'IBM Plex Mono', monospace; color: #4A4D40">{{l.closes}}</span>
+        </a>
+      </sc-for>
+    </div>
+
+    <section style="display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #E8E8E2; padding-top: 24px">
+      <h2 style="margin: 0; font-size: 22px; font-weight: 600">Single lots <span style="font-size: 15px; color: #6B6E60; font-weight: 400">· each with its own end time</span></h2>
+      <div style="display: flex; flex-wrap: wrap; gap: 20px">
+        <a href="Main.dc.html" style="display: flex; gap: 12px; align-items: center; text-decoration: none; color: #1E2119; border: 1px solid #E8E8E2; border-radius: 12px; padding: 10px 14px 10px 10px"><span style="width: 64px; height: 64px; border-radius: 8px; background: #E2E1D9"></span><span><b>Iron Cross 1st class, screwback</b><br><span style="font-size: 13px; color: #6B6E60">€520 · 6 bids · ends in 2 days</span></span></a>
+        <a href="Main.dc.html" style="display: flex; gap: 12px; align-items: center; text-decoration: none; color: #1E2119; border: 1px solid #E8E8E2; border-radius: 12px; padding: 10px 14px 10px 10px"><span style="width: 64px; height: 64px; border-radius: 8px; background: #D4D2C6"></span><span><b>Dutch M27 helmet with lion badge</b><br><span style="font-size: 13px; color: #6B6E60">€310 · 3 bids · ends in 5 days</span></span></a>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1000}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = { leading: ['You lead', '#DCEBD9', '#1F4D3A'], outbid: ['Outbid', '#F5E7C4', '#6E4A00'], sold: ['Sold', '#1E2119', '#FFFFFF'], open: ['Open', '#FFFFFF', '#1E2119'], unsold: ['Not sold', '#ECECE5', '#4A4D40'] };
+const rows = [
+[14, '50212', 'Iron Cross 2nd class 1914', '€190', '9 bids', 'sold', 'Closed · sold', '#E2E1D9'],
+[15, '50172', 'Bundeswehr M56 Stahlhelm', '€60', '2 bids', 'unsold', 'Closed · reserve not met', '#D9D8CF'],
+[16, '50185', 'Waffenrock M10, feldgrau', '€1,180', '7 bids', 'outbid', 'Closing · 00:41', '#CFCDBF'],
+[17, '50160', 'Stahlhelm M40 Heer, ET64', '€1,450', '12 bids', 'leading', 'Closes in 07:55', '#D9D8CF'],
+[18, '50206', 'Dienstglas 6x30 binoculars', '€240', '4 bids', 'open', 'Closes in 08:55', '#DAD9D0'],
+[19, '50200', 'Zeltbahn M31, splinter camo', '€180', '3 bids', 'open', 'Closes in 09:55', '#D1D0C4'],
+[20, '50234', 'Studio portrait US paratrooper', '€45', '1 bid', 'open', 'Closes in 10:55', '#E6E3D6'],
+[21, '50165', 'Dutch M34 helmet, Korps Mariniers', '€420', '5 bids', 'leading', 'Closes in 11:55', '#E0DFD5']
+];
+return { lots: rows.map(([lot, no, title, bid, bids, st, closes, tone]) => ({ lot, no, title, bid, bids, closes, tone, chip: s[st][0], chipBg: s[st][1], chipFg: s[st][2] })) };
+}
+}
+</script>
+</body>
+</html>

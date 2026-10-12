@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Auction results</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ECECE5}
+button{font:inherit;cursor:pointer}
+a{color:#7E5416}a:hover{color:#1E2119}
+</style>
+</helmet>
+<div style="width: 1280px; height: 860px; box-sizing: border-box; background: #ECECE5; color: #1E2119; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; padding: 24px; display: flex; flex-direction: column; gap: 16px">
+  <div style="display: flex; justify-content: space-between; align-items: flex-end">
+    <div>
+      <span style="font-size: 12px; color: #4A4D40">Auctions › Autumn Auction 2026 · closed Sun 9 Nov, 21:27</span>
+      <h1 style="margin: 2px 0 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px">RESULTS</h1>
+    </div>
+    <button type="button" style="height: 36px; padding: 0 14px; border: 1px solid #D7D8CC; background: #FAFAF6; border-radius: 4px">Export CSV</button>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px">
+    <div style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 14px 16px"><span style="font-size: 11px; letter-spacing: 0.12em; color: #4A4D40">SOLD</span><b style="display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 30px">64 / 80</b></div>
+    <div style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 14px 16px"><span style="font-size: 11px; letter-spacing: 0.12em; color: #4A4D40">HAMMER TOTAL</span><b style="display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 30px">€31,940</b></div>
+    <div style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 14px 16px"><span style="font-size: 11px; letter-spacing: 0.12em; color: #4A4D40">VS. LIST PRICES</span><b style="display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 30px; color: #2F6B3A">+8%</b></div>
+    <div style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 14px 16px"><span style="font-size: 11px; letter-spacing: 0.12em; color: #4A4D40">PAID</span><b style="display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 30px">51 / 64</b></div>
+    <div style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 14px 16px"><span style="font-size: 11px; letter-spacing: 0.12em; color: #4A4D40">BACK IN SHOP</span><b style="display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 30px">16</b></div>
+  </div>
+
+  <section style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+    <div style="display: flex; gap: 8px"><button type="button" style="height: 32px; padding: 0 12px; border: 1px solid #1E2119; border-radius: 999px; background: #1E2119; color: #FFFFFF">All</button><button type="button" style="height: 32px; padding: 0 12px; border: 1px solid #D7D8CC; border-radius: 999px; background: #FFFFFF">Awaiting payment · 13</button><button type="button" style="height: 32px; padding: 0 12px; border: 1px solid #D7D8CC; border-radius: 999px; background: #FFFFFF">Overdue · 2</button><button type="button" style="height: 32px; padding: 0 12px; border: 1px solid #D7D8CC; border-radius: 999px; background: #FFFFFF">Not sold · 16</button></div>
+    <div style="display: grid; grid-template-columns: 50px 2fr 1fr 0.9fr 1.3fr 1.2fr 1.4fr; gap: 8px; font-size: 11px; letter-spacing: 0.08em; color: #4A4D40; padding: 6px 0; border-bottom: 1px solid #E3E3DA"><span>LOT</span><span>ITEM</span><span>RESULT</span><span>HAMMER</span><span>WINNER</span><span>PAYMENT</span><span>ACTION</span></div>
+    <sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
+      <div style="display: grid; grid-template-columns: 50px 2fr 1fr 0.9fr 1.3fr 1.2fr 1.4fr; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #EDEDE6">
+        <span style="font-family: 'IBM Plex Mono', monospace">{{r.lot}}</span>
+        <span>{{r.title}}</span>
+        <span>{{r.result}}</span>
+        <span style="font-weight: 600">{{r.hammer}}</span>
+        <span>{{r.winner}}</span>
+        <span style="color: {{r.payColor}}; font-weight: 500">{{r.pay}}</span>
+        <span><sc-if value="{{r.hasAction}}" hint-placeholder-val="{{true}}"><button type="button" style="height: 30px; padding: 0 10px; border: 1px solid #1E2119; border-radius: 4px; background: #FFFFFF; font-size: 13px">{{r.action}}</button></sc-if></span>
+      </div>
+    </sc-for>
+    <span style="font-size: 12px; color: #4A4D40">Winners got an e-mail and a push with their personal payment link right after their lot closed. A reminder goes out automatically after 3 days; an unpaid lot can be offered to the next-highest bidder (phase 2).</span>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":860}}'>
+class Component extends DCLogic {
+renderVals() {
+const rows = [
+[14, 'Iron Cross 2nd class 1914', 'Sold', '€190', 'J. de Vries · Bidder 4', 'Paid', '#2F6B3A', ''],
+[15, 'Bundeswehr M56 Stahlhelm', 'Reserve not met', '€60', '—', 'Back in shop', '#4A4D40', ''],
+[16, 'Waffenrock M10, feldgrau', 'Sold', '€1,230', 'M. Bauer · Bidder 12', 'Awaiting · day 2 of 5', '#8A4B12', 'Send reminder'],
+[17, 'Stahlhelm M40 Heer, ET64', 'Sold', '€1,600', 'A. Janssen · Bidder 21', 'Paid', '#2F6B3A', ''],
+[18, 'Dienstglas 6x30 binoculars', 'Sold', '€260', 'K. Peeters · Bidder 9', 'Overdue · 6 days', '#8A1F1A', 'Cancel and block bidder'],
+[19, 'Zeltbahn M31, splinter camo', 'Reserve not met', '€180', '—', 'Back in shop', '#4A4D40', '']
+];
+return { rows: rows.map(([lot, title, result, hammer, winner, pay, payColor, action]) => ({ lot, title, result, hammer, winner, pay, payColor, action, hasAction: !!action })) };
+}
+}
+</script>
+</body>
+</html>

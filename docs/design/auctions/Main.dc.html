@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Auction lot page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFFFF}
+button{font:inherit;cursor:pointer}
+a{color:#1E2119}a:hover{color:#1F4D3A}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #FFFFFF; color: #1E2119; font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 15px">
+  <header style="border-bottom: 1px solid #E8E8E2">
+    <div style="max-width: 1240px; margin: 0 auto; padding: 16px 24px; display: flex; flex-wrap: wrap; gap: 14px 26px; align-items: center">
+      <strong style="font-size: 19px">Concept Militaria</strong>
+      <nav aria-label="Shop" style="display: flex; flex-wrap: wrap; gap: 18px; font-size: 14px; flex-grow: 1">
+        <a href="#" style="text-decoration: none">Shop</a><a href="#" style="text-decoration: none">Helmets</a><a href="#" style="text-decoration: none">Uniforms</a><a href="Catalogue.dc.html" aria-current="page" style="text-decoration: none; font-weight: 600">Auctions</a><a href="#" style="text-decoration: none">Archive</a>
+      </nav>
+      <a href="#" style="display: inline-flex; align-items: center; height: 40px; padding: 0 16px; border-radius: 999px; background: #1E2119; color: #FFFFFF; text-decoration: none; font-weight: 600">Cart</a>
+    </div>
+  </header>
+
+  <main style="max-width: 1240px; margin: 0 auto; padding: 20px 24px 64px; display: flex; flex-direction: column; gap: 18px">
+    <span style="font-size: 13px; color: #6B6E60"><a href="Catalogue.dc.html">Autumn Auction 2026</a> / Lot 17 of 80</span>
+    <div style="display: flex; flex-wrap: wrap; gap: 40px">
+      <div style="flex: 1 1 440px; display: flex; flex-direction: column; gap: 10px">
+        <span style="aspect-ratio: 4 / 3; border-radius: 10px; background: #D9D8CF; display: block; position: relative">
+          <span style="position: absolute; left: 12px; top: 12px; background: #1E2119; color: #FFFFFF; border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 600">Lot 17</span>
+        </span>
+        <div style="display: flex; gap: 8px"><span style="width: 84px; height: 84px; border-radius: 6px; background: #D9D8CF; outline: 2px solid #1E2119"></span><span style="width: 84px; height: 84px; border-radius: 6px; background: #E2E1D9"></span><span style="width: 84px; height: 84px; border-radius: 6px; background: #CFCDBF"></span></div>
+      </div>
+
+      <div style="flex: 1 1 420px; display: flex; flex-direction: column; gap: 16px">
+        <span style="font: 400 12px 'IBM Plex Mono', monospace; color: #7A2420">No. 50160 · Steel helmets · WW2 · Germany</span>
+        <h1 style="margin: 0; font-size: 36px; line-height: 1.1; font-weight: 600">Stahlhelm M40 Heer, ET64</h1>
+
+        <section aria-label="Bidding" style="border: 1px solid #DCDCD4; border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap">
+            <div style="display: flex; flex-direction: column; gap: 2px">
+              <span style="font-size: 13px; color: #6B6E60">Current bid · {{bidCount}} bids</span>
+              <span style="font-size: 34px; font-weight: 700">{{current}}</span>
+              <span style="font-size: 13px; color: {{reserveColor}}">{{reserveText}}</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 2px; text-align: right">
+              <span style="font-size: 13px; color: #6B6E60">Closes in</span>
+              <span style="font: 600 28px 'IBM Plex Mono', monospace">{{clock}}</span>
+              <span style="font-size: 12px; color: #6B6E60">Sun 9 Nov, 20:16 · a bid in the last 2 min adds 2 min</span>
+            </div>
+          </div>
+
+          <div role="status" style="border-radius: 10px; padding: 10px 12px; font-size: 14px; font-weight: 600; background: {{statusBg}}; color: {{statusFg}}">{{statusText}}</div>
+
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #4A4D40">Your maximum bid — we bid for you, step by step, up to this amount
+            <span style="display: flex; gap: 8px">
+              <input type="text" inputmode="decimal" value="{{suggest}}" style="flex-grow: 1; height: 50px; border: 1px solid #1E2119; border-radius: 999px; padding: 0 18px; font: 600 18px 'Hanken Grotesk', sans-serif; color: #1E2119; background: #FFFFFF">
+              <button type="button" onClick="{{bid}}" style="height: 50px; padding: 0 24px; border: 0; border-radius: 999px; background: #1F4D3A; color: #FFFFFF; font-weight: 600">Place bid</button>
+            </span>
+          </label>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap">
+            <button type="button" onClick="{{bid}}" style="height: 38px; padding: 0 14px; border: 1px solid #D4D4CC; border-radius: 999px; background: #FFFFFF">{{quick1}}</button>
+            <button type="button" onClick="{{bid}}" style="height: 38px; padding: 0 14px; border: 1px solid #D4D4CC; border-radius: 999px; background: #FFFFFF">{{quick2}}</button>
+            <button type="button" onClick="{{bid}}" style="height: 38px; padding: 0 14px; border: 1px solid #D4D4CC; border-radius: 999px; background: #FFFFFF">{{quick3}}</button>
+          </div>
+          <span style="font-size: 12px; color: #6B6E60">Next minimum bid {{nextMin}} · steps of €50 above €1,000 · no buyer's premium: the hammer price is what you pay, plus shipping · <a href="#">Auction terms</a></span>
+        </section>
+
+        <section aria-label="Bid history" style="display: flex; flex-direction: column; gap: 6px">
+          <strong style="font-size: 15px">Bid history</strong>
+          <sc-for list="{{history}}" as="h" hint-placeholder-count="4">
+            <div style="display: flex; justify-content: space-between; font-size: 14px; padding: 6px 0; border-bottom: 1px solid #EFEFE9">
+              <span style="color: {{h.color}}; font-weight: {{h.weight}}">{{h.who}}</span><span style="color: #6B6E60">{{h.when}}</span><span style="font-weight: 600">{{h.amount}}</span>
+            </div>
+          </sc-for>
+          <span style="font-size: 12px; color: #6B6E60">Bidders are shown by number. Automatic bids from a maximum are marked “auto”.</span>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1000}}'>
+class Component extends DCLogic {
+constructor(p) { super(p); this.state = { mine: false }; }
+renderVals() {
+const mine = this.state.mine;
+const current = mine ? '€1,450' : '€1,400';
+const base = [
+{ who: 'Bidder 12', when: '20:09:41', amount: '€1,400', color: '#1E2119', weight: '400' },
+{ who: 'Bidder 7 (auto)', when: '20:09:41', amount: '€1,350', color: '#1E2119', weight: '400' },
+{ who: 'Bidder 12', when: '19:58:02', amount: '€1,300', color: '#1E2119', weight: '400' },
+{ who: 'Bidder 3', when: '18:44:15', amount: '€1,150', color: '#1E2119', weight: '400' }
+];
+const history = mine ? [{ who: 'You (Bidder 21, max €1,600)', when: '20:10:05', amount: '€1,450', color: '#1F4D3A', weight: '700' }].concat(base) : base;
+return {
+current, bidCount: mine ? 12 : 11,
+reserveText: mine ? 'Reserve met — this lot will sell' : 'Reserve not met yet',
+reserveColor: mine ? '#2F6B3A' : '#8A4B12',
+clock: mine ? '07:55' : '06:12',
+statusText: mine ? 'You are the highest bidder. We bid for you up to €1,600. (Time extended by 2 min.)' : 'Not bidding yet. Bidder 12 leads.',
+statusBg: mine ? '#DCEBD9' : '#F3F3EE',
+statusFg: mine ? '#1F4D3A' : '#4A4D40',
+suggest: mine ? '€ 1,600' : '€ 1,450',
+nextMin: mine ? '€1,500' : '€1,450',
+quick1: mine ? 'Bid €1,500' : 'Bid €1,450', quick2: mine ? 'Bid €1,550' : 'Bid €1,500', quick3: mine ? 'Bid €1,600' : 'Bid €1,550',
+history,
+bid: () => this.setState({ mine: true })
+};
+}
+}
+</script>
+</body>
+</html>

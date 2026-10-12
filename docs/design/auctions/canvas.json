@@ -1,0 +1,20 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-10-12T10:00:00Z" },
+  "title": "Auctions",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1280, "h": 1000, "title": "1 · Lot page — live bidding with a max bid", "expand": "fill", "is_interactive": true },
+    "Catalogue.dc.html": { "x": 1360, "y": 0, "w": 1280, "h": 1000, "title": "2 · Auction day — catalogue, lots close one by one", "expand": "fill" },
+    "Phone.dc.html": { "x": 2720, "y": 0, "w": 390, "h": 844, "title": "3 · Phone — bid, get outbid, win, pay", "is_interactive": true },
+    "AdminAuction.dc.html": { "x": 0, "y": 1300, "w": 1280, "h": 1000, "title": "4 · Admin — set up an auction and watch it live" },
+    "AdminResults.dc.html": { "x": 1360, "y": 1300, "w": 1280, "h": 860, "title": "5 · Admin — results and payments after closing" }
+  },
+  "order": ["Main.dc.html", "Catalogue.dc.html", "Phone.dc.html", "AdminAuction.dc.html", "AdminResults.dc.html"],
+  "notes": {
+    "row1": { "x": 0, "y": -300, "text": "Bidding — shop side", "kind": "title1", "maxW": 3110 },
+    "row2": { "x": 0, "y": 1000, "text": "Running an auction — admin side", "kind": "title1", "maxW": 2640 }
+  },
+  "designSystems": []
+}

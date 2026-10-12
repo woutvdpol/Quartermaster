@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Auction admin</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ECECE5}
+button{font:inherit;cursor:pointer}
+a{color:#7E5416}a:hover{color:#1E2119}
+</style>
+</helmet>
+<div style="width: 1280px; height: 1000px; box-sizing: border-box; background: #ECECE5; color: #1E2119; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; display: flex">
+  <nav aria-label="Admin" style="width: 220px; flex-shrink: 0; background: #2F3526; color: #D9DCCB; padding: 18px 14px; display: flex; flex-direction: column; gap: 4px; box-sizing: border-box">
+    <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: 0.04em; padding: 4px 10px 16px">QUARTERMASTER</span>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; text-decoration: none">Inventory</a>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; text-decoration: none">Orders</a>
+    <a href="#" aria-current="page" style="color: #FFFFFF; background: #3E4532; padding: 8px 10px; border-radius: 4px; font-weight: 600; text-decoration: none">Auctions</a>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; text-decoration: none">Fairs</a>
+    <a href="#" style="color: #D9DCCB; padding: 8px 10px; text-decoration: none">Customers</a>
+  </nav>
+  <main style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column">
+    <header style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; border-bottom: 1px solid #D7D8CC; background: #FAFAF6">
+      <div>
+        <span style="font-size: 12px; color: #4A4D40">Auctions › Auction day</span>
+        <h1 style="margin: 2px 0 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px">AUTUMN AUCTION 2026</h1>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center">
+        <span style="padding: 5px 12px; border-radius: 999px; background: #DCEBD9; color: #2F6B3A; font-size: 13px; font-weight: 600">● Live · bidding open</span>
+        <button type="button" style="height: 36px; padding: 0 14px; border: 1px solid #D7D8CC; background: #FAFAF6; border-radius: 4px">View in shop</button>
+      </div>
+    </header>
+
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; padding: 20px 24px">
+      <section style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; justify-content: space-between; align-items: center"><h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #4A4D40">LOTS · 80</h2><button type="button" style="height: 32px; padding: 0 12px; border: 1px solid #1E2119; border-radius: 4px; background: #FFFFFF">+ Add lots from inventory</button></div>
+        <div style="display: grid; grid-template-columns: 50px 2.2fr 0.9fr 0.9fr 0.9fr 0.7fr 1fr; gap: 8px; font-size: 11px; letter-spacing: 0.08em; color: #4A4D40; padding: 6px 0; border-bottom: 1px solid #E3E3DA"><span>LOT</span><span>ITEM</span><span>START</span><span>RESERVE</span><span>CURRENT</span><span>BIDS</span><span>CLOSES</span></div>
+        <sc-for list="{{lots}}" as="l" hint-placeholder-count="7">
+          <div style="display: grid; grid-template-columns: 50px 2.2fr 0.9fr 0.9fr 0.9fr 0.7fr 1fr; gap: 8px; align-items: center; padding: 7px 0; border-bottom: 1px solid #EDEDE6">
+            <span style="font-family: 'IBM Plex Mono', monospace">{{l.lot}}</span>
+            <span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #7A2420">No. {{l.no}}</span><br>{{l.title}}</span>
+            <span>{{l.start}}</span><span>{{l.reserve}}</span><span style="font-weight: 600; color: {{l.curColor}}">{{l.current}}</span><span>{{l.bids}}</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px">{{l.closes}}</span>
+          </div>
+        </sc-for>
+        <span style="font-size: 12px; color: #4A4D40">Start price defaults to 60% of the list price, reserve to your purchase price + 10% — change per lot. Lots are hidden in the webshop from the moment the auction is published.</span>
+      </section>
+
+      <aside style="display: flex; flex-direction: column; gap: 16px">
+        <section style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+          <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #4A4D40">SETTINGS</h2>
+          <span style="display: flex; justify-content: space-between"><span style="color: #4A4D40">Type</span><b>Auction day</b></span>
+          <span style="display: flex; justify-content: space-between"><span style="color: #4A4D40">Opens</span><b>Sat 1 Nov, 10:00</b></span>
+          <span style="display: flex; justify-content: space-between"><span style="color: #4A4D40">First lot closes</span><b>Sun 9 Nov, 20:00</b></span>
+          <span style="display: flex; justify-content: space-between"><span style="color: #4A4D40">Gap between lots</span><b>1 min</b></span>
+          <span style="display: flex; justify-content: space-between"><span style="color: #4A4D40">Late-bid extension</span><b>2 min</b></span>
+          <span style="display: flex; justify-content: space-between"><span style="color: #4A4D40">Buyer's premium</span><b>none</b></span>
+          <span style="display: flex; justify-content: space-between"><span style="color: #4A4D40">Pay within</span><b>5 days</b></span>
+          <span style="display: flex; justify-content: space-between"><span style="color: #4A4D40">Unsold lots</span><b>back to the webshop</b></span>
+          <a href="#">Auction terms page</a>
+        </section>
+        <section style="background: #FAFAF6; border: 1px solid #D7D8CC; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+          <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.12em; color: #4A4D40">LIVE</h2>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+            <span><b style="display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 30px">312</b><span style="font-size: 12px; color: #4A4D40">bids</span></span>
+            <span><b style="display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 30px">47</b><span style="font-size: 12px; color: #4A4D40">bidders</span></span>
+            <span><b style="display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 30px">€24,180</b><span style="font-size: 12px; color: #4A4D40">current total</span></span>
+            <span><b style="display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 30px">61</b><span style="font-size: 12px; color: #4A4D40">lots above reserve</span></span>
+          </div>
+        </section>
+        <section style="background: #F5E7C4; border: 1px solid #E5D3A3; border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; color: #6E4A00">
+          <strong style="font-size: 13px">Check this (1)</strong>
+          <span style="font-size: 13px">Bidder 31 and Bidder 33 bid from the same device on 4 lots, always against each other.</span>
+          <span style="display: flex; gap: 8px"><button type="button" style="height: 30px; padding: 0 10px; border: 1px solid #6E4A00; border-radius: 4px; background: #FFFFFF; color: #6E4A00">Review bids</button><button type="button" style="height: 30px; padding: 0 10px; border: 1px solid #6E4A00; border-radius: 4px; background: transparent; color: #6E4A00">Block both</button></span>
+        </section>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1000}}'>
+class Component extends DCLogic {
+renderVals() {
+const rows = [
+[14, '50212', 'Iron Cross 2nd class 1914', '€90', '€110', '€190', 9, 'closed · sold', '#2F6B3A'],
+[15, '50172', 'Bundeswehr M56 Stahlhelm', '€30', '€70', '€60', 2, 'closed · not met', '#8A4B12'],
+[16, '50185', 'Waffenrock M10, feldgrau', '€800', '€900', '€1,180', 7, '20:15:00', '#1E2119'],
+[17, '50160', 'Stahlhelm M40 Heer, ET64', '€870', '€970', '€1,450', 12, '20:18:00 (+2)', '#1E2119'],
+[18, '50206', 'Dienstglas 6x30 binoculars', '€230', '€250', '€240', 4, '20:19:00', '#8A4B12'],
+[19, '50200', 'Zeltbahn M31, splinter camo', '€200', '€210', '€180', 3, '20:20:00', '#8A4B12'],
+[20, '50234', 'Studio portrait US paratrooper', '€20', '—', '€45', 1, '20:21:00', '#1E2119']
+];
+return { lots: rows.map(([lot, no, title, start, reserve, current, bids, closes, curColor]) => ({ lot, no, title, start, reserve, current, bids, closes, curColor })) };
+}
+}
+</script>
+</body>
+</html>
