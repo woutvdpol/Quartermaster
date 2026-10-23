@@ -61,20 +61,20 @@ check:
     - npm run typecheck
     - npm test
 
+# Rootless BuildKit in the job container itself: no Docker daemon, no privileged pod. The runner gives the
+# build container Unconfined seccomp/AppArmor, which rootlesskit needs for its user namespace.
 .build:
   stage: build
-  image: docker:27
-  services:
-    - docker:27-dind
+  image:
+    name: moby/buildkit:v0.34.0-rootless
+    entrypoint: [""]
   timeout: 45m
   variables:
-    DOCKER_TLS_CERTDIR: "/certs"
-    DOCKER_BUILDKIT: "1"
+    BUILDKITD_FLAGS: --oci-worker-no-process-sandbox
   before_script:
-    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-    # buildx can't build a builder from the dind TLS environment directly: wrap it in a context first.
-    - docker context create qm-ctx
-    - docker buildx create --use --driver docker-container --name qm qm-ctx
+    # buildctl reads registry credentials from the Docker config.
+    - mkdir -p ~/.docker
+    - printf '{"auths":{"%s":{"auth":"%s"}}}' "$CI_REGISTRY" "$(printf '%s:%s' "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')" > ~/.docker/config.json
   script:
     - |
       set -eu
@@ -84,18 +84,18 @@ check:
       PUSH="${PUSH_IMAGES:-true}"
       CACHE="$CI_REGISTRY_IMAGE/cache"
       build() { # build <target> <image>
-        target="$1"; image="$2"; tag_args=""
-        for t in $TAGS; do tag_args="$tag_args -t $image:$t"; done
-        docker buildx build . \
-          --target "$target" \
-          --build-arg NEXT_DEPLOYMENT_ID="$CI_COMMIT_SHORT_SHA" \
-          --build-arg NEXT_COMPRESS="${NEXT_COMPRESS:-true}" \
-          --cache-from "type=registry,ref=$CACHE:$target" \
-          --cache-to "type=registry,ref=$CACHE:$target,mode=max" \
-          --label "org.opencontainers.image.revision=$CI_COMMIT_SHA" \
-          --label "org.opencontainers.image.source=$CI_PROJECT_URL" \
-          $tag_args \
-          $( [ "$PUSH" = "true" ] && echo --push || echo --load )
+        target="$1"; image="$2"; names=""
+        for t in $TAGS; do names="${names:+$names,}$image:$t"; done
+        buildctl-daemonless.sh build \
+          --frontend dockerfile.v0 --local context=. --local dockerfile=. \
+          --opt target="$target" \
+          --opt build-arg:NEXT_DEPLOYMENT_ID="$CI_COMMIT_SHORT_SHA" \
+          --opt build-arg:NEXT_COMPRESS="${NEXT_COMPRESS:-true}" \
+          --import-cache "type=registry,ref=$CACHE:$target" \
+          --export-cache "type=registry,ref=$CACHE:$target,mode=max" \
+          --opt label:org.opencontainers.image.revision="$CI_COMMIT_SHA" \
+          --opt label:org.opencontainers.image.source="$CI_PROJECT_URL" \
+          --output "type=image,\"name=$names\",push=$PUSH"
       }
       for spec in $IMAGES; do
         target="${spec%%=*}"; suffix="${spec#*=}"
