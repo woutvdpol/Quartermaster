@@ -5,12 +5,14 @@ import { NewsletterForm } from "./NewsletterForm";
 import { layoutCopies } from "./_copy";
 
 /**
- * Shown instead of every shop page while the shop is still being set up (src/server/storefront/launch.ts).
- * Themed with the shop's own tokens; the shop name (or logo), a short note, the contact email and — when
- * the shop has the newsletter feature — a sign-up so visitors hear when it opens.
+ * Shown instead of every shop page while the shop is still being set up, or closed after its free trial
+ * (`closed`; src/server/storefront/launch.ts). Themed with the shop's own tokens; the shop name (or logo),
+ * a short note, the contact email and — when the shop has the newsletter feature — a sign-up so visitors
+ * hear when it opens.
  */
-export function OpeningSoon({ shop }: { shop: ShopContext }) {
-  const t = pickCopy(layoutCopies, shop.locale).openingSoon;
+export function OpeningSoon({ shop, closed = false }: { shop: ShopContext; closed?: boolean }) {
+  const copy = pickCopy(layoutCopies, shop.locale);
+  const t = closed ? { ...copy.openingSoon, ...copy.temporarilyClosed } : copy.openingSoon;
   const { appearance, general, features } = shop.settings;
   return (
     <main id="main" className="grid min-h-dvh place-items-center bg-shop-bg px-6 py-16 text-shop-ink">
@@ -41,20 +43,33 @@ export function OpeningSoon({ shop }: { shop: ShopContext }) {
   );
 }
 
-/** Staff-only notice on a shop that is not live yet (English, like the admin). Same bar as the theme-preview ribbon (never both). */
-export function NotLiveRibbon() {
+/** Staff-only notice on a shop that is not live yet or closed after its trial (English, like the admin). Same bar as the theme-preview ribbon (never both). */
+export function NotLiveRibbon({ closed = false }: { closed?: boolean }) {
   return (
     <div
       role="status"
       className="fixed inset-x-0 bottom-0 z-[60] flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-[#1c1a16] px-4 py-1.5 text-center text-xs font-medium text-white"
       style={{ fontFamily: "system-ui, sans-serif" }}
     >
-      <span>
-        <strong className="font-semibold">Not live yet</strong> · only you can see this shop — visitors see “Opening soon”
-      </span>
-      <Link href="/admin/setup" prefetch={false} className="underline underline-offset-2">
-        Finish setup
-      </Link>
+      {closed ? (
+        <>
+          <span>
+            <strong className="font-semibold">Trial ended</strong> · only you can see this shop — visitors see “Temporarily closed”
+          </span>
+          <Link href="/admin" prefetch={false} className="underline underline-offset-2">
+            Open admin
+          </Link>
+        </>
+      ) : (
+        <>
+          <span>
+            <strong className="font-semibold">Not live yet</strong> · only you can see this shop — visitors see “Opening soon”
+          </span>
+          <Link href="/admin/setup" prefetch={false} className="underline underline-offset-2">
+            Finish setup
+          </Link>
+        </>
+      )}
     </div>
   );
 }

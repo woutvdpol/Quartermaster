@@ -61,6 +61,10 @@ export const layoutCopyNl: CopyShape<typeof layoutCopy> = {
     notify: "Laat uw e-mailadres achter, dan laten we u weten wanneer we opengaan.",
     questions: "Vragen?",
   },
+  temporarilyClosed: {
+    eyebrow: "Tijdelijk gesloten",
+    body: "Onze shop is op dit moment gesloten. Kom snel terug.",
+  },
   ageGate: {
     title: (age: number) => `Bent u ${age} jaar of ouder?`,
     body: (shop: string, age: number) =>

@@ -16,6 +16,9 @@ import {
   setTenantPlan,
   setTenantModule,
   addNewsletterCredits,
+  extendTrial,
+  endTrialNow,
+  convertTrial,
 } from "@/server/platform";
 import { allowNetwork, removeFromNetwork } from "@/server/network/admin";
 import { fail, failFrom } from "../_system/errors";
@@ -229,4 +232,40 @@ export async function addNewsletterCreditsAction(tenantId: string, _prev: Action
   }
   revalidatePath(BASE, "layout");
   return actionOk(`Credits updated. Balance: ${balance.toLocaleString("en-NL")} mails.`);
+}
+
+// ─── Free trial (docs/signup-modes.md) ──────────────────────────────────────
+
+export async function extendTrialAction(formData: FormData): Promise<ActionResult> {
+  const days = Number(formString(formData, "days"));
+  try {
+    await extendTrial(await requirePlatformContext(), formString(formData, "tenantId"), days);
+  } catch (err) {
+    return failFrom(err);
+  }
+  revalidatePath(BASE, "layout");
+  revalidatePath("/admin", "layout"); // trial banner in the shop admin
+  return actionOk(`Trial extended by ${days} ${days === 1 ? "day" : "days"}.`);
+}
+
+export async function endTrialNowAction(formData: FormData): Promise<ActionResult> {
+  try {
+    await endTrialNow(await requirePlatformContext(), formString(formData, "tenantId"));
+  } catch (err) {
+    return failFrom(err);
+  }
+  revalidatePath(BASE, "layout");
+  revalidatePath("/admin", "layout");
+  return actionOk("Trial ended. The storefront is closed for visitors.");
+}
+
+export async function convertTrialAction(formData: FormData): Promise<ActionResult> {
+  try {
+    await convertTrial(await requirePlatformContext(), formString(formData, "tenantId"));
+  } catch (err) {
+    return failFrom(err);
+  }
+  revalidatePath(BASE, "layout");
+  revalidatePath("/admin", "layout");
+  return actionOk("Converted to a paid shop. Its storefront stays open.");
 }

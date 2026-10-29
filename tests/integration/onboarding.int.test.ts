@@ -4,7 +4,7 @@ import { AuthError } from "@/server/auth/guards";
 import { ServiceError, type ServiceContext } from "@/server/context";
 import { getSettings } from "@/server/settings";
 import { verifyPassword } from "@/server/auth/password";
-import type { PlatformContext } from "@/server/platform";
+import { convertTrial, endTrialNow, extendTrial, updateSignupConfig, type PlatformContext } from "@/server/platform";
 import {
   acceptDealerInvite,
   applyShippingTemplate,
@@ -18,6 +18,7 @@ import {
   rejectApplication,
   requestOwnDomain,
   resendDealerInvite,
+  runTrialNotices,
   saveBasicsStep,
   saveBusinessStep,
   submitApplication,
@@ -136,9 +137,9 @@ describe("dealer sign-up", () => {
     await db.user.update({ where: { id: a.actor.id }, data: { disabledAt: new Date() } });
     const token = await submitAndGetToken();
     h.mails.length = 0;
-    expect(await verifyApplicationEmail(token, nextIp())).toBe("verified");
-    expect(await verifyApplicationEmail(token, nextIp())).toBe("already_verified");
-    expect(await verifyApplicationEmail(token.slice(0, -3) + "abc", nextIp())).toBe("invalid");
+    expect(await verifyApplicationEmail(token, nextIp())).toEqual({ status: "verified" });
+    expect(await verifyApplicationEmail(token, nextIp())).toEqual({ status: "already_verified" });
+    expect(await verifyApplicationEmail(token.slice(0, -3) + "abc", nextIp())).toEqual({ status: "invalid" });
     await h.drain();
     expect(h.mails).toHaveLength(1);
     expect(h.mails[0].subject).toContain("New dealer application");
@@ -342,5 +343,115 @@ describe("setup wizard", () => {
     // A shop that predates the wizard (setupState null).
     expect(await getPendingSetup(otherOwner)).toBeNull();
     expect(await getPendingSetup(ownerCtx(tenant.id, owner.id, owner.email))).not.toBeNull();
+  });
+});
+
+describe("sign-up modes", () => {
+  /** Sets the mode with a fresh SUPERADMIN (the only one, so one notice per event) and returns it. */
+  async function setMode(signupMode: "APPLY" | "WAITLIST" | "TRIAL", trialDays = 30) {
+    const root = await superadmin();
+    await updateSignupConfig(root, { signupMode, trialDays });
+    h.mails.length = 0;
+    return root;
+  }
+
+  it("validates the config and is SUPERADMIN-only", async () => {
+    const root = await superadmin();
+    await expectServiceError(updateSignupConfig(root, { signupMode: "TRIAL", trialDays: 0 }), "INVALID");
+    const ctx = await createTenantContext();
+    await expect(updateSignupConfig({ actor: { ...ctx.actor, tenantId: ctx.tenantId } } as PlatformContext, { signupMode: "TRIAL", trialDays: 30 })).rejects.toThrow();
+  });
+
+  it("waitlist: no ping per sign-up, invite creates a normal shop", async () => {
+    const root = await setMode("WAITLIST");
+    const token = await submitAndGetToken();
+    expect(h.mails.at(-1)?.subject).toContain("waitlist");
+    expect(await db.dealerApplication.findFirstOrThrow()).toMatchObject({ status: "WAITLISTED", signupMode: "WAITLIST" });
+    h.mails.length = 0;
+    expect(await verifyApplicationEmail(token, nextIp())).toEqual({ status: "waitlisted" });
+    await h.drain();
+    expect(h.mails).toHaveLength(0);
+
+    const [app] = await listApplications(root, "WAITLISTED");
+    const res = await approveApplication(root, app.id);
+    expect(res.tenant.trialEndsAt).toBeNull();
+    expect(await db.tenantPlan.findUniqueOrThrow({ where: { tenantId: res.tenant.id } })).toMatchObject({ plan: "START" });
+  });
+
+  it("trial: verification creates the shop and sends the applicant to the invite page", async () => {
+    await setMode("TRIAL", 30);
+    const token = await submitAndGetToken();
+    h.mails.length = 0;
+    const res = await verifyApplicationEmail(token, nextIp());
+    expect(res.status).toBe("trial");
+    if (res.status !== "trial") return;
+    const url = new URL(res.redirectTo);
+    expect(url.host).toBe("vries-militaria.shops.test");
+    expect(url.pathname).toBe("/admin/accept-invite");
+
+    const app = await db.dealerApplication.findFirstOrThrow({ include: { tenant: true } });
+    expect(app).toMatchObject({ status: "APPROVED", reviewedById: null, signupMode: "TRIAL" });
+    const days = (app.tenant!.trialEndsAt!.getTime() - Date.now()) / 86_400_000;
+    expect(days).toBeGreaterThan(29.9);
+    expect(days).toBeLessThanOrEqual(30);
+    expect(await db.tenantPlan.findUniqueOrThrow({ where: { tenantId: app.tenantId! } })).toMatchObject({ plan: "COMPLETE" });
+
+    await h.drain();
+    expect(h.mails.map((m) => m.subject).sort()).toEqual(["New trial shop: Vries Militaria", "Your shop Vries Militaria is ready"].sort());
+    expect(await verifyApplicationEmail(token, nextIp())).toEqual({ status: "already_created" });
+
+    const owner = await db.user.findFirstOrThrow({ where: { tenantId: app.tenantId!, role: "OWNER" } });
+    expect(await acceptDealerInvite(url.searchParams.get("token")!, "a-long-password-123", { tenantId: app.tenantId! })).toEqual({ ok: true, userId: owner.id });
+  });
+
+  it("trial: suspicious applications wait for review with the reason in the note", async () => {
+    const ctx = await createTenantContext();
+    await db.user.create({ data: { tenantId: ctx.tenantId, role: "OWNER", email: application.email } });
+    const root = await setMode("TRIAL");
+    const token = await submitAndGetToken();
+    h.mails.length = 0;
+    expect(await verifyApplicationEmail(token, nextIp())).toEqual({ status: "verified" });
+    const app = await db.dealerApplication.findFirstOrThrow();
+    expect(app.status).toBe("PENDING");
+    expect(app.tenantId).toBeNull();
+    expect(app.internalNote).toContain("email address already known");
+    await h.drain();
+    expect(h.mails[0]?.subject).toContain("New dealer application");
+
+    // Approving it by hand still starts the trial.
+    const res = await approveApplication(root, app.id);
+    expect(res.tenant.trialEndsAt).not.toBeNull();
+  });
+
+  it("trial: reminder and ended mails once each; superadmin can extend, end and convert", async () => {
+    const root = await setMode("TRIAL");
+    const token = await submitAndGetToken();
+    await verifyApplicationEmail(token, nextIp());
+    const { tenantId } = await db.dealerApplication.findFirstOrThrow();
+    await h.drain();
+    h.mails.length = 0;
+
+    const day = 86_400_000;
+    await db.tenant.update({ where: { id: tenantId! }, data: { trialEndsAt: new Date(Date.now() + 6 * day) } });
+    expect(await runTrialNotices()).toEqual({ notices: 1 });
+    expect(await runTrialNotices()).toEqual({ notices: 0 });
+    await h.drain();
+    expect(h.mails.map((m) => m.subject)).toEqual([expect.stringContaining("Your Quartermaster trial ends on")]);
+
+    h.mails.length = 0;
+    await endTrialNow(root, tenantId!);
+    expect(await runTrialNotices()).toEqual({ notices: 1 });
+    await h.drain();
+    expect(h.mails.map((m) => m.subject).sort()).toEqual(["Trial ended: Vries Militaria", "Your Quartermaster trial for Vries Militaria has ended"].sort());
+    await expectServiceError(endTrialNow(root, tenantId!), "INVALID");
+
+    const ends = await extendTrial(root, tenantId!, 14);
+    expect(ends.getTime()).toBeGreaterThan(Date.now() + 13.9 * day);
+    expect(await db.tenant.findUniqueOrThrow({ where: { id: tenantId! } })).toMatchObject({ trialNotices: 0 });
+
+    await convertTrial(root, tenantId!);
+    expect(await db.tenant.findUniqueOrThrow({ where: { id: tenantId! } })).toMatchObject({ trialEndsAt: null });
+    await expectServiceError(convertTrial(root, tenantId!), "INVALID");
+    expect(await db.auditLog.count({ where: { tenantId: tenantId!, action: { startsWith: "trial." } } })).toBeGreaterThanOrEqual(4);
   });
 });

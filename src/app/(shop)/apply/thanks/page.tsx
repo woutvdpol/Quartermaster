@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getSignupConfig } from "@/server/platform/signup";
 import { getRequestScope } from "@/server/tenant";
 import { PlatformCard, PlatformShell } from "../../_platform/PlatformShell";
 import { applyCopy } from "../_copy";
@@ -9,15 +10,16 @@ const t = applyCopy.thanks;
 
 export const metadata: Metadata = { title: { absolute: "Application received — Quartermaster" }, robots: { index: false, follow: false } };
 
-/** Confirmation after a sign-up (no personal data in the URL). */
+/** Confirmation after a sign-up (no personal data in the URL); text per sign-up mode. */
 export default async function ApplyThanksPage() {
   if ((await getRequestScope()).kind !== "platform") notFound();
+  const mode = applyCopy.modes[(await getSignupConfig()).signupMode].thanks;
   return (
     <PlatformShell>
       <div className="mx-auto max-w-xl px-4 py-14 sm:px-6">
-        <PlatformCard title={t.title}>
+        <PlatformCard title={mode.title}>
           <div className="grid gap-3 text-[15px] text-[#33352c]">
-            {t.body.map((p) => (
+            {mode.body.map((p) => (
               <p key={p}>{p}</p>
             ))}
             <p className="text-sm text-[#666A5A]">{t.noMail}</p>

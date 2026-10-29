@@ -40,16 +40,26 @@ function describedBy(id: string, hint?: string, error?: string) {
   return [error ? `${id}-error` : null, hint ? `${id}-hint` : null].filter(Boolean).join(" ") || undefined;
 }
 
-function Submit() {
+function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
     <button type="submit" className={`${platformButtonClass} w-full`} disabled={pending} aria-disabled={pending}>
-      {pending ? t.submitting : t.submit}
+      {pending ? t.submitting : label}
     </button>
   );
 }
 
-export function ApplyForm({ countries, platforms }: { countries: Option[]; platforms: Option[] }) {
+export function ApplyForm({
+  countries,
+  platforms,
+  submitLabel,
+  footnote,
+}: {
+  countries: Option[];
+  platforms: Option[];
+  submitLabel: string;
+  footnote: string;
+}) {
   const [state, formAction] = useActionState<ApplyFormState, FormData>(submitApplicationAction, null);
   const v = state?.values ?? {};
   const fe = state?.fieldErrors ?? {};
@@ -199,8 +209,8 @@ export function ApplyForm({ countries, platforms }: { countries: Option[]; platf
       </div>
 
       <Turnstile action="apply" resetKey={state?.attempt} />
-      <Submit />
-      <p className="text-center text-xs text-[#666A5A]">{t.footnote}</p>
+      <Submit label={submitLabel} />
+      <p className="text-center text-xs text-[#666A5A]">{footnote}</p>
     </form>
   );
 }

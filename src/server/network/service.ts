@@ -11,7 +11,7 @@ import { toShopImage } from "@/components/shop/catalog/to-card";
 import type { ShopImage } from "@/components/shop/ui/types";
 import { dealerProductUrl, dealerShopUrl } from "@/lib/network";
 import {
-  NETWORK_TENANT_WHERE,
+  networkTenantWhere,
   facetValueIdsFor,
   networkExclusionFor,
   networkFacetOptions,
@@ -88,7 +88,7 @@ export type NetworkSearchResult = {
 /** Opted-in, live dealers with what the network needs about them. Uncached (tests, scripts). */
 export async function loadNetworkDirectory(): Promise<NetworkDirectory> {
   const tenants = await db.tenant.findMany({
-    where: NETWORK_TENANT_WHERE,
+    where: networkTenantWhere(),
     select: {
       id: true,
       slug: true,

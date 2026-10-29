@@ -4,3 +4,5 @@ export * from "./invite";
 export * from "./setup";
 export * from "./rules";
 export * from "./setup-rules";
+export * from "./trial-rules";
+export * from "./trials";

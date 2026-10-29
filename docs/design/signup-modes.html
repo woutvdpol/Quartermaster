@@ -1,0 +1,292 @@
+<title>Aanmeldmodus Quartermaster</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: één kolom ontwerpdocument; mock-schermen als losse panelen, flows als stappenrijen. */
+:root {
+  --bg: #F3F3EE; --panel: #FBFBF8; --ink: #1E2421; --ink-2: #4A514C; --muted: #7A817B;
+  --line: #D9DBD1; --accent: #7E5416; --accent-soft: #F1E6D3; --navy: #1F3347;
+  --ok: #2F6B45; --ok-soft: #E2EFE6; --warn: #8A5A00; --warn-soft: #FAEBC8;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "Public Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141816; --panel: #1C211E; --ink: #E7E9E3; --ink-2: #B9BEB6; --muted: #8C938B;
+  --line: #313833; --accent: #D9A85A; --accent-soft: #3A2E1C; --navy: #9DB8D3;
+  --ok: #7FC79A; --ok-soft: #1E3326; --warn: #E9C06A; --warn-soft: #3A2F15; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #141816; --panel: #1C211E; --ink: #E7E9E3; --ink-2: #B9BEB6; --muted: #8C938B;
+  --line: #313833; --accent: #D9A85A; --accent-soft: #3A2E1C; --navy: #9DB8D3;
+  --ok: #7FC79A; --ok-soft: #1E3326; --warn: #E9C06A; --warn-soft: #3A2F15; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+main { max-width: 1040px; margin: 0 auto; padding-block: 40px 72px; display: grid; gap: 44px }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em }
+h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.1 }
+h2 { font-size: 22px }
+h3 { font-size: 16px }
+p { margin: 0; max-width: 68ch }
+.eyebrow { font: 500 11px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--accent) }
+.lead { color: var(--ink-2); font-size: 17px }
+section { display: grid; gap: 16px }
+.note { color: var(--muted); font-size: 13px }
+code, .mono { font-family: var(--mono); font-size: 12.5px }
+
+/* Mock admin screen */
+.screen { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden }
+.screen-bar { display: flex; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); font: 12px var(--mono); color: var(--muted) }
+.screen-body { padding: 20px; display: grid; gap: 16px }
+.crumb { font-size: 12px; color: var(--muted) }
+.choice { display: grid; grid-template-columns: 20px 1fr; gap: 4px 12px; padding: 14px; border: 1px solid var(--line); border-radius: 6px; align-items: start }
+.choice.on { border-color: var(--accent); background: var(--accent-soft) }
+.radio { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--ink-2); margin-top: 3px; display: grid; place-items: center }
+.on .radio { border-color: var(--accent) }
+.on .radio::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent) }
+.choice strong { font-weight: 600 }
+.choice p { grid-column: 2; color: var(--ink-2); font-size: 13.5px }
+.inline-field { grid-column: 2; display: flex; gap: 8px; align-items: center; font-size: 13.5px; margin-top: 6px; flex-wrap: wrap }
+.input { border: 1px solid var(--line); background: var(--bg); border-radius: 5px; padding: 4px 8px; font: 13px var(--mono); min-width: 56px }
+.btn { display: inline-block; padding: 7px 14px; border-radius: 5px; background: var(--navy); color: var(--panel); font-weight: 600; font-size: 13px }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line) }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap }
+
+/* Flows */
+.flows { display: grid; gap: 14px }
+.flow { display: grid; grid-template-columns: 150px 1fr; gap: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel) }
+.flow h3 { padding-top: 2px }
+.flow .tag { font: 500 11px var(--mono); color: var(--muted); display: block; margin-top: 4px }
+.steps { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0 }
+.step { padding: 6px 10px; border-radius: 4px; background: var(--bg); border: 1px solid var(--line); font-size: 13px }
+.step.new { border-color: var(--accent); background: var(--accent-soft) }
+.step.wiz { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); font-weight: 600 }
+.arrow { color: var(--muted); font-size: 12px }
+.flow-note { grid-column: 2; color: var(--ink-2); font-size: 13.5px }
+
+/* Apply page copy compare */
+.copy-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px }
+.copy { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 8px; align-content: start; min-width: 0 }
+.copy .t { font-family: var(--display); font-weight: 600; font-size: 17px; line-height: 1.25 }
+.copy ol { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 13.5px; display: grid; gap: 2px }
+.copy .cta { justify-self: start; margin-top: 4px }
+
+/* Trial banner + tenant panel */
+.banner { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 10px 14px; border-radius: 6px; background: var(--warn-soft); color: var(--warn); font-size: 13.5px }
+.banner strong { color: var(--ink) }
+.meter { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; width: 160px }
+.meter i { display: block; height: 100%; width: 23%; background: var(--warn) }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font: 500 11.5px var(--mono); border: 1px solid currentColor }
+.pill.trial { color: var(--warn) } .pill.live { color: var(--ok) } .pill.wait { color: var(--navy) }
+.table-wrap { overflow-x: auto }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 560px }
+th { text-align: left; font: 500 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line) }
+td { padding: 9px 10px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums }
+
+.tech { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px }
+.tech > div { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 8px; align-content: start; min-width: 0 }
+.tech ul { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 13.5px; display: grid; gap: 4px }
+pre { margin: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; overflow-x: auto; font: 12px/1.5 var(--mono); color: var(--ink) }
+
+.q { display: grid; gap: 10px; counter-reset: q }
+.q li { list-style: none; padding: 12px 14px; border-left: 3px solid var(--accent); background: var(--panel); border-radius: 0 6px 6px 0 }
+.q li b { display: block; margin-bottom: 2px }
+.q li span { color: var(--ink-2); font-size: 13.5px }
+
+@media (max-width: 760px) {
+  .flow { grid-template-columns: 1fr } .flow-note { grid-column: 1 }
+  .copy-grid, .tech { grid-template-columns: 1fr }
+}
+</style>
+
+<main>
+  <header style="display:grid;gap:12px">
+    <span class="eyebrow">Ontwerp · platform-admin</span>
+    <h1>Aanmeldmodus: aanvragen, wachtlijst of 30 dagen proef</h1>
+    <p class="lead">De superadmin kiest hoe nieuwe handelaren binnenkomen. Kiest hij voor de proef, dan maakt de handelaar direct een shop aan en komt hij na het bevestigen van zijn e-mail meteen in de setup-wizard. Er hoeft niemand iets goed te keuren.</p>
+  </header>
+
+  <section>
+    <span class="eyebrow">1 · De instelling</span>
+    <h2>Platform → Aanmeldingen → Aanmeldmodus</h2>
+    <p class="note">Bovenaan de bestaande pagina <code>/admin/platform/applications</code>. De keuze geldt voor nieuwe aanmeldingen. Aanvragen die al openstaan, blijven gewoon in de lijst.</p>
+    <div class="screen" role="img" aria-label="Mock van de instelling aanmeldmodus">
+      <div class="screen-bar">concept-v27.woutvanderpol.nl/admin/platform/applications</div>
+      <div class="screen-body">
+        <div class="crumb">Platform › Dealer applications</div>
+        <h3>How dealers sign up</h3>
+        <div class="choice">
+          <span class="radio"></span><strong>Apply — reviewed by hand</strong>
+          <p>Zoals nu. Formulier, e-mail bevestigen, jij keurt goed of af. Pas daarna krijgt de handelaar een uitnodiging.</p>
+        </div>
+        <div class="choice">
+          <span class="radio"></span><strong>Waitlist</strong>
+          <p>Handelaren zetten zich op de wachtlijst. Je krijgt geen melding per aanmelding. Je nodigt zelf uit wanneer er plek is, in volgorde van aanmelding.</p>
+        </div>
+        <div class="choice on">
+          <span class="radio"></span><strong>Free trial — straight into the wizard</strong>
+          <p>Na het bevestigen van de e-mail wordt de shop direct aangemaakt. De handelaar kiest een wachtwoord en zit in de wizard. Jij krijgt een melding en kunt de shop altijd blokkeren.</p>
+          <div class="inline-field">Trial length <span class="input">30</span> days</div>
+        </div>
+        <div class="row"><span class="btn">Save</span><span class="note">Opgeslagen in het platform-auditlog.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">2 · De drie routes</span>
+    <h2>Wat een handelaar meemaakt</h2>
+    <div class="flows">
+      <div class="flow">
+        <div><h3>Aanvragen</h3><span class="tag">bestaat al</span></div>
+        <div class="steps">
+          <span class="step">Formulier</span><span class="arrow">→</span>
+          <span class="step">E-mail bevestigen</span><span class="arrow">→</span>
+          <span class="step">Superadmin keurt goed</span><span class="arrow">→</span>
+          <span class="step">Uitnodigingsmail</span><span class="arrow">→</span>
+          <span class="step">Wachtwoord</span><span class="arrow">→</span>
+          <span class="step wiz">Wizard</span>
+        </div>
+      </div>
+      <div class="flow">
+        <div><h3>Wachtlijst</h3><span class="tag">nieuw</span></div>
+        <div class="steps">
+          <span class="step">Formulier</span><span class="arrow">→</span>
+          <span class="step">E-mail bevestigen</span><span class="arrow">→</span>
+          <span class="step new">Op de wachtlijst</span><span class="arrow">→</span>
+          <span class="step new">Superadmin: Uitnodigen</span><span class="arrow">→</span>
+          <span class="step">Uitnodigingsmail</span><span class="arrow">→</span>
+          <span class="step">Wachtwoord</span><span class="arrow">→</span>
+          <span class="step wiz">Wizard</span>
+        </div>
+        <p class="flow-note">"Uitnodigen" doet hetzelfde als goedkeuren nu: shop, subdomein, eigenaar en uitnodiging. Afwijzen kan ook, met reden.</p>
+      </div>
+      <div class="flow">
+        <div><h3>30 dagen proef</h3><span class="tag">nieuw</span></div>
+        <div class="steps">
+          <span class="step">Formulier</span><span class="arrow">→</span>
+          <span class="step">E-mail bevestigen</span><span class="arrow">→</span>
+          <span class="step new">Shop wordt aangemaakt</span><span class="arrow">→</span>
+          <span class="step new">Direct: wachtwoord kiezen</span><span class="arrow">→</span>
+          <span class="step wiz">Wizard</span>
+        </div>
+        <p class="flow-note">De bevestigingsknop stuurt meteen door naar <code>&lt;shop&gt;.woutvanderpol.nl/admin/accept-invite</code>, zonder tweede mail. De uitnodigingsmail gaat wel mee als reserve, voor wie het tabblad sluit.</p>
+      </div>
+    </div>
+    <p class="note">De e-mailbevestiging blijft in alle drie de routes. Zonder die stap kan iedereen met een nep-adres een shop op ons domein aanmaken.</p>
+  </section>
+
+  <section>
+    <span class="eyebrow">3 · Aanmeldpagina</span>
+    <h2>Tekst op <code>/apply</code> per modus</h2>
+    <div class="copy-grid">
+      <div class="copy">
+        <span class="pill live">apply</span>
+        <span class="t">Open your shop. Built for unique items.</span>
+        <ol><li>Apply</li><li>We review</li><li>Set up in a guided wizard</li></ol>
+        <span class="btn cta">Send application</span>
+      </div>
+      <div class="copy">
+        <span class="pill wait">waitlist</span>
+        <span class="t">Join the waitlist.</span>
+        <ol><li>Tell us about your business</li><li>We invite you when there is room</li><li>Set up in a guided wizard</li></ol>
+        <span class="btn cta">Join the waitlist</span>
+      </div>
+      <div class="copy">
+        <span class="pill trial">trial</span>
+        <span class="t">Try Quartermaster free for 30 days.</span>
+        <ol><li>Tell us about your shop</li><li>Confirm your email</li><li>Straight into the setup wizard</li></ol>
+        <span class="btn cta">Start free trial</span>
+      </div>
+    </div>
+    <p class="note">Formulier en velden blijven gelijk (naam, e-mail, shopnaam, land, KvK, platform, wat je verkoopt, akkoord). Alleen de koptekst, stappen, knop en bedankpagina veranderen.</p>
+  </section>
+
+  <section>
+    <span class="eyebrow">4 · Tijdens de proef</span>
+    <h2>In de admin van de handelaar</h2>
+    <div class="screen" role="img" aria-label="Mock van de proefbanner in de admin">
+      <div class="screen-bar">fort-militaria.woutvanderpol.nl/admin/setup</div>
+      <div class="screen-body">
+        <div class="banner">
+          <span><strong>Free trial</strong> · 23 days left, ends 28 Nov 2026</span>
+          <span class="meter" aria-hidden="true"><i></i></span>
+          <span class="btn ghost">Choose a package</span>
+        </div>
+        <div class="note">De balk staat boven elke admin-pagina, ook in de wizard. Op dag 23 en dag 29 krijgt de eigenaar een mail.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">5 · Superadmin</span>
+    <h2>Shops-overzicht en shoppagina</h2>
+    <div class="screen">
+      <div class="screen-bar">concept-v27.woutvanderpol.nl/admin/platform</div>
+      <div class="screen-body">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Shop</th><th>Status</th><th>Package</th><th>Trial</th><th>Created</th></tr></thead>
+            <tbody>
+              <tr><td>Fort Militaria</td><td><span class="pill trial">trial</span></td><td>Compleet</td><td>23 days left</td><td>29 Oct 2026</td></tr>
+              <tr><td>Kazerne Antiek</td><td><span class="pill trial">trial</span></td><td>Compleet</td><td>ended 2 days ago</td><td>25 Sep 2026</td></tr>
+              <tr><td>Demo Militaria</td><td><span class="pill live">active</span></td><td>Compleet</td><td>—</td><td>12 Oct 2026</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="row"><span class="btn ghost">Extend trial +14 days</span><span class="btn ghost">End trial now</span><span class="btn">Convert to paid…</span></div>
+        <p class="note">Filter "Trial" naast Active / Suspended / Archived. Op de shoppagina: proef verlengen, beëindigen of omzetten naar een betaald pakket. Alles in het platform-auditlog.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">6 · Techniek</span>
+    <h2>Wat er onder de motorkap verandert</h2>
+    <div class="tech">
+      <div>
+        <h3>Data</h3>
+<pre>enum SignupMode { APPLY WAITLIST TRIAL }
+
+model PlatformConfig {      // één rij, id = 1
+  id         Int        @id @default(1)
+  signupMode SignupMode @default(APPLY)
+  trialDays  Int        @default(30)
+  updatedAt  DateTime   @updatedAt
+}
+
+enum DealerApplicationStatus {
+  PENDING  WAITLISTED  APPROVED  REJECTED
+}
+
+model Tenant { … trialEndsAt DateTime? }</pre>
+      </div>
+      <div>
+        <h3>Code</h3>
+        <ul>
+          <li><code>submitApplication</code> zet de status op PENDING of WAITLISTED, afhankelijk van de modus.</li>
+          <li><code>verifyApplicationEmail</code>: in de proefmodus wordt de aanvraag automatisch goedgekeurd (zelfde transactie als goedkeuren nu, met <code>trialEndsAt</code>), en wordt de uitnodigingslink teruggegeven voor de redirect.</li>
+          <li>Wachtlijst: geen superadmin-mail per aanmelding. Uitnodigen gebruikt <code>approveApplication</code>.</li>
+          <li>Proefshops: superadmin krijgt de melding "nieuwe proefshop".</li>
+          <li>Dagelijkse job <code>trials.tick</code>: herinneringsmails en het verlopen van proeven.</li>
+          <li>Rate limits, Turnstile, honeypot en de duplicaatchecks blijven gelijk. Een e-mail of KvK die al een shop heeft, krijgt geen tweede proef.</li>
+          <li>Tests voor de drie modi, de auto-goedkeuring en het verlopen.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">7 · Besluiten (29-10-2026)</span>
+    <h2>Jouw keuzes</h2>
+    <ol class="q">
+      <li><b>Proefshop mag direct live, ook met echte betalingen.</b><span>Jij krijgt een melding per nieuwe proefshop en kunt hem altijd blokkeren.</span></li>
+      <li><b>Na de proef: winkel dicht, admin open.</b><span>Bezoekers zien "Tijdelijk gesloten", gegevens blijven. Jij verlengt of zet om naar betaald.</span></li>
+      <li><b>Pakket tijdens de proef: Compleet.</b><span>De handelaar ziet alle modules.</span></li>
+      <li><b>Wachtlijst: alleen "je staat op de lijst".</b><span>Geen plek in de rij voor de aanmelder; jij ziet de volgorde wel.</span></li>
+    </ol>
+  </section>
+</main>

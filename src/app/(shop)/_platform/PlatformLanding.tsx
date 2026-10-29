@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { getSignupConfig } from "@/server/platform/signup";
 import { platformCopy as t } from "./_copy";
 
 /** `/` on the platform host (PLATFORM_HOST): a plain Quartermaster landing page, no shop chrome. */
-export function PlatformLanding() {
+export async function PlatformLanding() {
+  const { signupMode, trialDays } = await getSignupConfig();
   return (
     <main className="flex min-h-dvh flex-col bg-[#f4f1e8] text-[#23241e]">
       <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center gap-6 px-6 py-20">
@@ -14,7 +16,7 @@ export function PlatformLanding() {
             href="/apply"
             className="inline-flex h-11 items-center rounded-md bg-[#7E5416] px-5 text-sm font-medium text-white hover:bg-[#23241e]"
           >
-            {t.applyLink}
+            {t.applyLink[signupMode](trialDays)}
           </Link>
           <Link
             href="/admin"

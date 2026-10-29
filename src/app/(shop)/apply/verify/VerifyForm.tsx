@@ -18,9 +18,9 @@ function Submit() {
   );
 }
 
-export function VerifyForm({ token }: { token: string }) {
+export function VerifyForm({ token, body }: { token: string; body: string }) {
   const [state, formAction] = useActionState<VerifyState, FormData>(verifyApplicationAction, null);
-  if (state?.status === "verified" || state?.status === "already_verified") {
+  if (state?.status === "verified" || state?.status === "waitlisted" || state?.status === "already_verified" || state?.status === "already_created") {
     return (
       <p role="status" className="text-[15px] text-[#2F6B3A]">
         {t[state.status]}
@@ -40,7 +40,7 @@ export function VerifyForm({ token }: { token: string }) {
   }
   return (
     <form action={formAction} className="grid gap-4">
-      <p className="text-[15px] text-[#33352c]">{t.body}</p>
+      <p className="text-[15px] text-[#33352c]">{body}</p>
       {state ? (
         <p role="alert" className="text-sm text-[#a23a2a]">
           {t[state.status]}

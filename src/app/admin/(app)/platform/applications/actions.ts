@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { actionOk, formString, type ActionResult, type ActionState } from "@/components/admin/ui";
 import { approveApplication, rejectApplication, resendDealerInvite, saveApplicationNote } from "@/server/onboarding";
-import { requirePlatformContext } from "@/server/platform";
+import { requirePlatformContext, updateSignupConfig } from "@/server/platform";
+import type { SignupMode } from "@/generated/prisma/enums";
 import { fail, failFrom } from "../../_system/errors";
 
 const BASE = "/admin/platform/applications";
@@ -55,4 +56,17 @@ export async function resendDealerInviteAction(formData: FormData): Promise<Acti
   }
   revalidatePath(BASE);
   return actionOk("A new invite link (24 h) has been sent.");
+}
+
+export async function saveSignupConfigAction(_prev: ActionState, formData: FormData): Promise<ActionResult> {
+  try {
+    await updateSignupConfig(await requirePlatformContext(), {
+      signupMode: formString(formData, "signupMode") as SignupMode,
+      trialDays: formString(formData, "trialDays"),
+    });
+  } catch (err) {
+    return failFrom(err);
+  }
+  revalidatePath(BASE);
+  return actionOk("Sign-up mode saved.");
 }

@@ -49,9 +49,11 @@ export const MAIL_TEMPLATE_PROPS = {
   "dealer-application-rejected": z.object({ applicationId: id }),
   /** Tenant mail to the new OWNER: set a password (INVITE token, 24 h) → setup wizard. */
   "dealer-invite": z.object({ userId: id, tokenEnc: z.string().min(1) }),
-  /** Platform mail to one SUPERADMIN (`to`): new verified application, migration or domain request. */
+  /** Tenant mail to an OWNER of a trial shop: 1 = a week left, 2 = a day left, 3 = ended (docs/signup-modes.md). */
+  "trial-notice": z.object({ userId: id, notice: z.union([z.literal(1), z.literal(2), z.literal(3)]) }),
+  /** Platform mail to one SUPERADMIN (`to`): new verified application, migration or domain request, trial started / ended. */
   "platform-admin-notice": z.object({
-    kind: z.enum(["application", "migration", "domain"]),
+    kind: z.enum(["application", "migration", "domain", "trial", "trial-ended"]),
     applicationId: id.optional(),
     tenantId: id.optional(),
     detail: z.string().max(300).optional(),

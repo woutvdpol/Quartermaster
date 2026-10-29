@@ -30,6 +30,11 @@ model Tenant {
   // null = shop predates the wizard (treated as set up). setupCompletedAt set on "Go live".
   setupState       Json?
   setupCompletedAt DateTime?
+  // Free trial (docs/signup-modes.md): set for shops created in the TRIAL sign-up mode; null = not on
+  // a trial. Past this moment the storefront is closed (admin stays open) until a superadmin extends
+  // the trial or converts the shop. trialNotices = reminder mails already sent (0 none, 1 week, 2 day, 3 ended).
+  trialEndsAt      DateTime?
+  trialNotices     Int          @default(0)
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
@@ -119,14 +124,18 @@ enum PlanId {
   COMPLETE
 }
 
-/** Who granted an entitlement: by hand (superadmin), a paid subscription (phase 3) or a migration. */
+/**
+ * Who granted an entitlement: by hand (superadmin), a paid subscription (phase 3) or a migration.
+ */
 enum EntitlementSource {
   MANUAL
   SUBSCRIPTION
   LEGACY
 }
 
-/** TRIAL, ACTIVE and PAST_DUE (grace period) grant the module; CANCELLED does not. */
+/**
+ * TRIAL, ACTIVE and PAST_DUE (grace period) grant the module; CANCELLED does not.
+ */
 enum ModuleStatus {
   TRIAL
   ACTIVE
@@ -139,24 +148,26 @@ enum ModuleStatus {
  * Limit columns override the package default; null = package default.
  */
 model TenantPlan {
-  tenantId        String            @id
-  plan            PlanId            @default(START)
-  productLimit    Int?
-  photoLimit      Int?
-  storageGb       Float?
-  newsletterQuota Int?
+  tenantId          String            @id
+  plan              PlanId            @default(START)
+  productLimit      Int?
+  photoLimit        Int?
+  storageGb         Float?
+  newsletterQuota   Int?
   /// Purchased newsletter mails (one-off packs), used only after the monthly quota is exhausted; never expire.
-  newsletterCredits Int             @default(0)
-  source          EntitlementSource @default(MANUAL)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  newsletterCredits Int               @default(0)
+  source            EntitlementSource @default(MANUAL)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_plans")
 }
 
-/** A module bought or trialled on top of the package. `moduleId` is an id from src/server/modules/catalog.ts. */
+/**
+ * A module bought or trialled on top of the package. `moduleId` is an id from src/server/modules/catalog.ts.
+ */
 model TenantModule {
   id           String            @id @default(cuid())
   tenantId     String
@@ -1765,8 +1776,26 @@ model Redirect {
 
 enum DealerApplicationStatus {
   PENDING
+  WAITLISTED
   APPROVED
   REJECTED
+}
+
+/// How new dealers sign up on the platform host (docs/signup-modes.md).
+enum SignupMode {
+  APPLY
+  WAITLIST
+  TRIAL
+}
+
+/// Platform-wide settings: a single row (id 1). No row = the defaults.
+model PlatformConfig {
+  id         Int        @id @default(1)
+  signupMode SignupMode @default(APPLY)
+  trialDays  Int        @default(30)
+  updatedAt  DateTime   @updatedAt
+
+  @@map("platform_config")
 }
 
 // A dealer's request for a shop, submitted on the platform host and reviewed by a SUPERADMIN.
@@ -1782,6 +1811,7 @@ model DealerApplication {
   currentPlatform String? // "woocommerce" | "shopify" | "concept500" | "none" | free text
   description     String // what they sell
   legalConsent    Boolean                 @default(false)
+  signupMode      SignupMode              @default(APPLY) // mode at submission: TRIAL = shop created on verification
   emailVerifiedAt DateTime?
   checks          Json? // automated checks { emailDeliverable, cocFormat, duplicateEmail, … }
   internalNote    String?

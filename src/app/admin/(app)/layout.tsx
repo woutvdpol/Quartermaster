@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { TrialBanner } from "@/components/admin/TrialBanner";
 import { Sidebar } from "@/components/admin/Sidebar";
 import { Toaster } from "@/components/admin/ui";
 import { ADMIN_THEME_COOKIE, parseAdminThemeCookie } from "@/lib/admin-theme";
@@ -18,7 +19,10 @@ export default async function AdminAppLayout({ children }: LayoutProps<"/admin">
 
   return (
     <AdminShell sidebar={<Sidebar user={user} tenants={tenants} theme={theme} lockedNav={lockedNav} />}>
-      <main className="flex min-w-0 flex-1 flex-col">{children}</main>
+      <main className="flex min-w-0 flex-1 flex-col">
+        {tenants.active ? <TrialBanner tenant={tenants.active} timeZone={tenants.active.timezone} superadmin={user.role === "SUPERADMIN"} /> : null}
+        {children}
+      </main>
       <Toaster />
     </AdminShell>
   );

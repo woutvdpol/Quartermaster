@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { ConfirmDialog, DateTime, KeyValue, StatusPill, Textarea, buttonClasses, type StatusTone } from "@/components/admin/ui";
-import { CURRENT_PLATFORM_LABELS, summarizeChecks, type ApplicationDetail, type CurrentPlatform } from "@/server/onboarding";
+import { CURRENT_PLATFORM_LABELS, summarizeChecks, trialState, type ApplicationDetail, type CurrentPlatform } from "@/server/onboarding";
 import { countryName } from "@/server/shipping/countries";
 import { approveApplicationAction, rejectApplicationAction, resendDealerInviteAction } from "../actions";
 import { NoteForm } from "./NoteForm";
 
-export const APPLICATION_STATUS_LABEL = { PENDING: "Pending", APPROVED: "Approved", REJECTED: "Rejected" } as const;
-export const APPLICATION_STATUS_TONE: Record<keyof typeof APPLICATION_STATUS_LABEL, StatusTone> = { PENDING: "warn", APPROVED: "ok", REJECTED: "mute" };
+export const APPLICATION_STATUS_LABEL = { PENDING: "Pending", WAITLISTED: "Waitlist", APPROVED: "Approved", REJECTED: "Rejected" } as const;
+export const APPLICATION_STATUS_TONE: Record<keyof typeof APPLICATION_STATUS_LABEL, StatusTone> = { PENDING: "warn", WAITLISTED: "info", APPROVED: "ok", REJECTED: "mute" };
+const SIGNUP_MODE_LABEL = { APPLY: "Apply", WAITLIST: "Waitlist", TRIAL: "Trial" } as const;
 
 export function platformLabel(value: string | null): string {
   return value && value in CURRENT_PLATFORM_LABELS ? CURRENT_PLATFORM_LABELS[value as CurrentPlatform] : value || "—";
@@ -15,7 +16,10 @@ export function platformLabel(value: string | null): string {
 /** Detail panel of one application (docs/design/onboarding/Approval.dc.html). */
 export function ApplicationPanel({ app, closeHref }: { app: ApplicationDetail; closeHref: string }) {
   const checks = summarizeChecks(app.checks);
-  const pending = app.status === "PENDING";
+  const waitlisted = app.status === "WAITLISTED";
+  const open = app.status === "PENDING" || waitlisted;
+  const approveLabel = waitlisted ? "Invite & create shop" : "Approve & send invite";
+  const trial = app.tenant ? trialState(app.tenant) : null;
   return (
     <section aria-labelledby="application-title" className="grid content-start gap-4 rounded-card border border-line bg-panel p-4 shadow-card">
       <header className="flex items-start justify-between gap-3">
@@ -38,6 +42,7 @@ export function ApplicationPanel({ app, closeHref }: { app: ApplicationDetail; c
           { label: "CoC", value: app.cocNumber || "—", mono: true },
           { label: "Sells via", value: platformLabel(app.currentPlatform) },
           { label: app.tenant ? "Shop address" : "Proposed address", value: app.proposedHost, mono: true },
+          { label: "Sign-up mode", value: SIGNUP_MODE_LABEL[app.signupMode] },
           { label: "Received", value: <DateTime value={app.createdAt} format="datetime" /> },
           ...(app.reviewedAt ? [{ label: "Reviewed", value: <span><DateTime value={app.reviewedAt} format="datetime" />{app.reviewerEmail ? ` · ${app.reviewerEmail}` : ""}</span> }] : []),
         ]}
@@ -68,12 +73,13 @@ export function ApplicationPanel({ app, closeHref }: { app: ApplicationDetail; c
 
       <NoteForm id={app.id} note={app.internalNote} />
 
-      {pending ? (
+      {open ? (
         <>
           <div className="rounded-control border border-line bg-panel-2 p-3 text-[13px]">
-            <p className="mb-1 font-medium">On approve</p>
+            <p className="mb-1 font-medium">{waitlisted ? "On invite" : "On approve"}</p>
             <ul className="list-disc space-y-0.5 pl-5 text-muted">
               <li>Shop is created on {app.proposedHost} (own domain later)</li>
+              {app.signupMode === "TRIAL" ? <li>It starts as a free trial (Complete package)</li> : null}
               <li>Owner account gets an invite link (24 h)</li>
               <li>The setup wizard opens at first login</li>
             </ul>
@@ -91,15 +97,15 @@ export function ApplicationPanel({ app, closeHref }: { app: ApplicationDetail; c
               <Textarea label="Reason (sent to the applicant)" name="reason" rows={3} required maxLength={1000} />
             </ConfirmDialog>
             <ConfirmDialog
-              trigger="Approve & send invite"
+              trigger={approveLabel}
               triggerVariant="primary"
-              title={`Approve “${app.shopName}”?`}
+              title={`${waitlisted ? "Invite" : "Approve"} “${app.shopName}”?`}
               description={
                 app.emailVerifiedAt
                   ? `This creates the shop on ${app.proposedHost} and emails ${app.email} an invite link (24 h).`
                   : `The applicant has not confirmed their email yet. Approving creates the shop on ${app.proposedHost} and emails ${app.email} an invite link (24 h) anyway.`
               }
-              confirmLabel="Approve & send invite"
+              confirmLabel={approveLabel}
               tone="primary"
               action={approveApplicationAction}
               fields={{ id: app.id }}
@@ -116,6 +122,8 @@ export function ApplicationPanel({ app, closeHref }: { app: ApplicationDetail; c
               {app.tenant.name}
             </Link>{" "}
             · {app.tenant.setupCompletedAt ? "live (setup finished)" : "setup wizard not finished"}
+            {trial?.kind === "running" ? <> · Trial ends <DateTime value={trial.endsAt} format="date" /></> : null}
+            {trial?.kind === "ended" ? <> · Trial ended <DateTime value={trial.endsAt} format="date" /></> : null}
           </p>
           {app.owner?.invitePending ? (
             <div className="flex flex-wrap items-center justify-between gap-2">
