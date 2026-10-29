@@ -254,6 +254,8 @@ export async function changeCustomerEmail(user: CustomerUser, newEmail: string, 
       const other = await tx.customer.findUnique({ where: { tenantId_email: { tenantId, email } }, select: { userId: true } });
       if (other?.userId) throw new Error("EMAIL_TAKEN");
       await tx.user.update({ where: { id: user.id }, data: { email, emailVerifiedAt: null } });
+      // Links mailed to the old address must not prove (or reset) the new one (security review R1).
+      await tx.authToken.updateMany({ where: { userId: user.id, usedAt: null, type: { in: ["PASSWORD_RESET", "EMAIL_VERIFICATION"] } }, data: { usedAt: new Date() } });
       // The new address is unproven: the account's Customer gets the placeholder address and NOTHING
       // of the new address's guest data is merged until it is verified (claimVerifiedEmail, review R1).
       await tx.customer.update({ where: { id: customer.id }, data: { email: pendingCustomerEmail(user.id) } });

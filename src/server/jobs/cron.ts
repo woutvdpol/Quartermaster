@@ -24,10 +24,11 @@ export type CronTask = {
 export const CRON_TASKS = {
   "reservations.expire": {
     schedule: "* * * * *",
-    description: "Flip ACTIVE cart reservations past their expiry to EXPIRED (all tenants).",
+    description: "Flip ACTIVE reservations past their expiry to EXPIRED and cancel webshop payments that outlived their hold (all tenants).",
     run: async () => {
       const { expireReservations } = await import("@/server/stock/reservations");
-      return { expired: await expireReservations() };
+      const { cancelPaymentsWithoutHold } = await import("@/server/payments/mollie");
+      return { expired: await expireReservations(), paymentsCanceled: await cancelPaymentsWithoutHold() };
     },
   },
   "rate-limit.prune": {

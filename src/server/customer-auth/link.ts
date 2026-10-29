@@ -117,9 +117,17 @@ export async function claimVerifiedEmail(tx: Tx, tenantId: string, userId: strin
   return { customerId, linkedOrders: merged + attached.count };
 }
 
-/** Runs `claimVerifiedEmail` in its own transaction and audits it (verification / reset paths). */
-export async function claimVerifiedEmailAndAudit(tenantId: string, userId: string) {
-  const result = await db.$transaction((tx) => claimVerifiedEmail(tx, tenantId, userId));
+/**
+ * Runs `claimVerifiedEmail` in its own transaction and audits it (verification / reset paths).
+ * `provenEmail` is the address the link was mailed to: if the account's address changed since, the
+ * link proves nothing about the new one and nothing is claimed (returns null).
+ */
+export async function claimVerifiedEmailAndAudit(tenantId: string, userId: string, provenEmail: string) {
+  const result = await db.$transaction(async (tx) => {
+    const current = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { email: true } });
+    return current.email === provenEmail ? claimVerifiedEmail(tx, tenantId, userId) : null;
+  });
+  if (!result) return null;
   await audit({
     action: "customer.email_claimed",
     tenantId,

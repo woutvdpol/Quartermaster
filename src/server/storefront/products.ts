@@ -5,6 +5,7 @@ import { imageUrl } from "@/server/media/product-images";
 import { sourcesFromManifest, type ManifestLike } from "@/lib/media/variants";
 import { categoryHref } from "@/server/content/rules";
 import type { ProductAvailability, ProductCardData, ShopImage } from "@/components/shop/ui/types";
+import { resolveCompliance } from "@/server/compliance/resolve";
 import { shopCache } from "./cache";
 
 /*
@@ -81,7 +82,28 @@ export type CardOptions = {
   blurSensitiveForGuests: boolean;
   /** Ids with a live (unexpired ACTIVE) reservation — see `liveReservedIds`. */
   reservedIds?: ReadonlySet<string>;
+  /** Ids whose photos a compliance rule blurs in the visitor's country — see `applyCountryRules`. */
+  geoBlurred?: ReadonlySet<string>;
 };
+
+/** The blurred variant only (BLUR_IMAGES rule); without one, nothing but the inline placeholder. */
+function blurredShopImage(img: ImageRow): ShopImage {
+  const blur = manifestEntry(img.variants, "blur");
+  return { src: blur?.key ? `/uploads/${blur.key}` : "", blurDataUrl: blur?.dataUrl ?? null, alt: "", width: img.width, height: img.height };
+}
+
+/**
+ * The visitor-country compliance rules for block cards (home and CMS pages), as the catalog applies them:
+ * HIDE_PRODUCT drops the item, BLUR_IMAGES returns it in `geoBlurred`. No country known = no geo rules.
+ */
+export async function applyCountryRules<R extends { id: string }>(tenantId: string, rows: R[], country: string | null): Promise<{ rows: R[]; geoBlurred: Set<string> }> {
+  if (!country || !rows.length) return { rows, geoBlurred: new Set() };
+  const verdicts = await resolveCompliance(tenantId, rows.map((r) => r.id), country);
+  return {
+    rows: rows.filter((r) => !verdicts[r.id]?.hidden),
+    geoBlurred: new Set(rows.filter((r) => verdicts[r.id]?.blurred).map((r) => r.id)),
+  };
+}
 
 export function availabilityOf(p: { id: string; status: string; quantity: number }, reservedIds?: ReadonlySet<string>): ProductAvailability {
   if (p.status === "SOLD" || p.quantity <= 0) return "sold";
@@ -96,6 +118,7 @@ export function toProductCardData(p: ProductCardRow | ProductCardRowJson, opts: 
   const img = p.images[0];
   let image: ShopImage | null = img ? toShopImage(img, p.title) : null;
   if (image && locked) image = { src: "", blurDataUrl: image.blurDataUrl, alt: "" }; // never leak the real URL
+  else if (img && opts.geoBlurred?.has(p.id)) image = blurredShopImage(img);
   // Sold items show their price only when ticked per item (docs/sold-archive.md); a hidden one is not sent.
   const showPrice = availability !== "sold" || p.showSoldPrice;
   return {

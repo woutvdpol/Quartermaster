@@ -186,6 +186,23 @@ describe("orders", () => {
       expect(await code(cancelOrder(ctx, paid.id))).toBe("CONFLICT");
     });
 
+    it("a payment that lands after the order was canceled never revives or finalizes it", async () => {
+      const ctx = await createTenantContext();
+      const product = await makeProduct(ctx.tenantId);
+      const order = await makeOrder(ctx.tenantId, { lines: [{ product }], reserve: true, molliePaymentId: "tr_late" });
+      await cancelOrder(ctx, order.id, "no payment");
+
+      const r = await applyMolliePaymentStatus(ctx.tenantId, "tr_late", "paid", { method: "banktransfer" });
+      expect(r).toMatchObject({ orderStatus: "CANCELED", finalized: false });
+      const o = await db.order.findUniqueOrThrow({ where: { id: order.id } });
+      expect(o).toMatchObject({ paymentStatus: "CANCELED", finalizedAt: null, paidAt: null });
+      expect((await db.product.findUniqueOrThrow({ where: { id: product.id } })).status).toBe("ACTIVE");
+      expect(await db.orderEvent.count({ where: { orderId: order.id, type: "payment.paid_after_cancel" } })).toBe(1);
+      // A repeated webhook adds nothing.
+      await applyMolliePaymentStatus(ctx.tenantId, "tr_late", "paid");
+      expect(await db.orderEvent.count({ where: { orderId: order.id, type: "payment.paid_after_cancel" } })).toBe(1);
+    });
+
     it("archives/unarchives idempotently and never deletes", async () => {
       const ctx = await createTenantContext();
       const product = await makeProduct(ctx.tenantId);

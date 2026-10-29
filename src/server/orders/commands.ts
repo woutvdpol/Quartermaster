@@ -10,6 +10,7 @@ import { recordMovement } from "@/server/stock/ledger";
 import { queueOrderConfirmation } from "@/server/mail";
 import { onOrderFinalized } from "@/server/invoices";
 import { onReservationReleased } from "@/server/alerts/hooks";
+import { getMollieCredentials, mollieClient } from "@/server/payments/mollie-config";
 import {
   isFinalAttemptStatus,
   isMollieStatus,
@@ -302,7 +303,11 @@ export async function applyMolliePaymentStatus(
     const target = mollieToOrderStatus(status);
     const effectiveAttempt = attemptChanged ? nextAttempt : payment.status;
 
-    if (effectiveAttempt === "PAID") {
+    if (effectiveAttempt === "PAID" && order.canceledAt) {
+      // Paid after the shop canceled the order (a late bank transfer): its piece went back on sale and may
+      // be sold again. Never revive or finalize a canceled order; staff see this event and refund.
+      if (attemptChanged) await addEvent(tx, tenantId, orderId, "payment.paid_after_cancel", { provider: "MOLLIE", paymentId: pid, amount: payment.amount });
+    } else if (effectiveAttempt === "PAID") {
       if (!SETTLED.includes(order.paymentStatus)) {
         const paidAt = meta.paidAt ?? now;
         await tx.order.update({
@@ -345,7 +350,8 @@ export async function applyMolliePaymentStatus(
 /**
  * Cancels an unpaid order: releases its reservations, paymentStatus → CANCELED, canceledAt.
  * Paid/refunded orders can't be canceled (CONFLICT) — that needs a refund flow (not built yet).
- * TODO(mollie): also cancel an open Mollie payment via the API once the Mollie client exists.
+ * Open Mollie payments are canceled too (best effort: Mollie only cancels some methods, such as bank
+ * transfer). Should one still be paid, applyMolliePaymentStatus records it and leaves the order canceled.
  */
 export async function cancelOrder(ctx: ServiceContext, orderId: string, reason?: string | null) {
   const id = idSchema.parse(orderId);
@@ -363,7 +369,20 @@ export async function cancelOrder(ctx: ServiceContext, orderId: string, reason?:
     return { number: order.number, reservationsReleased: released };
   });
   await audit({ action: "order.cancel", tenantId: ctx.tenantId, actorId: ctx.actor.id, entity: "Order", entityId: id, data: { ...result, reason: cleanReason } });
+  await cancelOpenMolliePayments(ctx.tenantId, id);
   return result;
+}
+
+/** Best effort: cancels the order's open Mollie payments; the webhook then records the cancellation. */
+async function cancelOpenMolliePayments(tenantId: string, orderId: string) {
+  const open = await db.payment.findMany({ where: { tenantId, orderId, provider: "MOLLIE", status: "OPEN" }, select: { providerPaymentId: true } });
+  if (open.length === 0) return;
+  const creds = await getMollieCredentials(tenantId).catch(() => null);
+  if (!creds) return;
+  const client = mollieClient(creds.apiKey);
+  for (const p of open) {
+    if (p.providerPaymentId) await client.payments.cancel(p.providerPaymentId).catch(() => undefined); // not cancelable or Mollie down
+  }
 }
 
 async function setArchived(ctx: ServiceContext, orderId: string, archived: boolean) {

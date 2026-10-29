@@ -1,6 +1,8 @@
+import { headers } from "next/headers";
 import Link from "@/components/shop/ui/Link";
 import type { BlockData } from "@/server/content/blocks";
-import { getCategoryTiles, getNewItems, getProductsByIds, liveReservedIds, toProductCardData } from "@/server/storefront/products";
+import { visitorCountry } from "@/server/compliance";
+import { applyCountryRules, getCategoryTiles, getNewItems, getProductsByIds, liveReservedIds, toProductCardData } from "@/server/storefront/products";
 import { Container } from "@/components/shop/ui/Container";
 import { EmptyState } from "@/components/shop/ui/EmptyState";
 import { Markdown } from "@/components/shop/ui/Markdown";
@@ -15,10 +17,16 @@ import { pickCopy } from "@/lib/i18n/shop-copy";
 import { translateCards } from "@/server/storefront/translate";
 import { blocksCopies } from "./_copy";
 
+/** Per-country compliance rules of the visitor (hide / blur), as the catalog applies them. */
+async function visitorRules<R extends { id: string }>(tenantId: string, rows: R[]) {
+  return applyCountryRules(tenantId, rows, visitorCountry(await headers()));
+}
+
 export async function TextProductBlock({ data, ctx }: { data: BlockData<"TEXT_PRODUCT">; ctx: BlockContext }) {
-  const rows = data.productId ? await translateCards(ctx.tenantId, ctx.locale, await getProductsByIds(ctx.tenantId, [data.productId])) : [];
+  const loaded = data.productId ? await translateCards(ctx.tenantId, ctx.locale, await getProductsByIds(ctx.tenantId, [data.productId])) : [];
+  const { rows, geoBlurred } = await visitorRules(ctx.tenantId, loaded);
   const reserved = await liveReservedIds(ctx.tenantId, rows.map((r) => r.id));
-  const product = rows[0] ? toProductCardData(rows[0], { ...ctx.card, reservedIds: reserved }) : null;
+  const product = rows[0] ? toProductCardData(rows[0], { ...ctx.card, reservedIds: reserved, geoBlurred }) : null;
   const blocksCopy = pickCopy(blocksCopies, ctx.locale);
   return (
     <Container className="grid items-center gap-8 md:grid-cols-12 md:gap-14">
@@ -42,9 +50,9 @@ export async function TextProductBlock({ data, ctx }: { data: BlockData<"TEXT_PR
 
 export async function NewItemsBlock({ data, ctx, priority }: { data: BlockData<"NEW_ITEMS">; ctx: BlockContext; priority?: boolean }) {
   // Titles in the shop language (approved translations; docs/i18n.md).
-  const rows = await translateCards(ctx.tenantId, ctx.locale, await getNewItems(ctx.tenantId, data.count));
+  const { rows, geoBlurred } = await visitorRules(ctx.tenantId, await translateCards(ctx.tenantId, ctx.locale, await getNewItems(ctx.tenantId, data.count)));
   const reserved = await liveReservedIds(ctx.tenantId, rows.map((r) => r.id));
-  const products = rows.map((r) => toProductCardData(r, { ...ctx.card, reservedIds: reserved }));
+  const products = rows.map((r) => toProductCardData(r, { ...ctx.card, reservedIds: reserved, geoBlurred }));
   const blocksCopy = pickCopy(blocksCopies, ctx.locale);
   return (
     <Container>

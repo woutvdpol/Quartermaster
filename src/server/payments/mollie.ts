@@ -143,6 +143,45 @@ export async function createMolliePayment(
   }
 }
 
+/** A webshop order without a live hold: its piece is back on sale (see cancelPaymentsWithoutHold). */
+export function webOrderWithoutHold(now: Date): Prisma.OrderWhereInput {
+  return { channel: "WEB", reservations: { none: { status: "ACTIVE", expiresAt: { gt: now } } } };
+}
+
+/**
+ * A webshop payment may not outlive the order's hold (owner, 2026-10-29): once the hold has lapsed the
+ * piece is back on sale, so a payment that stays open for days (bank transfer) could sell it twice.
+ * Cancels such open Mollie payments and applies the result like the webhook would. Mollie refuses to
+ * cancel some methods (iDEAL, cards); those expire at Mollie by themselves and are left alone.
+ * Auction orders hold their piece through the lot, not a reservation, and are never touched.
+ * Run every minute by the `reservations.expire` cron.
+ */
+export async function cancelPaymentsWithoutHold(now = new Date()): Promise<number> {
+  const open = await db.payment.findMany({
+    where: { provider: "MOLLIE", status: "OPEN", order: { paymentStatus: "PENDING", finalizedAt: null, canceledAt: null, ...webOrderWithoutHold(now) } },
+    select: { tenantId: true, providerPaymentId: true },
+    orderBy: { createdAt: "asc" },
+    take: 100,
+  });
+  const keys = new Map<string, string | null>();
+  let canceled = 0;
+  for (const p of open) {
+    if (!p.providerPaymentId) continue;
+    if (!keys.has(p.tenantId)) keys.set(p.tenantId, (await getMollieCredentials(p.tenantId))?.apiKey ?? null);
+    const apiKey = keys.get(p.tenantId);
+    if (!apiKey) continue;
+    let status: string;
+    try {
+      status = (await mollieClient(apiKey).payments.cancel(p.providerPaymentId)).status;
+    } catch {
+      continue; // not cancelable (or Mollie unreachable): it expires at Mollie, or the next run retries
+    }
+    await applyMolliePaymentStatus(p.tenantId, p.providerPaymentId, status);
+    canceled++;
+  }
+  return canceled;
+}
+
 export type MollieWebhookOutcome =
   | { outcome: "processed"; result: ApplyMollieResult }
   /** The fetched payment doesn't match our records (R3): nothing applied, `payment.mismatch` recorded. */

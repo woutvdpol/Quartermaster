@@ -43,10 +43,15 @@ export async function startOrderPayment(tenantId: string, orderId: string, opts:
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`qm:pay:${orderId}`}))`;
       const order = await tx.order.findFirst({
         where: { id: orderId, tenantId },
-        select: { id: true, uuid: true, paymentStatus: true, paymentMethod: true, canceledAt: true, archivedAt: true },
+        select: { id: true, uuid: true, channel: true, paymentStatus: true, paymentMethod: true, canceledAt: true, archivedAt: true },
       });
       if (!order) throw new ServiceError("NOT_FOUND", "Order not found");
       if (order.paymentStatus !== "PENDING" || order.canceledAt || order.archivedAt) return { kind: "order", reason: "not_payable" } as const;
+      // A webshop order is payable only while its hold lives; after that the piece is back on sale and
+      // the open payment gets canceled (cancelPaymentsWithoutHold). "Try again" re-reserves first.
+      if (order.channel === "WEB" && !(await tx.reservation.findFirst({ where: { tenantId, orderId, status: "ACTIVE", expiresAt: { gt: new Date() } }, select: { id: true } }))) {
+        return { kind: "order", reason: "not_payable" } as const;
+      }
 
       const latest = await tx.payment.findFirst({
         where: { tenantId, orderId, provider: "MOLLIE" },

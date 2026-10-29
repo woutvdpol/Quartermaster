@@ -78,18 +78,19 @@ export async function verifyCustomerEmail(tenantId: string, token: string): Prom
   const claimed = await db.authToken.updateMany({ where: { id: row.id, usedAt: null }, data: { usedAt: new Date() } });
   if (claimed.count !== 1) return { ok: false, error: "invalid_token" };
   if (!row.user.emailVerifiedAt) {
-    await db.user.update({ where: { id: row.user.id }, data: { emailVerifiedAt: new Date() } });
-    await audit({ action: "customer.email_verified", tenantId, actorId: row.user.id, entity: "User", entityId: row.user.id });
+    // Only while the account still has the address this link was mailed to.
+    const verified = await db.user.updateMany({ where: { id: row.user.id, email: row.user.email, emailVerifiedAt: null }, data: { emailVerifiedAt: new Date() } });
+    if (verified.count === 1) await audit({ action: "customer.email_verified", tenantId, actorId: row.user.id, entity: "User", entityId: row.user.id });
   }
   // The address is proven now: only now may the guest data of this address join the account
   // (guest Customer, its orders, addresses, …) — security review R1. Never fail the verification over it.
-  await claimVerifiedEmailAndAudit(tenantId, row.user.id).catch((e) => console.error("verifyCustomerEmail: claim failed", e));
+  await claimVerifiedEmailAndAudit(tenantId, row.user.id, row.user.email).catch((e) => console.error("verifyCustomerEmail: claim failed", e));
   return { ok: true, email: row.user.email };
 }
 
 /**
  * Whether the customer changed their e-mail after `since` (audit "customer.email_changed").
- * changeCustomerEmail() does not void verification tokens itself; this keeps old links harmless.
+ * changeCustomerEmail() voids open links since 2026-10-29; this also keeps links from before that harmless.
  * Uses the (tenantId, createdAt) index: only entries newer than the token are scanned.
  */
 async function emailChangedSince(tenantId: string, userId: string, since: Date): Promise<boolean> {

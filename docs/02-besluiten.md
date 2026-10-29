@@ -196,6 +196,16 @@ Ontwerp: `docs/design/platform-landing.html` (artifact https://claude.ai/artifac
 - **Het certificatenblok uit het ontwerp is niet gebouwd** (eigenaar). "Provenance & certificates" staat wel in de pakketlijst, want die komt uit de catalogus.
 - Knoppen en teksten volgen de aanmeldmodus (aanvragen, wachtlijst, proef). Lettertypes self-hosted (`npm run fonts:sync platform`).
 
+## Audit-fixes — akkoord eigenaar (29-10-2026)
+Uit de repo-audit van 29-10-2026; per punt een integratietest.
+- **Account-overname via e-mailwijziging + reset gedicht** (zie `docs/04-security-review.md`, R1).
+- **Een webshopbetaling vervalt met de hold.** De hold wordt níet verlengd tot de vervaldatum van Mollie (eigenaar). Na de hold is het stuk weer te koop, dus annuleert de cron `reservations.expire` de open Mollie-betaling (`cancelPaymentsWithoutHold`; lukt bij o.a. bankoverschrijving, iDEAL en kaart verlopen vanzelf). "Verder betalen" en het hergebruiken van een open betaling werken alleen zolang de hold leeft; daarna "opnieuw proberen", dat het stuk opnieuw reserveert. Veilingorders vallen hierbuiten (die houden hun stuk via het lot vast).
+- **Order-hold blijft 30 minuten** (max van 30 en `checkout.reservationMinutes`), winkelwagen 15 (eigenaar).
+- **Betaald na annuleren:** een late betaling op een geannuleerde order rondt die niet meer af (geen SALE, geen bevestiging, geen factuur). De order blijft geannuleerd met event `payment.paid_after_cancel`; de shop betaalt terug. Annuleren in de admin annuleert ook de open Mollie-betaling.
+- **Beurs en veiling sluiten elkaar uit:** een stuk in een veiling (gehouden, of lot van een concept-/gepubliceerde/live veiling) kan niet op een beurs en wordt op de beurs niet verkocht; een stuk op een beurs in voorbereiding of live kan geen lot worden.
+- **Landenregels ook in home- en CMS-blokken** ("Nieuw binnen", productblok) en in `llms-full.txt`: verbergen en vervagen zoals in de catalogus.
+- **Een categorie met compliance-regels kan niet verwijderd worden** (foutmelding; de database weigert het ook). Eerst de regel aanpassen of verwijderen.
+
 ## Aanmeldpagina's — akkoord eigenaar (29-10-2026)
 Ontwerp: `docs/design/platform-signup.html` (artifact https://claude.ai/artifact/MkebSvLMt1WKsYLS3hP4qe). Code: `src/app/(shop)/apply/`, gedeelde frame `src/app/(shop)/_platform/PlatformShell.tsx`.
 - Zelfde stijl als de landing (`DESIGN.md`): nav en footer van de landing, lettertypes, tokens.

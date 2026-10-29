@@ -8,6 +8,7 @@ import { createComplianceRule, deleteComplianceRule, getComplianceRule, listComp
 import { complianceHideFilter, loadCompiledRules, resolveCompliance, testCompliance } from "./resolve";
 import { assertDeactivationCertOnFile, deactivationCertBlockers } from "./guard";
 import { visitorCountry } from "./country";
+import { applyCountryRules, toProductCardData, type ProductCardRowJson } from "@/server/storefront/products";
 
 describe("compliance", () => {
   let a: ServiceContext;
@@ -116,6 +117,33 @@ describe("compliance", () => {
     });
     await expect(assertDeactivationCertOnFile(db, gun.id, a.tenantId)).resolves.toBeUndefined();
     expect(await deactivationCertBlockers(db, b.tenantId, [gun.id])).toEqual([]);
+  });
+
+  it("applies the visitor's rules to home and CMS block cards: hidden items drop, blurred ones never show the photo", async () => {
+    const hiddenCat = await createCategory(a, { title: "Hidden in DE" });
+    const helmet = await createProduct(a, { title: "M40", categoryId: hiddenCat.id });
+    const cap = await createProduct(a, { title: "Cap", restrictedSymbols: true });
+    const canteen = await createProduct(a, { title: "Canteen" });
+    await createComplianceRule(a, { name: "Hide DE", match: "CATEGORY", categoryId: hiddenCat.id, countries: ["DE"], action: "HIDE_PRODUCT" });
+    await createComplianceRule(a, { name: "Blur DE", match: "RESTRICTED_SYMBOLS", countries: ["DE"], action: "BLUR_IMAGES" });
+    const rows = [helmet, cap, canteen].map((p) => ({ id: p.id }));
+
+    const de = await applyCountryRules(a.tenantId, rows, "DE");
+    expect(de.rows.map((r) => r.id)).toEqual([cap.id, canteen.id]);
+    expect([...de.geoBlurred]).toEqual([cap.id]);
+    const unknown = await applyCountryRules(a.tenantId, rows, null);
+    expect(unknown.rows).toHaveLength(3);
+    expect(unknown.geoBlurred.size).toBe(0);
+
+    const variants = { card: { key: "t/products/p/card.webp" }, blur: { key: "t/products/p/blur.webp", dataUrl: "data:image/webp;base64,AAAA" } };
+    const row = {
+      id: cap.id, stockCode: 1, slug: "cap", title: "Cap", price: 1000, status: "ACTIVE", quantity: 1, blurred: false, showSoldPrice: false, onSale: false, category: null, publishedAt: null,
+      images: [{ storageKey: "t/products/p/original.jpg", variants, alt: null, width: 800, height: 1000 }],
+    } as unknown as ProductCardRowJson;
+    const opts = { currency: "EUR", viewerSignedIn: false, blurSensitiveForGuests: false };
+    expect(toProductCardData(row, { ...opts, geoBlurred: de.geoBlurred }).image).toMatchObject({ src: "/uploads/t/products/p/blur.webp", alt: "" });
+    expect(toProductCardData(row, { ...opts, geoBlurred: de.geoBlurred }).image?.srcSet).toBeUndefined();
+    expect(toProductCardData(row, opts).image?.src).toBe("/uploads/t/products/p/card.webp");
   });
 
   it("reads the visitor country from edge headers only", () => {
