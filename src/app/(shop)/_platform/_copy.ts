@@ -143,17 +143,17 @@ export const platformCopy = {
     } satisfies Record<Mode, string>,
     steps: {
       APPLY: [
-        { title: "Apply", body: "Your name, your shop and your Chamber of Commerce number.", meta: "About 3 minutes" },
+        { title: "Apply", body: "Your name, your shop and what you sell.", meta: "About 3 minutes" },
         { title: "We review", body: "Militaria is sensitive, so every dealer is checked by hand.", meta: "Usually a few working days" },
         wizardStep,
       ],
       WAITLIST: [
-        { title: "Join the waitlist", body: "Your name, your shop and your Chamber of Commerce number.", meta: "About 3 minutes" },
+        { title: "Join the waitlist", body: "Your name, your shop and what you sell.", meta: "About 3 minutes" },
         { title: "We invite you", body: "In the order dealers signed up, as soon as there is room.", meta: "We email you" },
         wizardStep,
       ],
       TRIAL: [
-        { title: "Tell us about your shop", body: "Your name, your shop and your Chamber of Commerce number.", meta: "About 3 minutes" },
+        { title: "Tell us about your shop", body: "Your name, your shop and what you sell.", meta: "About 3 minutes" },
         { title: "Confirm your email", body: "Your shop is created the moment you click the link in your inbox.", meta: "Choose a password" },
         wizardStep,
       ],

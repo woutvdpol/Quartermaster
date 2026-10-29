@@ -6,6 +6,9 @@ import { cn } from "@/components/shop/ui/cn";
 export const wrapClass = "mx-auto max-w-[1200px] px-[clamp(16px,4vw,56px)]";
 export const wordmarkClass = "font-pf-display text-[15px] leading-none font-bold tracking-[0.18em] uppercase no-underline sm:tracking-[0.26em]";
 
+/** Title of the single card on the confirmation pages (thanks, verify). */
+export const cardTitleClass = "font-pf-display text-[clamp(28px,3vw,34px)] leading-[1.1] font-semibold tracking-[-0.015em] text-balance focus:outline-none";
+
 const button = "inline-flex items-center justify-center gap-2 rounded-lg border font-semibold whitespace-nowrap no-underline transition-colors duration-200 ease-pf-out active:translate-y-px";
 
 export const buttonClass = {

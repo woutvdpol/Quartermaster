@@ -28,7 +28,7 @@ const cocInput = z
   .string()
   .trim()
   .max(APPLICATION_LIMITS.coc)
-  .regex(/^[A-Za-z0-9 .\-/]*$/, "Use letters, digits, spaces or dashes only");
+  .regex(/^[A-Za-z0-9 .\-/]*$/, "Use only letters, digits, spaces, dots, dashes or slashes.");
 
 export const applicationSchema = z.object({
   applicantName: z.string().trim().min(2, "Enter your name.").max(APPLICATION_LIMITS.name),

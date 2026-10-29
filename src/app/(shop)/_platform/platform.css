@@ -66,10 +66,13 @@
   background: #f1e5cc;
   color: #1e2119;
 }
-.qm-platform :focus-visible {
-  outline: 2px solid #7e5416;
-  outline-offset: 3px;
-  border-radius: 4px;
+/* In `base`, so a field's own focus utilities (offset, corner radius) still win. */
+@layer base {
+  .qm-platform :focus-visible {
+    outline: 2px solid #7e5416;
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
 }
 .qm-platform summary::-webkit-details-marker {
   display: none;

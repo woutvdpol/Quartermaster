@@ -206,3 +206,13 @@ Uit de repo-audit van 29-10-2026; per punt een integratietest.
 - **Landenregels ook in home- en CMS-blokken** ("Nieuw binnen", productblok) en in `llms-full.txt`: verbergen en vervagen zoals in de catalogus.
 - **Een categorie met compliance-regels kan niet verwijderd worden** (foutmelding; de database weigert het ook). Eerst de regel aanpassen of verwijderen.
 
+## Aanmeldpagina's — akkoord eigenaar (29-10-2026)
+Ontwerp: `docs/design/platform-signup.html` (artifact https://claude.ai/artifact/MkebSvLMt1WKsYLS3hP4qe). Code: `src/app/(shop)/apply/`, gedeelde frame `src/app/(shop)/_platform/PlatformShell.tsx`.
+- Zelfde stijl als de landing (`DESIGN.md`): nav en footer van de landing, lettertypes, tokens.
+- **De proefknop staat ook op de aanmeldpagina's in de nav**, en alle "start / aanvragen"-knoppen op het platform linken naar het formulier met een anker (`/apply#apply-form`).
+- **Concept500 blijft** een antwoord op "Where do you sell now?".
+- **KvK-nummer is optioneel** en heet zo in het label.
+- **Knoptekst in mail en pagina is gelijk:** bij proef "Confirm and create my shop", bij aanvragen en wachtlijst "Confirm my email".
+- **"Je shop wordt meteen aangemaakt"** staat alleen bij proef (ook al kan een proefaanvraag in review belanden); bij aanvragen en wachtlijst niet.
+- **Een dubbel e-mailadres geeft geen foutmelding** (de server antwoordt "ok" en stuurt de link opnieuw), zodat niemand kan uitzoeken welke adressen al aangemeld zijn.
+- Foutsamenvatting boven het formulier met links naar de velden; invoertekst 16px (geen zoom op iOS); Turnstile licht; na bevestigen een eigen titel per uitkomst met focus erop.

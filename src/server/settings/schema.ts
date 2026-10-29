@@ -91,7 +91,7 @@ const shortText = (max = 200) => z.string().trim().max(max);
 const compactUpper = (s: string) => s.replace(/[\s.\-]/g, "").toUpperCase();
 
 /** Chamber of Commerce (KvK) number; loose so foreign registrations fit. "" = not set. */
-const cocNumber = shortText(30).regex(/^[A-Za-z0-9 .\-/]*$/, "Use letters, digits, spaces or dashes only");
+const cocNumber = shortText(30).regex(/^[A-Za-z0-9 .\-/]*$/, "Use only letters, digits, spaces, dots, dashes or slashes.");
 
 /** EU-style VAT id, e.g. NL123456789B01 (country code + 2–13 characters). "" = not set. */
 const vatNumber = z

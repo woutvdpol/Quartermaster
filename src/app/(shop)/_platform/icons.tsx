@@ -44,6 +44,9 @@ export const CardIcon = ({ className = "size-5" }: P) => (
 export const FileIcon = ({ className = "size-5" }: P) => (
   <svg viewBox="0 0 24 24" className={className} {...base}><path d="M14 3H6v18h12V7z" /><path d="M14 3v4h4M9 13h6M9 17h6" /></svg>
 );
+export const AlertIcon = ({ className = "size-4" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} strokeWidth={1.8}><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5M12 16.5v.01" /></svg>
+);
 export const PlusIcon = ({ className = "size-5" }: P) => (
   <svg viewBox="0 0 24 24" className={className} {...base}><path d="M12 5v14M5 12h14" /></svg>
 );

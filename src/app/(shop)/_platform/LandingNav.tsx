@@ -12,15 +12,16 @@ import { buttonClass, wordmarkClass, wrapClass } from "./parts";
 type NavCopy = (typeof platformCopy)["nav"];
 
 /** Only the nav texts come in as props, so the rest of the page copy stays out of the client bundle. */
-export function LandingNav({ name, cta, t }: { name: string; cta: string; t: NavCopy }) {
+/** `base` prefixes the section anchors: "" on the landing, "/" elsewhere (they point at the landing). */
+export function LandingNav({ name, cta, ctaHref, base, t }: { name: string; cta: string; ctaHref: string; base: "" | "/"; t: NavCopy }) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   const sections = [
-    ["#how", t.how],
-    ["#features", t.features],
-    ["#pricing", t.pricing],
-    ["#network", t.network],
+    [`${base}#how`, t.how],
+    [`${base}#features`, t.features],
+    [`${base}#pricing`, t.pricing],
+    [`${base}#network`, t.network],
   ] as const;
 
   useEffect(() => {
@@ -44,7 +45,7 @@ export function LandingNav({ name, cta, t }: { name: string; cta: string; t: Nav
   return (
     <header className={cn("sticky top-0 z-10 border-b bg-pf-paper/92 backdrop-blur-[10px] backdrop-saturate-[1.4] transition-colors duration-200", scrolled || open ? "border-pf-line-soft" : "border-transparent")}>
       <div className={cn(wrapClass, "flex h-[68px] items-center gap-3 lg:gap-8")}>
-        <a href="#top" className={wordmarkClass}>
+        <a href={base ? "/" : "#top"} className={wordmarkClass}>
           {name}
         </a>
         <nav aria-label={t.label} className="mr-auto hidden gap-7 text-[15px] font-medium lg:flex">
@@ -58,7 +59,7 @@ export function LandingNav({ name, cta, t }: { name: string; cta: string; t: Nav
           <Link href="/admin" className="hidden text-pf-ink-2 no-underline hover:text-pf-ink sm:inline">
             {t.login}
           </Link>
-          <Link href="/apply" className={buttonClass.primarySm}>
+          <Link href={ctaHref} className={buttonClass.primarySm}>
             {cta}
           </Link>
           <button
