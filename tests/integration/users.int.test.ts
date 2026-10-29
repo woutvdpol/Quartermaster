@@ -10,6 +10,7 @@ import {
   inviteOwner,
   listSessions,
   listStaff,
+  markAdminTourSeen,
   resendOwnerInvite,
   resetUserTwoFactor,
   revokeSession,
@@ -201,5 +202,21 @@ describe("own sessions and profile", () => {
     const owner = await createTenantContext();
     const c = await db.user.create({ data: { tenantId: owner.tenantId, role: "CUSTOMER", email: "c@x.test" } });
     await expect(updateOwnProfile({ id: c.id, role: c.role, tenantId: c.tenantId, email: c.email }, { name: "x" })).rejects.toBeInstanceOf(AuthError);
+  });
+});
+
+describe("admin tour", () => {
+  it("is marked seen once and never for customers", async () => {
+    const ctx = await createTenantContext();
+    const o = await addOwner(ctx, "new-owner@x.test");
+    const actor = { id: o.id, role: o.role, tenantId: o.tenantId, email: o.email };
+    await markAdminTourSeen(actor);
+    const first = (await db.user.findUniqueOrThrow({ where: { id: o.id } })).adminTourSeenAt;
+    expect(first).toBeInstanceOf(Date);
+    await markAdminTourSeen(actor);
+    expect((await db.user.findUniqueOrThrow({ where: { id: o.id } })).adminTourSeenAt).toEqual(first);
+
+    const c = await db.user.create({ data: { tenantId: ctx.tenantId, role: "CUSTOMER", email: "c2@x.test" } });
+    await expect(markAdminTourSeen({ id: c.id, role: c.role, tenantId: c.tenantId, email: c.email })).rejects.toBeInstanceOf(AuthError);
   });
 });

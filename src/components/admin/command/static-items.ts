@@ -11,6 +11,7 @@ export function quickActions(opts: { superadmin: boolean; canSwitch: boolean }):
     { id: "action:new-product", label: "New product", href: "/admin/inventory/new", meta: "Inventory" },
     { id: "action:orders-to-ship", label: "Go to Orders › To ship", href: "/admin/orders?view=toShip", meta: "Orders" },
     { id: "action:shipping-board", label: "Open shipping board", href: "/admin/shipping-board", meta: "Orders" },
+    { id: "action:admin-tour", label: "Take the admin tour", href: "/admin/dashboard?tour=1", meta: "Help" },
   ];
   if (opts.superadmin && opts.canSwitch) items.push({ id: "action:switch-shop", label: "Switch shop…", action: "switch-shop", meta: "Platform" });
   return items;

@@ -1,0 +1,266 @@
+<title>Quartermaster Admin Tour</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: design doc in one column; a live mock of the admin with a step-through spotlight tour at the top. */
+:root {
+  --bg: #F3F3EE; --panel: #FBFBF8; --ink: #1E2421; --ink-2: #4A514C; --muted: #7A817B; --line: #D9DBD1;
+  --rail: #1F3347; --rail-ink: #E8EEF3; --rail-muted: #9DB0C2; --rail-raised: #2B4359;
+  --accent: #7E5416; --accent-soft: #F1E6D3; --ok: #2F6B45; --warn: #8A5A00; --warn-soft: #FAEBC8;
+  --scrim: rgba(18, 24, 22, .55);
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "Public Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141816; --panel: #1C211E; --ink: #E7E9E3; --ink-2: #B9BEB6; --muted: #8C938B; --line: #313833;
+  --rail: #101A24; --rail-ink: #DCE5EC; --rail-muted: #7F93A6; --rail-raised: #1B2A38;
+  --accent: #D9A85A; --accent-soft: #3A2E1C; --ok: #7FC79A; --warn: #E9C06A; --warn-soft: #3A2F15;
+  --scrim: rgba(0, 0, 0, .6); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #141816; --panel: #1C211E; --ink: #E7E9E3; --ink-2: #B9BEB6; --muted: #8C938B; --line: #313833;
+  --rail: #101A24; --rail-ink: #DCE5EC; --rail-muted: #7F93A6; --rail-raised: #1B2A38;
+  --accent: #D9A85A; --accent-soft: #3A2E1C; --ok: #7FC79A; --warn: #E9C06A; --warn-soft: #3A2F15;
+  --scrim: rgba(0, 0, 0, .6); color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+main { max-width: 1040px; margin: 0 auto; padding-block: 40px 72px; display: grid; gap: 40px }
+h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; letter-spacing: -0.01em }
+h1 { font-size: clamp(28px, 4vw, 38px); line-height: 1.1 }
+h2 { font-size: 21px }
+h3 { font-size: 15px }
+p { margin: 0; max-width: 68ch }
+.eyebrow { font: 500 11px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--accent) }
+.lead { color: var(--ink-2); font-size: 17px }
+.note { color: var(--muted); font-size: 13px }
+section { display: grid; gap: 14px }
+code { font-family: var(--mono); font-size: 12.5px }
+
+/* Mock admin */
+.mock { position: relative; display: grid; grid-template-columns: 200px 1fr; min-height: 470px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel) }
+.rail { background: var(--rail); color: var(--rail-ink); padding: 14px 10px; display: flex; flex-direction: column; gap: 10px; font-size: 12.5px }
+.brand { font: 600 13px var(--display); letter-spacing: .12em; text-transform: uppercase; padding: 2px 6px }
+.search { border: 1px solid var(--rail-raised); border-radius: 5px; padding: 5px 8px; color: var(--rail-muted); display: flex; justify-content: space-between; font-size: 12px }
+.group { font: 500 10px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--rail-muted); padding: 6px 6px 2px }
+.nav a { display: flex; justify-content: space-between; padding: 3px 6px; border-radius: 4px; color: inherit; text-decoration: none }
+.nav a.cur { background: var(--rail-raised) }
+.lock { color: var(--rail-muted); font-size: 10px }
+.acct { margin-top: auto; border-top: 1px solid var(--rail-raised); padding: 8px 6px 0; font-size: 12px }
+.acct span { display: block; color: var(--rail-muted) }
+.page { padding: 18px; display: grid; gap: 14px; align-content: start; min-width: 0 }
+.ph { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap }
+.ph h3 { font-size: 18px }
+.btn { display: inline-block; padding: 6px 12px; border-radius: 5px; background: var(--accent); color: var(--panel); font: 600 12.5px var(--body); border: 0; cursor: pointer }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line) }
+.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px }
+.kpi { border: 1px solid var(--line); border-radius: 6px; padding: 10px }
+.kpi b { display: block; font: 600 18px var(--display); font-variant-numeric: tabular-nums }
+.kpi span { font: 500 10px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted) }
+.todo { border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; display: grid; gap: 6px; font-size: 13px }
+.todo div { display: flex; justify-content: space-between }
+.todo i { font-style: normal; font-family: var(--mono); color: var(--ink-2) }
+
+/* Tour layer */
+.spot { position: absolute; border-radius: 6px; box-shadow: 0 0 0 9999px var(--scrim); outline: 2px solid var(--accent); outline-offset: 2px; transition: all .25s ease; pointer-events: none; z-index: 5 }
+.pop { position: absolute; z-index: 6; width: min(300px, calc(100% - 24px)); background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.25); transition: top .25s ease, left .25s ease }
+.pop .count { font: 500 11px var(--mono); color: var(--muted); letter-spacing: .08em }
+.pop h3 { font-size: 15px }
+.pop p { font-size: 13.5px; color: var(--ink-2) }
+.pop .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 4px }
+.pop .row div { display: flex; gap: 6px }
+.linkbtn { background: none; border: 0; color: var(--muted); font: 500 12.5px var(--body); cursor: pointer; padding: 4px 0 }
+.btn:focus-visible, .linkbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+@media (prefers-reduced-motion: reduce) { .spot, .pop { transition: none } }
+
+.steps { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; counter-reset: s }
+.steps li { display: grid; grid-template-columns: 34px 160px 1fr; gap: 12px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; align-items: baseline; counter-increment: s }
+.steps li::before { content: counter(s); font: 600 13px var(--mono); color: var(--accent) }
+.steps b { font-weight: 600 }
+.steps span { color: var(--ink-2); font-size: 13.5px; min-width: 0 }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px }
+.facts > div { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; min-width: 0 }
+.facts ul { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 13.5px; display: grid; gap: 3px }
+.q { display: grid; gap: 10px; padding: 0; margin: 0 }
+.q li { list-style: none; padding: 12px 14px; border-left: 3px solid var(--accent); background: var(--panel); border-radius: 0 6px 6px 0 }
+.q b { display: block; margin-bottom: 2px }
+.q span { color: var(--ink-2); font-size: 13.5px }
+
+@media (max-width: 760px) {
+  .mock { grid-template-columns: 1fr } .rail { display: none }
+  .kpis, .facts { grid-template-columns: 1fr }
+  .steps li { grid-template-columns: 28px 1fr } .steps span { grid-column: 2 }
+}
+</style>
+
+<main>
+  <header style="display:grid;gap:12px">
+    <span class="eyebrow">Design · shop admin</span>
+    <h1>A one-minute tour on the first sign-in</h1>
+    <p class="lead">The first time a shop owner opens the admin, a short spotlight tour points out where everything is. It runs on the real screens, can be skipped, and comes back from the Account menu whenever they want it.</p>
+  </header>
+
+  <section>
+    <span class="eyebrow">Try it</span>
+    <h2>The tour on the dashboard</h2>
+    <p class="note">Mock of the admin with example data. Use Next, Back or the arrow keys; Esc skips.</p>
+    <div class="mock" id="mock" aria-label="Mock of the admin with the tour">
+      <aside class="rail" data-tour="rail">
+        <div class="brand">Quartermaster</div>
+        <div class="search" data-tour="search"><span>Search…</span><span>⌘K</span></div>
+        <div class="nav" data-tour="nav">
+          <div class="group">Overview</div>
+          <a class="cur" href="#mock">Dashboard</a>
+          <div class="group">Catalog</div>
+          <a href="#mock" data-tour="inventory">Inventory</a>
+          <a href="#mock">Categories</a>
+          <div class="group">Sales</div>
+          <a href="#mock" data-tour="orders">Orders</a>
+          <a href="#mock">Shipping board</a>
+          <a href="#mock" data-tour="locked">Auctions <span class="lock">🔒</span></a>
+          <div class="group">Website</div>
+          <a href="#mock" data-tour="website">Theme</a>
+          <div class="group">System</div>
+          <a href="#mock" data-tour="settings">Payment methods</a>
+        </div>
+        <div class="acct" data-tour="account">Jan de Vries<span>Owner · Account</span></div>
+      </aside>
+      <div class="page">
+        <div class="ph"><h3>Dashboard</h3><span class="btn" data-tour="new">+ New product</span></div>
+        <div class="kpis">
+          <div class="kpi"><span>Revenue 30 d</span><b>€1,425</b></div>
+          <div class="kpi"><span>Orders</span><b>11</b></div>
+          <div class="kpi"><span>For sale</span><b>23</b></div>
+        </div>
+        <div class="todo" data-tour="todo">
+          <h3>To do today</h3>
+          <div>Paid, not yet shipped <i>2</i></div>
+          <div>Bank transfer awaiting payment <i>0</i></div>
+          <div>Reserved in a cart now <i>1</i></div>
+        </div>
+        <div class="row"><span class="btn ghost" data-tour="shop">View your shop ↗</span></div>
+      </div>
+      <div class="spot" id="spot" hidden></div>
+      <div class="pop" id="pop" role="dialog" aria-modal="false" aria-labelledby="pop-title" aria-live="polite">
+        <span class="count" id="pop-count"></span>
+        <h3 id="pop-title"></h3>
+        <p id="pop-body"></p>
+        <div class="row">
+          <button class="linkbtn" id="skip" type="button">Skip tour</button>
+          <div><button class="btn ghost" id="back" type="button">Back</button><button class="btn" id="next" type="button">Next</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Steps</span>
+    <h2>What the tour shows</h2>
+    <ol class="steps">
+      <li><b>Welcome</b><span>"Welcome to <em>shop name</em>. A one-minute tour of your admin." Start or skip.</span></li>
+      <li><b>Menu</b><span>Everything lives in the menu, grouped by Catalog, Sales, Website and System.</span></li>
+      <li><b>Search ⌘K</b><span>Jump to a product, an order number or a page from the keyboard.</span></li>
+      <li><b>To do today</b><span>What needs you now: paid orders to ship, payments waiting, items in a cart.</span></li>
+      <li><b>New product</b><span>Every piece is unique: one product, one stock number, sold once. Photos and a QR certificate come with it.</span></li>
+      <li><b>Orders</b><span>Web shop and fair sales arrive here; the shipping board shows what to pack.</span></li>
+      <li><b>Website</b><span>Look, pages and menus of the shop.</span></li>
+      <li><b>Payments</b><span>Connect Mollie to take real payments.</span></li>
+      <li><b>Locked items</b><span>A lock means the module is not in your package. Open it to see what it does.</span></li>
+      <li><b>Account</b><span>Password, two-factor sign-in, and "Restart tour".</span></li>
+      <li><b>Done</b><span>"You're set." Button: View your shop.</span></li>
+    </ol>
+    <p class="note">Steps on menu items that are hidden on a phone (closed menu) show as a centred card instead of a spotlight. A step whose target is missing (for example no locked modules on Complete) is left out.</p>
+  </section>
+
+  <section>
+    <span class="eyebrow">How it works</span>
+    <h2>Rules and build</h2>
+    <div class="facts">
+      <div>
+        <h3>When it starts</h3>
+        <ul>
+          <li>Once per owner, on the first admin page after sign-in.</li>
+          <li>Never inside the setup wizard; for a new shop it starts on the first page after the wizard.</li>
+          <li>Skip or finish both count as seen. "Restart tour" in Account (and in the ⌘K palette) plays it again.</li>
+          <li>Superadmins never get it automatically.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Build</h3>
+        <ul>
+          <li><code>User.adminTourSeenAt</code> (one column, one migration).</li>
+          <li>A small client component in the admin shell; targets are <code>data-tour="…"</code> attributes on existing elements. No new dependency.</li>
+          <li>Keyboard: arrows, Enter, Esc; focus stays in the card; respects reduced motion.</li>
+          <li>Tests: shows once, not in the wizard, restart works.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Decisions (29 Oct 2026)</span>
+    <h2>Your choices</h2>
+    <ol class="q">
+      <li><b>Every owner gets it.</b><span>On their first sign-in, including colleagues invited later and owners of migrated shops.</span></li>
+      <li><b>After the setup wizard.</b><span>It never starts inside the wizard; a new shop sees it on the dashboard after Go live.</span></li>
+      <li><b>Spotlight tour.</b><span>Skippable, restart from Account or the ⌘K palette.</span></li>
+      <li><b>Stays on the dashboard.</b><span>Points at the menu and dashboard parts; it does not open other pages.</span></li>
+    </ol>
+  </section>
+</main>
+
+<script>
+(() => {
+  const steps = [
+    { title: "Welcome to Vries Militaria", body: "A one-minute tour of your admin. You can play it again any time from Account." },
+    { t: "nav", title: "Everything is in the menu", body: "Grouped by Catalog, Sales, Website and System." },
+    { t: "search", title: "Search or press ⌘K", body: "Jump to a product, an order number or a page from the keyboard." },
+    { t: "todo", title: "To do today", body: "What needs you now: paid orders to ship, payments waiting, items in a cart." },
+    { t: "new", title: "Add your first piece", body: "Every piece is unique: one product, one stock number, sold once." },
+    { t: "orders", title: "Orders", body: "Web shop and fair sales arrive here. The shipping board shows what to pack." },
+    { t: "website", title: "Your website", body: "Change the look, pages and menus of your shop." },
+    { t: "settings", title: "Take payments", body: "Connect Mollie under Payment methods to take real payments." },
+    { t: "locked", title: "Locked items", body: "A lock means the module is not in your package. Open it to see what it does." },
+    { t: "account", title: "Your account", body: "Password, two-factor sign-in, and Restart tour." },
+    { t: "shop", title: "You're set", body: "Have a look at your shop as visitors see it." },
+  ];
+  const mock = document.getElementById("mock"), spot = document.getElementById("spot"), pop = document.getElementById("pop");
+  const $ = (id) => document.getElementById(id);
+  let i = 0;
+  function place() {
+    const s = steps[i];
+    $("pop-count").textContent = `${i + 1} / ${steps.length}`;
+    $("pop-title").textContent = s.title;
+    $("pop-body").textContent = s.body;
+    $("back").hidden = i === 0;
+    $("next").textContent = i === 0 ? "Start tour" : i === steps.length - 1 ? "Done" : "Next";
+    const m = mock.getBoundingClientRect();
+    const el = s.t ? mock.querySelector(`[data-tour="${s.t}"]`) : null;
+    const r = el && el.offsetParent !== null ? el.getBoundingClientRect() : null;
+    if (!r) {
+      spot.hidden = true;
+      pop.style.left = `${Math.max(12, (m.width - pop.offsetWidth) / 2)}px`;
+      pop.style.top = `${Math.max(12, (m.height - pop.offsetHeight) / 2)}px`;
+      return;
+    }
+    spot.hidden = false;
+    Object.assign(spot.style, { left: `${r.left - m.left - 4}px`, top: `${r.top - m.top - 4}px`, width: `${r.width + 8}px`, height: `${r.height + 8}px` });
+    let left = r.right - m.left + 14, top = r.top - m.top;
+    if (left + pop.offsetWidth > m.width - 12) { left = Math.max(12, r.left - m.left); top = r.bottom - m.top + 14; }
+    if (top + pop.offsetHeight > m.height - 12) top = Math.max(12, r.top - m.top - pop.offsetHeight - 14);
+    pop.style.left = `${left}px`; pop.style.top = `${top}px`;
+  }
+  const go = (d) => { i = (i + d + steps.length) % steps.length; place(); };
+  $("next").addEventListener("click", () => go(1));
+  $("back").addEventListener("click", () => go(-1));
+  $("skip").addEventListener("click", () => { i = 0; place(); });
+  mock.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") go(1); else if (e.key === "ArrowLeft") go(-1); else if (e.key === "Escape") { i = 0; place(); }
+  });
+  addEventListener("resize", place);
+  place();
+})();
+</script>

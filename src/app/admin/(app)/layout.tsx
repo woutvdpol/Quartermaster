@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { TrialBanner } from "@/components/admin/TrialBanner";
+import { AdminTour } from "@/components/admin/tour/AdminTour";
 import { Sidebar } from "@/components/admin/Sidebar";
 import { Toaster } from "@/components/admin/ui";
 import { ADMIN_THEME_COOKIE, parseAdminThemeCookie } from "@/lib/admin-theme";
@@ -9,6 +11,7 @@ import { requireAdminPage } from "@/server/auth/guards";
 import { ADMIN_NAV, type NavItemKey } from "@/lib/admin-nav";
 import { getEntitlements } from "@/server/modules";
 import { moduleForNavKey } from "@/server/modules/catalog";
+import { markAdminTourSeenAction } from "./actions";
 
 /** Authenticated admin shell. Everything under this group requires a fully signed-in staff user. */
 export default async function AdminAppLayout({ children }: LayoutProps<"/admin">) {
@@ -24,6 +27,12 @@ export default async function AdminAppLayout({ children }: LayoutProps<"/admin">
         {children}
       </main>
       <Toaster />
+      {tenants.active ? (
+        // useSearchParams (?tour=1) needs a Suspense boundary.
+        <Suspense fallback={null}>
+          <AdminTour shopName={tenants.active.name} autoStart={user.role === "OWNER" && !user.adminTourSeen} markSeen={markAdminTourSeenAction} />
+        </Suspense>
+      ) : null}
     </AdminShell>
   );
 }

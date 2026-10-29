@@ -178,3 +178,10 @@ Ontwerp: `docs/design/signup-modes.html`. Uitwerking: `docs/signup-modes.md`.
   - **Pakket tijdens de proef: Compleet.**
   - **Na de proef: winkel dicht, admin open.** Bezoekers zien "Tijdelijk gesloten", de gegevens blijven. De superadmin verlengt de proef of zet de shop om naar een betaald pakket (betalen via het platform bestaat nog niet).
 - **Wachtlijst:** de aanmelder ziet alleen "je staat op de lijst", geen plek in de rij. De superadmin nodigt uit in volgorde van aanmelding.
+
+## Admin-rondleiding — akkoord eigenaar (29-10-2026)
+Ontwerp: `docs/design/admin-tour.html`. Uitwerking: `docs/admin-tour.md`.
+- **Elke eigenaar** krijgt bij de eerste keer inloggen een korte rondleiding door de admin, ook collega's die later worden uitgenodigd en eigenaren van gemigreerde shops.
+- Bij een nieuwe shop **na de setup-wizard**: de rondleiding start nooit in de wizard.
+- **Vorm:** een spotlight-rondleiding op de echte schermen, over te slaan en opnieuw te starten via Account.
+- **Blijft op het dashboard:** wijst menu-onderdelen en delen van het dashboard aan, en opent geen andere pagina's.

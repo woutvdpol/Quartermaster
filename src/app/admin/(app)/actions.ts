@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { db } from "@/server/db";
 import { canAccessTenant, requireUser } from "@/server/auth/guards";
 import { TENANT_COOKIE } from "@/lib/admin-tenant";
+import { markAdminTourSeen } from "@/server/users";
 
 /** Switches the shop a SUPERADMIN is working on. Owners cannot switch (canAccessTenant fails). */
 export async function selectTenantAction(formData: FormData): Promise<void> {
@@ -19,4 +20,9 @@ export async function selectTenantAction(formData: FormData): Promise<void> {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
   });
+}
+
+/** The first-sign-in admin tour opened; it does not start by itself again (docs/admin-tour.md). */
+export async function markAdminTourSeenAction(): Promise<void> {
+  await markAdminTourSeen(await requireUser());
 }

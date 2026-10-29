@@ -352,6 +352,12 @@ export type UpdateProfileResult =
   | { ok: true; profile: { id: string; email: string; name: string | null } }
   | { ok: false; error: "invalid_password" | "rate_limited" | "email_taken" };
 
+/** Records that the signed-in staff member has seen the first-sign-in admin tour (docs/admin-tour.md). */
+export async function markAdminTourSeen(user: ActingUser): Promise<void> {
+  assertStaffActor(user);
+  await db.user.updateMany({ where: { id: user.id, adminTourSeenAt: null }, data: { adminTourSeenAt: new Date() } });
+}
+
 /**
  * Updates the signed-in staff member's own name/e-mail. Changing the e-mail requires the current
  * password (rate limited on the same key as other re-auth prompts) and clears `emailVerifiedAt`.

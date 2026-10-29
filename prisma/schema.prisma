@@ -218,6 +218,7 @@ model User {
   totpEnabledAt   DateTime?
   disabledAt      DateTime?
   lastLoginAt     DateTime?
+  adminTourSeenAt DateTime? // first-sign-in admin tour finished or skipped (docs/admin-tour.md)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
