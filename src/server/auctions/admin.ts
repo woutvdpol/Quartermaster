@@ -180,8 +180,10 @@ async function blockers(tx: Tx, tenantId: string, products: Candidate[], auction
   const out: { stockCode: number; reason: string }[] = [];
   const now = new Date();
   const ids = products.map((p) => p.id);
-  const [reserved, otherLots] = await Promise.all([
+  const [reserved, onFair, otherLots] = await Promise.all([
     tx.reservation.findMany({ where: { tenantId, productId: { in: ids }, status: "ACTIVE", expiresAt: { gt: now } }, select: { productId: true } }),
+    // A fair that is still preparing holds nothing yet, but the piece is going there.
+    tx.fairItem.findMany({ where: { tenantId, productId: { in: ids }, soldAt: null, fair: { status: { in: ["PREPARING", "LIVE"] } } }, select: { productId: true } }),
     tx.auctionLot.findMany({
       where: { tenantId, productId: { in: ids }, auctionId: { not: auctionId }, status: { in: ["OPEN", "SOLD"] }, auction: { status: { in: ["DRAFT", "PUBLISHED", "LIVE"] } } },
       select: { productId: true },
@@ -189,9 +191,10 @@ async function blockers(tx: Tx, tenantId: string, products: Candidate[], auction
   ]);
   const reservedIds = new Set(reserved.map((r) => r.productId));
   const lotIds = new Set(otherLots.map((r) => r.productId));
+  const fairIds = new Set(onFair.map((r) => r.productId));
   for (const p of products) {
     if (p.status !== "ACTIVE" || p.quantity <= 0) out.push({ stockCode: p.stockCode, reason: "not for sale" });
-    else if (p.fairHoldId) out.push({ stockCode: p.stockCode, reason: "on a fair" });
+    else if (p.fairHoldId || fairIds.has(p.id)) out.push({ stockCode: p.stockCode, reason: "on a fair" });
     else if (p.auctionHoldId && p.auctionHoldId !== auctionId) out.push({ stockCode: p.stockCode, reason: "in another auction" });
     else if (lotIds.has(p.id)) out.push({ stockCode: p.stockCode, reason: "in another auction" });
     else if (reservedIds.has(p.id)) out.push({ stockCode: p.stockCode, reason: "in a customer's cart" });

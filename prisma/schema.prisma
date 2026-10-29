@@ -1599,7 +1599,8 @@ model ComplianceRule {
   updatedAt  DateTime         @updatedAt
 
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  category Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  // Restrict: deleting a category must never silently drop the legal rules on it (deleteCategory refuses).
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, isActive])
   @@map("compliance_rules")

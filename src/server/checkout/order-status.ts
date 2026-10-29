@@ -89,14 +89,20 @@ export async function getOrderStatusView(tenantId: string, uuid: string): Promis
       lines: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: { productId: true, title: true, stockCode: true, quantity: true, unitPrice: true, lineTotal: true, imagePath: true } },
       addresses: { where: { type: "SHIPPING" }, select: { firstName: true, lastName: true, city: true, countryCode: true } },
       payments: { where: { provider: "MOLLIE" }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1, select: { status: true, checkoutUrl: true, expiresAt: true } },
+      channel: true,
+      reservations: { where: { status: "ACTIVE", expiresAt: { gt: new Date() } }, select: { id: true }, take: 1 },
     },
   });
   if (!order) return null;
 
   const latest = order.payments[0] ?? null;
   const state = orderDisplayState(order, latest);
+  // A webshop payment may only be continued while the order's hold lives (cancelPaymentsWithoutHold).
+  const holdLive = order.channel !== "WEB" || order.reservations.length > 0;
   const continueUrl =
-    state === "waiting" && latest?.status === "OPEN" && latest.checkoutUrl && (!latest.expiresAt || latest.expiresAt.getTime() > Date.now()) ? latest.checkoutUrl : null;
+    state === "waiting" && holdLive && latest?.status === "OPEN" && latest.checkoutUrl && (!latest.expiresAt || latest.expiresAt.getTime() > Date.now())
+      ? latest.checkoutUrl
+      : null;
 
   const retryable = (state === "failed" || state === "unpaid") && !order.archivedAt && !order.canceledAt && !order.finalizedAt;
   const retryExpired = retryable && Date.now() - order.placedAt.getTime() > RETRY_WINDOW_MS;

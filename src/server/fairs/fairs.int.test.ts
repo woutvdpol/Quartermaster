@@ -5,6 +5,7 @@ import { markPaidManually } from "@/server/orders/commands";
 import { createTenantContext, resetDb } from "../../../tests/integration/helpers";
 import { makeOrder, makeProduct } from "../orders/test-fixtures";
 import { addFairItems, createFair, endFair, getFairReport, recordFairSale, startFair } from "./index";
+import { addLots, createAuction, publishAuction } from "@/server/auctions";
 
 const code = (p: Promise<unknown>) =>
   p.then(
@@ -81,6 +82,25 @@ describe("fairs", () => {
     await db.product.update({ where: { id: other.id }, data: { fairHoldId: null } });
     await makeOrder(ctx.tenantId, { lines: [{ product: other }], reserve: true });
     expect(await code(recordFairSale(ctx, { fairId: fair.id, productId: other.id, price: 10000, method: "cash", clientRef: "ref-web-00001" }))).toBe("CONFLICT");
+  });
+
+  it("never sells or adds an item that is in an auction", async () => {
+    const { ctx, product, fair } = await liveFair();
+    // Already on the (live) fair, then held by a published auction: the stand refuses the sale.
+    await db.product.update({ where: { id: product.id }, data: { fairHoldId: null } });
+    const auction = await createAuction(ctx, { title: "Autumn auction", opensAt: new Date(), firstCloseAt: new Date(Date.now() + 3_600_000) });
+    const lotted = await makeProduct(ctx.tenantId, { price: 20000 });
+    await addLots(ctx, auction.id, [lotted.id]);
+    await publishAuction(ctx, auction.id);
+    await db.fairItem.create({ data: { tenantId: ctx.tenantId, fairId: fair.id, productId: lotted.id, floorPrice: 15000 } });
+    expect(await code(recordFairSale(ctx, { fairId: fair.id, productId: lotted.id, price: 20000, method: "cash", clientRef: "ref-lot-00001" }))).toBe("CONFLICT");
+    expect((await db.product.findUniqueOrThrow({ where: { id: lotted.id } })).status).toBe("ACTIVE");
+
+    // A lot (even of a draft auction) cannot be added to a fair.
+    const draft = await createAuction(ctx, { title: "Draft auction", opensAt: new Date(), firstCloseAt: new Date(Date.now() + 3_600_000) });
+    const drafted = await makeProduct(ctx.tenantId, { price: 30000 });
+    await addLots(ctx, draft.id, [drafted.id]);
+    expect(await addFairItems(ctx, fair.id, [drafted.id])).toMatchObject({ added: 0 });
   });
 
   it("enforces the floor unless overridden", async () => {

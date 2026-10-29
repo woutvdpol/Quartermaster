@@ -34,6 +34,7 @@ import {
   type ShopCustomerContext,
 } from "./index";
 import { parsePayToken } from "./shared";
+import { addFairItems, createFair } from "@/server/fairs";
 
 let h: ReturnType<typeof installHarness>;
 beforeEach(async () => {
@@ -220,6 +221,15 @@ describe("holds", () => {
     const cart = await db.cart.create({ data: { tenantId: ctx.tenantId, tokenHash: "cart-token-hash-123456", expiresAt: new Date(Date.now() + 86_400_000) } });
     await reserveProduct({ tenantId: ctx.tenantId, productId: p.id, cartId: cart.id, minutes: 15 });
     const a = await createAuction(ctx, { title: "Cart test", opensAt: new Date(), firstCloseAt: new Date(Date.now() + 3_600_000) });
+    await expect(addLots(ctx, a.id, [p.id])).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("refuses items that are going to a fair", async () => {
+    const ctx = await createTenantContext();
+    const p = await makeProduct(ctx.tenantId, { price: 10000 });
+    const fair = await createFair(ctx, { name: "Spring fair", startsOn: "2026-11-01", hideFromShop: true });
+    await addFairItems(ctx, fair.id, [p.id]); // still PREPARING: no hold yet
+    const a = await createAuction(ctx, { title: "Fair clash", opensAt: new Date(), firstCloseAt: new Date(Date.now() + 3_600_000) });
     await expect(addLots(ctx, a.id, [p.id])).rejects.toMatchObject({ code: "CONFLICT" });
   });
 

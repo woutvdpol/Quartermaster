@@ -329,6 +329,24 @@ describe("account management", () => {
     expect(await changeCustomerEmail({ ...user, email: "new@example.test" }, "taken@example.test", PASSWORD)).toEqual({ ok: false, error: "email_taken" });
   });
 
+  it("a link mailed before an email change cannot claim the new address's guest orders (R1)", async () => {
+    const { tenant } = await shop();
+    const p = await makeProduct(tenant.id);
+    const victimOrder = await makeOrder(tenant.id, { lines: [{ product: p }], customerId: null, email: "victim@example.test" });
+    const r = (await registerCustomer({ tenantId: tenant.id, email: "me@example.test", name: "M", password: PASSWORD })) as { userId: string; customerId: string };
+    const user = { id: r.userId, tenantId: tenant.id, email: "me@example.test", role: "CUSTOMER" as const };
+
+    // Both links go to the attacker's own mailbox, then the account moves to the victim's address.
+    const reset = (await requestPasswordReset(tenant.id, "me@example.test"))!;
+    const verify = await verificationToken(r.userId);
+    expect(await changeCustomerEmail(user, "victim@example.test", PASSWORD)).toMatchObject({ ok: true });
+
+    expect(await resetPassword(reset, "another strong password", { tenantId: tenant.id })).toEqual({ ok: false, error: "invalid_token" });
+    expect(await verifyCustomerEmail(tenant.id, verify)).toEqual({ ok: false, error: "invalid_token" });
+    expect((await db.order.findUniqueOrThrow({ where: { id: victimOrder.id } })).customerId).toBeNull();
+    expect((await db.user.findUniqueOrThrow({ where: { id: r.userId } })).emailVerifiedAt).toBeNull();
+  });
+
   it("delete account anonymizes the customer, keeps orders and disables the login", async () => {
     const { tenant } = await shop();
     const p = await makeProduct(tenant.id);

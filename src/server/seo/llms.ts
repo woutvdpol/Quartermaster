@@ -1,7 +1,7 @@
 import "server-only";
 import type { ShopContext } from "@/server/storefront/context";
 import { getLegalLinks } from "@/server/storefront/content";
-import { getNewItems } from "@/server/storefront/products";
+import { applyCountryRules, getNewItems } from "@/server/storefront/products";
 import { categoryHref, facetValueHref, getCategoryTree, getTaxonomy, productHref } from "@/server/storefront-catalog";
 import type { PublicCategoryNode } from "@/server/storefront-catalog/types";
 import type { LlmsCategory, LlmsInput } from "@/lib/seo/llms";
@@ -59,7 +59,9 @@ export async function loadLlmsInput(shop: ShopContext, full: boolean): Promise<L
     policies: legal.map((l) => ({ title: l.label, href: l.href, note: `Markdown: ${new URL(`${l.href}.md`, shop.origin).toString()}` })),
     categories: tree.filter((n) => n.total > 0).map(toCategory),
     facets,
-    latest: latest.filter((p) => !p.blurred).map((p) => ({ title: p.title, href: productHref(p), stockCode: p.stockCode, price: p.price })),
+    latest: (await applyCountryRules(id, latest, general.address.country || null)).rows
+      .filter((p) => !p.blurred)
+      .map((p) => ({ title: p.title, href: productHref(p), stockCode: p.stockCode, price: p.price })),
     returnsLine: returnsSummary(shop.settings.legal.returns),
   };
 }

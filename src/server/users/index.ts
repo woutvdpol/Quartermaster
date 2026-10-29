@@ -405,6 +405,8 @@ export async function updateOwnProfile(
   }
 
   if (emailChanged) {
+    // A reset link mailed to the old address must not open the account under its new address.
+    await db.authToken.updateMany({ where: { userId: user.id, usedAt: null, type: "PASSWORD_RESET" }, data: { usedAt: new Date() } });
     await audit({
       action: "user.email_changed",
       tenantId: current.tenantId,

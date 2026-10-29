@@ -73,12 +73,22 @@ async function lockFair(tx: Tx, tenantId: string, fairId: string) {
 }
 
 /** Holds this fair's unsold, still-for-sale items (not held by another fair). Returns the count. */
+/**
+ * Products that are in an auction (held by a published one, or a lot of a draft/published/live one)
+ * never go on a fair: one piece, one sales channel at a time (docs/auctions.md).
+ */
+const NOT_IN_AUCTION = {
+  auctionHoldId: null,
+  auctionLots: { none: { status: { in: ["OPEN", "SOLD"] }, auction: { status: { in: ["DRAFT", "PUBLISHED", "LIVE"] } } } },
+} satisfies Prisma.ProductWhereInput;
+
 async function applyHolds(tx: Tx, tenantId: string, fairId: string, productIds?: string[]) {
   const res = await tx.product.updateMany({
     where: {
       tenantId,
       status: "ACTIVE",
       fairHoldId: null,
+      auctionHoldId: null,
       fairItems: { some: { fairId, soldAt: null } },
       ...(productIds ? { id: { in: productIds } } : {}),
     },
@@ -251,6 +261,7 @@ export async function searchFairCandidates(ctx: ServiceContext, fairId: string, 
       status: "ACTIVE",
       quantity: { gt: 0 },
       fairItems: { none: { fairId: id } },
+      ...NOT_IN_AUCTION,
       ...(query
         ? { OR: [{ title: { contains: query, mode: "insensitive" } }, { sku: { contains: query, mode: "insensitive" } }, ...(code ? [{ stockCode: code }] : [])] }
         : {}),
@@ -358,7 +369,7 @@ export async function addFairItems(ctx: ServiceContext, fairId: string, productI
     const fair = await lockFair(tx, ctx.tenantId, id);
     if (fair.status === "ENDED") throw new ServiceError("CONFLICT", "The fair has ended");
     const products = await tx.product.findMany({
-      where: { tenantId: ctx.tenantId, id: { in: [...new Set(ids)] }, status: "ACTIVE", quantity: { gt: 0 } },
+      where: { tenantId: ctx.tenantId, id: { in: [...new Set(ids)] }, status: "ACTIVE", quantity: { gt: 0 }, ...NOT_IN_AUCTION },
       select: { id: true, price: true },
     });
     const created = await tx.fairItem.createMany({
@@ -519,7 +530,7 @@ export async function recordFairSale(ctx: ServiceContext, input: FairSaleInput):
 
         const product = await tx.product.findUniqueOrThrow({
           where: { id: data.productId },
-          select: { id: true, stockCode: true, sku: true, title: true, price: true, purchasePrice: true, status: true, quantity: true, fairHoldId: true },
+          select: { id: true, stockCode: true, sku: true, title: true, price: true, purchasePrice: true, status: true, quantity: true, fairHoldId: true, auctionHoldId: true },
         });
         const item = await tx.fairItem.findUnique({ where: { fairId_productId: { fairId: fair.id, productId: product.id } } });
         if (!item) throw new ServiceError("NOT_FOUND", `No. ${product.stockCode} is not on this fair`);
@@ -528,6 +539,7 @@ export async function recordFairSale(ctx: ServiceContext, input: FairSaleInput):
         }
         if (product.status !== "ACTIVE") throw new ServiceError("CONFLICT", `No. ${product.stockCode} is not for sale (${product.status.toLowerCase()})`, { reason: "unavailable" });
         if (product.fairHoldId && product.fairHoldId !== fair.id) throw new ServiceError("CONFLICT", `No. ${product.stockCode} is on another fair`, { reason: "other_fair" });
+        if (product.auctionHoldId) throw new ServiceError("CONFLICT", `No. ${product.stockCode} is in an auction`, { reason: "auction" });
         const now = new Date();
         const webOrderHold = await tx.reservation.findFirst({
           where: { tenantId, productId: product.id, status: "ACTIVE", expiresAt: { gt: now }, orderId: { not: null } },
