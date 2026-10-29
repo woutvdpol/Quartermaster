@@ -74,6 +74,60 @@
         ],
         "createdAt": "2026-10-29T16:35:24.559Z",
         "reason": "Claude: unchosen direction sketch from the decision round; it shows a different world on purpose and is not governed by DESIGN.md"
+      },
+      {
+        "rule": "cream-palette",
+        "value": "*",
+        "files": [
+          "docs/design/platform-signup.html"
+        ],
+        "createdAt": "2026-10-29T17:36:25.745Z",
+        "reason": "Claude: #ecece5 is the DESIGN.md canvas token, also used on the shipped landing"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "docs/design/platform-signup.html"
+        ],
+        "createdAt": "2026-10-29T17:36:25.772Z",
+        "reason": "Claude: flagged elements are the design file's own viewer chrome (mode switch, frame scroller), not page UI"
+      },
+      {
+        "rule": "tight-leading",
+        "value": "*",
+        "files": [
+          "docs/design/platform-signup.html"
+        ],
+        "createdAt": "2026-10-29T17:36:25.792Z",
+        "reason": "Claude: 1.2 is the DESIGN.md heading leading (title-sm), not body text"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "13.5px",
+        "files": [
+          "src/app/(shop)/_platform/LandingMocks.tsx"
+        ],
+        "createdAt": "2026-10-29T18:36:04.158Z",
+        "reason": "Claude: miniature product UI inside the landing mockups (DESIGN.md: mockups depict the product), not page text"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "11.5px",
+        "files": [
+          "src/app/(shop)/_platform/LandingMocks.tsx"
+        ],
+        "createdAt": "2026-10-29T18:36:04.177Z",
+        "reason": "Claude: miniature product UI inside the landing mockups (DESIGN.md: mockups depict the product), not page text"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "11px",
+        "files": [
+          "src/app/(shop)/_platform/parts.tsx"
+        ],
+        "createdAt": "2026-10-29T18:36:04.197Z",
+        "reason": "Claude: the dashed Demo marker on mockup data, deliberately smaller than page text"
       }
     ]
   }

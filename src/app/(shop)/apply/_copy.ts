@@ -1,6 +1,7 @@
 const intro =
-  "Every piece listed once, reserved while someone checks out, sold everywhere at the same moment. Certificates with QR code, per-country compliance rules and Mollie payments are built in.";
-const wizardStep = { title: "Set up in a guided wizard", body: "theme, payments, shipping, and import from WooCommerce, Shopify or Concept500." };
+  "Every piece is listed once, held while a buyer pays, and gone everywhere the moment it sells. Mollie payments, shipping zones and rules per country are built in.";
+const step1 = "Your name, your shop and what you sell.";
+const wizardStep = { title: "Set up in the wizard", body: "Pick a theme, connect Mollie, set your shipping zones and import your products.", meta: "Live when you are ready" };
 
 /** Texts that depend on the platform's sign-up mode (docs/signup-modes.md). */
 const modes = {
@@ -9,14 +10,15 @@ const modes = {
     title: "Open your shop. Built for unique items.",
     intro,
     steps: [
-      { n: "01", title: "Apply", body: "tell us about your business. Takes 3 minutes." },
-      { n: "02", title: "We review", body: "usually within a few working days. Militaria is sensitive; every dealer is checked." },
-      { n: "03", ...wizardStep },
+      { title: "Apply", body: step1, meta: "About 3 minutes" },
+      { title: "We review", body: "Militaria is sensitive, so every dealer is checked by hand.", meta: "Usually a few working days" },
+      wizardStep,
     ],
     formTitle: "Apply for a shop",
     submit: "Send application",
     footnote: "Protected by Turnstile. We email you once your application is reviewed.",
     verifyBody: "Confirm that this is your email address so we can review your application.",
+    verifyButton: "Confirm my email",
     thanks: {
       title: "Thanks — check your inbox",
       body: [
@@ -30,14 +32,15 @@ const modes = {
     title: "Join the waitlist. Built for unique items.",
     intro,
     steps: [
-      { n: "01", title: "Tell us about your business", body: "takes 3 minutes." },
-      { n: "02", title: "We invite you", body: "in the order dealers signed up, as soon as there is room." },
-      { n: "03", ...wizardStep },
+      { title: "Tell us about your business", body: step1, meta: "About 3 minutes" },
+      { title: "We invite you", body: "In the order dealers signed up, as soon as there is room.", meta: "We email you" },
+      wizardStep,
     ],
     formTitle: "Join the waitlist",
     submit: "Join the waitlist",
     footnote: "Protected by Turnstile. We email you when it is your turn.",
     verifyBody: "Confirm that this is your email address to take your place on the waitlist.",
+    verifyButton: "Confirm my email",
     thanks: {
       title: "Thanks — check your inbox",
       body: [
@@ -51,14 +54,16 @@ const modes = {
     title: (days: number) => `Try Quartermaster free for ${days} days.`,
     intro,
     steps: [
-      { n: "01", title: "Tell us about your shop", body: "takes 3 minutes." },
-      { n: "02", title: "Confirm your email", body: "your shop is created the moment you click the link." },
-      { n: "03", title: "Straight into the setup wizard", body: wizardStep.body },
+      { title: "Tell us about your shop", body: step1, meta: "About 3 minutes" },
+      { title: "Confirm your email", body: "Your shop is created the moment you click the link in your inbox.", meta: "Choose a password" },
+      { ...wizardStep, title: "Straight into the setup wizard" },
     ],
     formTitle: "Start your free trial",
     submit: "Start free trial",
     footnote: "Protected by Turnstile. No payment details needed.",
     verifyBody: "Confirm that this is your email address and your shop is created right away.",
+    // Same words as the button in the confirmation mail (src/server/mail/builders-onboarding.tsx).
+    verifyButton: "Confirm and create my shop",
     thanks: {
       title: "Almost there — check your inbox",
       body: [
@@ -70,14 +75,14 @@ const modes = {
 } as const;
 
 export const applyCopy = {
-  eyebrow: "For militaria dealers",
   modes,
+  next: "What happens next",
   fields: {
     applicantName: "Your name",
     email: "Email",
     shopName: "Shop name",
     country: "Country",
-    cocNumber: "Chamber of Commerce no.",
+    cocNumber: "Chamber of Commerce no. (optional)",
     cocHint: "Your company registration number (KvK, KBO, Handelsregister, …).",
     currentPlatform: "Where do you sell now?",
     description: "What do you sell?",
@@ -93,19 +98,23 @@ export const applyCopy = {
     unexpected: "Something went wrong. Please try again.",
   },
   thanks: {
+    metaTitle: "Check your inbox",
     noMail: "No email after a few minutes? Check your spam folder, or apply again with the same address to get a new link.",
     back: "Back to Quartermaster",
   },
   verify: {
     title: "Confirm your email",
-    button: "Confirm my email",
     pending: "Confirming…",
     invalidTitle: "This link is not valid",
     invalidBody: "The link has expired or is not complete. Apply again with the same email address to get a new link.",
-    verified: "Thanks, your email address is confirmed. We review your application and email you the outcome.",
-    waitlisted: "Thanks, your email address is confirmed and you are on the waitlist. We email you as soon as there is room.",
-    already_verified: "Your email address was already confirmed. We email you about the next step.",
-    already_created: "Your shop has already been created. Use the link in the email “Your shop … is ready” to choose your password, or sign in on your shop's address.",
+    /** Outcomes of verifyApplicationEmail: a title of their own, the body no longer repeats it. */
+    verified: { title: "Email confirmed", body: "We review your application and email you the outcome." },
+    waitlisted: { title: "You are on the waitlist", body: "Your email address is confirmed. We email you as soon as there is room." },
+    already_verified: { title: "Email already confirmed", body: "We email you about the next step." },
+    already_created: {
+      title: "Your shop already exists",
+      body: "Use the link in the email “Your shop … is ready” to choose your password, or sign in on your shop's address.",
+    },
     rate_limited: "Too many attempts. Please try again later.",
     error: "Something went wrong. Please try again.",
     applyAgain: "Apply again",
