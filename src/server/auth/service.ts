@@ -419,13 +419,14 @@ export async function resetPassword(
   if (count !== 1) return { ok: false, error: "invalid_token" };
 
   const passwordHash = await hashPassword(pw.data);
-  // The reset link went to this mailbox, so a successful reset also proves the address.
-  await db.user.update({
-    where: { id: row.userId },
-    data: { passwordHash, ...(row.user.emailVerifiedAt ? {} : { emailVerifiedAt: new Date() }) },
-  });
+  await db.user.update({ where: { id: row.userId }, data: { passwordHash } });
+  // The reset link went to this mailbox, so a successful reset also proves the address, but only while
+  // the account still has that address (an email change in between voids nothing it has not seen).
+  if (!row.user.emailVerifiedAt) {
+    await db.user.updateMany({ where: { id: row.userId, email: row.user.email, emailVerifiedAt: null }, data: { emailVerifiedAt: new Date() } });
+  }
   if (row.user.role === "CUSTOMER" && row.user.tenantId) {
-    await claimVerifiedEmailAndAudit(row.user.tenantId, row.userId).catch((e) => console.error("resetPassword: claim failed", e));
+    await claimVerifiedEmailAndAudit(row.user.tenantId, row.userId, row.user.email).catch((e) => console.error("resetPassword: claim failed", e));
   }
   await destroyAllSessions(row.userId);
   // A successful reset proves mailbox ownership; lift any lock-out on the account.

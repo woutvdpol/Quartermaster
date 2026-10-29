@@ -5,7 +5,7 @@ import { ServiceError } from "@/server/context";
 import { createTenantContext, resetDb } from "../../../tests/integration/helpers";
 import { makeOrder, makeProduct } from "@/server/orders/test-fixtures";
 import { getMollieCredentials, getMollieStatus, listMollieMethods, removeMollieKey, saveMollieKey, setEnabledMethods } from "./mollie-config";
-import { createMolliePayment, handleMollieWebhook, MollieWebhookRetryableError, syncLocalMolliePayment, WEBHOOK_RULES } from "./mollie";
+import { cancelPaymentsWithoutHold, createMolliePayment, handleMollieWebhook, MollieWebhookRetryableError, syncLocalMolliePayment, WEBHOOK_RULES } from "./mollie";
 import { POST } from "@/app/api/webhooks/mollie/[tenant]/route";
 
 const mollie = vi.hoisted(() => ({
@@ -346,5 +346,33 @@ describe("Mollie payments + webhook", () => {
       mollie.payments.get.mockRejectedValueOnce(new MollieApiError("Bad gateway", { statusCode: 502 }));
       expect((await post(tenant.id, "id=tr_route002")).status).toBe(500);
     });
+  });
+});
+
+describe("payments do not outlive the order's hold", () => {
+  it("cancels open webshop payments once the hold lapsed; live holds, auctions and uncancelable methods are left alone", async () => {
+    const ctx = await createTenantContext();
+    await saveMollieKey(ctx, TEST_KEY);
+    const lapsed = await makeOrder(ctx.tenantId, { lines: [{ product: await makeProduct(ctx.tenantId) }], reserve: true, molliePaymentId: "tr_lapsed" });
+    await makeOrder(ctx.tenantId, { lines: [{ product: await makeProduct(ctx.tenantId) }], reserve: true, molliePaymentId: "tr_live" });
+    const auction = await makeOrder(ctx.tenantId, { lines: [{ product: await makeProduct(ctx.tenantId) }], molliePaymentId: "tr_auction" });
+    await db.order.update({ where: { id: auction.id }, data: { channel: "AUCTION" } });
+    const ideal = await makeOrder(ctx.tenantId, { lines: [{ product: await makeProduct(ctx.tenantId) }], reserve: true, molliePaymentId: "tr_ideal" });
+    // The hold of `lapsed` and `ideal` ran out a minute ago (the sweeper may not have flipped it yet).
+    await db.reservation.updateMany({ where: { orderId: { in: [lapsed.id, ideal.id] } }, data: { expiresAt: new Date(Date.now() - 60_000) } });
+
+    mollie.payments.cancel.mockImplementation(async (id: string) => {
+      if (id === "tr_ideal") throw new MollieApiError("The payment cannot be canceled", { statusCode: 422 });
+      return molliePayment({ id, status: "canceled" });
+    });
+
+    expect(await cancelPaymentsWithoutHold()).toBe(1);
+    expect(mollie.payments.cancel.mock.calls.map(([id]) => id).sort()).toEqual(["tr_ideal", "tr_lapsed"]);
+    const status = async (pid: string) => (await db.payment.findFirstOrThrow({ where: { providerPaymentId: pid } })).status;
+    expect(await status("tr_lapsed")).toBe("CANCELED");
+    expect(await status("tr_live")).toBe("OPEN");
+    expect(await status("tr_auction")).toBe("OPEN");
+    expect(await status("tr_ideal")).toBe("OPEN");
+    expect((await db.order.findUniqueOrThrow({ where: { id: lapsed.id } })).finalizedAt).toBeNull();
   });
 });

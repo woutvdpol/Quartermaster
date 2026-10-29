@@ -285,10 +285,15 @@ export async function deleteCategory(ctx: ServiceContext, id: string, opts?: { r
   const moved = await db.$transaction(async (tx) => {
     await lockTree(tx, ctx.tenantId);
     await requireCategory(tx, ctx.tenantId, id);
-    const [productCount, childCount] = await Promise.all([
+    const [productCount, childCount, ruleCount] = await Promise.all([
       tx.product.count({ where: { tenantId: ctx.tenantId, categoryId: id } }),
       tx.category.count({ where: { tenantId: ctx.tenantId, parentId: id } }),
+      tx.complianceRule.count({ where: { tenantId: ctx.tenantId, categoryId: id } }),
     ]);
+    // Moving the products elsewhere would quietly lift legal rules (hide / no shipping) from them.
+    if (ruleCount) {
+      throw new ServiceError("CONFLICT", `This category is used by ${ruleCount} compliance rule${ruleCount === 1 ? "" : "s"}; change or delete ${ruleCount === 1 ? "it" : "them"} first`, { ruleCount });
+    }
     let movedProducts = 0;
     if (productCount || childCount) {
       if (!data.reassignTo) {

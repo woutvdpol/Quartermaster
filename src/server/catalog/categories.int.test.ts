@@ -5,6 +5,7 @@ import { createTenantContext, resetDb } from "../../../tests/integration/helpers
 import { createCategory, deleteCategory, getCategory, listCategoryTree, moveCategory, reorderCategories, updateCategory } from "./categories";
 import { createTag, deleteTag, listTags, mergeTags, updateTag } from "./tags";
 import { createProduct, getProduct } from "./products";
+import { createComplianceRule } from "@/server/compliance/rules";
 
 describe("catalog/categories", () => {
   let a: ServiceContext;
@@ -80,6 +81,18 @@ describe("catalog/categories", () => {
     const empty = await createCategory(a, { title: "Empty" });
     await deleteCategory(a, empty.id);
     await expect(getCategory(a, empty.id)).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("refuses to delete a category that compliance rules use, so the rules never silently vanish", async () => {
+    const cat = await createCategory(a, { title: "Third Reich" });
+    const target = await createCategory(a, { title: "Militaria" });
+    await createProduct(a, { title: "Cap", categoryId: cat.id });
+    const rule = await createComplianceRule(a, { name: "Hide DE", match: "CATEGORY", categoryId: cat.id, countries: ["DE"], action: "HIDE_PRODUCT" });
+    await expect(deleteCategory(a, cat.id, { reassignTo: target.id })).rejects.toMatchObject({ code: "CONFLICT", details: { ruleCount: 1 } });
+    expect(await db.complianceRule.findUnique({ where: { id: rule.id } })).not.toBeNull();
+    expect((await getCategory(a, cat.id)).id).toBe(cat.id);
+    // And the database refuses it too, whatever the code path.
+    await expect(db.category.delete({ where: { id: cat.id } })).rejects.toThrow();
   });
 
   it("slug changes only on request; explicit taken slug conflicts", async () => {
