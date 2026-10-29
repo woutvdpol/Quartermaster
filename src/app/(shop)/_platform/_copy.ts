@@ -77,7 +77,8 @@ export const platformCopy = {
         action: "Reset the demo",
       },
     },
-    held: (clock: string) => `Held for ${clock} while the buyer pays.`,
+    /** `{clock}` is replaced by the hold clock (mm:ss). A string, so the copy can be passed to the client. */
+    held: "Held for {clock} while the buyer pays.",
     expired: "Hold expired. Back on sale everywhere.",
   },
 

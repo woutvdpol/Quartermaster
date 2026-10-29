@@ -9,6 +9,7 @@ import { LandingNav } from "./LandingNav";
 import { AdminWindow, FairPhone, NetworkSearch, StoreGrid } from "./LandingMocks";
 import { buttonClass, wordmarkClass, wrapClass } from "./parts";
 import { CardIcon, CheckIcon, FileIcon, GlobeIcon, LockIcon, PlusIcon } from "./icons";
+import "./platform.css";
 
 /*
  * `/` on the platform host (PLATFORM_HOST): the Quartermaster landing for dealers. Design:
@@ -67,7 +68,7 @@ export async function PlatformLanding() {
         {PLATFORM_FONT_CSS}
       </style>
 
-      <LandingNav cta={ctaShort} />
+      <LandingNav name={t.name} cta={ctaShort} t={t.nav} />
 
       <main id="top">
         <section aria-labelledby="hero-title" className="overflow-hidden pt-[clamp(40px,4.5vw,56px)] text-center">
@@ -123,7 +124,7 @@ export async function PlatformLanding() {
               </h2>
               <p className={lead}>{t.how.body}</p>
             </div>
-            <CheckoutDemo />
+            <CheckoutDemo t={t.checkout} d={{ piece: t.demo.piece, tagShort: t.demo.tagShort }} />
           </div>
         </section>
 

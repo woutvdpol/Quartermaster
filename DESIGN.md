@@ -179,7 +179,7 @@ components:
 
 # Design System: Quartermaster platform
 
-> **Reikwijdte.** Dit document beschrijft alleen de **platformpagina's**: de landing op `PLATFORM_HOST` (`/`) en, later, de aanmeld-, verificatie- en bedankpagina's en de netwerkpagina's. Die volgen allemaal het systeem van deze landing. Bron is het ontwerpbestand `docs/design/platform-landing.html`; gebouwd in `src/app/(shop)/_platform/` (tokens `pf-*` in `src/app/(shop)/shop.css`, fonts in `src/lib/platform-fonts.ts`). Het certificatenblok uit het ontwerp is op verzoek van de eigenaar niet gebouwd.
+> **Reikwijdte.** Dit document beschrijft alleen de **platformpagina's**: de landing op `PLATFORM_HOST` (`/`) en, later, de aanmeld-, verificatie- en bedankpagina's en de netwerkpagina's. Die volgen allemaal het systeem van deze landing. Bron is het ontwerpbestand `docs/design/platform-landing.html`; gebouwd in `src/app/(shop)/_platform/` (tokens `pf-*` in `src/app/(shop)/_platform/platform.css`, alleen geladen door platformpagina's, fonts in `src/lib/platform-fonts.ts`). Het certificatenblok uit het ontwerp is op verzoek van de eigenaar niet gebouwd.
 >
 > **Buiten de reikwijdte.** Twee aparte, bestaande systemen vallen niet onder dit document:
 > - **De admin**, met schakelbare tokenthema's Depot (standaard), Field Ledger en Naval Quiet, gedefinieerd onder `[data-admin-theme]` in `src/app/globals.css`.

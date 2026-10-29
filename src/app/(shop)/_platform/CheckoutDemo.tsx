@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { cn } from "@/components/shop/ui/cn";
-import { platformCopy } from "./_copy";
+import type { platformCopy } from "./_copy";
 import { buttonClass, Chip, DEMO_PHOTOS, DemoPhoto, DemoTag, type ChipTone } from "./parts";
 import { GlobeIcon, StoreIcon, TableIcon } from "./icons";
 
@@ -12,10 +12,9 @@ import { GlobeIcon, StoreIcon, TableIcon } from "./icons";
  * speed; when it runs out the hold is released, as in the shop.
  */
 
-const t = platformCopy.checkout;
-const d = platformCopy.demo;
-
-type State = keyof typeof t.states;
+type CheckoutCopy = (typeof platformCopy)["checkout"];
+type PieceCopy = Pick<(typeof platformCopy)["demo"], "piece" | "tagShort">;
+type State = keyof CheckoutCopy["states"];
 const NEXT: Record<State, State> = { available: "reserved", reserved: "sold", sold: "available" };
 const TONE: Record<State, Record<"shop" | "network" | "fair", ChipTone>> = {
   available: { shop: "ok", network: "ok", fair: "info" },
@@ -39,7 +38,8 @@ function clock(seconds: number): string {
   return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-export function CheckoutDemo() {
+/** Only the demo's own texts come in as props, so the rest of the page copy stays out of the client bundle. */
+export function CheckoutDemo({ t, d }: { t: CheckoutCopy; d: PieceCopy }) {
   const [state, setState] = useState<State>("available");
   const [left, setLeft] = useState(HOLD_SECONDS);
   const [note, setNote] = useState<string | null>(null);
@@ -58,7 +58,7 @@ export function CheckoutDemo() {
       setVersion((v) => v + 1);
     }, TICK_MS);
     return () => clearInterval(id);
-  }, [state]);
+  }, [state, t.expired]);
 
   function advance() {
     setLeft(HOLD_SECONDS);
@@ -103,7 +103,7 @@ export function CheckoutDemo() {
         </div>
         <div className="mt-[18px] flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
           <span className="min-h-[1.45em] text-[13px] text-pf-muted">
-            {state === "reserved" ? <span className="font-pf-mono">{t.held(clock(left))}</span> : (note ?? s.log)}
+            {state === "reserved" ? <span className="font-pf-mono">{t.held.replace("{clock}", clock(left))}</span> : (note ?? s.log)}
           </span>
           <button type="button" onClick={advance} className={buttonClass.primarySm}>
             {s.action}
@@ -111,7 +111,7 @@ export function CheckoutDemo() {
         </div>
       </div>
       <div className="grid gap-7">
-        {(Object.keys(t.states) as State[]).map((key) => {
+        {(["available", "reserved", "sold"] as const).map((key) => {
           const step = t.states[key];
           const active = !live || key === state;
           return (

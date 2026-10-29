@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dealerProductUrl, dealerShopUrl, networkHref, networkMount, networkRewritePath, platformApplyUrl, platformNetworkRedirect } from "./network";
+import { PLATFORM_LANDING_PATH, dealerProductUrl, dealerShopUrl, networkHref, networkMount, networkRewritePath, platformApplyUrl, platformLandingRewrite, platformNetworkRedirect } from "./network";
 
 const platformOnly = { platformHost: "platform.example", networkHost: null };
 const withNetwork = { platformHost: "platform.example", networkHost: "network.example" };
@@ -49,5 +49,13 @@ describe("proxy helpers", () => {
     expect(platformNetworkRedirect("platform.example", "/networking", withNetwork)).toBeNull();
     expect(platformNetworkRedirect("platform.example", "/network", platformOnly)).toBeNull();
     expect(platformNetworkRedirect("shop.example", "/network", withNetwork)).toBeNull();
+  });
+  it("serves the platform landing for PLATFORM_HOST's root only", () => {
+    expect(platformLandingRewrite("platform.example", "/", platformOnly)).toBe(PLATFORM_LANDING_PATH);
+    expect(platformLandingRewrite("Platform.Example.", "/", withNetwork)).toBe(PLATFORM_LANDING_PATH);
+    expect(platformLandingRewrite("platform.example", "/apply", platformOnly)).toBeNull();
+    expect(platformLandingRewrite("shop.example", "/", platformOnly)).toBeNull();
+    expect(platformLandingRewrite(null, "/", platformOnly)).toBeNull();
+    expect(platformLandingRewrite("platform.example", "/", { platformHost: null, networkHost: null })).toBeNull();
   });
 });

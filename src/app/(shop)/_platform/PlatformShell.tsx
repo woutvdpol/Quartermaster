@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import "./platform.css";
 
 /*
  * Chrome for the public pages on the platform host (PLATFORM_HOST): landing, dealer sign-up and its

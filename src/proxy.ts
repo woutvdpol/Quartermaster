@@ -2,8 +2,7 @@
 // Real authorization happens in server code (src/server/auth/guards.ts).
 import { NextResponse, type NextRequest } from "next/server";
 import { buildCsp, createNonce, cspHeaderName, parseCspMode, reportingEndpointsHeader } from "@/lib/csp";
-import { networkRewritePath, platformNetworkRedirect } from "@/lib/network";
-import { platformLandingRewrite } from "@/lib/platform-landing";
+import { networkRewritePath, platformLandingRewrite, platformNetworkRedirect } from "@/lib/network";
 import { LOCALE_HEADER, isLocalizablePath, splitLocalePath } from "@/lib/i18n/shop-locales";
 import { THEME_PREVIEW_COOKIE, THEME_PREVIEW_HEADER, THEME_PREVIEW_MAX_AGE_SECONDS, THEME_PREVIEW_PARAM } from "@/lib/theme-preview";
 
@@ -82,7 +81,7 @@ export function proxy(request: NextRequest) {
     }
     // Quartermaster network on its own host (NETWORK_HOST, src/lib/network.ts): "/x" is served by /network/x.
     const networkPath = onNetworkHost ? networkRewritePath(pathname) : null;
-    // Platform landing on its own route (src/lib/platform-landing.ts): "/" on PLATFORM_HOST is /_landing.
+    // Platform landing on its own route (src/lib/network.ts): "/" on PLATFORM_HOST is /_landing.
     const landingPath = isAdmin ? null : platformLandingRewrite(request.headers.get("host"), pathname);
     const rewriteTo = networkPath ?? landingPath ?? localized?.path ?? null;
     response = rewriteTo
