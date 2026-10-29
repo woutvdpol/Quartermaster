@@ -185,3 +185,13 @@ Ontwerp: `docs/design/admin-tour.html`. Uitwerking: `docs/admin-tour.md`.
 - Bij een nieuwe shop **na de setup-wizard**: de rondleiding start nooit in de wizard.
 - **Vorm:** een spotlight-rondleiding op de echte schermen, over te slaan en opnieuw te starten via Account.
 - **Blijft op het dashboard:** wijst menu-onderdelen en delen van het dashboard aan, en opent geen andere pagina's.
+
+## Platformlanding — akkoord eigenaar (29-10-2026)
+Ontwerp: `docs/design/platform-landing.html` (artifact https://claude.ai/artifact/864C8gGC8aqHAuub7jgrt6). Systeem: `DESIGN.md`, productcontext: `PRODUCT.md`. Code: `src/app/(shop)/_platform/`.
+- **Doelgroep:** de militariahandelaar die al een webshop heeft (WooCommerce, Shopify). **Kernbelofte:** elk stuk is uniek en wordt nooit twee keer verkocht.
+- **Vorm: bewust de categoriestandaard** van een commerceplatform, op het niveau van Shopify, Lightspeed/Shopware, Linear/Stripe en Squarespace. Dat geldt ook voor de latere platformpagina's (aanmelden, netwerk).
+- **Bewijs:** alleen productfeiten en de pakketprijzen (uit de modulecatalogus). Geen testimonials, klantnamen, aantallen, Concept500 of de demo-shop.
+- **Vermijden:** militair kostuum, generieke SaaS (gradients, iconentegels) en beladen symboliek.
+- **Demo "Simulate a checkout":** één voorraadregel die tegelijk wisselt in webshop, netwerk en beurstafel (beschikbaar → gereserveerd → verkocht). Niet "drie kanalen tegelijk te koop": een veiling of live beurs haalt een stuk juist uit de webshop.
+- **Het certificatenblok uit het ontwerp is niet gebouwd** (eigenaar). "Provenance & certificates" staat wel in de pakketlijst, want die komt uit de catalogus.
+- Knoppen en teksten volgen de aanmeldmodus (aanvragen, wachtlijst, proef). Lettertypes self-hosted (`npm run fonts:sync platform`).

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { getRequestScope } from "@/server/tenant";
 import { requireShop, getShopContext } from "@/server/storefront/context";
 import { getStorefrontHomePage } from "@/server/storefront/content";
@@ -9,8 +10,6 @@ import type { PublicBlock } from "@/server/content/pages";
 import { BlockRenderer } from "@/components/shop/blocks/BlockRenderer";
 import { blockContext } from "@/components/shop/blocks/context";
 import { JsonLd } from "@/components/shop/ui/JsonLd";
-import { PlatformLanding } from "./_platform/PlatformLanding";
-import { platformCopy } from "./_platform/_copy";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/seo/json-ld";
 import { shopAlternates, shopOgDefaults } from "@/lib/seo/metadata";
 import { pickCopy } from "@/lib/i18n/shop-copy";
@@ -21,7 +20,7 @@ import { shopPageCopies, type shopPageCopy } from "./_copy";
 
 export async function generateMetadata(): Promise<Metadata> {
   const shop = await getShopContext();
-  if (!shop) return { title: { absolute: platformCopy.name }, description: platformCopy.metaDescription, alternates: { canonical: "/" } };
+  if (!shop) return {};
   const page = await translatePage(shop.tenant.id, shop.locale, await getStorefrontHomePage(shop.tenant.id));
   const firstText = page?.blocks.find((b) => b.type === "TEXT" || b.type === "TEXT_IMAGE" || b.type === "TEXT_HORIZONTAL");
   const description = metaDescription(
@@ -51,7 +50,8 @@ function fallbackBlocks(shopName: string, t: (typeof shopPageCopy)["home"]): Pub
 
 export default async function HomePage() {
   const scope = await getRequestScope();
-  if (scope.kind === "platform") return <PlatformLanding />;
+  // The platform host's "/" is rewritten to the landing route by the proxy (src/lib/platform-landing.ts).
+  if (scope.kind === "platform") notFound();
   const shop = await requireShop();
   if (shop.settings.content.homeRedirectsToShop) await localeRedirect("/shop");
 

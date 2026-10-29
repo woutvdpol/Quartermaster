@@ -183,6 +183,13 @@ export const PLANS: Record<PlanId, PlanDef> = {
   },
 };
 
+/** Modules a package adds on top of the next smaller one, in catalog order (Start: none, it is the core shop). */
+export function planAddedModules(plan: PlanId): ModuleId[] {
+  const i = PLAN_IDS.indexOf(plan);
+  const before: readonly ModuleId[] = i > 0 ? PLANS[PLAN_IDS[i - 1]].modules : [];
+  return MODULE_IDS.filter((id) => PLANS[plan].modules.includes(id) && !before.includes(id));
+}
+
 /** Mails per month the newsletter module adds when bought on top of a package without it. */
 export const NEWSLETTER_MODULE_QUOTA = 5000;
 

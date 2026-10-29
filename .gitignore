@@ -44,3 +44,11 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Impeccable design tool: local working files (review captures, decision sketches, question logs, hook cache).
+# Committed: .impeccable/config.json, design.json and surfaces/ (shared design context).
+/.impeccable/review/
+/.impeccable/mocks/
+/.impeccable/questions/
+/.impeccable/hook.cache.json
+/.impeccable/config.local.json

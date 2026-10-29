@@ -1,0 +1,577 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-29T16:34:43+00:00",
+  "title": "Design System: Quartermaster platform",
+  "extensions": {
+    "colorMeta": {
+      "paper": {
+        "role": "neutral",
+        "displayName": "Papier",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "paper-2": {
+        "role": "neutral",
+        "displayName": "Gebroken papier",
+        "canonical": "#fafaf6",
+        "tonalRamp": [
+          "#0b0b0a",
+          "#252524",
+          "#424240",
+          "#61615e",
+          "#82827f",
+          "#a5a5a3",
+          "#c9c9c7",
+          "#eeeeed"
+        ]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Depotgrond",
+        "canonical": "#ecece5",
+        "tonalRamp": [
+          "#0b0b0a",
+          "#252523",
+          "#42423e",
+          "#62625c",
+          "#83837d",
+          "#a5a5a1",
+          "#c9c9c6",
+          "#eeeeed"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Olijfinkt donker",
+        "canonical": "#1e2119",
+        "tonalRamp": [
+          "#0b0b0a",
+          "#242622",
+          "#41433d",
+          "#5f635a",
+          "#80847b",
+          "#a3a69f",
+          "#c8cac5",
+          "#eeefec"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Inkt 2",
+        "canonical": "#3a3e32",
+        "tonalRamp": [
+          "#0b0c09",
+          "#242621",
+          "#40433b",
+          "#5f6358",
+          "#808478",
+          "#a3a79d",
+          "#c8cac3",
+          "#eeefeb"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Gedempt",
+        "canonical": "#5f6354",
+        "tonalRamp": [
+          "#0b0c09",
+          "#242620",
+          "#41433a",
+          "#606356",
+          "#818476",
+          "#a4a79b",
+          "#c8cac2",
+          "#eeefea"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Haarlijn",
+        "canonical": "#d7d8cc",
+        "tonalRamp": [
+          "#0b0b09",
+          "#252521",
+          "#42433c",
+          "#616259",
+          "#828379",
+          "#a5a69e",
+          "#c9cac4",
+          "#eeefeb"
+        ]
+      },
+      "line-soft": {
+        "role": "neutral",
+        "displayName": "Zachte haarlijn",
+        "canonical": "#e6e6dd",
+        "tonalRamp": [
+          "#0b0b0a",
+          "#252522",
+          "#42423d",
+          "#62625b",
+          "#83837c",
+          "#a5a5a0",
+          "#c9c9c5",
+          "#efefec"
+        ]
+      },
+      "brass": {
+        "role": "primary",
+        "displayName": "Depotmessing",
+        "canonical": "#7e5416",
+        "tonalRamp": [
+          "#120902",
+          "#32210a",
+          "#573c17",
+          "#7e5926",
+          "#a17a48",
+          "#bf9f79",
+          "#dcc5aa",
+          "#faecdd"
+        ]
+      },
+      "brass-hover": {
+        "role": "primary",
+        "displayName": "Donker messing",
+        "canonical": "#5f3f10",
+        "tonalRamp": [
+          "#100a03",
+          "#302210",
+          "#533d22",
+          "#795b34",
+          "#9c7c55",
+          "#baa082",
+          "#d8c6b0",
+          "#f7ede0"
+        ]
+      },
+      "brass-soft": {
+        "role": "primary",
+        "displayName": "Messingwas",
+        "canonical": "#f1e5cc",
+        "tonalRamp": [
+          "#0d0b07",
+          "#29251c",
+          "#484133",
+          "#69604d",
+          "#8b816d",
+          "#aca494",
+          "#cec9bd",
+          "#f1eee7"
+        ]
+      },
+      "olive": {
+        "role": "secondary",
+        "displayName": "Depotolijf",
+        "canonical": "#2f3526",
+        "tonalRamp": [
+          "#0a0c08",
+          "#23261f",
+          "#3f4439",
+          "#5e6455",
+          "#7f8576",
+          "#a2a79b",
+          "#c7cbc2",
+          "#edefea"
+        ]
+      },
+      "olive-2": {
+        "role": "secondary",
+        "displayName": "Olijf licht",
+        "canonical": "#3e4532",
+        "tonalRamp": [
+          "#0a0c08",
+          "#23261e",
+          "#3f4437",
+          "#5d6452",
+          "#7e8673",
+          "#a2a899",
+          "#c7cbc0",
+          "#edf0e9"
+        ]
+      },
+      "olive-ink": {
+        "role": "secondary",
+        "displayName": "Olijfinkt",
+        "canonical": "#d9dccb",
+        "tonalRamp": [
+          "#0b0b09",
+          "#252620",
+          "#41433a",
+          "#616356",
+          "#828476",
+          "#a4a69b",
+          "#c9cac2",
+          "#eeefea"
+        ]
+      },
+      "olive-muted": {
+        "role": "secondary",
+        "displayName": "Olijf gedempt",
+        "canonical": "#a3a891",
+        "tonalRamp": [
+          "#0b0c08",
+          "#24261d",
+          "#414436",
+          "#606451",
+          "#818571",
+          "#a4a797",
+          "#c8cbbf",
+          "#eeefe9"
+        ]
+      },
+      "ok": {
+        "role": "status",
+        "displayName": "Beschikbaar",
+        "canonical": "#2f6b3a",
+        "tonalRamp": [
+          "#040e05",
+          "#132b17",
+          "#264c2c",
+          "#3b6f43",
+          "#5c9163",
+          "#88b18d",
+          "#b5d2b8",
+          "#e3f4e4"
+        ]
+      },
+      "ok-soft": {
+        "role": "status",
+        "displayName": "Beschikbaar zacht",
+        "canonical": "#dcebd9",
+        "tonalRamp": [
+          "#090c09",
+          "#222720",
+          "#3c453b",
+          "#5a6557",
+          "#7a8678",
+          "#9fa89d",
+          "#c4cbc3",
+          "#ecf0eb"
+        ]
+      },
+      "warn": {
+        "role": "status",
+        "displayName": "Gereserveerd",
+        "canonical": "#7a5000",
+        "tonalRamp": [
+          "#120901",
+          "#332107",
+          "#573c12",
+          "#7f591f",
+          "#a27a42",
+          "#bf9f75",
+          "#dcc5a8",
+          "#faecdb"
+        ]
+      },
+      "warn-soft": {
+        "role": "status",
+        "displayName": "Gereserveerd zacht",
+        "canonical": "#f5e7c4",
+        "tonalRamp": [
+          "#0d0b05",
+          "#2a2518",
+          "#49412e",
+          "#6b6045",
+          "#8d8165",
+          "#ada48e",
+          "#cfc9b9",
+          "#f2eee5"
+        ]
+      },
+      "crit": {
+        "role": "status",
+        "displayName": "Verkocht",
+        "canonical": "#a2342a",
+        "tonalRamp": [
+          "#190403",
+          "#411410",
+          "#6e2821",
+          "#9e3d33",
+          "#c56053",
+          "#dd8c80",
+          "#f4b8af",
+          "#ffe5df"
+        ]
+      },
+      "crit-soft": {
+        "role": "status",
+        "displayName": "Verkocht zacht",
+        "canonical": "#f4dad6",
+        "tonalRamp": [
+          "#0e0a09",
+          "#2c2321",
+          "#4c3e3c",
+          "#705c59",
+          "#927d7a",
+          "#b1a19e",
+          "#d2c6c4",
+          "#f4edeb"
+        ]
+      },
+      "info": {
+        "role": "status",
+        "displayName": "Info",
+        "canonical": "#2c5873",
+        "tonalRamp": [
+          "#050c12",
+          "#162733",
+          "#2a4657",
+          "#40667f",
+          "#6088a2",
+          "#8baabf",
+          "#b7cddc",
+          "#e4f1f9"
+        ]
+      },
+      "info-soft": {
+        "role": "status",
+        "displayName": "Info zacht",
+        "canonical": "#d8e5ee",
+        "tonalRamp": [
+          "#090b0d",
+          "#212629",
+          "#3c4348",
+          "#59636a",
+          "#79848b",
+          "#9ea6ac",
+          "#c4cace",
+          "#ebeff1"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Hero-kop, één per pagina."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Sectiekoppen (h2)."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Featurekoppen (h3)."
+      },
+      "title-sm": {
+        "displayName": "Title small",
+        "purpose": "Stappen, tijdlijn, producttitel."
+      },
+      "price": {
+        "displayName": "Price",
+        "purpose": "Maandbedrag in prijskaarten."
+      },
+      "lead": {
+        "displayName": "Lead",
+        "purpose": "Sectie-intro's."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Broodtekst; 16px onder 600px."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Nav, feitenstrook, importchips."
+      },
+      "button": {
+        "displayName": "Button",
+        "purpose": "Alle knoppen."
+      },
+      "wordmark": {
+        "displayName": "Wordmark",
+        "purpose": "Alleen het logo."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Voorraadnummers en timer in product-UI."
+      }
+    },
+    "shadows": [
+      {
+        "name": "frame",
+        "value": "0 1px 2px rgb(30 33 25 / .06), 0 24px 48px -16px rgb(30 33 25 / .22)",
+        "purpose": "Productkaders en het uitgelichte pakket."
+      },
+      {
+        "name": "frame-on-olive",
+        "value": "0 24px 48px -16px rgb(0 0 0 / .5)",
+        "purpose": "Productkader op de olijfband."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(.16, 1, .3, 1)",
+        "purpose": "Alle overgangen; exponentiële ease-out."
+      },
+      {
+        "name": "state-color",
+        "value": ".2s",
+        "purpose": "Knop- en linkkleur."
+      },
+      {
+        "name": "row-state",
+        "value": ".45s",
+        "purpose": "Rijgrond en chipkleur bij statuswissel in de demo."
+      },
+      {
+        "name": "chip-flip",
+        "value": ".5s",
+        "purpose": "Chip van vervaagd/92% naar scherp bij statuswissel."
+      },
+      {
+        "name": "disclosure",
+        "value": ".3s",
+        "purpose": "FAQ-plusicoon draait 45 graden."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "600px"
+      },
+      {
+        "name": "md",
+        "value": "900px"
+      },
+      {
+        "name": "lg",
+        "value": "1080px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "De enige actiekleur: start de proef, verkoopacties.",
+      "html": "<a class=\"ds-btn-primary\" href=\"#\">Start your free 30-day trial</a>",
+      "css": ":host{--paper:#ffffff;--paper-2:#fafaf6;--canvas:#ecece5;--ink:#1e2119;--ink-2:#3a3e32;--muted:#5f6354;--line:#d7d8cc;--line-soft:#e6e6dd;--brass:#7e5416;--brass-hover:#5f3f10;--olive:#2f3526;--olive-ink:#d9dccb;--ok:#2f6b3a;--ok-soft:#dcebd9;--warn:#7a5000;--warn-soft:#f5e7c4;--crit:#a2342a;--crit-soft:#f4dad6;--info:#2c5873;--info-soft:#d8e5ee;--ease-out:cubic-bezier(.16,1,.3,1);--shadow-frame:0 1px 2px rgb(30 33 25 / .06),0 24px 48px -16px rgb(30 33 25 / .22);} .ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;padding:0 22px;border-radius:8px;font:600 16px/1 \"Hanken Grotesk\",system-ui,sans-serif;text-decoration:none;cursor:pointer;border:1px solid transparent;transition:background-color .2s var(--ease-out),border-color .2s var(--ease-out);background:var(--brass);color:#fff;} .ds-btn-primary:hover{background:var(--brass-hover);} .ds-btn-primary:focus-visible{outline:2px solid var(--brass);outline-offset:3px;} .ds-btn-primary:active{transform:translateY(1px);}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Tweede keuze naast de primaire knop.",
+      "html": "<a class=\"ds-btn-secondary\" href=\"#\">See how it works</a>",
+      "css": ":host{--paper:#ffffff;--paper-2:#fafaf6;--canvas:#ecece5;--ink:#1e2119;--ink-2:#3a3e32;--muted:#5f6354;--line:#d7d8cc;--line-soft:#e6e6dd;--brass:#7e5416;--brass-hover:#5f3f10;--olive:#2f3526;--olive-ink:#d9dccb;--ok:#2f6b3a;--ok-soft:#dcebd9;--warn:#7a5000;--warn-soft:#f5e7c4;--crit:#a2342a;--crit-soft:#f4dad6;--info:#2c5873;--info-soft:#d8e5ee;--ease-out:cubic-bezier(.16,1,.3,1);--shadow-frame:0 1px 2px rgb(30 33 25 / .06),0 24px 48px -16px rgb(30 33 25 / .22);} .ds-btn-secondary{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;padding:0 22px;border-radius:8px;font:600 16px/1 \"Hanken Grotesk\",system-ui,sans-serif;text-decoration:none;cursor:pointer;border:1px solid transparent;transition:background-color .2s var(--ease-out),border-color .2s var(--ease-out);background:var(--paper);color:var(--ink);border-color:var(--line);} .ds-btn-secondary:hover{border-color:var(--ink);} .ds-btn-secondary:focus-visible{outline:2px solid var(--brass);outline-offset:3px;} .ds-btn-secondary:active{transform:translateY(1px);}"
+    },
+    {
+      "name": "Status Chips",
+      "kind": "chip",
+      "refersTo": "chip-ok",
+      "description": "Kanaalstatus, alleen in product-UI.",
+      "html": "<div class=\"ds-chips\"><span class=\"ds-chip ds-ok\">For sale</span><span class=\"ds-chip ds-warn\">Reserved</span><span class=\"ds-chip ds-crit\">Sold</span><span class=\"ds-chip ds-info\">Ready to sell</span><span class=\"ds-chip ds-mute\">Hidden</span></div>",
+      "css": ":host{--paper:#ffffff;--paper-2:#fafaf6;--canvas:#ecece5;--ink:#1e2119;--ink-2:#3a3e32;--muted:#5f6354;--line:#d7d8cc;--line-soft:#e6e6dd;--brass:#7e5416;--brass-hover:#5f3f10;--olive:#2f3526;--olive-ink:#d9dccb;--ok:#2f6b3a;--ok-soft:#dcebd9;--warn:#7a5000;--warn-soft:#f5e7c4;--crit:#a2342a;--crit-soft:#f4dad6;--info:#2c5873;--info-soft:#d8e5ee;--ease-out:cubic-bezier(.16,1,.3,1);--shadow-frame:0 1px 2px rgb(30 33 25 / .06),0 24px 48px -16px rgb(30 33 25 / .22);} .ds-chips{display:flex;gap:8px;flex-wrap:wrap;} .ds-chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:99px;font:600 12px/1 \"Hanken Grotesk\",system-ui,sans-serif;white-space:nowrap;transition:background-color .45s var(--ease-out),color .45s var(--ease-out);} .ds-chip::before{content:\"\";width:6px;height:6px;border-radius:50%;background:currentColor;} .ds-ok{background:var(--ok-soft);color:var(--ok);} .ds-warn{background:var(--warn-soft);color:var(--warn);} .ds-crit{background:var(--crit-soft);color:var(--crit);} .ds-info{background:var(--info-soft);color:var(--info);} .ds-mute{background:var(--line-soft);color:var(--muted);}"
+    },
+    {
+      "name": "Navigation",
+      "kind": "nav",
+      "refersTo": "nav",
+      "description": "Sticky platformnav met woordmerk, links en proefknop.",
+      "html": "<header class=\"ds-nav\"><a class=\"ds-wordmark\" href=\"#\">Quartermaster</a><nav class=\"ds-links\"><a href=\"#\">How it works</a><a href=\"#\">Features</a><a href=\"#\">Pricing</a><a href=\"#\">Network</a></nav><a class=\"ds-login\" href=\"#\">Dealer login</a><a class=\"ds-nav-cta\" href=\"#\">Start free trial</a></header>",
+      "css": ":host{--paper:#ffffff;--paper-2:#fafaf6;--canvas:#ecece5;--ink:#1e2119;--ink-2:#3a3e32;--muted:#5f6354;--line:#d7d8cc;--line-soft:#e6e6dd;--brass:#7e5416;--brass-hover:#5f3f10;--olive:#2f3526;--olive-ink:#d9dccb;--ok:#2f6b3a;--ok-soft:#dcebd9;--warn:#7a5000;--warn-soft:#f5e7c4;--crit:#a2342a;--crit-soft:#f4dad6;--info:#2c5873;--info-soft:#d8e5ee;--ease-out:cubic-bezier(.16,1,.3,1);--shadow-frame:0 1px 2px rgb(30 33 25 / .06),0 24px 48px -16px rgb(30 33 25 / .22);} .ds-nav{display:flex;align-items:center;gap:32px;height:68px;padding:0 24px;background:rgb(255 255 255 / .92);backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--line-soft);font:500 15px/1 \"Hanken Grotesk\",system-ui,sans-serif;color:var(--ink);} .ds-wordmark{font:700 15px/1 Barlow,system-ui,sans-serif;letter-spacing:.26em;text-transform:uppercase;text-decoration:none;color:var(--ink);} .ds-links{display:flex;gap:28px;margin-right:auto;} .ds-links a,.ds-login{color:var(--ink-2);text-decoration:none;} .ds-links a:hover,.ds-login:hover{color:var(--ink);} .ds-nav a:focus-visible{outline:2px solid var(--brass);outline-offset:3px;border-radius:4px;} .ds-nav-cta{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;padding:0 22px;border-radius:8px;font:600 16px/1 \"Hanken Grotesk\",system-ui,sans-serif;text-decoration:none;cursor:pointer;border:1px solid transparent;transition:background-color .2s var(--ease-out),border-color .2s var(--ease-out);height:40px;padding:0 16px;font-size:15px;background:var(--brass);color:#fff;} .ds-nav-cta:hover{background:var(--brass-hover);}"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "refersTo": "product-frame",
+      "description": "Zoekveld zoals in de netwerkmockup; basis voor velden op aanmeldpagina's.",
+      "html": "<label class=\"ds-q\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"m20 20-3.5-3.5\"/></svg><input placeholder=\"Search all dealers\"></label>",
+      "css": ":host{--paper:#ffffff;--paper-2:#fafaf6;--canvas:#ecece5;--ink:#1e2119;--ink-2:#3a3e32;--muted:#5f6354;--line:#d7d8cc;--line-soft:#e6e6dd;--brass:#7e5416;--brass-hover:#5f3f10;--olive:#2f3526;--olive-ink:#d9dccb;--ok:#2f6b3a;--ok-soft:#dcebd9;--warn:#7a5000;--warn-soft:#f5e7c4;--crit:#a2342a;--crit-soft:#f4dad6;--info:#2c5873;--info-soft:#d8e5ee;--ease-out:cubic-bezier(.16,1,.3,1);--shadow-frame:0 1px 2px rgb(30 33 25 / .06),0 24px 48px -16px rgb(30 33 25 / .22);} .ds-q{display:flex;align-items:center;gap:10px;height:46px;padding:0 14px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--muted);transition:border-color .2s var(--ease-out);} .ds-q:hover{border-color:var(--ink);} .ds-q:focus-within{outline:2px solid var(--brass);outline-offset:3px;} .ds-q input{flex:1;border:0;outline:0;background:none;font:400 15px/1.4 \"Hanken Grotesk\",system-ui,sans-serif;color:var(--ink);}"
+    },
+    {
+      "name": "Plan Card (featured)",
+      "kind": "card",
+      "refersTo": "plan-card",
+      "description": "Prijskaart; uitgelicht met inktrand, frameschaduw en vlag.",
+      "html": "<div class=\"ds-plan\"><span class=\"ds-flag\">Your trial runs on this</span><h3>Complete</h3><p class=\"ds-for\">Everything, unlimited products</p><div class=\"ds-price\"><strong>€99</strong><span>/ month</span></div><a class=\"ds-plan-btn\" href=\"#\">Start free trial</a><ul><li><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg>Auctions and fair mode</li><li><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg>Provenance certificates</li></ul></div>",
+      "css": ":host{--paper:#ffffff;--paper-2:#fafaf6;--canvas:#ecece5;--ink:#1e2119;--ink-2:#3a3e32;--muted:#5f6354;--line:#d7d8cc;--line-soft:#e6e6dd;--brass:#7e5416;--brass-hover:#5f3f10;--olive:#2f3526;--olive-ink:#d9dccb;--ok:#2f6b3a;--ok-soft:#dcebd9;--warn:#7a5000;--warn-soft:#f5e7c4;--crit:#a2342a;--crit-soft:#f4dad6;--info:#2c5873;--info-soft:#d8e5ee;--ease-out:cubic-bezier(.16,1,.3,1);--shadow-frame:0 1px 2px rgb(30 33 25 / .06),0 24px 48px -16px rgb(30 33 25 / .22);} .ds-plan{position:relative;max-width:340px;border:1px solid var(--ink);border-radius:14px;padding:28px;background:#fff;box-shadow:var(--shadow-frame);font:400 15.5px/1.55 \"Hanken Grotesk\",system-ui,sans-serif;color:var(--ink);} .ds-flag{position:absolute;top:-13px;left:28px;height:26px;padding:0 12px;display:inline-flex;align-items:center;border-radius:99px;background:var(--ink);color:#fff;font-size:13px;font-weight:600;} .ds-plan h3{margin:0;font:600 24px/1.2 Barlow,system-ui,sans-serif;letter-spacing:-.015em;} .ds-for{margin:4px 0 0;color:var(--muted);} .ds-price{display:flex;align-items:baseline;gap:6px;margin-top:22px;} .ds-price strong{font:600 48px/1 Barlow,system-ui,sans-serif;letter-spacing:-.02em;font-variant-numeric:tabular-nums;} .ds-price span{color:var(--muted);font-size:15px;} .ds-plan-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;padding:0 22px;border-radius:8px;font:600 16px/1 \"Hanken Grotesk\",system-ui,sans-serif;text-decoration:none;cursor:pointer;border:1px solid transparent;transition:background-color .2s var(--ease-out),border-color .2s var(--ease-out);width:100%;margin-top:24px;background:var(--brass);color:#fff;} .ds-plan-btn:hover{background:var(--brass-hover);} .ds-plan-btn:focus-visible{outline:2px solid var(--brass);outline-offset:3px;} .ds-plan ul{list-style:none;padding:22px 0 0;margin:24px 0 0;border-top:1px solid var(--line-soft);display:grid;gap:10px;} .ds-plan li{display:flex;gap:10px;} .ds-plan li svg{color:var(--ok);margin-top:2px;flex:none;}"
+    },
+    {
+      "name": "Channel Rows",
+      "kind": "custom",
+      "refersTo": "product-frame",
+      "description": "Signature: één voorraadregel, drie kanalen, één statuswissel.",
+      "html": "<div class=\"ds-demo\"><div class=\"ds-no\">No. 50212</div><div class=\"ds-ttl\">Wool greatcoat, double-breasted</div><div class=\"ds-rows\"><div class=\"ds-row\"><b>Webshop<small>A buyer is paying. Nobody else can add it.</small></b><span class=\"ds-chip\">Reserved</span></div><div class=\"ds-row\"><b>Quartermaster network<small>Out of the network while it is reserved</small></b><span class=\"ds-chip ds-m\">Hidden</span></div><div class=\"ds-row\"><b>Spring fair, table 14<small>In a webshop order awaiting payment</small></b><span class=\"ds-chip\">Blocked</span></div></div></div>",
+      "css": ":host{--paper:#ffffff;--paper-2:#fafaf6;--canvas:#ecece5;--ink:#1e2119;--ink-2:#3a3e32;--muted:#5f6354;--line:#d7d8cc;--line-soft:#e6e6dd;--brass:#7e5416;--brass-hover:#5f3f10;--olive:#2f3526;--olive-ink:#d9dccb;--ok:#2f6b3a;--ok-soft:#dcebd9;--warn:#7a5000;--warn-soft:#f5e7c4;--crit:#a2342a;--crit-soft:#f4dad6;--info:#2c5873;--info-soft:#d8e5ee;--ease-out:cubic-bezier(.16,1,.3,1);--shadow-frame:0 1px 2px rgb(30 33 25 / .06),0 24px 48px -16px rgb(30 33 25 / .22);} .ds-demo{max-width:460px;background:var(--paper-2);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-frame);padding:22px;font:400 14px/1.45 \"Hanken Grotesk\",system-ui,sans-serif;color:var(--ink);} .ds-no{font:500 12.5px/1 \"IBM Plex Mono\",ui-monospace,monospace;color:var(--muted);} .ds-ttl{margin-top:6px;font:600 22px/1.2 Barlow,system-ui,sans-serif;letter-spacing:-.015em;} .ds-rows{margin-top:18px;border:1px solid var(--line);border-radius:8px;overflow:hidden;} .ds-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px;border-top:1px solid var(--line-soft);background:#fdf8ec;transition:background-color .45s var(--ease-out);} .ds-row:first-child{border-top:0;} .ds-row:hover{background:#fbf0ee;} .ds-row b{font-weight:600;} .ds-row small{display:block;color:var(--muted);font-size:13px;font-weight:400;} .ds-chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:99px;font:600 12px/1 \"Hanken Grotesk\",system-ui,sans-serif;white-space:nowrap;background:var(--warn-soft);color:var(--warn);} .ds-chip::before{content:\"\";width:6px;height:6px;border-radius:50%;background:currentColor;} .ds-m{background:var(--line-soft);color:var(--muted);}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Het Depotregister",
+    "overview": "**Creative North Star: \"Het Depotregister\"**\n\nEen commerceplatform-landing in de categoriestandaard (kop, product, bewijs, prijzen, FAQ) op het afwerkingsniveau van Stripe en Shopify, in de kleuren van een goed bijgehouden depot: wit en licht getint gebroken wit als ondergrond, bijna-zwart olijfinkt voor tekst, één messingkleur voor actie en één diepe olijfband als rustpunt. Het bewijs is het product zelf: echte product-UI in kaders met een zachte schaduw, geen illustraties of icoontegels.\n\nDe dichtheid is ruim en kalm. Secties krijgen veel verticale lucht, koppen zijn in zinsnotatie en gebalanceerd, broodtekst blijft binnen 52 tot 68 tekens. Kleur doet weinig: messing alleen op acties, statuskleuren alleen binnen product-UI. Het enige echte moment van beweging is één georkestreerde statuswissel in de mechanisme-demo.\n\nBevestigde afwijzingen (PRODUCT.md, surface brief): geen militaire kostumering, geen generieke SaaS-taal met verlopen of icoontegels, geen beladen symbolen als decoratie.",
+    "keyCharacteristics": [
+      "Witte en gebroken-witte vlakken (`paper`, `paper-2`, `canvas`) gescheiden door haarlijnen, niet door schaduw.",
+      "Messing (`brass`) is de enige actiekleur.",
+      "Eén olijfband (`olive`) per pagina; dezelfde olijf vormt de rail en balk in product-UI.",
+      "Barlow 600 in zinsnotatie voor koppen, Hanken Grotesk voor alles wat gelezen of bediend wordt.",
+      "Product-UI in kaders van 12px met haarlijn en zachte frameschaduw.",
+      "Getekende lijniconen (24-viewBox, lijn 1.6), nooit in tegels."
+    ],
+    "rules": [
+      {
+        "name": "The One Action Colour Rule",
+        "body": "Messing betekent \"doe dit\". Het staat op knoppen en focus, nergens als decoratie, achtergrondvlak of kopkleur.",
+        "section": "colors"
+      },
+      {
+        "name": "The Status Stays Inside Rule",
+        "body": "De statuskleuren `ok`, `warn`, `crit` en `info` verschijnen alleen in product-UI (chips, meldingen) en als vinkje in lijsten; nooit als sectiegrond of marketingaccent.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Band Rule",
+        "body": "De olijfband komt één keer per pagina voor, als rustpunt; de rest van het ritme wisselt tussen `paper`, `paper-2` en `canvas`.",
+        "section": "colors"
+      },
+      {
+        "name": "The Sentence Case Rule",
+        "body": "Koppen staan in zinsnotatie met `letter-spacing: -0.015em`. Hoofdletters met ruime spatiëring zijn alleen voor het woordmerk.",
+        "section": "typography"
+      },
+      {
+        "name": "The Stock Number Rule",
+        "body": "IBM Plex Mono is voor voorraadnummers en tijden in product-UI, nooit voor koppen, labels of marketingtekst.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Price Rule",
+        "body": "Prijzen en tellers gebruiken `font-variant-numeric: tabular-nums`.",
+        "section": "typography"
+      },
+      {
+        "name": "The Product Floats Rule",
+        "body": "Alleen wat het product toont of de aanbevolen keuze is, krijgt de frameschaduw. Al het andere ligt plat op zijn grond.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** gebruik `brass` voor de primaire actie en de focusring, en voor niets anders.",
+      "**Do** toon het product in een kader met `rounded.frame` (12px), `line`-haarlijn en de frameschaduw, met echte productteksten en voorraadnummers.",
+      "**Do** wissel secties af tussen `paper`, `paper-2` en `canvas`, gescheiden door 1px haarlijnen, met hoogstens één `olive`-band.",
+      "**Do** zet koppen in Barlow 600 in zinsnotatie met `-0.015em` en `text-wrap: balance`.",
+      "**Do** gebruik getekende lijniconen (lijn 1.6, ronde uiteinden) inline naast tekst.",
+      "**Do** host Barlow, Hanken Grotesk en IBM Plex Mono zelf via `next/font` in de implementatie."
+    ],
+    "donts": [
+      "**Don't** gebruik statuskleuren (`ok`, `warn`, `crit`, `info`) buiten product-UI en vinkjes.",
+      "**Don't** zet iconen in tegels of gekleurde vierkanten; geen icoontegel-featuremuren.",
+      "**Don't** gebruik verlopen als decoratie; de hero-achtergrond is een harde naad tussen twee vlakken, geen verloop.",
+      "**Don't** gebruik militaire kostumering of beladen symbolen als decoratie.",
+      "**Don't** geef knoppen, chips of gewone kaarten een schaduw; schaduw is voor productkaders en het uitgelichte pakket.",
+      "**Don't** gebruik IBM Plex Mono voor koppen, labels of marketingtekst.",
+      "**Don't** behandel de product-mockups als specificatie voor de admin of de storefront; die hebben hun eigen systemen."
+    ]
+  }
+}
