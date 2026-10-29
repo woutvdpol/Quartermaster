@@ -229,6 +229,7 @@ export function CommandPalette({
       <button
         type="button"
         onClick={openPalette}
+        data-tour="search"
         aria-haspopup="dialog"
         aria-keyshortcuts="Meta+K Control+K"
         className="mx-1 mt-3 mb-1 flex items-center justify-between rounded-control border border-rail-line px-2 py-1.5 text-[12.5px] text-rail-muted hover:bg-rail-raised hover:text-rail-ink"

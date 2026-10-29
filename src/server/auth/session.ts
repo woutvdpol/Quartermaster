@@ -26,6 +26,8 @@ export type SessionUser = {
   email: string;
   name: string | null;
   totpEnabled: boolean;
+  /** The first-sign-in admin tour was finished or skipped (docs/admin-tour.md). */
+  adminTourSeen: boolean;
 };
 
 export type ValidSession = { sessionId: string; pendingTotp: boolean; user: SessionUser };
@@ -76,7 +78,7 @@ export async function getSession(): Promise<ValidSession | null> {
     // Only the columns the session needs — never pull password/TOTP secrets into every request.
     include: {
       user: {
-        select: { id: true, tenantId: true, role: true, email: true, name: true, totpEnabledAt: true, disabledAt: true },
+        select: { id: true, tenantId: true, role: true, email: true, name: true, totpEnabledAt: true, adminTourSeenAt: true, disabledAt: true },
       },
     },
   });
@@ -106,6 +108,7 @@ export async function getSession(): Promise<ValidSession | null> {
       email: user.email,
       name: user.name,
       totpEnabled: user.totpEnabledAt !== null,
+      adminTourSeen: user.adminTourSeenAt !== null,
     },
   };
 }

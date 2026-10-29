@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Card, ConfirmDialog, DateTime, PageHeader, StatusPill } from "@/components/admin/ui";
+import Link from "next/link";
+import { Card, ConfirmDialog, DateTime, PageHeader, StatusPill, buttonClasses } from "@/components/admin/ui";
 import { MIN_PASSWORD_LENGTH } from "@/server/auth/password";
 import { listSessions } from "@/server/users";
 import { requireTenantDisplay } from "@/server/tenant-display";
@@ -60,6 +61,15 @@ export default async function AccountPage() {
 
         <Card title="Two-factor authentication" className="lg:col-span-2">
           <TwoFactorPanel enabled={user.totpEnabled} />
+        </Card>
+
+        <Card title="Admin tour" className="lg:col-span-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[13.5px] text-ink-2">A one-minute walk past the menu, search, orders and settings on the dashboard.</p>
+            <Link href="/admin/dashboard?tour=1" className={buttonClasses({ size: "sm" })}>
+              Restart tour
+            </Link>
+          </div>
         </Card>
 
         <Card

@@ -6,8 +6,12 @@ import { ADMIN_NAV, adminHref, type NavItemKey } from "@/lib/admin-nav";
 import type { Role } from "@/generated/prisma/enums";
 import { getDictionary } from "@/lib/i18n";
 import { WipBadge } from "./StatusPill";
+import type { TourTarget } from "./tour/steps";
 
 const t = getDictionary().nav;
+
+/** Sidebar items the admin tour points at (docs/admin-tour.md). */
+const TOUR_TARGETS: Partial<Record<NavItemKey, TourTarget>> = { orders: "orders", theme: "website", paymentMethods: "payments" };
 
 /** Small padlock for nav items of a paid module the shop does not have (docs/modules.md). */
 function LockIcon() {
@@ -27,7 +31,7 @@ export function SidebarNav({ role, locked = [] }: { role: Role; locked?: readonl
     .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
     .sort((a, b) => b.length - a.length)[0];
   return (
-    <nav aria-label={t.label} className="flex flex-col gap-0.5">
+    <nav aria-label={t.label} className="flex flex-col gap-0.5" data-tour="nav">
       {ADMIN_NAV.map(({ group, items }) => (
         <div key={group}>
           <h2 className="type-label mx-2 mt-3 mb-1 text-[11px] text-rail-muted">{t.groups[group]}</h2>
@@ -41,6 +45,7 @@ export function SidebarNav({ role, locked = [] }: { role: Role; locked?: readonl
                   <Link
                     href={href}
                     aria-current={active ? "page" : undefined}
+                    data-tour={isLocked ? "locked" : TOUR_TARGETS[item.key]}
                     className={
                       "flex items-center justify-between gap-2 rounded-[4px] px-2 py-1.5 text-[13px] text-rail-ink " +
                       (active

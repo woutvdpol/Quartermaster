@@ -47,7 +47,7 @@ export function Sidebar({ user, tenants, theme, lockedNav = [] }: SidebarProps) 
       <SidebarNav role={user.role} locked={lockedNav} />
 
       <div className="mt-auto grid gap-3 border-t border-rail-line px-2 pt-3">
-        <Link href="/admin/account" className="-mx-1 block rounded-control px-1 py-0.5 text-xs hover:bg-rail-raised">
+        <Link href="/admin/account" data-tour="account" className="-mx-1 block rounded-control px-1 py-0.5 text-xs hover:bg-rail-raised">
           <p className="truncate text-rail-ink">{user.name ?? user.email}</p>
           <p className="text-rail-muted">{roleLabel} · Account</p>
         </Link>

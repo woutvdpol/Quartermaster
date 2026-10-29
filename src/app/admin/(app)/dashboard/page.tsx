@@ -33,7 +33,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/admin/
         actions={
           <>
             <PeriodLinks active={days} />
-            <Link href="/admin/inventory/new" className={buttonClasses({ variant: "primary" })}>
+            <Link href="/admin/inventory/new" data-tour="new-product" className={buttonClasses({ variant: "primary" })}>
               {copy.newProduct}
             </Link>
           </>
@@ -65,9 +65,12 @@ export default async function DashboardPage({ searchParams }: PageProps<"/admin/
           <Suspense key={`rev-${days}`} fallback={<CardSkeleton title={copy.chart.title} height="h-56" />}>
             <RevenueSection ctx={ctx} days={days} />
           </Suspense>
-          <Suspense fallback={<ListSkeleton title={copy.todo.title} lines={6} />}>
-            <TodoSection ctx={ctx} />
-          </Suspense>
+          {/* The admin tour points here (docs/admin-tour.md); the wrapper exists before the section streams in. */}
+          <div data-tour="todo" className="grid min-w-0">
+            <Suspense fallback={<ListSkeleton title={copy.todo.title} lines={6} />}>
+              <TodoSection ctx={ctx} />
+            </Suspense>
+          </div>
         </div>
 
         <Suspense fallback={<CardSkeleton title={copy.stock.title} height="h-12" />}>
