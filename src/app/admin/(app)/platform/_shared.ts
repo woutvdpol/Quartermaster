@@ -1,4 +1,5 @@
 import type { StatusTone } from "@/components/admin/ui";
+import type { TrialState } from "@/server/onboarding/trial-rules";
 
 export type TenantStatusValue = "ACTIVE" | "SUSPENDED" | "ARCHIVED";
 
@@ -10,6 +11,13 @@ export const STATUS_EFFECT: Record<TenantStatusValue, string> = {
   SUSPENDED: "The shop and its admin stop resolving on its domains, and every owner and customer is signed out. Data is kept; you can reactivate it later.",
   ARCHIVED: "Like suspended, but marks the shop as closed for good. Every owner and customer is signed out. Data is kept; you can still reactivate it.",
 };
+
+/** Pill for a free-trial shop (docs/signup-modes.md); null when the shop has no trial. */
+export function trialPill(trial: TrialState): { tone: StatusTone; label: string } | null {
+  if (trial.kind === "running") return { tone: "warn", label: `Trial · ${trial.daysLeft} ${trial.daysLeft === 1 ? "day" : "days"}` };
+  if (trial.kind === "ended") return { tone: "crit", label: "Trial ended" };
+  return null;
+}
 
 export const COMMON_CURRENCIES = ["EUR", "USD", "GBP", "CHF", "SEK", "NOK", "DKK", "PLN", "CZK", "AUD", "CAD", "NZD", "JPY"];
 

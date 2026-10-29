@@ -9,6 +9,8 @@ import { isUniqueViolation, parseInput } from "@/server/catalog/errors";
 import { ensureSystemPages } from "@/server/content/pages";
 import { queueMail } from "@/server/mail/queue";
 import { assertPlatformActor, type PlatformContext } from "@/server/platform/context";
+import { getSignupConfig } from "@/server/platform/signup";
+import { hostToBaseUrl, MAIL_PATHS, withQuery } from "@/server/mail/urls";
 import { SETTINGS_GROUPS, defaultSettings, type SettingsGroup } from "@/server/settings/schema";
 import { verifyTurnstile } from "@/server/turnstile";
 import type { Prisma } from "@/generated/prisma/client";
@@ -28,9 +30,16 @@ import {
   type ApplicationField,
 } from "./rules";
 import { signApplicationToken, verifyApplicationToken } from "./verify-token";
+import { autoTrialBlockers, trialEndFrom, TRIAL_DAILY_CAP } from "./trial-rules";
 
 /*
  * Dealer applications: public sign-up on the platform host → e-mail verification → SUPERADMIN review.
+ * The platform's sign-up mode (docs/signup-modes.md) is stored on each application when it is sent:
+ *   APPLY     PENDING → reviewed by hand (below).
+ *   WAITLIST  WAITLISTED → no ping per application; a SUPERADMIN invites (= approves) when there is room.
+ *   TRIAL     PENDING → on verification the shop is created automatically with Tenant.trialEndsAt and the
+ *             applicant is sent straight to the invite page (password → setup wizard). Suspicious
+ *             applications (autoTrialBlockers) and the daily cap fall back to review by hand.
  *
  * - Submit: honeypot (in the action), zod validation, atomic rate limits per IP and per e-mail
  *   (`take`), Turnstile, then duplicate detection: a PENDING application with the same e-mail is not
@@ -49,7 +58,11 @@ export const APPLICATION_RULES = {
   submitPerIp: { limit: 10, windowMs: HOUR },
   submitPerEmail: { limit: 3, windowMs: 24 * HOUR },
   verifyPerIp: { limit: 30, windowMs: HOUR },
+  autoTrials: { limit: TRIAL_DAILY_CAP, windowMs: 24 * HOUR },
 } satisfies Record<string, RateLimitRule>;
+
+/** Applications that still wait for a decision. */
+const OPEN_STATUSES = ["PENDING", "WAITLISTED"] as const satisfies readonly DealerApplicationStatus[];
 
 const idSchema = z.string().trim().min(1).max(64);
 
@@ -124,7 +137,7 @@ export async function submitApplication(input: { data: unknown; ip: string | nul
 
   // Duplicate: an open application for this e-mail → don't create another, re-send its verification.
   const existing = await db.dealerApplication.findFirst({
-    where: { email: data.email, status: "PENDING" },
+    where: { email: data.email, status: { in: [...OPEN_STATUSES] } },
     orderBy: { createdAt: "desc" },
     select: { id: true, emailVerifiedAt: true },
   });
@@ -135,9 +148,12 @@ export async function submitApplication(input: { data: unknown; ip: string | nul
   }
 
   const checks = await computeChecks(data);
+  const { signupMode } = await getSignupConfig();
   const app = await db.$transaction(async (tx) => {
     const created = await tx.dealerApplication.create({
       data: {
+        status: signupMode === "WAITLIST" ? "WAITLISTED" : "PENDING",
+        signupMode,
         applicantName: data.applicantName,
         email: data.email,
         shopName: data.shopName,
@@ -153,12 +169,17 @@ export async function submitApplication(input: { data: unknown; ip: string | nul
     await queueVerification(created.id, tx);
     return created;
   });
-  await audit({ action: "dealer_application.submitted", entity: "DealerApplication", entityId: app.id, data: { shopName: app.shopName, country: app.country } });
+  await audit({ action: "dealer_application.submitted", entity: "DealerApplication", entityId: app.id, data: { shopName: app.shopName, country: app.country, signupMode } });
   return { ok: true };
 }
 
 /** Notifies every active SUPERADMIN (one mail job each). */
-export async function notifySuperadmins(props: { kind: "application" | "migration" | "domain"; applicationId?: string; tenantId?: string; detail?: string }) {
+export async function notifySuperadmins(props: {
+  kind: "application" | "migration" | "domain" | "trial" | "trial-ended";
+  applicationId?: string;
+  tenantId?: string;
+  detail?: string;
+}) {
   const admins = await db.user.findMany({ where: { role: "SUPERADMIN", tenantId: null, disabledAt: null }, select: { email: true } });
   for (const a of admins) {
     if (/\.invalid$/i.test(a.email)) continue;
@@ -166,26 +187,75 @@ export async function notifySuperadmins(props: { kind: "application" | "migratio
   }
 }
 
-export type VerifyApplicationResult = "verified" | "already_verified" | "invalid" | "rate_limited";
+/**
+ * verified          APPLY (or a trial held for review): waits for a SUPERADMIN.
+ * waitlisted        on the waitlist.
+ * trial             shop created; `redirectTo` is the owner's invite page on the shop host.
+ * already_verified  confirmed before; already_created: confirmed before and the trial shop exists.
+ */
+export type VerifyApplicationResult =
+  | { status: "verified" | "waitlisted" | "already_verified" | "already_created" | "invalid" | "rate_limited" }
+  | { status: "trial"; redirectTo: string; host: string };
 
 /** Confirms the applicant's e-mail (POST from /apply/verify). Idempotent. */
 export async function verifyApplicationEmail(token: unknown, ip: string | null): Promise<VerifyApplicationResult> {
-  if (!(await take(`apply-verify:ip:${ip ?? "unknown"}`, APPLICATION_RULES.verifyPerIp))) return "rate_limited";
+  if (!(await take(`apply-verify:ip:${ip ?? "unknown"}`, APPLICATION_RULES.verifyPerIp))) return { status: "rate_limited" };
   const id = verifyApplicationToken(token);
-  if (!id) return "invalid";
+  if (!id) return { status: "invalid" };
   const app = await db.dealerApplication.findUnique({ where: { id } });
-  if (!app || app.status === "REJECTED") return "invalid";
-  if (app.emailVerifiedAt) return "already_verified";
+  if (!app || app.status === "REJECTED") return { status: "invalid" };
+  const already = { status: app.status === "APPROVED" && app.signupMode === "TRIAL" ? "already_created" : "already_verified" } as const;
+  if (app.emailVerifiedAt) return already;
 
   const checks = await computeChecks(app, { excludeId: app.id, emailVerified: true });
+  // The claim: of two parallel clicks only one gets past this (and may create the trial shop).
   const { count } = await db.dealerApplication.updateMany({
     where: { id, emailVerifiedAt: null },
     data: { emailVerifiedAt: new Date(), checks: checks as unknown as Prisma.InputJsonValue },
   });
-  if (count === 0) return "already_verified";
+  if (count === 0) return already;
   await audit({ action: "dealer_application.email_verified", entity: "DealerApplication", entityId: id });
-  if (app.status === "PENDING") await notifySuperadmins({ kind: "application", applicationId: id });
-  return "verified";
+  if (app.status === "WAITLISTED") return { status: "waitlisted" };
+  if (app.status !== "PENDING") return { status: "verified" };
+  if (app.signupMode === "TRIAL") {
+    const trial = await startTrial(app, checks);
+    if (trial) return { status: "trial", ...trial };
+  }
+  await notifySuperadmins({ kind: "application", applicationId: id });
+  return { status: "verified" };
+}
+
+/**
+ * TRIAL mode: creates the shop for a just-verified application, unless something looks off
+ * (autoTrialBlockers) — then it stays PENDING with the reasons in its internal note, for review by hand.
+ */
+async function startTrial(app: DealerApplicationRow, checks: ApplicationChecks): Promise<{ redirectTo: string; host: string } | null> {
+  const cocUsedBefore = app.cocNumber
+    ? (await db.dealerApplication.count({ where: { id: { not: app.id }, cocNumber: app.cocNumber } })) > 0
+    : false;
+  let blockers = autoTrialBlockers(checks, { cocUsedBefore, dailyCapReached: false });
+  // Only clean applications use up the daily allowance.
+  if (blockers.length === 0 && !(await take("apply:auto-trial", APPLICATION_RULES.autoTrials))) {
+    blockers = autoTrialBlockers(checks, { cocUsedBefore, dailyCapReached: true });
+  }
+  if (blockers.length > 0) {
+    const note = `Trial not started automatically: ${blockers.join("; ")}. Approve to start the trial by hand.`;
+    await db.dealerApplication.update({ where: { id: app.id }, data: { internalNote: app.internalNote ? `${app.internalNote}\n\n${note}` : note } });
+    await audit({ action: "dealer_application.trial_held", entity: "DealerApplication", entityId: app.id, data: { blockers } });
+    return null;
+  }
+  try {
+    const shop = await createShopFromApplication(app.id, null);
+    await notifySuperadmins({ kind: "trial", tenantId: shop.tenant.id, applicationId: app.id });
+    return {
+      redirectTo: withQuery(hostToBaseUrl(shop.domain.host), MAIL_PATHS.dealerInviteAccept, { token: shop.inviteToken }),
+      host: shop.domain.host,
+    };
+  } catch (err) {
+    // Lost a race or a slug clash: leave it for review instead of failing the verification.
+    if (err instanceof ServiceError && err.code === "CONFLICT") return null;
+    throw err;
+  }
 }
 
 // ─── Platform admin (SUPERADMIN) ────────────────────────────────────────────
@@ -203,13 +273,14 @@ export type ApplicationListItem = {
   createdAt: Date;
 };
 
-const statusSchema = z.enum(["PENDING", "APPROVED", "REJECTED"]);
+const statusSchema = z.enum(["PENDING", "WAITLISTED", "APPROVED", "REJECTED"]);
 
 export async function listApplications(ctx: PlatformContext, status: DealerApplicationStatus = "PENDING"): Promise<ApplicationListItem[]> {
   assertPlatformActor(ctx);
   const rows = await db.dealerApplication.findMany({
     where: { status: parseInput(statusSchema, status) },
-    orderBy: { createdAt: status === "PENDING" ? "asc" : "desc" },
+    // Open lists oldest first (waitlist order); decided ones newest first.
+    orderBy: { createdAt: status === "PENDING" || status === "WAITLISTED" ? "asc" : "desc" },
     take: 500,
   });
   return rows.map((r) => ({
@@ -229,7 +300,7 @@ export async function listApplications(ctx: PlatformContext, status: DealerAppli
 export async function countApplications(ctx: PlatformContext): Promise<Record<DealerApplicationStatus, number>> {
   assertPlatformActor(ctx);
   const groups = await db.dealerApplication.groupBy({ by: ["status"], _count: { _all: true } });
-  const out: Record<DealerApplicationStatus, number> = { PENDING: 0, APPROVED: 0, REJECTED: 0 };
+  const out: Record<DealerApplicationStatus, number> = { PENDING: 0, WAITLISTED: 0, APPROVED: 0, REJECTED: 0 };
   for (const g of groups) out[g.status] = g._count._all;
   return out;
 }
@@ -238,7 +309,9 @@ export async function getApplication(ctx: PlatformContext, id: string) {
   assertPlatformActor(ctx);
   const app = await db.dealerApplication.findUnique({
     where: { id: parseInput(idSchema, id) },
-    include: { tenant: { select: { id: true, name: true, slug: true, setupCompletedAt: true, domains: { where: { isPrimary: true }, select: { host: true } } } } },
+    include: {
+      tenant: { select: { id: true, name: true, slug: true, setupCompletedAt: true, trialEndsAt: true, domains: { where: { isPrimary: true }, select: { host: true } } } },
+    },
   });
   if (!app) throw new ServiceError("NOT_FOUND", "Application not found");
   const [reviewer, owner] = await Promise.all([
@@ -273,7 +346,7 @@ export async function rejectApplication(ctx: PlatformContext, id: string, reason
   const why = parseInput(z.string().trim().min(3, "Give a reason (it is sent to the applicant).").max(1000), reason ?? "");
   await db.$transaction(async (tx) => {
     const { count } = await tx.dealerApplication.updateMany({
-      where: { id: appId, status: "PENDING" },
+      where: { id: appId, status: { in: [...OPEN_STATUSES] } },
       data: { status: "REJECTED", rejectReason: why, reviewedById: ctx.actor.id, reviewedAt: new Date() },
     });
     if (count === 0) {
@@ -300,16 +373,37 @@ function initialSettings(app: { shopName: string; email: string; country: string
 }
 
 /**
- * Approves a PENDING application. One transaction: claim, Tenant (setupState {} → wizard pending),
- * settings, TenantDomain on the platform sub-domain, OWNER (no password), INVITE token + mail job,
- * application.tenantId. Then (best effort) the shop's draft system pages.
+ * Approves an open (PENDING or WAITLISTED) application: for a waitlist this is the invite.
+ * See createShopFromApplication for what is created.
  */
 export async function approveApplication(ctx: PlatformContext, id: string) {
   assertPlatformActor(ctx);
   const appId = parseInput(idSchema, id);
+  const app = await db.dealerApplication.findUnique({ where: { id: appId }, select: { status: true } });
+  if (!app) throw new ServiceError("NOT_FOUND", "Application not found");
+  if (!isOpenStatus(app.status)) throw new ServiceError("CONFLICT", "This application has already been reviewed");
+  return createShopFromApplication(appId, ctx.actor.id);
+}
+
+function isOpenStatus(status: DealerApplicationStatus): boolean {
+  return (OPEN_STATUSES as readonly DealerApplicationStatus[]).includes(status);
+}
+
+type DealerApplicationRow = NonNullable<Awaited<ReturnType<typeof db.dealerApplication.findUnique>>>;
+
+/**
+ * One transaction: claim the open application, Tenant (setupState {} → wizard pending), settings,
+ * TenantDomain on the platform sub-domain, package, OWNER (no password), INVITE token + mail job,
+ * application.tenantId. Applications sent in TRIAL mode get Tenant.trialEndsAt and the Compleet
+ * package; the others Start. Then (best effort) the shop's draft system pages.
+ * `actorId` null = started automatically (trial on verification).
+ */
+async function createShopFromApplication(appId: string, actorId: string | null) {
   const app = await db.dealerApplication.findUnique({ where: { id: appId } });
   if (!app) throw new ServiceError("NOT_FOUND", "Application not found");
-  if (app.status !== "PENDING") throw new ServiceError("CONFLICT", "This application has already been reviewed");
+  if (!isOpenStatus(app.status)) throw new ServiceError("CONFLICT", "This application has already been reviewed");
+  const trial = app.signupMode === "TRIAL";
+  const { trialDays } = trial ? await getSignupConfig() : { trialDays: 0 };
 
   const base = baseTenantSlug(app.shopName);
   let result;
@@ -317,8 +411,8 @@ export async function approveApplication(ctx: PlatformContext, id: string) {
     result = await db.$transaction(async (tx) => {
       const now = new Date();
       const claimed = await tx.dealerApplication.updateMany({
-        where: { id: appId, status: "PENDING" },
-        data: { status: "APPROVED", reviewedById: ctx.actor.id, reviewedAt: now },
+        where: { id: appId, status: { in: [...OPEN_STATUSES] } },
+        data: { status: "APPROVED", reviewedById: actorId, reviewedAt: now },
       });
       if (claimed.count !== 1) throw new ServiceError("CONFLICT", "This application has already been reviewed");
 
@@ -331,10 +425,17 @@ export async function approveApplication(ctx: PlatformContext, id: string) {
       const host = shopSubdomainHost(slug);
 
       const tenant = await tx.tenant.create({
-        data: { slug, name: app.shopName, timezone: defaultTimeZone(app.country), setupState: {} },
+        data: {
+          slug,
+          name: app.shopName,
+          timezone: defaultTimeZone(app.country),
+          setupState: {},
+          trialEndsAt: trial ? trialEndFrom(now, trialDays) : null,
+        },
       });
       const domain = await tx.tenantDomain.create({ data: { tenantId: tenant.id, host, isPrimary: true } });
-      await tx.tenantPlan.create({ data: { tenantId: tenant.id, plan: "START" } }); // docs/modules.md
+      // docs/modules.md: new shops get Start; a trial shows everything (docs/signup-modes.md).
+      await tx.tenantPlan.create({ data: { tenantId: tenant.id, plan: trial ? "COMPLETE" : "START" } });
       await tx.setting.createMany({ data: initialSettings(app).map((s) => ({ tenantId: tenant.id, ...s })) });
       const owner = await tx.user.create({
         data: { tenantId: tenant.id, role: "OWNER", email: app.email, name: app.applicantName, emailVerifiedAt: app.emailVerifiedAt },
@@ -351,21 +452,21 @@ export async function approveApplication(ctx: PlatformContext, id: string) {
 
   const { tenant, domain, owner, invite } = result;
   await audit({
-    action: "dealer_application.approved",
-    actorId: ctx.actor.id,
+    action: actorId ? "dealer_application.approved" : "dealer_application.trial_started",
+    actorId,
     entity: "DealerApplication",
     entityId: appId,
-    data: { tenantId: tenant.id, slug: tenant.slug, host: domain.host },
+    data: { tenantId: tenant.id, slug: tenant.slug, host: domain.host, trialEndsAt: tenant.trialEndsAt?.toISOString() ?? null },
   });
   await audit({
     action: "tenant.created",
     tenantId: tenant.id,
-    actorId: ctx.actor.id,
+    actorId,
     entity: "Tenant",
     entityId: tenant.id,
-    data: { slug: tenant.slug, name: tenant.name, host: domain.host, ownerEmail: owner.email, applicationId: appId },
+    data: { slug: tenant.slug, name: tenant.name, host: domain.host, ownerEmail: owner.email, applicationId: appId, trial },
   });
-  await audit({ action: "user.invited", tenantId: tenant.id, actorId: ctx.actor.id, entity: "User", entityId: owner.id, data: { email: owner.email } });
+  await audit({ action: "user.invited", tenantId: tenant.id, actorId, entity: "User", entityId: owner.id, data: { email: owner.email } });
   try {
     await ensureSystemPages(tenant.id);
   } catch (err) {

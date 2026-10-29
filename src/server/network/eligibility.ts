@@ -22,26 +22,33 @@ import { fold } from "@/server/search/normalize";
 
 // ─── Dealers ────────────────────────────────────────────────────────────────
 
-/** Prisma filter for network dealers. */
-export const NETWORK_TENANT_WHERE = {
-  status: "ACTIVE",
-  networkOptIn: true,
-  OR: [{ setupCompletedAt: { not: null } }, { setupState: { equals: Prisma.DbNull } }],
-  domains: { some: { isPrimary: true } },
-} satisfies Prisma.TenantWhereInput;
+/** Prisma filter for network dealers: live, opted in, and not closed after a free trial. */
+export function networkTenantWhere(now: Date = new Date()) {
+  return {
+    status: "ACTIVE",
+    networkOptIn: true,
+    AND: [
+      { OR: [{ setupCompletedAt: { not: null } }, { setupState: { equals: Prisma.DbNull } }] },
+      { OR: [{ trialEndsAt: null }, { trialEndsAt: { gt: now } }] },
+    ],
+    domains: { some: { isPrimary: true } },
+  } satisfies Prisma.TenantWhereInput;
+}
 
 export type TenantEligibilityFacts = {
   status: string;
   networkOptIn: boolean;
   setupState: unknown;
   setupCompletedAt: Date | string | null;
+  trialEndsAt?: Date | null;
   domains: { isPrimary: boolean }[];
 };
 
-/** Same rule as NETWORK_TENANT_WHERE, for a loaded tenant. */
-export function isNetworkEligibleTenant(t: TenantEligibilityFacts): boolean {
+/** Same rule as networkTenantWhere, for a loaded tenant. */
+export function isNetworkEligibleTenant(t: TenantEligibilityFacts, now: Date = new Date()): boolean {
   const live = t.setupCompletedAt !== null || t.setupState === null || t.setupState === undefined;
-  return t.status === "ACTIVE" && t.networkOptIn && live && t.domains.some((d) => d.isPrimary);
+  const open = !t.trialEndsAt || t.trialEndsAt.getTime() > now.getTime();
+  return t.status === "ACTIVE" && t.networkOptIn && live && open && t.domains.some((d) => d.isPrimary);
 }
 
 /** Pure check of one product row (mirrors networkProductWhere minus the per-country rules). */

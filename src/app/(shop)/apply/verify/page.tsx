@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getSignupConfig } from "@/server/platform/signup";
 import { getRequestScope } from "@/server/tenant";
 import { PlatformCard, PlatformShell } from "../../_platform/PlatformShell";
 import { applyCopy } from "../_copy";
@@ -19,12 +20,13 @@ export default async function ApplyVerifyPage({ searchParams }: PageProps<"/appl
   const raw = (await searchParams).token;
   const token = typeof raw === "string" ? raw.trim() : "";
   const plausible = token.length > 0 && token.length <= 200 && token.split(".").length === 3;
+  const { signupMode } = await getSignupConfig();
   return (
     <PlatformShell>
       <div className="mx-auto max-w-xl px-4 py-14 sm:px-6">
         <PlatformCard title={plausible ? t.title : t.invalidTitle}>
           {plausible ? (
-            <VerifyForm token={token} />
+            <VerifyForm token={token} body={applyCopy.modes[signupMode].verifyBody} />
           ) : (
             <div className="grid gap-3 text-[15px]">
               <p className="text-[#33352c]">{t.invalidBody}</p>

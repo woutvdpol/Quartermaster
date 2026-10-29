@@ -37,6 +37,7 @@ export const CRON_JOBS = {
   "cron.push.flush": cronJob("push.flush"),
   "cron.translations.sync": cronJob("translations.sync"),
   "cron.auctions.tick": cronJob("auctions.tick"),
+  "cron.trials.tick": cronJob("trials.tick"),
 } satisfies { [K in CronTaskName as `cron.${K}`]: unknown };
 
 export const JOBS = {

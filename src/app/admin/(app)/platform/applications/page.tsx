@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { DataTable, DateTime, EmptyState, PageHeader, StatusPill, ViewTabs, getParam, hrefWith, type Column } from "@/components/admin/ui";
+import { Card, DataTable, DateTime, EmptyState, PageHeader, StatusPill, ViewTabs, getParam, hrefWith, type Column } from "@/components/admin/ui";
 import { countApplications, getApplication, listApplications, summarizeChecks, type ApplicationListItem } from "@/server/onboarding";
-import { requirePlatformContext } from "@/server/platform";
+import { getSignupConfig, requirePlatformContext } from "@/server/platform";
 import { ServiceError } from "@/server/context";
 import type { DealerApplicationStatus } from "@/generated/prisma/enums";
 import { ApplicationPanel, APPLICATION_STATUS_LABEL, platformLabel } from "./_components/ApplicationPanel";
+import { SignupModeForm } from "./_components/SignupModeForm";
 
 export const metadata: Metadata = { title: "Platform · Dealer applications" };
 
-const STATUSES: DealerApplicationStatus[] = ["PENDING", "APPROVED", "REJECTED"];
+const STATUSES: DealerApplicationStatus[] = ["PENDING", "WAITLISTED", "APPROVED", "REJECTED"];
 
 /** Dealer applications (SUPERADMIN; the platform layout 404s everyone else). */
 export default async function ApplicationsPage({ searchParams }: PageProps<"/admin/platform/applications">) {
@@ -20,9 +21,10 @@ export default async function ApplicationsPage({ searchParams }: PageProps<"/adm
   const selectedId = getParam(sp, "id")?.slice(0, 64);
   const basePath = "/admin/platform/applications";
 
-  const [rows, counts, selected] = await Promise.all([
+  const [rows, counts, signupConfig, selected] = await Promise.all([
     listApplications(ctx, status),
     countApplications(ctx),
+    getSignupConfig(),
     selectedId
       ? getApplication(ctx, selectedId).catch((err) => {
           if (err instanceof ServiceError && err.code === "NOT_FOUND") return null;
@@ -33,6 +35,8 @@ export default async function ApplicationsPage({ searchParams }: PageProps<"/adm
   const now = new Date();
 
   const columns: Column<ApplicationListItem>[] = [
+    // The waitlist is listed oldest first, so the row number is the place in line.
+    ...(status === "WAITLISTED" ? [{ key: "position", header: "#", numeric: true, cell: (_a: ApplicationListItem, i: number) => i + 1 }] : []),
     {
       key: "shop",
       header: "Shop",
@@ -82,33 +86,38 @@ export default async function ApplicationsPage({ searchParams }: PageProps<"/adm
         }
         title="Dealer applications"
       />
-      <div className={`grid content-start gap-4 p-4 md:px-[22px] md:py-5 ${selected ? "xl:grid-cols-[minmax(0,1fr)_420px]" : ""}`}>
-        <DataTable
-          caption={`${APPLICATION_STATUS_LABEL[status]} dealer applications`}
-          columns={columns}
-          rows={rows}
-          rowKey={(a) => a.id}
-          rowLabel={(a) => a.shopName}
-          rowClassName={(a) => (a.id === selectedId ? "bg-panel-2" : undefined)}
-          toolbar={
-            <ViewTabs
-              basePath={basePath}
-              searchParams={{ ...sp, id: undefined }}
-              param="status"
-              active={status === "PENDING" ? null : status.toLowerCase()}
-              label="Application status"
-              views={STATUSES.map((s) => ({ value: s === "PENDING" ? null : s.toLowerCase(), label: APPLICATION_STATUS_LABEL[s], count: counts[s] }))}
-            />
-          }
-          empty={
-            <EmptyState
-              compact
-              title={status === "PENDING" ? "No applications waiting" : `No ${APPLICATION_STATUS_LABEL[status].toLowerCase()} applications`}
-              body={status === "PENDING" ? "New dealer sign-ups from the platform page (/apply) appear here." : undefined}
-            />
-          }
-        />
-        {selected ? <ApplicationPanel app={selected} closeHref={hrefWith(basePath, sp, { id: null })} /> : null}
+      <div className="grid content-start gap-4 p-4 md:px-[22px] md:py-5">
+        <Card title="How dealers sign up">
+          <SignupModeForm config={signupConfig} />
+        </Card>
+        <div className={`grid content-start gap-4 ${selected ? "xl:grid-cols-[minmax(0,1fr)_420px]" : ""}`}>
+          <DataTable
+            caption={`${APPLICATION_STATUS_LABEL[status]} dealer applications`}
+            columns={columns}
+            rows={rows}
+            rowKey={(a) => a.id}
+            rowLabel={(a) => a.shopName}
+            rowClassName={(a) => (a.id === selectedId ? "bg-panel-2" : undefined)}
+            toolbar={
+              <ViewTabs
+                basePath={basePath}
+                searchParams={{ ...sp, id: undefined }}
+                param="status"
+                active={status === "PENDING" ? null : status.toLowerCase()}
+                label="Application status"
+                views={STATUSES.map((s) => ({ value: s === "PENDING" ? null : s.toLowerCase(), label: APPLICATION_STATUS_LABEL[s], count: counts[s] }))}
+              />
+            }
+            empty={
+              <EmptyState
+                compact
+                title={status === "PENDING" ? "No applications waiting" : `No ${APPLICATION_STATUS_LABEL[status].toLowerCase()} applications`}
+                body={status === "PENDING" ? "New dealer sign-ups from the platform page (/apply) appear here." : undefined}
+              />
+            }
+          />
+          {selected ? <ApplicationPanel app={selected} closeHref={hrefWith(basePath, sp, { id: null })} /> : null}
+        </div>
       </div>
     </>
   );

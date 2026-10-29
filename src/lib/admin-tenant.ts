@@ -16,7 +16,7 @@ import type { SessionUser } from "@/server/auth/session";
 
 export const TENANT_COOKIE = "qm_tenant";
 
-export type AdminTenant = { id: string; name: string; slug: string; status: string };
+export type AdminTenant = { id: string; name: string; slug: string; status: string; timezone: string; trialEndsAt: Date | null };
 
 export type AdminTenantContext = {
   active: AdminTenant | null;
@@ -24,7 +24,7 @@ export type AdminTenantContext = {
   switchable: AdminTenant[];
 };
 
-const tenantSelect = { id: true, name: true, slug: true, status: true } as const;
+const tenantSelect = { id: true, name: true, slug: true, status: true, timezone: true, trialEndsAt: true } as const;
 
 export const getAdminTenantContext = cache(async (user: SessionUser): Promise<AdminTenantContext> => {
   if (user.role === "SUPERADMIN") {

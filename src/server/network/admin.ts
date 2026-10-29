@@ -7,6 +7,7 @@ import { parseInput } from "@/server/catalog/errors";
 import { getSettings, updateSettings } from "@/server/settings";
 import { assertPlatformActor, type PlatformContext } from "@/server/platform/context";
 import { isSetupPending } from "@/server/onboarding/setup-rules";
+import { isTrialEnded } from "@/server/onboarding/trial-rules";
 import { NETWORK_PATH, networkMount, originOf, readNetworkHosts } from "@/lib/network";
 import { revalidateNetwork } from "./service";
 
@@ -42,7 +43,15 @@ export async function getNetworkMembership(ctx: ServiceContext): Promise<Network
   const [tenant, platform] = await Promise.all([
     db.tenant.findUnique({
       where: { id: ctx.tenantId },
-      select: { status: true, networkOptIn: true, networkJoinedAt: true, setupState: true, setupCompletedAt: true, domains: { where: { isPrimary: true }, select: { id: true } } },
+      select: {
+        status: true,
+        networkOptIn: true,
+        networkJoinedAt: true,
+        setupState: true,
+        setupCompletedAt: true,
+        trialEndsAt: true,
+        domains: { where: { isPrimary: true }, select: { id: true } },
+      },
     }),
     getSettings(ctx.tenantId, "platform"),
   ]);
@@ -51,6 +60,7 @@ export async function getNetworkMembership(ctx: ServiceContext): Promise<Network
   if (platform.networkBlocked) blockers.push("Quartermaster removed this shop from the network. Contact support to be listed again.");
   if (tenant.status !== "ACTIVE") blockers.push("The shop is not active.");
   if (isSetupPending(tenant)) blockers.push("The shop is not live yet (finish the setup wizard).");
+  if (isTrialEnded(tenant)) blockers.push("The free trial has ended; the shop is closed for visitors.");
   if (!tenant.domains.length) blockers.push("The shop has no primary domain.");
   return { optIn: tenant.networkOptIn, joinedAt: tenant.networkJoinedAt, blocked: platform.networkBlocked, blockers, networkUrl: networkPublicUrl() };
 }

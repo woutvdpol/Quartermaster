@@ -50,16 +50,24 @@ export async function submitApplicationAction(prev: ApplyFormState, formData: Fo
   return null;
 }
 
-export type VerifyState = { status: "verified" | "already_verified" | "invalid" | "rate_limited" | "error" } | null;
+export type VerifyState = {
+  status: "verified" | "waitlisted" | "already_verified" | "already_created" | "invalid" | "rate_limited" | "error";
+} | null;
 
-/** POST from /apply/verify (GET never verifies: mail scanners follow links). */
+/**
+ * POST from /apply/verify (GET never verifies: mail scanners follow links). A trial shop created by this
+ * click sends the applicant straight to its invite page (choose a password → setup wizard).
+ */
 export async function verifyApplicationAction(_prev: VerifyState, formData: FormData): Promise<VerifyState> {
+  let redirectTo: string | null = null;
   try {
     if ((await getRequestScope()).kind !== "platform") return { status: "invalid" };
-    const status = await verifyApplicationEmail(formData.get("token"), await requestClientIp());
-    return { status };
+    const res = await verifyApplicationEmail(formData.get("token"), await requestClientIp());
+    if (res.status !== "trial") return { status: res.status };
+    redirectTo = res.redirectTo;
   } catch (error) {
     console.error("verifyApplicationAction failed", error);
     return { status: "error" };
   }
+  redirect(redirectTo); // outside the try: redirect() throws
 }

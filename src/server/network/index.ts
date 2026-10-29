@@ -9,4 +9,4 @@ import "server-only";
 export * from "./service";
 export * from "./admin";
 export * from "./params";
-export { NETWORK_TENANT_WHERE, isNetworkEligibleTenant, isNetworkEligibleProduct, type NetworkFacetOption } from "./eligibility";
+export { networkTenantWhere, isNetworkEligibleTenant, isNetworkEligibleProduct, type NetworkFacetOption } from "./eligibility";

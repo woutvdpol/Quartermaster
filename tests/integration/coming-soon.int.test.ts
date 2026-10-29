@@ -63,7 +63,7 @@ describe("coming soon", () => {
 
   it("blocks storefront actions for visitors and customers of a shop in the wizard", async () => {
     const t = await shop({ setupState: {} });
-    expect(await getLaunchState()).toEqual({ prelaunch: true, staff: false });
+    expect(await getLaunchState()).toEqual({ prelaunch: true, staff: false, reason: "setup" });
     expect(await getOpenShopTenant()).toBeNull();
 
     const customer = await db.user.create({ data: { role: "CUSTOMER", tenantId: t.id, email: "c@x.test" } });
@@ -77,7 +77,7 @@ describe("coming soon for staff", () => {
     const t = await shop({ setupState: {} });
     const owner = await db.user.create({ data: { role: "OWNER", tenantId: t.id, email: "o@x.test" } });
     await createSession(owner.id, "OWNER");
-    expect(await getLaunchState()).toEqual({ prelaunch: true, staff: true });
+    expect(await getLaunchState()).toEqual({ prelaunch: true, staff: true, reason: "setup" });
     expect((await getOpenShopTenant())?.id).toBe(t.id);
   });
 });
@@ -105,5 +105,17 @@ describe("footer legal links", () => {
     ];
     // Returns is already in the footer menu; system links always stay.
     expect(withoutMenuDuplicates(links, menu).map((l) => l.key)).toEqual(["TERMS", "SHIPPING", "CONTACT"]);
+  });
+});
+
+describe("trial ended", () => {
+  it("closes the storefront for visitors and keeps it for the owner", async () => {
+    const t = await shop({ setupState: null });
+    await db.tenant.update({ where: { id: t.id }, data: { trialEndsAt: new Date(Date.now() + 60_000) } });
+    expect(await getLaunchState()).toEqual({ prelaunch: false });
+
+    await db.tenant.update({ where: { id: t.id }, data: { trialEndsAt: new Date(Date.now() - 1000) } });
+    expect(await getLaunchState()).toEqual({ prelaunch: true, staff: false, reason: "closed" });
+    expect(await getOpenShopTenant()).toBeNull();
   });
 });

@@ -14,9 +14,9 @@ import {
   type Column,
 } from "@/components/admin/ui";
 import { listTenants, requirePlatformContext, type TenantListItem } from "@/server/platform";
-import { countApplications } from "@/server/onboarding";
+import { countApplications, trialState } from "@/server/onboarding";
 import { CreateTenantDrawer } from "./_components/CreateTenantDrawer";
-import { STATUS_LABEL, STATUS_TONE, timeZoneOptions, type TenantStatusValue } from "./_shared";
+import { STATUS_LABEL, STATUS_TONE, timeZoneOptions, trialPill, type TenantStatusValue } from "./_shared";
 
 export const metadata: Metadata = { title: "Platform · Shops" };
 
@@ -27,10 +27,11 @@ export default async function PlatformPage({ searchParams }: PageProps<"/admin/p
   const ctx = await requirePlatformContext();
   const statusParam = getParam(sp, "status");
   const status = STATUSES.find((s) => s === statusParam?.toUpperCase());
+  const trialView = statusParam?.toLowerCase() === "trial";
   const q = getParam(sp, "q")?.slice(0, 120);
 
   const [tenants, all, applicationCounts] = await Promise.all([
-    listTenants(ctx, { status, search: q || undefined }),
+    listTenants(ctx, { status, trial: trialView || undefined, search: q || undefined }),
     listTenants(ctx),
     countApplications(ctx),
   ]);
@@ -52,7 +53,19 @@ export default async function PlatformPage({ searchParams }: PageProps<"/admin/p
         </span>
       ),
     },
-    { key: "status", header: "Status", cell: (t) => <StatusPill tone={STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</StatusPill> },
+    {
+      key: "status",
+      header: "Status",
+      cell: (t) => {
+        const trial = trialPill(trialState(t, now));
+        return (
+          <span className="flex flex-wrap gap-1">
+            <StatusPill tone={STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</StatusPill>
+            {trial ? <StatusPill tone={trial.tone}>{trial.label}</StatusPill> : null}
+          </span>
+        );
+      },
+    },
     {
       key: "products",
       header: "Products",
@@ -112,10 +125,11 @@ export default async function PlatformPage({ searchParams }: PageProps<"/admin/p
                 basePath={basePath}
                 searchParams={sp}
                 param="status"
-                active={status?.toLowerCase() ?? null}
+                active={status?.toLowerCase() ?? (trialView ? "trial" : null)}
                 views={[
                   { value: null, label: "All", count: count() },
                   ...STATUSES.map((s) => ({ value: s.toLowerCase(), label: STATUS_LABEL[s], count: count(s) })),
+                  { value: "trial", label: "Trial", count: all.filter((t) => t.trialEndsAt).length },
                 ]}
               />
               <FilterBar>

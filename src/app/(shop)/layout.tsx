@@ -84,13 +84,14 @@ export default async function ShopLayout({ children }: LayoutProps<"/">) {
         <TurnstileSiteKeyProvider siteKey={process.env.TURNSTILE_SITE_KEY || process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || undefined}>
           <div className="shop-root flex min-h-dvh flex-col" data-shop-theme={appearance.theme} style={style}>
             <ShopFonts appearance={appearance} />
-            <OpeningSoon shop={shop} />
+            <OpeningSoon shop={shop} closed={launch.reason === "closed"} />
           </div>
         </TurnstileSiteKeyProvider>
       </ShopLocaleProvider>
     );
   }
   const notLive = launch.prelaunch;
+  const closed = launch.prelaunch && launch.reason === "closed";
   const [menus, allLegalLinks, ageOk, auctions] = await Promise.all([
     // Menu labels in the shop language (approved translations only; docs/i18n.md).
     getPublicMenus(shop.tenant.id)
@@ -148,7 +149,7 @@ export default async function ShopLayout({ children }: LayoutProps<"/">) {
             <Suspense fallback={null}>
               <ServerHeaderCounts tenantId={shop.tenant.id} />
             </Suspense>
-            {notLive && !shop.themePreview ? <NotLiveRibbon /> : null}
+            {notLive && !shop.themePreview ? <NotLiveRibbon closed={closed} /> : null}
             {shop.themePreview ? (
               <ThemePreviewBridge
                 hasDraft={shop.themePreview.hasDraft}

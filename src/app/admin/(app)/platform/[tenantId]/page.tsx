@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Card, ConfirmDialog, DateTime, KeyValue, PageHeader, StatusPill } from "@/components/admin/ui";
+import { Card, ConfirmDialog, DateTime, KeyValue, NumberInput, PageHeader, StatusPill } from "@/components/admin/ui";
 import { queryPlatformAuditLog } from "@/server/auditlog";
 import { ServiceError } from "@/server/context";
 import { getTenant, getTenantPlan, listTenants, requirePlatformContext } from "@/server/platform";
@@ -9,11 +9,12 @@ import { MODULES, MODULE_IDS, PLANS, PLAN_IDS } from "@/server/modules/catalog";
 import { toRows } from "../../audit-log/_data";
 import { AuditList } from "../../audit-log/_components/AuditList";
 import { getSettings } from "@/server/settings";
-import { addNewsletterCreditsAction, setTenantModuleAction, setTenantPlanAction, addDomainAction, allowNetworkAction, removeFromNetworkAction, loadMorePlatformAuditAction, removeDomainAction, setPrimaryDomainAction, setTenantStatusAction, updateTenantAction } from "../actions";
+import { TRIAL_EXTEND_DEFAULT_DAYS, trialState } from "@/server/onboarding";
+import { convertTrialAction, endTrialNowAction, extendTrialAction, addNewsletterCreditsAction, setTenantModuleAction, setTenantPlanAction, addDomainAction, allowNetworkAction, removeFromNetworkAction, loadMorePlatformAuditAction, removeDomainAction, setPrimaryDomainAction, setTenantStatusAction, updateTenantAction } from "../actions";
 import { AddDomainForm } from "../_components/AddDomainForm";
 import { TenantForm } from "../_components/TenantForm";
 import { CreditsForm, PlanForm } from "../_components/PlanForms";
-import { STATUS_EFFECT, STATUS_LABEL, STATUS_TONE, timeZoneOptions, type TenantStatusValue } from "../_shared";
+import { STATUS_EFFECT, STATUS_LABEL, STATUS_TONE, timeZoneOptions, trialPill, type TenantStatusValue } from "../_shared";
 
 export const metadata: Metadata = { title: "Platform · Shop" };
 
@@ -137,6 +138,8 @@ export default async function PlatformTenantPage({ params }: PageProps<"/admin/p
           </Card>
         </div>
 
+        <TrialCard tenant={tenant} planName={PLANS[planInfo.entitlements.plan].name} />
+
         <PackageCard tenantId={tenant.id} info={planInfo} />
 
         <Card title="Domains" aside={`${tenant.domains.length} ${tenant.domains.length === 1 ? "domain" : "domains"}`} className="lg:col-span-2">
@@ -194,6 +197,66 @@ export default async function PlatformTenantPage({ params }: PageProps<"/admin/p
         </section>
       </div>
     </>
+  );
+}
+
+// ─── Free trial (docs/signup-modes.md) ──────────────────────────────────────
+
+function TrialCard({ tenant, planName }: { tenant: { id: string; name: string; trialEndsAt: Date | null }; planName: string }) {
+  const trial = trialState(tenant);
+  const pill = trialPill(trial);
+  if (trial.kind === "none" || !pill) return null;
+  const running = trial.kind === "running";
+  return (
+    <Card title="Free trial" aside={<StatusPill tone={pill.tone}>{pill.label}</StatusPill>} className="lg:col-span-2">
+      <p className="mb-3 text-[13px] text-ink-2">
+        {running ? (
+          <>
+            Ends <DateTime value={trial.endsAt} format="date" /> ({trial.daysLeft} {trial.daysLeft === 1 ? "day" : "days"} left). The storefront then closes for visitors; the admin stays open.
+          </>
+        ) : (
+          <>
+            Ended <DateTime value={trial.endsAt} format="date" />. The storefront is closed for visitors; the admin stays open.
+          </>
+        )}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <ConfirmDialog
+          trigger="Extend trial"
+          triggerSize="sm"
+          tone="primary"
+          title={`Extend the trial of “${tenant.name}”?`}
+          description={running ? "The days are added to the current end date." : "The days count from today, and the storefront opens again."}
+          confirmLabel="Extend trial"
+          action={extendTrialAction}
+          fields={{ tenantId: tenant.id }}
+        >
+          <NumberInput label="Days to add" name="days" defaultValue={String(TRIAL_EXTEND_DEFAULT_DAYS)} inputMode="numeric" required />
+        </ConfirmDialog>
+        {running ? (
+          <ConfirmDialog
+            trigger="End trial now"
+            triggerSize="sm"
+            tone="danger"
+            title={`End the trial of “${tenant.name}” now?`}
+            description="The storefront closes for visitors straight away and the owner gets the “trial ended” email. The admin stays open; you can extend the trial later."
+            confirmLabel="End trial now"
+            action={endTrialNowAction}
+            fields={{ tenantId: tenant.id }}
+          />
+        ) : null}
+        <ConfirmDialog
+          trigger="Convert to paid shop"
+          triggerSize="sm"
+          tone="primary"
+          title={`Convert “${tenant.name}” to a paid shop?`}
+          description={`The trial end date is removed and the storefront ${running ? "stays open" : "opens again"}. The package stays ${planName}; change it under Package & modules below.`}
+          confirmLabel="Convert to paid shop"
+          action={convertTrialAction}
+          fields={{ tenantId: tenant.id }}
+        />
+      </div>
+    </Card>
   );
 }
 

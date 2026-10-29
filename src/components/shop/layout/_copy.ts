@@ -63,6 +63,11 @@ export const layoutCopy = {
     notify: "Leave your email and we let you know when we open.",
     questions: "Questions?",
   },
+  /** Shown instead of the shop after its free trial has ended (src/server/storefront/launch.ts). */
+  temporarilyClosed: {
+    eyebrow: "Temporarily closed",
+    body: "Our shop is closed for the moment. Please come back soon.",
+  },
   ageGate: {
     title: (age: number) => `Are you ${age} or older?`,
     body: (shop: string, age: number) =>

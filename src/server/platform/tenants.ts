@@ -71,6 +71,8 @@ export type TenantListItem = {
   primaryHost: string | null;
   /** Opted in to the Quartermaster network (docs/network.md). */
   networkOptIn: boolean;
+  /** Free trial end (docs/signup-modes.md); null = not a trial shop. */
+  trialEndsAt: Date | null;
   ownerCount: number;
   productCount: number;
   activeProductCount: number;
@@ -80,6 +82,8 @@ export type TenantListItem = {
 
 const listSchema = z.object({
   status: z.enum(["ACTIVE", "SUSPENDED", "ARCHIVED"]).optional(),
+  /** Only shops on a free trial (running or ended). */
+  trial: z.boolean().optional(),
   search: z.string().trim().max(120).optional(),
 });
 
@@ -92,6 +96,7 @@ export async function listTenants(ctx: PlatformContext, query: z.input<typeof li
   const tenants = await db.tenant.findMany({
     where: {
       ...(q.status ? { status: q.status } : {}),
+      ...(q.trial ? { trialEndsAt: { not: null } } : {}),
       ...(q.search
         ? {
             OR: [
@@ -138,6 +143,7 @@ export async function listTenants(ctx: PlatformContext, query: z.input<typeof li
       createdAt: t.createdAt,
       primaryHost: t.domains[0]?.host ?? null,
       networkOptIn: t.networkOptIn,
+      trialEndsAt: t.trialEndsAt,
       ownerCount: s?.ownerCount ?? 0,
       productCount: s?.productCount ?? 0,
       activeProductCount: s?.activeProductCount ?? 0,

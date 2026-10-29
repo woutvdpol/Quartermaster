@@ -54,6 +54,14 @@ export const CRON_TASKS = {
   ...PUSH_CRON_TASKS, // push.reservations, push.flush
   ...TRANSLATION_CRON_TASKS, // translations.sync
   ...AUCTION_CRON_TASKS, // auctions.tick
+  "trials.tick": {
+    schedule: "7 * * * *",
+    description: "Send due free-trial reminder and ended mails (docs/signup-modes.md).",
+    run: async () => {
+      const { runTrialNotices } = await import("@/server/onboarding/trials");
+      return await runTrialNotices();
+    },
+  },
   "rates.refresh": {
     // ECB publishes ~16:00 CET on working days; 15:30 UTC is after that in summer and winter time.
     schedule: "30 15 * * *",

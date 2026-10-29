@@ -169,3 +169,12 @@ Ontwerp goedgekeurd (`docs/design/insights-duplicates-i18n/`).
   - Machinevertaling met lokale Opus-MT-modellen in de embedder-container, plus een woordenlijst per shop.
   - **Vertalingen staan pas online na goedkeuring.** Tot die tijd zien bezoekers de Engelse tekst.
   - De bestaande voorraad wordt in één keer vertaald en komt in de nakijklijst.
+
+## Aanmeldmodus — akkoord eigenaar (29-10-2026)
+Ontwerp: `docs/design/signup-modes.html`. Uitwerking: `docs/signup-modes.md`.
+- De superadmin kiest hoe handelaren zich aanmelden: **aanvragen** (zoals het was), **wachtlijst** of **gratis proef**.
+- **Proef:** na het bevestigen van het e-mailadres wordt de shop meteen aangemaakt en komt de handelaar via "wachtwoord kiezen" direct in de setup-wizard. Standaard 30 dagen; de superadmin stelt de lengte in.
+  - **Een proefshop mag direct live**, ook met echte betalingen. De superadmin krijgt een melding per nieuwe proefshop en kan hem altijd blokkeren.
+  - **Pakket tijdens de proef: Compleet.**
+  - **Na de proef: winkel dicht, admin open.** Bezoekers zien "Tijdelijk gesloten", de gegevens blijven. De superadmin verlengt de proef of zet de shop om naar een betaald pakket (betalen via het platform bestaat nog niet).
+- **Wachtlijst:** de aanmelder ziet alleen "je staat op de lijst", geen plek in de rij. De superadmin nodigt uit in volgorde van aanmelding.
