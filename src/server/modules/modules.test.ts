@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ADMIN_NAV } from "@/lib/admin-nav";
-import { MODULES, MODULE_IDS, NEWSLETTER_MODULE_QUOTA, PLANS, moduleForNavKey } from "./catalog";
+import { MODULES, MODULE_IDS, NEWSLETTER_MODULE_QUOTA, PLANS, moduleForNavKey, planAddedModules } from "./catalog";
 import { resolveEntitlements, type ModuleRow } from "./resolve";
 
 const navKeys = new Set(ADMIN_NAV.flatMap((g) => g.items.map((i) => i.key)));
@@ -21,6 +21,12 @@ describe("module catalog", () => {
         seen.add(key);
       }
     }
+  });
+
+  it("lists what each package adds over the one below it (platform landing pricing)", () => {
+    expect(planAddedModules("START")).toEqual([]);
+    expect(planAddedModules("PRO")).toEqual(["offers", "coupons", "newsletter", "alerts", "insights"]);
+    expect(planAddedModules("COMPLETE")).toEqual(["auctions", "fairs", "leads", "smartSearch", "translations", "provenance"]);
   });
 
   it("maps nav items back to their module; core items have none", () => {

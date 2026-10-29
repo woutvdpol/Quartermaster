@@ -1,7 +1,8 @@
 /*
  * Self-hosted web fonts for the storefront and the admin (docs/perf/round2.md § Fonts).
  *
- *   npm run fonts:sync     # downloads the woff2 files + regenerates the face tables; commit all of it
+ *   npm run fonts:sync           # downloads the woff2 files + regenerates the face tables; commit all of it
+ *   npm run fonts:sync platform  # only the named set(s); the other sets keep their files
  *
  * Why not next/font: for the storefront, next/font can only emit ONE stylesheet with the @font-face
  * rules of every declared family (all 24 allowlisted fonts × every Google subset, ~47 kB raw,
@@ -15,6 +16,7 @@
  *   shop  → public/fonts/shop/,  src/components/shop/layout/font-faces.generated.ts
  *           (inlined per tenant theme by src/components/shop/layout/fonts.ts)
  *   admin → public/fonts/admin/, src/lib/admin-font-faces.generated.ts (src/lib/admin-fonts.ts)
+ *   platform → public/fonts/platform/, src/lib/platform-font-faces.generated.ts (src/lib/platform-fonts.ts)
  *
  * Run it after changing FONT_ALLOWLIST, the admin themes' fonts or the per-family options below.
  * Needs network access; `next build` does not.
@@ -100,6 +102,18 @@ const SETS: FontSet[] = [
       "Geist Mono": {},
     },
   },
+  {
+    name: "platform",
+    constName: "PLATFORM_FONT_FACES",
+    typePrefix: "Platform",
+    table: "src/lib/platform-font-faces.generated.ts",
+    // Platform pages on PLATFORM_HOST (DESIGN.md): display, body, stock numbers.
+    families: {
+      Barlow: { weight: ["500", "600", "700"] },
+      "Hanken Grotesk": {},
+      "IBM Plex Mono": { weight: "500" },
+    },
+  },
 ];
 
 const SUBSETS = ["latin", "latin-ext"] as const;
@@ -169,7 +183,10 @@ async function syncSet(set: FontSet): Promise<number> {
 }
 
 async function main() {
-  for (const set of SETS) await syncSet(set);
+  const only = process.argv.slice(2);
+  const unknown = only.filter((name) => !SETS.some((set) => set.name === name));
+  if (unknown.length) throw new Error(`unknown font set(s): ${unknown.join(", ")}`);
+  for (const set of SETS) if (!only.length || only.includes(set.name)) await syncSet(set);
 }
 
 main().catch((e) => {

@@ -1,0 +1,80 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/challenger-nixie.html"
+        ],
+        "createdAt": "2026-10-29T15:26:42.255Z",
+        "reason": "Claude: nixie-tube glow is the literal subject of the dealt challenger's decision sketch, not shipping UI"
+      },
+      {
+        "rule": "hero-eyebrow-chip",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/assigned.html"
+        ],
+        "createdAt": "2026-10-29T15:28:53.085Z",
+        "reason": "Claude: the field caption is the shipping-label form's own grammar (every field has one); decision sketch, not shipping UI"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/challenger-nixie.html"
+        ],
+        "createdAt": "2026-10-29T15:28:53.107Z",
+        "reason": "Claude: a digit filling its glass tube is the literal nixie form in a decision sketch, not shipping UI"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "docs/design/platform-landing.src.html"
+        ],
+        "createdAt": "2026-10-29T16:20:00.478Z",
+        "reason": "Claude: insets come from clamp() section padding and child .wrap/.tl/summary padding, checked in the render at 1440 and 390"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "docs/design/platform-landing.html"
+        ],
+        "createdAt": "2026-10-29T16:20:00.496Z",
+        "reason": "Claude: built copy of platform-landing.src.html, same verified insets"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/assigned.html"
+        ],
+        "createdAt": "2026-10-29T16:35:24.519Z",
+        "reason": "Claude: unchosen direction sketch from the decision round; it shows a different world on purpose and is not governed by DESIGN.md"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/model-pick.html"
+        ],
+        "createdAt": "2026-10-29T16:35:24.539Z",
+        "reason": "Claude: unchosen direction sketch from the decision round; it shows a different world on purpose and is not governed by DESIGN.md"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/challenger-nixie.html"
+        ],
+        "createdAt": "2026-10-29T16:35:24.559Z",
+        "reason": "Claude: unchosen direction sketch from the decision round; it shows a different world on purpose and is not governed by DESIGN.md"
+      }
+    ]
+  }
+}
