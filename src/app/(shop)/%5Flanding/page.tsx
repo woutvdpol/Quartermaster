@@ -6,7 +6,7 @@ import { platformCopy as t } from "../_platform/_copy";
 
 /*
  * The platform landing. URL "/_landing", reached as "/" on PLATFORM_HOST through the proxy rewrite
- * (src/lib/platform-landing.ts): a route of its own keeps its client JS out of every shop home page.
+ * (platformLandingRewrite, src/lib/network.ts): a route of its own keeps its client JS out of every shop home page.
  */
 
 export const metadata: Metadata = {

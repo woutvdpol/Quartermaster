@@ -36,6 +36,8 @@
 }
 
 @source "./";
+/* Platform pages (landing, apply shell) bring their own utilities: src/app/(shop)/_platform/platform.css. */
+@source not "./_platform";
 @source "../../components/shop";
 @source "../layout.tsx"; /* root <html>/<body> classes */
 
@@ -90,80 +92,6 @@
   --spacing-shop-grid-sm: calc(1.5rem * var(--shop-density));
   --spacing-shop-grid-lg: calc(2rem * var(--shop-density));
   --spacing-shop-grid-y: calc(2.25rem * var(--shop-density));
-}
-
-/*
- * Quartermaster platform pages (PLATFORM_HOST: landing; DESIGN.md). Not tenant-themed: one fixed
- * palette, so the tokens are plain values. Fonts come from src/lib/platform-fonts.ts (`qm-platform-fonts`).
- * Usage: bg-pf-paper, text-pf-ink, border-pf-line, bg-pf-brass, font-pf-display, shadow-pf-frame, ease-pf-out …
- * Status colours (pf-ok, pf-warn, pf-crit, pf-info) are for product UI inside the page only.
- */
-@theme inline {
-  --color-pf-paper: #ffffff;
-  --color-pf-paper-2: #fafaf6;
-  --color-pf-panel: #f3f3ec;
-  --color-pf-canvas: #ecece5;
-  --color-pf-ink: #1e2119;
-  --color-pf-ink-2: #3a3e32;
-  --color-pf-muted: #5f6354;
-  --color-pf-line: #d7d8cc;
-  --color-pf-line-soft: #e6e6dd;
-  --color-pf-brass: #7e5416;
-  --color-pf-brass-hover: #5f3f10;
-  --color-pf-brass-soft: #f1e5cc;
-  --color-pf-olive: #2f3526;
-  --color-pf-olive-2: #3e4532;
-  --color-pf-olive-ink: #d9dccb;
-  --color-pf-olive-muted: #a3a891;
-  --color-pf-olive-check: #b9cf9a;
-  --color-pf-on-olive: #f1f2ea;
-  --color-pf-device: #191b16;
-  --color-pf-ok: #2f6b3a;
-  --color-pf-ok-soft: #dcebd9;
-  --color-pf-warn: #7a5000;
-  --color-pf-warn-soft: #f5e7c4;
-  --color-pf-warn-row: #fdf8ec;
-  --color-pf-crit: #a2342a;
-  --color-pf-crit-soft: #f4dad6;
-  --color-pf-crit-row: #fbf0ee;
-  --color-pf-info: #2c5873;
-  --color-pf-info-soft: #d8e5ee;
-
-  --font-pf-display: var(--qm-pf-font-display), system-ui, sans-serif;
-  --font-pf-body: var(--qm-pf-font-body), system-ui, sans-serif;
-  --font-pf-mono: var(--qm-pf-font-mono), ui-monospace, Menlo, monospace;
-
-  --shadow-pf-frame: 0 1px 2px rgb(30 33 25 / 0.06), 0 24px 48px -16px rgb(30 33 25 / 0.22);
-  --shadow-pf-frame-dark: 0 24px 48px -16px rgb(0 0 0 / 0.5);
-  --ease-pf-out: cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.qm-platform {
-  font-feature-settings: "ss01";
-  /* @theme inline emits no variables: plain values (DESIGN.md brass, line, paper). */
-  accent-color: #7e5416;
-  scrollbar-color: #d7d8cc #ffffff;
-  -webkit-font-smoothing: antialiased;
-}
-.qm-platform ::selection {
-  background: #f1e5cc;
-  color: #1e2119;
-}
-.qm-platform :focus-visible {
-  outline: 2px solid #7e5416;
-  outline-offset: 3px;
-  border-radius: 4px;
-}
-.qm-platform summary::-webkit-details-marker {
-  display: none;
-}
-/* Channel chips in the checkout demo settle into their new state. */
-@keyframes pf-flip {
-  from {
-    opacity: 0.2;
-    transform: scale(0.92);
-    filter: blur(2px);
-  }
 }
 
 .shop-root {

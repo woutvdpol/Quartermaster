@@ -87,6 +87,17 @@ export function platformNetworkRedirect(requestHost: string | null | undefined, 
   return `${originOf(hosts.networkHost)}${pathname.slice(NETWORK_PATH.length) || "/"}`;
 }
 
+/**
+ * The platform landing has its own route, src/app/(shop)/%5Flanding (URL "/_landing"), so its client JS
+ * never ends up in the shop home page that shares "/" on shop hosts. The proxy serves it as PLATFORM_HOST's "/".
+ */
+export const PLATFORM_LANDING_PATH = "/_landing";
+
+/** Proxy rewrite on PLATFORM_HOST: "/" → "/_landing"; null = leave as is. */
+export function platformLandingRewrite(requestHost: string | null | undefined, pathname: string, hosts: NetworkHosts = readNetworkHosts()): string | null {
+  return pathname === "/" && hosts.platformHost !== null && normalize(requestHost) === hosts.platformHost ? PLATFORM_LANDING_PATH : null;
+}
+
 /** The dealer application page (/apply on the platform host), relative when the network runs there. */
 export function platformApplyUrl(base: string, hosts: NetworkHosts = readNetworkHosts()): string {
   if (base === NETWORK_PATH || !hosts.platformHost) return "/apply";

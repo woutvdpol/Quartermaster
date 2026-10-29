@@ -50,7 +50,7 @@ function fallbackBlocks(shopName: string, t: (typeof shopPageCopy)["home"]): Pub
 
 export default async function HomePage() {
   const scope = await getRequestScope();
-  // The platform host's "/" is rewritten to the landing route by the proxy (src/lib/platform-landing.ts).
+  // The platform host's "/" is rewritten to the landing route by the proxy (platformLandingRewrite, src/lib/network.ts).
   if (scope.kind === "platform") notFound();
   const shop = await requireShop();
   if (shop.settings.content.homeRedirectsToShop) await localeRedirect("/shop");
